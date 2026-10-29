@@ -1,5 +1,7 @@
 # T000 - Repository foundations and developer commands
 
+> Status: Complete. This record is retained for history. Task IDs referenced below were superseded by the milestone layer in [`docs/milestones/`](../milestones/README.md); do not use them to plan new work.
+
 - Milestone: M0
 - Depends on: none
 - Suggested subagent: general

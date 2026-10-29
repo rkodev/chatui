@@ -48,74 +48,74 @@ help:
 		'  make format              Format web and Rust sources' \
 		'  make clean               Remove build outputs only' \
 		'' \
-		'See README.md and docs/tasks/README.md for prerequisites and task ownership.'
+		'See README.md and docs/milestones/README.md for prerequisites and milestone ownership.'
 
 contracts-install:
-	$(call require_file,scripts/package.json,Contract tooling is not present yet (see docs/tasks/T001-contracts.md).)
+	$(call require_file,scripts/package.json,Contract tooling is not present yet (see docs/milestones/M0-foundations.md).)
 	npm --prefix scripts install
 
 contracts-check:
-	$(call require_file,scripts/validate-contracts.mjs,Contract validator is not present yet (see docs/tasks/T001-contracts.md).)
+	$(call require_file,scripts/validate-contracts.mjs,Contract validator is not present yet (see docs/milestones/M0-foundations.md).)
 	node scripts/validate-contracts.mjs
 
 web-install:
-	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/tasks/T010-web-foundation.md).)
+	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	pnpm --dir $(WEB_DIR) install
 
 web-dev:
-	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/tasks/T010-web-foundation.md).)
+	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	pnpm --dir $(WEB_DIR) dev
 
 web-lint:
-	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/tasks/T010-web-foundation.md).)
+	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	pnpm --dir $(WEB_DIR) lint
 
 web-typecheck:
-	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/tasks/T010-web-foundation.md).)
+	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	pnpm --dir $(WEB_DIR) typecheck
 
 web-test:
-	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/tasks/T010-web-foundation.md).)
+	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	pnpm --dir $(WEB_DIR) test
 
 web-build:
-	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/tasks/T010-web-foundation.md).)
+	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	pnpm --dir $(WEB_DIR) build
 
 web-e2e:
-	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/tasks/T015-web-parity.md).)
+	$(call require_file,$(WEB_DIR)/package.json,Web end-to-end setup is not present yet (see docs/milestones/M2-providers-and-content.md).)
 	pnpm --dir $(WEB_DIR) exec playwright test
 
 android-test:
-	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/tasks/T020-android-foundation.md).)
+	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	cd $(ANDROID_DIR) && ./gradlew testDebugUnitTest
 
 android-lint:
-	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/tasks/T020-android-foundation.md).)
+	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	cd $(ANDROID_DIR) && ./gradlew lintDebug
 
 android-assemble:
-	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/tasks/T020-android-foundation.md).)
+	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	cd $(ANDROID_DIR) && ./gradlew assembleDebug
 
 rust-check:
-	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/tasks/T030-rust-foundation.md).)
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-multiplatform.md).)
 	cargo check --manifest-path $(RUST_DIR)/Cargo.toml --workspace --all-targets
 
 rust-lint:
-	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/tasks/T030-rust-foundation.md).)
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-multiplatform.md).)
 	cargo clippy --manifest-path $(RUST_DIR)/Cargo.toml --workspace --all-targets -- -D warnings
 
 rust-test:
-	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/tasks/T030-rust-foundation.md).)
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-multiplatform.md).)
 	cargo test --manifest-path $(RUST_DIR)/Cargo.toml --workspace
 
 rust-build:
-	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/tasks/T030-rust-foundation.md).)
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-multiplatform.md).)
 	cargo build --manifest-path $(RUST_DIR)/Cargo.toml --workspace --release
 
 rust-run:
-	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/tasks/T030-rust-foundation.md).)
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-multiplatform.md).)
 	cargo run --manifest-path $(RUST_DIR)/Cargo.toml
 
 format:

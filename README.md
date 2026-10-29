@@ -7,8 +7,9 @@ provider the user configured; ChatUI operates no proxy that can read prompts,
 responses, or keys.
 
 The authoritative product and engineering specification lives in
-[`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md). The implementation task index
-is [`docs/tasks/README.md`](docs/tasks/README.md).
+[`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md). The milestone index is
+[`docs/milestones/README.md`](docs/milestones/README.md); concrete implementation
+tasks are generated per milestone from there.
 
 ## Clients
 
@@ -60,8 +61,9 @@ make contracts-install
 make contracts-check
 ```
 
-Run `make help` for the full target list. Contracts are owned by T001, so
-`make contracts-check` fails with a clear message until that task lands.
+Run `make help` for the full target list. Shared contracts are established in
+M0, so `make contracts-check` fails with a clear message until that milestone's
+contract work lands.
 
 ## Security
 
