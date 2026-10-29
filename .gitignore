@@ -1,0 +1,93 @@
+# Node and package managers
+node_modules/
+.pnpm-store/
+.pnp
+.pnp.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# Vite and web build outputs
+.vite/
+dist/
+web/dist/
+*.tsbuildinfo
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+web/playwright-report/
+
+# Test and coverage output
+coverage/
+.nyc_output/
+*.lcov
+junit.xml
+
+# Gradle and Android
+android/.gradle/
+android/local.properties
+android/.cxx/
+android/.externalNativeBuild/
+android/captures/
+android/build/
+android/*/build/
+build/
+.gradle/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Android Studio and IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Rust
+rust/target/
+target/
+**/*.rs.bk
+
+# IDE and editor files
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Environment and local configuration
+.env
+.env.*
+!.env.example
+config.local.json
+**/config.local.json
+
+# Secrets, signing material, and release credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+secrets/
