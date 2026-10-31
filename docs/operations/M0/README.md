@@ -31,7 +31,7 @@
 | --- | --- | --- | --- | --- | --- |
 | 1 | [M0-01.1 Provider presets and preset schema](M0-01.1-provider-presets-and-schema.md) | Complete | none | contracts | M0-01.4 |
 | 2 | [M0-01.2 Model, settings, export, and backup schemas](M0-01.2-remaining-schemas.md) | Complete | M0-01.1 | contracts | M0-01.4 |
-| 3 | [M0-01.3 Stream, catalog, and error fixtures](M0-01.3-fixtures.md) | Not started | M0-01.1, M0-01.2 | contracts | M0-01.4 |
+| 3 | [M0-01.3 Stream, catalog, and error fixtures](M0-01.3-fixtures.md) | Complete | M0-01.1, M0-01.2 | contracts | M0-01.4 |
 | 4 | [M0-01.4 Parity checklist](M0-01.4-parity.md) | Not started | none | contracts | M0-01.1 to M0-01.3 |
 | 5 | [M0-01.5 Contract validator and tooling](M0-01.5-contract-validator.md) | Not started | M0-01.1 to M0-01.4 | contracts | none |
 | 6 | [M0-02.1 Web scaffold and toolchain](M0-02.1-web-scaffold.md) | Not started | M0-01.5 | web | M0-04.1 |

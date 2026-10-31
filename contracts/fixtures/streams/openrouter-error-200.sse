@@ -1,0 +1,5 @@
+data: {"id":"gen-example-error-200","object":"chat.completion.chunk","created":1761868803,"model":"openrouter/auto","choices":[{"index":0,"delta":{"role":"assistant","content":"Partial answer"},"finish_reason":null}]}
+
+data: {"id":"gen-example-error-200","object":"chat.completion.chunk","created":1761868803,"model":"openrouter/auto","choices":[],"error":{"code":502,"message":"Upstream provider returned an error.","metadata":{"provider_name":"Synthetic Provider","raw":"synthetic-error-detail"}}}
+
+data: [DONE]

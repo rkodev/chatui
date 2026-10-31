@@ -1,0 +1,15 @@
+: OPENROUTER PROCESSING
+
+data: {"id":"gen-example-keepalive","object":"chat.completion.chunk","created":1761868804,"model":"openrouter/auto","x_synthetic_trace":"keepalive-example","choices":[{"index":0,"delta":{"role":"assistant","content":"Keep"},"finish_reason":null}]}
+
+: OPENROUTER PROCESSING
+
+data: {"id":"gen-example-keepalive","object":"chat.completion.chunk","created":1761868804,"model":"openrouter/auto","x_synthetic_trace":"keepalive-example","choices":[{"index":0,"delta":{"content":" alive"},"finish_reason":null}],"unknown_field":{"ignored":true}}
+
+: OPENROUTER PROCESSING
+
+data: {"id":"gen-example-keepalive","object":"chat.completion.chunk","created":1761868804,"model":"openrouter/auto","choices":[{"index":0,"delta":{"content":" comments"},"finish_reason":null}]}
+
+data: {"id":"gen-example-keepalive","object":"chat.completion.chunk","created":1761868804,"model":"openrouter/auto","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]

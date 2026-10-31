@@ -1,0 +1,11 @@
+data: {"id":"chatcmpl-example-text","object":"chat.completion.chunk","created":1761868805,"model":"gpt-4o-mini","system_fingerprint":"fp_synthetic","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}]}
+
+data: {"id":"chatcmpl-example-text","object":"chat.completion.chunk","created":1761868805,"model":"gpt-4o-mini","system_fingerprint":"fp_synthetic","choices":[{"index":0,"delta":{"content":"Hello"},"logprobs":null,"finish_reason":null}]}
+
+data: {"id":"chatcmpl-example-text","object":"chat.completion.chunk","created":1761868805,"model":"gpt-4o-mini","system_fingerprint":"fp_synthetic","choices":[{"index":0,"delta":{"content":" from OpenAI."},"logprobs":null,"finish_reason":null}]}
+
+data: {"id":"chatcmpl-example-text","object":"chat.completion.chunk","created":1761868805,"model":"gpt-4o-mini","system_fingerprint":"fp_synthetic","choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}]}
+
+data: {"id":"chatcmpl-example-text","object":"chat.completion.chunk","created":1761868805,"model":"gpt-4o-mini","system_fingerprint":"fp_synthetic","choices":[],"usage":{"prompt_tokens":8,"completion_tokens":5,"total_tokens":13}}
+
+data: [DONE]
