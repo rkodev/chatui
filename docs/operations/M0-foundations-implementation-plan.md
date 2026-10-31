@@ -1,6 +1,7 @@
 # M0 Foundations Implementation Plan
 
 - Source milestone: [M0-foundations.md](../milestones/M0-foundations.md)
+- Task breakdown: [M0 task list](M0/README.md)
 - Authoritative spec: [IMPLEMENTATION.md](../IMPLEMENTATION.md)
 - Status: Proposed
 - Prepared: 2026-10-30
