@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rkodev/chatui/contracts/schema/provider-preset.schema.json",
+  "title": "ChatUI Provider Preset",
+  "contractVersion": 1,
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "label",
+    "kind",
+    "baseUrl",
+    "auth",
+    "keyValidation",
+    "modelDiscovery",
+    "defaultHeaders",
+    "attributionHeaders",
+    "browserCors",
+    "docsUrl",
+    "defaultModelId",
+    "default",
+    "reference",
+    "required"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "openai-compatible",
+        "anthropic",
+        "google-gemini"
+      ]
+    },
+    "baseUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "bearer",
+            "x-api-key",
+            "query-key",
+            "none"
+          ]
+        },
+        "headerName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scheme": {
+          "type": "string",
+          "minLength": 1
+        },
+        "queryParam": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "keyValidation": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "path"
+          ],
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": [
+                "GET"
+              ]
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "modelDiscovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "format",
+        "public",
+        "cacheTtlSeconds"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "openrouter",
+            "openai",
+            "anthropic",
+            "gemini",
+            "ollama-tags"
+          ]
+        },
+        "public": {
+          "type": "boolean"
+        },
+        "cacheTtlSeconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "defaultHeaders": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "attributionHeaders": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "browserCors": {
+      "type": "string",
+      "enum": [
+        "supported",
+        "unsupported",
+        "unknown"
+      ]
+    },
+    "docsUrl": {
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "defaultModelId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "default": {
+      "type": "boolean"
+    },
+    "reference": {
+      "type": "boolean"
+    },
+    "required": {
+      "type": "boolean"
+    }
+  }
+}

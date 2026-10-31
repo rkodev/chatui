@@ -3,7 +3,7 @@
 - Source plan: [M0 Foundations Implementation Plan](../M0-foundations-implementation-plan.md)
 - Milestone: [M0 Foundations](../../milestones/M0-foundations.md)
 - Status: Not started
-- Last updated: 2026-10-30
+- Last updated: 2026-10-31
 - Ordering: complete tasks in the numbered order unless the dependency column says otherwise.
 
 ## How to use these tasks
@@ -29,8 +29,8 @@
 
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [M0-01.1 Provider presets and preset schema](M0-01.1-provider-presets-and-schema.md) | Not started | none | contracts | M0-01.4 |
-| 2 | [M0-01.2 Model, settings, export, and backup schemas](M0-01.2-remaining-schemas.md) | Not started | M0-01.1 | contracts | M0-01.4 |
+| 1 | [M0-01.1 Provider presets and preset schema](M0-01.1-provider-presets-and-schema.md) | Complete | none | contracts | M0-01.4 |
+| 2 | [M0-01.2 Model, settings, export, and backup schemas](M0-01.2-remaining-schemas.md) | Complete | M0-01.1 | contracts | M0-01.4 |
 | 3 | [M0-01.3 Stream, catalog, and error fixtures](M0-01.3-fixtures.md) | Not started | M0-01.1, M0-01.2 | contracts | M0-01.4 |
 | 4 | [M0-01.4 Parity checklist](M0-01.4-parity.md) | Not started | none | contracts | M0-01.1 to M0-01.3 |
 | 5 | [M0-01.5 Contract validator and tooling](M0-01.5-contract-validator.md) | Not started | M0-01.1 to M0-01.4 | contracts | none |
