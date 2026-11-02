@@ -1,0 +1,15 @@
+{
+  "name": "openrouter-attribution",
+  "kind": "attribution",
+  "providerId": "openrouter",
+  "appConfig": {
+    "name": "ChatUI",
+    "origin": "https://chatui.example"
+  },
+  "expected": {
+    "headers": {
+      "HTTP-Referer": "https://chatui.example",
+      "X-Title": "ChatUI"
+    }
+  }
+}

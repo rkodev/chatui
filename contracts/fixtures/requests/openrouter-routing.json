@@ -1,0 +1,60 @@
+{
+  "name": "openrouter-routing",
+  "kind": "chat-request",
+  "providerId": "openrouter",
+  "request": {
+    "model": "openai/gpt-4o-mini-2024-07-18",
+    "system": null,
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Route this request."
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": null,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {
+        "openrouter": {
+          "provider": {
+            "allow_fallbacks": true,
+            "sort": "price",
+            "data_collection": "deny"
+          }
+        }
+      }
+    }
+  },
+  "supportedParameters": [
+    "stream"
+  ],
+  "expected": {
+    "body": {
+      "model": "openai/gpt-4o-mini-2024-07-18",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Route this request."
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "provider": {
+        "allow_fallbacks": true,
+        "sort": "price",
+        "data_collection": "deny"
+      }
+    }
+  }
+}

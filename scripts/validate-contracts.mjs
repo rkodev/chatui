@@ -10,7 +10,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TextDecoder } from 'node:util';
+import { TextDecoder, isDeepStrictEqual } from 'node:util';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
@@ -19,6 +19,7 @@ const repoRoot = path.resolve(scriptDir, '..');
 const contractsDir = path.join(repoRoot, 'contracts');
 const fixturesDir = path.join(contractsDir, 'fixtures');
 const expectedDir = path.join(fixturesDir, 'expected');
+const requestsDir = path.join(fixturesDir, 'requests');
 const schemaDir = path.join(contractsDir, 'schema');
 
 const EXPECTED_STREAM_SOURCES = new Map([
@@ -35,6 +36,35 @@ const EXPECTED_FILES = new Set([
   EXPECTED_KEY_FILE,
   EXPECTED_ERRORS_FILE,
 ]);
+
+const REQUEST_KINDS = ['chat-request', 'protected-fields', 'attribution', 'default-model'];
+const REQUIRED_REQUEST_FILES = [
+  'openrouter-basic.json',
+  'openrouter-routing.json',
+  'openrouter-advanced-protected.json',
+  'openrouter-attribution.json',
+];
+const PROTECTED_REQUEST_FIELDS = ['model', 'messages', 'stream', 'stream_options'];
+const REQUEST_BODY_FIELDS = [
+  'model',
+  'messages',
+  'stream',
+  'stream_options',
+  'max_tokens',
+  'temperature',
+  'top_p',
+  'stop',
+  'reasoning',
+  'provider',
+  'models',
+  'route',
+];
+const MESSAGE_ROLES = ['user', 'assistant', 'tool'];
+const PART_TYPES = ['text', 'image', 'file', 'reasoning', 'tool-call', 'tool-result'];
+const REASONING_EFFORTS = ['low', 'medium', 'high'];
+const ROUTING_SORTS = ['price', 'throughput', 'latency'];
+const DATA_COLLECTION_VALUES = ['allow', 'deny'];
+const EXTRA_OPENROUTER_FIELDS = ['provider', 'models', 'route', 'reasoning'];
 
 const EVENT_TYPES = [
   'start',
@@ -742,6 +772,723 @@ function validateErrorsExpected(filePath, document) {
   });
 }
 
+function validateNormalizedRequest(filePath, field, request) {
+  if (
+    !checkObjectShape(
+      filePath,
+      field,
+      request,
+      ['model', 'system', 'messages', 'params'],
+      ['model', 'system', 'messages', 'params'],
+    )
+  ) {
+    return false;
+  }
+
+  let valid = true;
+  if (typeof request.model !== 'string' || request.model.length === 0) {
+    addError(filePath, `${field}/model`, 'must be a non-empty string');
+    valid = false;
+  }
+  if (request.system !== null && typeof request.system !== 'string') {
+    addError(filePath, `${field}/system`, 'must be a string or null');
+    valid = false;
+  }
+
+  if (!Array.isArray(request.messages)) {
+    addError(filePath, `${field}/messages`, 'must be an array');
+    valid = false;
+  } else if (request.messages.length === 0) {
+    addError(filePath, `${field}/messages`, 'must contain at least one message');
+    valid = false;
+  } else {
+    request.messages.forEach((message, index) => {
+      const messageField = `${field}/messages/${index}`;
+      if (!checkObjectShape(filePath, messageField, message, ['role', 'parts'], ['role', 'parts'])) {
+        valid = false;
+        return;
+      }
+      if (!MESSAGE_ROLES.includes(message.role)) {
+        addError(filePath, `${messageField}/role`, `must be one of ${JSON.stringify(MESSAGE_ROLES)}`);
+        valid = false;
+      }
+      if (!Array.isArray(message.parts)) {
+        addError(filePath, `${messageField}/parts`, 'must be an array');
+        valid = false;
+        return;
+      }
+      if (message.parts.length === 0) {
+        addError(filePath, `${messageField}/parts`, 'must contain at least one part');
+        valid = false;
+      }
+      message.parts.forEach((part, partIndex) => {
+        const partField = `${messageField}/parts/${partIndex}`;
+        if (!isPlainObject(part)) {
+          addError(filePath, partField, 'must be an object');
+          valid = false;
+          return;
+        }
+        if (!PART_TYPES.includes(part.type)) {
+          addError(filePath, `${partField}/type`, `must be one of ${JSON.stringify(PART_TYPES)}`);
+          valid = false;
+        }
+        if (part.type === 'text' && typeof part.text !== 'string') {
+          addError(filePath, `${partField}/text`, 'must be a string');
+          valid = false;
+        }
+      });
+    });
+  }
+
+  const paramsField = `${field}/params`;
+  if (
+    !checkObjectShape(
+      filePath,
+      paramsField,
+      request.params,
+      ['temperature', 'topP', 'maxOutputTokens', 'stop', 'reasoningEffort', 'streaming', 'extra'],
+      ['temperature', 'topP', 'maxOutputTokens', 'stop', 'reasoningEffort', 'streaming', 'extra'],
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    request.params.temperature !== null &&
+    (typeof request.params.temperature !== 'number' || !Number.isFinite(request.params.temperature))
+  ) {
+    addError(filePath, `${paramsField}/temperature`, 'must be a finite number or null');
+    valid = false;
+  }
+  if (
+    request.params.topP !== null &&
+    (typeof request.params.topP !== 'number' || !Number.isFinite(request.params.topP))
+  ) {
+    addError(filePath, `${paramsField}/topP`, 'must be a finite number or null');
+    valid = false;
+  }
+  if (
+    request.params.maxOutputTokens !== null &&
+    (!Number.isInteger(request.params.maxOutputTokens) || request.params.maxOutputTokens < 0)
+  ) {
+    addError(filePath, `${paramsField}/maxOutputTokens`, 'must be a non-negative integer or null');
+    valid = false;
+  }
+  if (!Array.isArray(request.params.stop) || request.params.stop.some((value) => typeof value !== 'string')) {
+    addError(filePath, `${paramsField}/stop`, 'must be an array of strings');
+    valid = false;
+  }
+  if (
+    request.params.reasoningEffort !== null &&
+    !REASONING_EFFORTS.includes(request.params.reasoningEffort)
+  ) {
+    addError(
+      filePath,
+      `${paramsField}/reasoningEffort`,
+      `must be one of ${JSON.stringify(REASONING_EFFORTS)} or null`,
+    );
+    valid = false;
+  }
+  if (typeof request.params.streaming !== 'boolean') {
+    addError(filePath, `${paramsField}/streaming`, 'must be a boolean');
+    valid = false;
+  }
+  if (!isPlainObject(request.params.extra)) {
+    addError(filePath, `${paramsField}/extra`, 'must be an object');
+    valid = false;
+  }
+
+  return valid;
+}
+
+function serializeRequestMessages(request) {
+  const messages = [];
+  if (request.system !== null) {
+    messages.push({ role: 'system', content: request.system });
+  }
+  for (const message of request.messages) {
+    const content = message.parts
+      .filter((part) => part.type === 'text' && typeof part.text === 'string')
+      .map((part) => part.text)
+      .join('');
+    messages.push({ role: message.role, content });
+  }
+  return messages;
+}
+
+function validateOpenRouterExtra(filePath, field, extra, allowProtected) {
+  if (!checkObjectShape(filePath, field, extra, ['openrouter'], [])) {
+    return undefined;
+  }
+  if (!Object.prototype.hasOwnProperty.call(extra, 'openrouter')) {
+    return undefined;
+  }
+
+  const openrouter = extra.openrouter;
+  if (!isPlainObject(openrouter)) {
+    addError(filePath, `${field}/openrouter`, 'must be an object');
+    return undefined;
+  }
+
+  const allowed = allowProtected
+    ? [...EXTRA_OPENROUTER_FIELDS, ...PROTECTED_REQUEST_FIELDS]
+    : EXTRA_OPENROUTER_FIELDS;
+  checkObjectShape(filePath, `${field}/openrouter`, openrouter, allowed, []);
+
+  if (!allowProtected) {
+    for (const key of PROTECTED_REQUEST_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(openrouter, key)) {
+        addError(filePath, `${field}/openrouter/${key}`, 'protected field must be rejected, not serialized');
+      }
+    }
+  }
+
+  if (openrouter.provider !== undefined) {
+    const providerField = `${field}/openrouter/provider`;
+    if (
+      checkObjectShape(
+        filePath,
+        providerField,
+        openrouter.provider,
+        ['allow_fallbacks', 'sort', 'data_collection', 'order', 'only', 'ignore', 'models', 'route'],
+        [],
+      )
+    ) {
+      const provider = openrouter.provider;
+      if (provider.allow_fallbacks !== undefined && typeof provider.allow_fallbacks !== 'boolean') {
+        addError(filePath, `${providerField}/allow_fallbacks`, 'must be a boolean');
+      }
+      if (provider.sort !== undefined && !ROUTING_SORTS.includes(provider.sort)) {
+        addError(filePath, `${providerField}/sort`, `must be one of ${JSON.stringify(ROUTING_SORTS)}`);
+      }
+      if (
+        provider.data_collection !== undefined &&
+        !DATA_COLLECTION_VALUES.includes(provider.data_collection)
+      ) {
+        addError(
+          filePath,
+          `${providerField}/data_collection`,
+          `must be one of ${JSON.stringify(DATA_COLLECTION_VALUES)}`,
+        );
+      }
+      for (const key of ['order', 'only', 'ignore', 'models']) {
+        if (
+          provider[key] !== undefined &&
+          (!Array.isArray(provider[key]) || provider[key].some((value) => typeof value !== 'string'))
+        ) {
+          addError(filePath, `${providerField}/${key}`, 'must be an array of strings');
+        }
+      }
+      if (provider.route !== undefined && typeof provider.route !== 'string') {
+        addError(filePath, `${providerField}/route`, 'must be a string');
+      }
+    }
+  }
+
+  if (
+    openrouter.models !== undefined &&
+    (!Array.isArray(openrouter.models) || openrouter.models.some((value) => typeof value !== 'string'))
+  ) {
+    addError(filePath, `${field}/openrouter/models`, 'must be an array of strings');
+  }
+  if (openrouter.route !== undefined && typeof openrouter.route !== 'string') {
+    addError(filePath, `${field}/openrouter/route`, 'must be a string');
+  }
+  if (openrouter.reasoning !== undefined && !isPlainObject(openrouter.reasoning)) {
+    addError(filePath, `${field}/openrouter/reasoning`, 'must be an object');
+  }
+
+  return openrouter;
+}
+
+function validateChatRequestBody(filePath, request, supportedParameters, expectedBody) {
+  if (
+    !checkObjectShape(
+      filePath,
+      '/expected/body',
+      expectedBody,
+      REQUEST_BODY_FIELDS,
+      ['model', 'messages', 'stream', 'stream_options'],
+    )
+  ) {
+    return;
+  }
+
+  if (expectedBody.model !== request.model) {
+    addError(filePath, '/expected/body/model', `must equal the normalized request model "${request.model}"`);
+  }
+
+  const expectedMessages = serializeRequestMessages(request);
+  if (!isDeepStrictEqual(expectedBody.messages, expectedMessages)) {
+    addError(
+      filePath,
+      '/expected/body/messages',
+      `must equal the serialized normalized messages ${JSON.stringify(expectedMessages)}`,
+    );
+  }
+
+  if (expectedBody.stream !== request.params.streaming) {
+    addError(filePath, '/expected/body/stream', `must equal params.streaming (${request.params.streaming})`);
+  }
+  if (!isDeepStrictEqual(expectedBody.stream_options, { include_usage: true })) {
+    addError(filePath, '/expected/body/stream_options', 'must equal {"include_usage":true}');
+  }
+
+  const supported = new Set(supportedParameters);
+  const optionalControls = [
+    ['max_tokens', request.params.maxOutputTokens, 'max_tokens'],
+    ['temperature', request.params.temperature, 'temperature'],
+    ['top_p', request.params.topP, 'top_p'],
+    ['stop', request.params.stop.length > 0 ? request.params.stop : null, 'stop'],
+  ];
+  for (const [bodyKey, value, supportedKey] of optionalControls) {
+    if (value !== null && supported.has(supportedKey)) {
+      if (!isDeepStrictEqual(expectedBody[bodyKey], value)) {
+        addError(
+          filePath,
+          `/expected/body/${bodyKey}`,
+          `must equal the normalized request value ${JSON.stringify(value)}`,
+        );
+      }
+    } else if (Object.prototype.hasOwnProperty.call(expectedBody, bodyKey)) {
+      addError(
+        filePath,
+        `/expected/body/${bodyKey}`,
+        'must be omitted because the control is unsupported or unset',
+      );
+    }
+  }
+
+  const reasoning =
+    request.params.reasoningEffort !== null && supported.has('reasoning')
+      ? { effort: request.params.reasoningEffort }
+      : null;
+  if (reasoning !== null) {
+    if (!isDeepStrictEqual(expectedBody.reasoning, reasoning)) {
+      addError(filePath, '/expected/body/reasoning', `must equal ${JSON.stringify(reasoning)}`);
+    }
+  } else if (Object.prototype.hasOwnProperty.call(expectedBody, 'reasoning')) {
+    addError(filePath, '/expected/body/reasoning', 'must be omitted because reasoning is unsupported or unset');
+  }
+
+  const openrouter = request.params.extra.openrouter;
+  const provider = isPlainObject(openrouter) ? openrouter.provider : undefined;
+  if (provider !== undefined) {
+    if (!isDeepStrictEqual(expectedBody.provider, provider)) {
+      addError(
+        filePath,
+        '/expected/body/provider',
+        `must equal params.extra.openrouter.provider ${JSON.stringify(provider)}`,
+      );
+    }
+  } else if (Object.prototype.hasOwnProperty.call(expectedBody, 'provider')) {
+    addError(filePath, '/expected/body/provider', 'must be omitted because no routing preferences are configured');
+  }
+
+  const models = isPlainObject(openrouter) ? openrouter.models : undefined;
+  if (models !== undefined) {
+    if (!isDeepStrictEqual(expectedBody.models, models)) {
+      addError(
+        filePath,
+        '/expected/body/models',
+        `must equal params.extra.openrouter.models ${JSON.stringify(models)}`,
+      );
+    }
+  } else if (Object.prototype.hasOwnProperty.call(expectedBody, 'models')) {
+    addError(filePath, '/expected/body/models', 'must be omitted because no fallback models are configured');
+  }
+
+  const route = isPlainObject(openrouter) ? openrouter.route : undefined;
+  if (route !== undefined) {
+    if (expectedBody.route !== route) {
+      addError(filePath, '/expected/body/route', `must equal params.extra.openrouter.route "${route}"`);
+    }
+  } else if (Object.prototype.hasOwnProperty.call(expectedBody, 'route')) {
+    addError(filePath, '/expected/body/route', 'must be omitted because no route is configured');
+  }
+
+  const extraReasoning = isPlainObject(openrouter) ? openrouter.reasoning : undefined;
+  if (extraReasoning !== undefined) {
+    const merged = { ...(reasoning ?? {}), ...extraReasoning };
+    if (!isDeepStrictEqual(expectedBody.reasoning, merged)) {
+      addError(filePath, '/expected/body/reasoning', `must equal ${JSON.stringify(merged)}`);
+    }
+  }
+}
+
+function validateChatRequestVector(filePath, document) {
+  if (
+    !checkObjectShape(
+      filePath,
+      '',
+      document,
+      ['name', 'kind', 'providerId', 'request', 'supportedParameters', 'expected'],
+      ['name', 'kind', 'providerId', 'request', 'supportedParameters', 'expected'],
+    )
+  ) {
+    return;
+  }
+  if (!validateNormalizedRequest(filePath, '/request', document.request)) {
+    return;
+  }
+  if (
+    !Array.isArray(document.supportedParameters) ||
+    document.supportedParameters.some((value) => typeof value !== 'string')
+  ) {
+    addError(filePath, '/supportedParameters', 'must be an array of strings');
+    return;
+  }
+  validateOpenRouterExtra(filePath, '/request/params/extra', document.request.params.extra, false);
+  if (!checkObjectShape(filePath, '/expected', document.expected, ['body'], ['body'])) {
+    return;
+  }
+  validateChatRequestBody(filePath, document.request, document.supportedParameters, document.expected.body);
+}
+
+function validateProtectedFieldsVector(filePath, document) {
+  if (
+    !checkObjectShape(
+      filePath,
+      '',
+      document,
+      ['name', 'kind', 'providerId', 'request', 'supportedParameters', 'expected'],
+      ['name', 'kind', 'providerId', 'request', 'supportedParameters', 'expected'],
+    )
+  ) {
+    return;
+  }
+  if (!validateNormalizedRequest(filePath, '/request', document.request)) {
+    return;
+  }
+  if (
+    !Array.isArray(document.supportedParameters) ||
+    document.supportedParameters.some((value) => typeof value !== 'string')
+  ) {
+    addError(filePath, '/supportedParameters', 'must be an array of strings');
+  }
+
+  const openrouter = validateOpenRouterExtra(
+    filePath,
+    '/request/params/extra',
+    document.request.params.extra,
+    true,
+  );
+  const protectedFields = isPlainObject(openrouter)
+    ? PROTECTED_REQUEST_FIELDS.filter((key) => Object.prototype.hasOwnProperty.call(openrouter, key)).sort()
+    : [];
+  if (protectedFields.length === 0) {
+    addError(
+      filePath,
+      '/request/params/extra/openrouter',
+      `must contain at least one protected field (${PROTECTED_REQUEST_FIELDS.join(', ')})`,
+    );
+  }
+
+  if (!checkObjectShape(filePath, '/expected', document.expected, ['error'], ['error'])) {
+    return;
+  }
+  validateChatError(filePath, '/expected/error', document.expected.error);
+  if (isPlainObject(document.expected.error)) {
+    if (document.expected.error.code !== 'invalid_request') {
+      addError(filePath, '/expected/error/code', 'must be "invalid_request"');
+    }
+    if (document.expected.error.providerId !== 'openrouter') {
+      addError(filePath, '/expected/error/providerId', 'must be "openrouter"');
+    }
+    if (document.expected.error.retryable !== false) {
+      addError(filePath, '/expected/error/retryable', 'must be false');
+    }
+    const details = document.expected.error.details;
+    if (!isPlainObject(details) || !Array.isArray(details.protectedFields)) {
+      addError(
+        filePath,
+        '/expected/error/details/protectedFields',
+        'must be an array of protected field names',
+      );
+    } else if (!isDeepStrictEqual(details.protectedFields, protectedFields)) {
+      addError(
+        filePath,
+        '/expected/error/details/protectedFields',
+        `must equal ${JSON.stringify(protectedFields)}`,
+      );
+    }
+  }
+}
+
+function validateAttributionVector(filePath, document) {
+  if (
+    !checkObjectShape(
+      filePath,
+      '',
+      document,
+      ['name', 'kind', 'providerId', 'appConfig', 'expected'],
+      ['name', 'kind', 'providerId', 'appConfig', 'expected'],
+    )
+  ) {
+    return;
+  }
+  if (!checkObjectShape(filePath, '/appConfig', document.appConfig, ['name', 'origin'], ['name', 'origin'])) {
+    return;
+  }
+  if (typeof document.appConfig.name !== 'string' || document.appConfig.name.length === 0) {
+    addError(filePath, '/appConfig/name', 'must be a non-empty string');
+  }
+  if (typeof document.appConfig.origin !== 'string' || document.appConfig.origin.length === 0) {
+    addError(filePath, '/appConfig/origin', 'must be a non-empty string');
+  }
+  if (!checkObjectShape(filePath, '/expected', document.expected, ['headers'], ['headers'])) {
+    return;
+  }
+  if (
+    !checkObjectShape(
+      filePath,
+      '/expected/headers',
+      document.expected.headers,
+      ['HTTP-Referer', 'X-Title'],
+      ['HTTP-Referer', 'X-Title'],
+    )
+  ) {
+    return;
+  }
+  if (document.expected.headers['HTTP-Referer'] !== document.appConfig.origin) {
+    addError(filePath, '/expected/headers/HTTP-Referer', 'must equal appConfig.origin');
+  }
+  if (document.expected.headers['X-Title'] !== document.appConfig.name) {
+    addError(filePath, '/expected/headers/X-Title', 'must equal appConfig.name');
+  }
+
+  const providersPath = path.join(contractsDir, 'providers.json');
+  const providers = readJson(providersPath);
+  if (Array.isArray(providers)) {
+    const openrouter = providers.find((preset) => isPlainObject(preset) && preset.id === 'openrouter');
+    if (!isPlainObject(openrouter) || !isPlainObject(openrouter.attributionHeaders)) {
+      addError(
+        providersPath,
+        '/openrouter/attributionHeaders',
+        'must define the OpenRouter attribution header mapping',
+      );
+    } else {
+      if (openrouter.attributionHeaders['HTTP-Referer'] !== 'app.origin') {
+        addError(providersPath, '/openrouter/attributionHeaders/HTTP-Referer', 'must map to "app.origin"');
+      }
+      if (openrouter.attributionHeaders['X-Title'] !== 'app.name') {
+        addError(providersPath, '/openrouter/attributionHeaders/X-Title', 'must map to "app.name"');
+      }
+    }
+  }
+}
+
+function validateDefaultModelVector(filePath, document) {
+  if (
+    !checkObjectShape(
+      filePath,
+      '',
+      document,
+      ['name', 'kind', 'providerId', 'cases'],
+      ['name', 'kind', 'providerId', 'cases'],
+    )
+  ) {
+    return;
+  }
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'presetDefaultModelId', 'catalog', 'expected'],
+        ['name', 'presetDefaultModelId', 'catalog', 'expected'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (
+      item.presetDefaultModelId !== null &&
+      (typeof item.presetDefaultModelId !== 'string' || item.presetDefaultModelId.length === 0)
+    ) {
+      addError(filePath, `${field}/presetDefaultModelId`, 'must be a non-empty string or null');
+    }
+
+    if (!Array.isArray(item.catalog)) {
+      addError(filePath, `${field}/catalog`, 'must be an array');
+      return;
+    }
+    if (item.catalog.length === 0) {
+      addError(filePath, `${field}/catalog`, 'must contain at least one model');
+    }
+
+    const seenRemoteIds = new Set();
+    item.catalog.forEach((model, modelIndex) => {
+      const modelField = `${field}/catalog/${modelIndex}`;
+      if (
+        !checkObjectShape(
+          filePath,
+          modelField,
+          model,
+          ['remoteId', 'hidden', 'outputModalities'],
+          ['remoteId', 'hidden', 'outputModalities'],
+        )
+      ) {
+        return;
+      }
+      if (typeof model.remoteId !== 'string' || model.remoteId.length === 0) {
+        addError(filePath, `${modelField}/remoteId`, 'must be a non-empty string');
+      } else if (seenRemoteIds.has(model.remoteId)) {
+        addError(filePath, `${modelField}/remoteId`, `duplicate remoteId "${model.remoteId}"`);
+      } else {
+        seenRemoteIds.add(model.remoteId);
+      }
+      if (typeof model.hidden !== 'boolean') {
+        addError(filePath, `${modelField}/hidden`, 'must be a boolean');
+      }
+      if (
+        !Array.isArray(model.outputModalities) ||
+        model.outputModalities.some((value) => typeof value !== 'string')
+      ) {
+        addError(filePath, `${modelField}/outputModalities`, 'must be an array of strings');
+      }
+    });
+
+    if (
+      !checkObjectShape(
+        filePath,
+        `${field}/expected`,
+        item.expected,
+        ['selectedModelId', 'notice'],
+        ['selectedModelId', 'notice'],
+      )
+    ) {
+      return;
+    }
+    if (
+      item.expected.selectedModelId !== null &&
+      (typeof item.expected.selectedModelId !== 'string' || item.expected.selectedModelId.length === 0)
+    ) {
+      addError(filePath, `${field}/expected/selectedModelId`, 'must be a non-empty string or null');
+    }
+    if (
+      item.expected.notice !== null &&
+      (typeof item.expected.notice !== 'string' || item.expected.notice.length === 0)
+    ) {
+      addError(filePath, `${field}/expected/notice`, 'must be a non-empty string or null');
+    }
+
+    const presetDefault = item.presetDefaultModelId;
+    const hasPresetDefault =
+      presetDefault !== null &&
+      item.catalog.some((model) => isPlainObject(model) && model.remoteId === presetDefault);
+    let selectedModelId = null;
+    let notice = null;
+    if (hasPresetDefault) {
+      selectedModelId = presetDefault;
+    } else {
+      const candidates = item.catalog
+        .filter(
+          (model) =>
+            isPlainObject(model) &&
+            model.hidden === false &&
+            Array.isArray(model.outputModalities) &&
+            model.outputModalities.includes('text'),
+        )
+        .map((model) => model.remoteId)
+        .sort();
+      if (candidates.length > 0) {
+        selectedModelId = candidates[0];
+        notice = `Default model ${presetDefault ?? '(none)'} is unavailable; using ${selectedModelId}.`;
+      } else {
+        notice = `Default model ${presetDefault ?? '(none)'} is unavailable; no text model is available.`;
+      }
+    }
+
+    if (item.expected.selectedModelId !== selectedModelId) {
+      addError(
+        filePath,
+        `${field}/expected/selectedModelId`,
+        `must be ${JSON.stringify(selectedModelId)} per the default-model fallback rule`,
+      );
+    }
+    if (item.expected.notice !== notice) {
+      addError(
+        filePath,
+        `${field}/expected/notice`,
+        `must be ${JSON.stringify(notice)} per the default-model fallback rule`,
+      );
+    }
+  });
+}
+
+function validateRequestVectors() {
+  const requestFiles = walkFiles(requestsDir).filter((file) => file.endsWith('.json'));
+  if (requestFiles.length === 0) {
+    addError(requestsDir, '$', 'no request vectors found');
+    return;
+  }
+
+  const seen = new Set();
+  for (const filePath of requestFiles) {
+    const name = path.basename(filePath, '.json');
+    seen.add(path.basename(filePath));
+    const document = readJson(filePath);
+    if (document === undefined) {
+      continue;
+    }
+    if (!isPlainObject(document)) {
+      addError(filePath, '$', 'must be an object');
+      continue;
+    }
+    if (document.name !== name) {
+      addError(filePath, '/name', `must equal the file name "${name}"`);
+    }
+    if (!REQUEST_KINDS.includes(document.kind)) {
+      addError(filePath, '/kind', `must be one of ${JSON.stringify(REQUEST_KINDS)}`);
+      continue;
+    }
+    if (document.providerId !== 'openrouter') {
+      addError(filePath, '/providerId', 'must be "openrouter"');
+    }
+
+    switch (document.kind) {
+      case 'chat-request':
+        validateChatRequestVector(filePath, document);
+        break;
+      case 'protected-fields':
+        validateProtectedFieldsVector(filePath, document);
+        break;
+      case 'attribution':
+        validateAttributionVector(filePath, document);
+        break;
+      case 'default-model':
+        validateDefaultModelVector(filePath, document);
+        break;
+    }
+  }
+
+  for (const name of REQUIRED_REQUEST_FILES) {
+    if (!seen.has(name)) {
+      addError(path.join(requestsDir, name), '$', 'required request vector is missing');
+    }
+  }
+}
+
 function validateExpectedVectors() {
   const expectedFiles = walkFiles(expectedDir).filter((file) => file.endsWith('.json'));
   const seen = new Set();
@@ -904,6 +1651,7 @@ function main() {
   validateProviders(validators);
   validateModelFixtures(validators);
   validateExpectedVectors();
+  validateRequestVectors();
   validateFixtureEncoding();
   validateParity();
 
