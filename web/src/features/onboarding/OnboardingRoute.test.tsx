@@ -53,7 +53,7 @@ describe('onboarding routes', () => {
     await user.click(screen.getByRole('button', { name: 'Connect' }))
 
     expect(
-      await screen.findByRole('heading', { name: 'Chat placeholder' }),
+      await screen.findByRole('heading', { name: 'Conversation not found' }),
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/chat/conversation-1')
   })

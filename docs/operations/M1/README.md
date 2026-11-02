@@ -43,7 +43,7 @@
 | 9 | [M1-03.2 Web onboarding and key entry](M1-03.2-web-onboarding-key-entry.md) | Complete | M1-03.1 | web | M1-07.2 |
 | 10 | [M1-03.3 Web provider, model, defaults, and routing UI](M1-03.3-web-provider-model-management.md) | Complete | M1-03.1, M1-03.2 | web | M1-07.3 |
 | 11 | [M1-04.1 Web ChatRunner and streaming store](M1-04.1-web-chat-runner.md) | Complete | M1-02.4, M1-05.1 | web | M1-09.1 |
-| 12 | [M1-04.2 Web chat screen and message states](M1-04.2-web-chat-screen.md) | Not started | M1-04.1, M1-03.1, M1-05.1 | web | M1-09.2 |
+| 12 | [M1-04.2 Web chat screen and message states](M1-04.2-web-chat-screen.md) | Complete | M1-04.1, M1-03.1, M1-05.1 | web | M1-09.2 |
 | 13 | [M1-04.3 Web composer](M1-04.3-web-composer.md) | Not started | M1-04.1 | web | M1-09.2 |
 | 14 | [M1-04.4 Web Markdown, code, actions, accessibility](M1-04.4-web-markdown-actions.md) | Not started | M1-04.2 | web | M1-09.3 |
 | 15 | [M1-05.2 Web history, restore, and recovery](M1-05.2-web-history-recovery.md) | Not started | M1-05.1, M1-03.1, M1-04.2 | web | M1-08.2 |

@@ -124,7 +124,7 @@ describe('web shell smoke tests', () => {
 
   it.each([
     ['/', 'Welcome to ChatUI'],
-    ['/chat/conversation-1', 'Chat placeholder'],
+    ['/chat/conversation-1', 'Conversation not found'],
     ['/settings/appearance', 'Appearance settings placeholder'],
     ['/settings/providers', 'Providers'],
     ['/settings/providers/new', 'Welcome to ChatUI'],

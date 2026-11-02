@@ -2,6 +2,8 @@ import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ConfigContext, type AppConfig } from './config'
+import { ChatServiceProvider } from '../features/chat'
+import { createFakeChatService } from '../features/chat/testSupport'
 import { OnboardingServiceProvider, type OnboardingServiceLike } from '../features/onboarding'
 import { ProviderManagementProvider } from '../features/providers'
 import { createFakeProviderManagementService } from '../features/providers/testSupport'
@@ -31,11 +33,13 @@ function renderRoute(path: string) {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }))
   render(
     <ConfigContext.Provider value={testConfig}>
-      <ProviderManagementProvider service={createFakeProviderManagementService()}>
-        <OnboardingServiceProvider service={onboardingService}>
-          <RouterProvider router={router} />
-        </OnboardingServiceProvider>
-      </ProviderManagementProvider>
+      <ChatServiceProvider service={createFakeChatService()}>
+        <ProviderManagementProvider service={createFakeProviderManagementService()}>
+          <OnboardingServiceProvider service={onboardingService}>
+            <RouterProvider router={router} />
+          </OnboardingServiceProvider>
+        </ProviderManagementProvider>
+      </ChatServiceProvider>
     </ConfigContext.Provider>,
   )
   return router
@@ -44,7 +48,7 @@ function renderRoute(path: string) {
 describe('app router', () => {
   it.each([
     ['/', 'Welcome to ChatUI'],
-    ['/chat/conversation-1', 'Chat placeholder'],
+    ['/chat/conversation-1', 'New chat'],
     ['/settings/appearance', 'Appearance settings placeholder'],
     ['/settings/providers', 'Providers'],
     ['/settings/providers/new', 'Welcome to ChatUI'],
