@@ -2,7 +2,7 @@
 
 - Source plan: [M0 Foundations Implementation Plan](../M0-foundations-implementation-plan.md)
 - Milestone: [M0 Foundations](../../milestones/M0-foundations.md)
-- Status: Not started
+- Status: Complete
 - Last updated: 2026-11-02
 - Ordering: complete tasks in the numbered order unless the dependency column says otherwise.
 
@@ -50,7 +50,7 @@
 | 19 | [M0-05.2 App shell, navigation, Hilt, Android verification](M0-05.2-android-app-shell.md) | Complete | M0-05.1 | android | M0-03.3 |
 | 20 | [M0-06.1 Contracts and web workflows](M0-06.1-contracts-web-ci.md) | Complete | M0-01.5, M0-03.3 | ci | M0-06.2 |
 | 21 | [M0-06.2 Android workflow](M0-06.2-android-ci.md) | Complete | M0-05.2 | ci | M0-06.1 |
-| 22 | [M0-06.3 CI guardrails and final M0 verification](M0-06.3-final-verification.md) | Not started | M0-06.1, M0-06.2, and all prior tasks | ci | none |
+| 22 | [M0-06.3 CI guardrails and final M0 verification](M0-06.3-final-verification.md) | Complete | M0-06.1, M0-06.2, and all prior tasks | ci | none |
 
 ## Parallel execution groups
 

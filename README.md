@@ -62,8 +62,7 @@ make contracts-check
 ```
 
 Run `make help` for the full target list. Shared contracts are established in
-M0, so `make contracts-check` fails with a clear message until that milestone's
-contract work lands.
+M0; `make contracts-check` validates providers, schemas, fixtures, and parity.
 
 ## Security
 

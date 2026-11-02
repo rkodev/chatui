@@ -1,6 +1,6 @@
 # M0 - Foundations
 
-- Status: In progress (repository bootstrap complete)
+- Status: Complete (exit-gate evidence in [M0 verification](../operations/M0/M0-verification.md))
 - Target: 1 week
 - Depends on: none
 - Blocks: M1, M3.5
