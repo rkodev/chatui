@@ -40,7 +40,7 @@
 | 6 | [M1-02.4 Web OpenRouter streaming, retry, errors, routing](M1-02.4-web-openrouter-streaming.md) | Complete | M1-01.2, M1-02.2, M1-02.3 | web | M1-06.4 |
 | 7 | [M1-03.1 Web settings and provider/model services](M1-03.1-web-settings-provider-services.md) | Complete | M1-02.4 | web | M1-05.1, M1-07.1 |
 | 8 | [M1-05.1 Web conversation service](M1-05.1-web-conversation-service.md) | Complete | M1-03.1 | web | M1-03.2, M1-08.1 |
-| 9 | [M1-03.2 Web onboarding and key entry](M1-03.2-web-onboarding-key-entry.md) | Not started | M1-03.1 | web | M1-07.2 |
+| 9 | [M1-03.2 Web onboarding and key entry](M1-03.2-web-onboarding-key-entry.md) | Complete | M1-03.1 | web | M1-07.2 |
 | 10 | [M1-03.3 Web provider, model, defaults, and routing UI](M1-03.3-web-provider-model-management.md) | Not started | M1-03.1, M1-03.2 | web | M1-07.3 |
 | 11 | [M1-04.1 Web ChatRunner and streaming store](M1-04.1-web-chat-runner.md) | Not started | M1-02.4, M1-05.1 | web | M1-09.1 |
 | 12 | [M1-04.2 Web chat screen and message states](M1-04.2-web-chat-screen.md) | Not started | M1-04.1, M1-03.1, M1-05.1 | web | M1-09.2 |

@@ -7,6 +7,10 @@ import { ConfigContext, type AppConfig } from '../app/config'
 import { AppProviders } from '../app/providers'
 import { createAppRouter } from '../app/router'
 import { useToastStore } from '../app/stores'
+import {
+  OnboardingServiceProvider,
+  type OnboardingServiceLike,
+} from '../features/onboarding'
 import { useToast } from '../ui/primitives'
 import { useTheme } from '../ui/theme'
 
@@ -24,13 +28,21 @@ const validConfig: AppConfig = {
   telemetry: false,
 }
 
+const onboardingService: OnboardingServiceLike = {
+  loadCatalog: async () => [],
+  connect: async () => ({ conversationId: 'conversation-1', notice: null }),
+  isOnboardingComplete: async () => false,
+}
+
 function renderShell(path = '/') {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }))
 
   return render(
     <ConfigContext.Provider value={validConfig}>
       <AppProviders>
-        <App router={router} />
+        <OnboardingServiceProvider service={onboardingService}>
+          <App router={router} />
+        </OnboardingServiceProvider>
       </AppProviders>
     </ConfigContext.Provider>,
   )
@@ -67,7 +79,7 @@ describe('web shell smoke tests', () => {
 
     expect(await screen.findByRole('heading', { name: 'ChatUI' })).toBeInTheDocument()
     expect(
-      await screen.findByRole('heading', { name: 'No conversation selected' }),
+      await screen.findByRole('heading', { name: 'Welcome to ChatUI' }),
     ).toBeInTheDocument()
     expect(document.documentElement.dataset.theme).toBe('system')
   })
@@ -107,17 +119,17 @@ describe('web shell smoke tests', () => {
   })
 
   it.each([
-    ['/', 'No conversation selected'],
+    ['/', 'Welcome to ChatUI'],
     ['/chat/conversation-1', 'Chat placeholder'],
     ['/settings/appearance', 'Appearance settings placeholder'],
     ['/settings/providers', 'Providers settings placeholder'],
-    ['/settings/providers/new', 'New provider placeholder'],
+    ['/settings/providers/new', 'Welcome to ChatUI'],
     ['/settings/providers/provider-1', 'Provider details placeholder'],
     ['/settings/models', 'Models settings placeholder'],
     ['/settings/data', 'Data settings placeholder'],
     ['/settings/backup', 'Backup settings placeholder'],
     ['/settings/about', 'About settings placeholder'],
-  ])('renders the %s placeholder route', async (path, heading) => {
+  ])('renders the %s route', async (path, heading) => {
     renderShell(path)
 
     expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument()

@@ -1,21 +1,49 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { ConfigContext, type AppConfig } from './config'
+import { OnboardingServiceProvider, type OnboardingServiceLike } from '../features/onboarding'
 import { createAppRouter } from './router'
+
+const testConfig: AppConfig = {
+  appName: 'ChatUI',
+  defaultTheme: 'system',
+  defaultProviderPreset: 'openrouter',
+  enabledPresets: ['openrouter'],
+  allowCustomProviders: false,
+  openRouter: {
+    attributionOrigin: 'https://chat.example.com',
+    appTitle: 'ChatUI',
+  },
+  docsUrl: 'https://github.com/rkodev/chatui',
+  telemetry: false,
+}
+
+const onboardingService: OnboardingServiceLike = {
+  loadCatalog: async () => [],
+  connect: async () => ({ conversationId: 'conversation-1', notice: null }),
+  isOnboardingComplete: async () => false,
+}
 
 function renderRoute(path: string) {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }))
-  render(<RouterProvider router={router} />)
+  render(
+    <ConfigContext.Provider value={testConfig}>
+      <OnboardingServiceProvider service={onboardingService}>
+        <RouterProvider router={router} />
+      </OnboardingServiceProvider>
+    </ConfigContext.Provider>,
+  )
   return router
 }
 
 describe('app router', () => {
   it.each([
-    ['/', 'No conversation selected'],
+    ['/', 'Welcome to ChatUI'],
     ['/chat/conversation-1', 'Chat placeholder'],
     ['/settings/appearance', 'Appearance settings placeholder'],
     ['/settings/providers', 'Providers settings placeholder'],
-    ['/settings/providers/new', 'New provider placeholder'],
+    ['/settings/providers/new', 'Welcome to ChatUI'],
     ['/settings/providers/provider-1', 'Provider details placeholder'],
     ['/settings/models', 'Models settings placeholder'],
     ['/settings/data', 'Data settings placeholder'],

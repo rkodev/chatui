@@ -6,10 +6,10 @@ import {
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router'
+import { HomeRoute, OnboardingRoute } from '../features/onboarding'
 import { RootLayout } from './routes/RootLayout'
 import {
   ChatPlaceholder,
-  NoConversationPlaceholder,
   NotFoundPlaceholder,
   SettingsAboutPlaceholder,
   SettingsAppearancePlaceholder,
@@ -17,7 +17,6 @@ import {
   SettingsDataPlaceholder,
   SettingsModelsPlaceholder,
   SettingsProviderDetailPlaceholder,
-  SettingsProviderNewPlaceholder,
   SettingsProvidersPlaceholder,
 } from './routes/placeholders'
 
@@ -29,7 +28,7 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: NoConversationPlaceholder,
+  component: HomeRoute,
 })
 
 const chatRoute = createRoute({
@@ -71,7 +70,7 @@ const settingsProvidersIndexRoute = createRoute({
 const settingsProviderNewRoute = createRoute({
   getParentRoute: () => settingsProvidersRoute,
   path: 'new',
-  component: SettingsProviderNewPlaceholder,
+  component: OnboardingRoute,
 })
 
 const settingsProviderDetailRoute = createRoute({
