@@ -37,7 +37,7 @@
 | 6 | [M0-02.1 Web scaffold and toolchain](M0-02.1-web-scaffold.md) | Complete | M0-01.5 | web | M0-04.1 |
 | 7 | [M0-02.2 Runtime config and domain model](M0-02.2-web-config-domain.md) | Complete | M0-02.1 | web | M0-04.2 |
 | 8 | [M0-02.3 IndexedDB schema, migrations, repositories](M0-02.3-web-indexeddb.md) | Complete | M0-02.2 | web | M0-04.3 |
-| 9 | [M0-02.4 OPFS attachment store and fallback](M0-02.4-web-opfs.md) | Not started | M0-02.3 | web | M0-04.4 |
+| 9 | [M0-02.4 OPFS attachment store and fallback](M0-02.4-web-opfs.md) | Complete | M0-02.3 | web | M0-04.4 |
 | 10 | [M0-02.5 Secret store, crypto, and redaction](M0-02.5-web-secrets.md) | Not started | M0-02.3 | web | M0-04.4 |
 | 11 | [M0-03.1 Router and shell state](M0-03.1-web-router-shell.md) | Not started | M0-02.5 | web | M0-03.2 |
 | 12 | [M0-03.2 Design tokens, themes, and accessibility modes](M0-03.2-web-design-tokens.md) | Not started | M0-02.5 | web | M0-03.1 |
