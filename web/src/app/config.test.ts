@@ -7,8 +7,8 @@ const validConfig = {
   appName: 'ChatUI',
   defaultTheme: 'system',
   defaultProviderPreset: 'openrouter',
-  enabledPresets: ['openrouter', 'openai', 'custom'],
-  allowCustomProviders: true,
+  enabledPresets: ['openrouter'],
+  allowCustomProviders: false,
   openRouter: {
     attributionOrigin: 'https://chat.example.com',
     appTitle: 'ChatUI',
@@ -39,7 +39,8 @@ describe('configSchema', () => {
     const parsed = configSchema.parse(JSON.parse(raw))
 
     expect(parsed.appName).toBe('ChatUI')
-    expect(parsed.enabledPresets).toContain('openrouter')
+    expect(parsed.enabledPresets).toEqual(['openrouter'])
+    expect(parsed.allowCustomProviders).toBe(false)
   })
 
   it('accepts a valid config object', () => {
@@ -116,5 +117,41 @@ describe('loadConfig', () => {
       expect((error as ConfigError).issues.length).toBeGreaterThan(0)
       expect((error as ConfigError).message).toContain('/config.json is invalid')
     }
+  })
+
+  it('rejects presets that are not enabled in M1', async () => {
+    const fetchMock = vi.fn<FetchLike>(async () =>
+      fakeResponse({ ...validConfig, enabledPresets: ['openrouter', 'openai'] }),
+    )
+
+    await expect(loadConfig(fetchMock)).rejects.toThrow('"openai" is not available in M1')
+  })
+
+  it('rejects unknown presets', async () => {
+    const fetchMock = vi.fn<FetchLike>(async () =>
+      fakeResponse({ ...validConfig, enabledPresets: ['openrouter', 'unknown'] }),
+    )
+
+    await expect(loadConfig(fetchMock)).rejects.toThrow(
+      'unknown provider preset "unknown"',
+    )
+  })
+
+  it('rejects custom provider creation', async () => {
+    const fetchMock = vi.fn<FetchLike>(async () =>
+      fakeResponse({ ...validConfig, allowCustomProviders: true }),
+    )
+
+    await expect(loadConfig(fetchMock)).rejects.toThrow(
+      'custom providers are not available in M1',
+    )
+  })
+
+  it('rejects a default preset that is not enabled', async () => {
+    const fetchMock = vi.fn<FetchLike>(async () =>
+      fakeResponse({ ...validConfig, defaultProviderPreset: 'openai' }),
+    )
+
+    await expect(loadConfig(fetchMock)).rejects.toThrow('"openai" is not in enabledPresets')
   })
 })

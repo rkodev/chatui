@@ -34,7 +34,7 @@
 | --- | --- | --- | --- | --- | --- |
 | 1 | [M1-01.1 Expected OpenRouter normalized vectors](M1-01.1-openrouter-expected-vectors.md) | Complete | none | contracts | none; unblocks adapters |
 | 2 | [M1-01.2 Request vectors and CORS evidence template](M1-01.2-request-vectors-and-cors-template.md) | Complete | M1-01.1 | contracts | none |
-| 3 | [M1-02.1 Web contract registry and config gating](M1-02.1-web-contract-registry.md) | Not started | M1-01.2 | web | M1-06.1 |
+| 3 | [M1-02.1 Web contract registry and config gating](M1-02.1-web-contract-registry.md) | Complete | M1-01.2 | web | M1-06.1 |
 | 4 | [M1-02.2 Web SSE transport](M1-02.2-web-sse-transport.md) | Not started | M1-02.1 | web | M1-02.3, M1-06.2 |
 | 5 | [M1-02.3 Web OpenRouter key validation and catalog](M1-02.3-web-openrouter-key-catalog.md) | Not started | M1-02.1 | web | M1-02.2, M1-06.3 |
 | 6 | [M1-02.4 Web OpenRouter streaming, retry, errors, routing](M1-02.4-web-openrouter-streaming.md) | Not started | M1-01.2, M1-02.2, M1-02.3 | web | M1-06.4 |
