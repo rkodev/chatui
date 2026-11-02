@@ -11,6 +11,7 @@ import {
   type ModelInfo,
   type ProviderKeyInfo,
 } from './openrouterCatalog'
+import { OpenRouterRequestError, streamChat } from './openrouterStream'
 
 export type {
   CatalogCache,
@@ -19,6 +20,13 @@ export type {
   ModelInfo,
   ProviderKeyInfo,
 } from './openrouterCatalog'
+export { OpenRouterRequestError, streamChat } from './openrouterStream'
+export type {
+  NormalizedChatMessage,
+  NormalizedChatRequest,
+  StreamChatOptions,
+  StreamEvent,
+} from './openrouterStream'
 
 /** Attribution headers supplied by runtime config. */
 export interface OpenRouterAttribution {
@@ -44,36 +52,6 @@ export interface ListModelsOptions {
   cache?: CatalogCache
   now?: () => number
   forceRefresh?: boolean
-}
-
-interface OpenRouterRequestErrorOptions {
-  cause?: unknown
-  providerId?: string | null
-  status?: number | null
-  retryable?: boolean
-  retryAfterSeconds?: number | null
-  details?: Record<string, unknown> | null
-}
-
-/** Normalized OpenRouter request failure. */
-export class OpenRouterRequestError extends Error {
-  readonly code: ChatErrorCode
-  readonly providerId: string | null
-  readonly status: number | null
-  readonly retryable: boolean
-  readonly retryAfterSeconds: number | null
-  readonly details: Record<string, unknown> | null
-
-  constructor(code: ChatErrorCode, message: string, options: OpenRouterRequestErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause })
-    this.name = 'OpenRouterRequestError'
-    this.code = code
-    this.providerId = options.providerId ?? null
-    this.status = options.status ?? null
-    this.retryable = options.retryable ?? false
-    this.retryAfterSeconds = options.retryAfterSeconds ?? null
-    this.details = options.details ?? null
-  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -370,4 +348,5 @@ export const openRouterAdapter = {
   kind: 'openai-compatible' as const,
   validateKey,
   listModels,
+  streamChat,
 }
