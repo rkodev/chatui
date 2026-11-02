@@ -1,0 +1,269 @@
+/*
+ * Shared primitive styling. Every value comes from the semantic tokens in
+ * styles/tokens.css so primitives follow the active theme and density.
+ */
+
+/* Button ------------------------------------------------------------------ */
+
+.ui-button {
+  display: inline-flex;
+  min-height: var(--density-control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--density-space-2);
+  padding: 0 var(--density-space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.ui-button--sm {
+  min-height: 2rem;
+  padding: 0 var(--density-space-3);
+  font-size: 0.875rem;
+}
+
+.ui-button--md {
+  font-size: 1rem;
+}
+
+.ui-button--primary {
+  background: var(--color-accent);
+  color: var(--color-fg-on-accent);
+}
+
+.ui-button--primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.ui-button--secondary {
+  border-color: var(--color-border-subtle);
+  background: var(--color-bg-surface-raised);
+  color: var(--color-fg-primary);
+}
+
+.ui-button--secondary:hover:not(:disabled) {
+  background: var(--color-bg-surface);
+}
+
+.ui-button--ghost {
+  background: transparent;
+  color: var(--color-fg-primary);
+}
+
+.ui-button--ghost:hover:not(:disabled) {
+  background: var(--color-bg-surface);
+}
+
+.ui-button--danger {
+  background: var(--color-danger);
+  color: var(--color-fg-on-accent);
+}
+
+.ui-button--danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.ui-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Dialog ------------------------------------------------------------------ */
+
+.ui-dialog__overlay {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  background: rgb(0 0 0 / 50%);
+}
+
+.ui-dialog__content {
+  position: fixed;
+  z-index: 51;
+  top: 50%;
+  left: 50%;
+  width: min(32rem, calc(100vw - 2rem));
+  max-height: 85vh;
+  overflow: auto;
+  padding: var(--density-space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface-raised);
+  color: var(--color-fg-primary);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 25%);
+  transform: translate(-50%, -50%);
+}
+
+.ui-dialog__title {
+  margin: 0 0 var(--density-space-2);
+  font-family: var(--font-heading-family);
+  font-size: var(--font-heading-size-3);
+  font-weight: var(--font-heading-weight);
+  line-height: var(--font-heading-line-height);
+}
+
+.ui-dialog__description {
+  margin: 0 0 var(--density-space-4);
+  color: var(--color-fg-secondary);
+}
+
+.ui-dialog__close {
+  position: absolute;
+  top: var(--density-space-3);
+  right: var(--density-space-3);
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-fg-secondary);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ui-dialog__close:hover {
+  background: var(--color-bg-surface);
+  color: var(--color-fg-primary);
+}
+
+/* Menu -------------------------------------------------------------------- */
+
+.ui-menu__content {
+  z-index: 60;
+  min-width: 12rem;
+  padding: var(--density-space-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-raised);
+  color: var(--color-fg-primary);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 20%);
+}
+
+.ui-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--density-space-2);
+  padding: var(--density-space-2) var(--density-space-3);
+  border-radius: var(--radius-sm);
+  outline: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ui-menu__item[data-highlighted],
+.ui-menu__item:focus-visible {
+  background: var(--color-bg-surface);
+  color: var(--color-fg-primary);
+}
+
+.ui-menu__item[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ui-menu__label {
+  padding: var(--density-space-2) var(--density-space-3);
+  color: var(--color-fg-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ui-menu__content [role='separator'] {
+  height: 1px;
+  margin: var(--density-space-1) 0;
+  background: var(--color-border-subtle);
+}
+
+/* Tooltip ----------------------------------------------------------------- */
+
+.ui-tooltip__content {
+  z-index: 70;
+  max-width: 20rem;
+  padding: var(--density-space-2) var(--density-space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-fg-primary);
+  color: var(--color-bg-canvas);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Toast ------------------------------------------------------------------- */
+
+.ui-toast__viewport {
+  position: fixed;
+  z-index: 80;
+  right: var(--density-space-4);
+  bottom: var(--density-space-4);
+  display: flex;
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: 100vh;
+  flex-direction: column;
+  gap: var(--density-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-toast {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--density-space-2);
+  align-items: start;
+  padding: var(--density-space-3) var(--density-space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-raised);
+  color: var(--color-fg-primary);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 20%);
+}
+
+.ui-toast[data-tone='success'] {
+  border-left-color: var(--color-success);
+}
+
+.ui-toast[data-tone='warning'] {
+  border-left-color: var(--color-warning);
+}
+
+.ui-toast[data-tone='error'] {
+  border-left-color: var(--color-danger);
+}
+
+.ui-toast__title {
+  font-weight: 600;
+}
+
+.ui-toast__close {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-fg-secondary);
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ui-toast__close:hover {
+  background: var(--color-bg-surface);
+  color: var(--color-fg-primary);
+}

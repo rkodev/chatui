@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": 503,
+    "message": "No available upstream provider could serve the request.",
+    "metadata": {
+      "provider_name": "Synthetic Provider"
+    }
+  }
+}

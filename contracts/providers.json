@@ -1,0 +1,394 @@
+[
+  {
+    "id": "openrouter",
+    "label": "OpenRouter",
+    "kind": "openai-compatible",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "auth": {
+      "type": "bearer",
+      "headerName": "Authorization",
+      "scheme": "Bearer"
+    },
+    "keyValidation": {
+      "method": "GET",
+      "path": "/key"
+    },
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openrouter",
+      "public": true,
+      "cacheTtlSeconds": 86400
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {
+      "HTTP-Referer": "app.origin",
+      "X-Title": "app.name"
+    },
+    "browserCors": "unknown",
+    "docsUrl": "https://openrouter.ai/docs",
+    "defaultModelId": "openrouter/auto",
+    "default": true,
+    "reference": true,
+    "required": true
+  },
+  {
+    "id": "openai",
+    "label": "OpenAI",
+    "kind": "openai-compatible",
+    "baseUrl": "https://api.openai.com/v1",
+    "auth": {
+      "type": "bearer",
+      "headerName": "Authorization",
+      "scheme": "Bearer"
+    },
+    "keyValidation": {
+      "method": "GET",
+      "path": "/models"
+    },
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openai",
+      "public": false,
+      "cacheTtlSeconds": 86400
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://platform.openai.com/docs",
+    "defaultModelId": "gpt-4o-mini",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "anthropic",
+    "label": "Anthropic",
+    "kind": "anthropic",
+    "baseUrl": "https://api.anthropic.com/v1",
+    "auth": {
+      "type": "x-api-key",
+      "headerName": "x-api-key"
+    },
+    "keyValidation": {
+      "method": "GET",
+      "path": "/models"
+    },
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "anthropic",
+      "public": false,
+      "cacheTtlSeconds": 86400
+    },
+    "defaultHeaders": {
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://docs.anthropic.com",
+    "defaultModelId": "claude-sonnet-4-5",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "google",
+    "label": "Google Gemini",
+    "kind": "google-gemini",
+    "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+    "auth": {
+      "type": "x-api-key",
+      "headerName": "x-goog-api-key"
+    },
+    "keyValidation": {
+      "method": "GET",
+      "path": "/models"
+    },
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "gemini",
+      "public": false,
+      "cacheTtlSeconds": 86400
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://ai.google.dev/gemini-api/docs",
+    "defaultModelId": "gemini-2.5-flash",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "groq",
+    "label": "Groq",
+    "kind": "openai-compatible",
+    "baseUrl": "https://api.groq.com/openai/v1",
+    "auth": {
+      "type": "bearer",
+      "headerName": "Authorization",
+      "scheme": "Bearer"
+    },
+    "keyValidation": {
+      "method": "GET",
+      "path": "/models"
+    },
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openai",
+      "public": false,
+      "cacheTtlSeconds": 86400
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://console.groq.com/docs",
+    "defaultModelId": "llama-3.3-70b-versatile",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "mistral",
+    "label": "Mistral",
+    "kind": "openai-compatible",
+    "baseUrl": "https://api.mistral.ai/v1",
+    "auth": {
+      "type": "bearer",
+      "headerName": "Authorization",
+      "scheme": "Bearer"
+    },
+    "keyValidation": {
+      "method": "GET",
+      "path": "/models"
+    },
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openai",
+      "public": false,
+      "cacheTtlSeconds": 86400
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://docs.mistral.ai",
+    "defaultModelId": "mistral-large-latest",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "deepseek",
+    "label": "DeepSeek",
+    "kind": "openai-compatible",
+    "baseUrl": "https://api.deepseek.com/v1",
+    "auth": {
+      "type": "bearer",
+      "headerName": "Authorization",
+      "scheme": "Bearer"
+    },
+    "keyValidation": {
+      "method": "GET",
+      "path": "/models"
+    },
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openai",
+      "public": false,
+      "cacheTtlSeconds": 86400
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://api-docs.deepseek.com",
+    "defaultModelId": "deepseek-chat",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "xai",
+    "label": "xAI",
+    "kind": "openai-compatible",
+    "baseUrl": "https://api.x.ai/v1",
+    "auth": {
+      "type": "bearer",
+      "headerName": "Authorization",
+      "scheme": "Bearer"
+    },
+    "keyValidation": {
+      "method": "GET",
+      "path": "/models"
+    },
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openai",
+      "public": false,
+      "cacheTtlSeconds": 86400
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://docs.x.ai",
+    "defaultModelId": "grok-4",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "together",
+    "label": "Together AI",
+    "kind": "openai-compatible",
+    "baseUrl": "https://api.together.xyz/v1",
+    "auth": {
+      "type": "bearer",
+      "headerName": "Authorization",
+      "scheme": "Bearer"
+    },
+    "keyValidation": {
+      "method": "GET",
+      "path": "/models"
+    },
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openai",
+      "public": false,
+      "cacheTtlSeconds": 86400
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://docs.together.ai",
+    "defaultModelId": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "fireworks",
+    "label": "Fireworks AI",
+    "kind": "openai-compatible",
+    "baseUrl": "https://api.fireworks.ai/inference/v1",
+    "auth": {
+      "type": "bearer",
+      "headerName": "Authorization",
+      "scheme": "Bearer"
+    },
+    "keyValidation": {
+      "method": "GET",
+      "path": "/models"
+    },
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openai",
+      "public": false,
+      "cacheTtlSeconds": 86400
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://docs.fireworks.ai",
+    "defaultModelId": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "ollama",
+    "label": "Ollama",
+    "kind": "openai-compatible",
+    "baseUrl": "http://localhost:11434/v1",
+    "auth": {
+      "type": "none"
+    },
+    "keyValidation": null,
+    "modelDiscovery": {
+      "path": "http://localhost:11434/api/tags",
+      "format": "ollama-tags",
+      "public": true,
+      "cacheTtlSeconds": 300
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://docs.ollama.com",
+    "defaultModelId": "llama3.2",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "lmstudio",
+    "label": "LM Studio",
+    "kind": "openai-compatible",
+    "baseUrl": "http://localhost:1234/v1",
+    "auth": {
+      "type": "none"
+    },
+    "keyValidation": null,
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openai",
+      "public": true,
+      "cacheTtlSeconds": 300
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://lmstudio.ai/docs",
+    "defaultModelId": "local-model",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "llamacpp",
+    "label": "llama.cpp server",
+    "kind": "openai-compatible",
+    "baseUrl": "http://localhost:8080/v1",
+    "auth": {
+      "type": "none"
+    },
+    "keyValidation": null,
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openai",
+      "public": true,
+      "cacheTtlSeconds": 300
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": "https://github.com/ggml-org/llama.cpp/tree/master/tools/server",
+    "defaultModelId": "local-model",
+    "default": false,
+    "reference": false,
+    "required": false
+  },
+  {
+    "id": "custom",
+    "label": "Custom OpenAI-compatible",
+    "kind": "openai-compatible",
+    "baseUrl": "https://example.com/v1",
+    "auth": {
+      "type": "bearer",
+      "headerName": "Authorization",
+      "scheme": "Bearer"
+    },
+    "keyValidation": null,
+    "modelDiscovery": {
+      "path": "/models",
+      "format": "openai",
+      "public": false,
+      "cacheTtlSeconds": 0
+    },
+    "defaultHeaders": {},
+    "attributionHeaders": {},
+    "browserCors": "unknown",
+    "docsUrl": null,
+    "defaultModelId": "custom-model",
+    "default": false,
+    "reference": false,
+    "required": false
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": 429,
+    "message": "Rate limit exceeded. Please retry after 2 seconds.",
+    "metadata": {
+      "retry_after_seconds": 2
+    }
+  }
+}

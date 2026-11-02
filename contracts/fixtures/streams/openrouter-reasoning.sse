@@ -1,0 +1,13 @@
+data: {"id":"gen-example-reasoning","object":"chat.completion.chunk","created":1761868801,"model":"openrouter/auto","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"gen-example-reasoning","object":"chat.completion.chunk","created":1761868801,"model":"openrouter/auto","choices":[{"index":0,"delta":{"reasoning":"Let me compare the available models."},"finish_reason":null}]}
+
+data: {"id":"gen-example-reasoning","object":"chat.completion.chunk","created":1761868801,"model":"openrouter/auto","choices":[{"index":0,"delta":{"reasoning_details":[{"type":"reasoning.text","text":"Let me compare the available models.","signature":null,"format":"unknown"}]},"finish_reason":null}]}
+
+data: {"id":"gen-example-reasoning","object":"chat.completion.chunk","created":1761868801,"model":"openrouter/auto","choices":[{"index":0,"delta":{"content":"The free tier is the cheapest option."},"finish_reason":null}]}
+
+data: {"id":"gen-example-reasoning","object":"chat.completion.chunk","created":1761868801,"model":"openrouter/auto","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: {"id":"gen-example-reasoning","object":"chat.completion.chunk","created":1761868801,"model":"openrouter/auto","choices":[],"usage":{"prompt_tokens":20,"completion_tokens":8,"total_tokens":28,"cost":0.000024}}
+
+data: [DONE]

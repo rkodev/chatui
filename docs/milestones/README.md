@@ -8,7 +8,7 @@ Milestones are intentionally not task lists. Concrete tasks are generated later,
 
 | ID | Milestone | Status | Depends on | Platforms |
 | --- | --- | --- | --- | --- |
-| M0 | Foundations | In progress | none | shared, web, android |
+| M0 | Foundations | Complete | none | shared, web, android |
 | M1 | OpenRouter-first core chat | Planned | M0 | web, android |
 | M2 | Providers and content | Planned | M1 | web, android |
 | M3 | Android depth | Planned | M2 | android |
@@ -17,7 +17,7 @@ Milestones are intentionally not task lists. Concrete tasks are generated later,
 | M5 | Backup and sync | Future | M4 | all shipping clients |
 | M6 | Managed roksky hosting | Future | M4 (M5 for BYO storage) | web hosting |
 
-Repository bootstrap (root README, Makefile, ignore rules, directory skeleton) is complete. The completed record is [`docs/tasks/T000-foundations.md`](../tasks/T000-foundations.md). M0 remains in progress until shared contracts, the web and Android foundations, and the CI skeleton are complete.
+Repository bootstrap (root README, Makefile, ignore rules, directory skeleton) is complete. The completed record is [`docs/tasks/T000-foundations.md`](../tasks/T000-foundations.md). M0 is complete; the exit-gate evidence is in [`docs/operations/M0/M0-verification.md`](../operations/M0/M0-verification.md).
 
 ## Dependency graph
 

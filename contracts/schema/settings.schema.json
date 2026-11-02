@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rkodev/chatui/contracts/schema/settings.schema.json",
+  "title": "ChatUI Settings",
+  "contractVersion": 1,
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "theme",
+    "density",
+    "chatFontSize",
+    "sendKey",
+    "defaultProviderId",
+    "defaultModelId",
+    "defaultSystemPrompt",
+    "defaultParams",
+    "rememberKeysOnWeb",
+    "showTokenUsage",
+    "loadRemoteImages",
+    "lastActiveConversationId",
+    "backup",
+    "onboardingCompleted"
+  ],
+  "properties": {
+    "theme": {
+      "type": "string",
+      "enum": [
+        "system",
+        "light",
+        "dark"
+      ],
+      "default": "system"
+    },
+    "density": {
+      "type": "string",
+      "enum": [
+        "comfortable",
+        "compact"
+      ],
+      "default": "comfortable"
+    },
+    "chatFontSize": {
+      "type": "string",
+      "enum": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "default": "md"
+    },
+    "sendKey": {
+      "type": "string",
+      "enum": [
+        "enter",
+        "mod-enter"
+      ],
+      "default": "enter"
+    },
+    "defaultProviderId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "defaultModelId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "defaultSystemPrompt": {
+      "type": "string",
+      "default": ""
+    },
+    "defaultParams": {
+      "$ref": "#/$defs/chatParams",
+      "default": {
+        "temperature": null,
+        "topP": null,
+        "maxOutputTokens": null,
+        "stop": [],
+        "reasoningEffort": null,
+        "streaming": true,
+        "extra": {}
+      }
+    },
+    "rememberKeysOnWeb": {
+      "type": "boolean",
+      "default": true
+    },
+    "showTokenUsage": {
+      "type": "boolean"
+    },
+    "loadRemoteImages": {
+      "type": "boolean",
+      "default": false
+    },
+    "lastActiveConversationId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "backup": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/backupConfig"
+        }
+      ],
+      "default": null
+    },
+    "onboardingCompleted": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "$defs": {
+    "chatParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "temperature",
+        "topP",
+        "maxOutputTokens",
+        "stop",
+        "reasoningEffort",
+        "streaming",
+        "extra"
+      ],
+      "properties": {
+        "temperature": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 2
+        },
+        "topP": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maxOutputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "stop": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reasoningEffort": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            null
+          ]
+        },
+        "streaming": {
+          "type": "boolean"
+        },
+        "extra": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "backupConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "backend",
+        "endpoint",
+        "region",
+        "bucket",
+        "prefix",
+        "credentialSecretId",
+        "encryption",
+        "kdf",
+        "kdfSalt",
+        "lastSyncAt",
+        "lastManifestEtag",
+        "deviceId"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "backend": {
+          "type": "string",
+          "enum": [
+            "s3",
+            "azure-blob",
+            "gcs",
+            "webdav"
+          ]
+        },
+        "endpoint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "region": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "credentialSecretId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "encryption": {
+          "type": "string",
+          "const": "aes-256-gcm"
+        },
+        "kdf": {
+          "type": "string",
+          "enum": [
+            "pbkdf2-sha256",
+            "argon2id"
+          ]
+        },
+        "kdfSalt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastSyncAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastManifestEtag": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deviceId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "data": {
+    "label": "Example OpenRouter Key",
+    "usage": 12.34,
+    "limit": 100,
+    "limit_remaining": 87.66,
+    "is_free_tier": false,
+    "rate_limit": {
+      "requests": 60,
+      "interval": "1m"
+    }
+  }
+}

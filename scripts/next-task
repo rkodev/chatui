@@ -1,0 +1,292 @@
+#!/usr/bin/env python3
+"""Select the next eligible repository task deterministically.
+
+The selector reads task markdown files, extracts Status, Order, and Depends on,
+expands dependency ranges, and prints only the selected task path on stdout.
+It never uses a model, makes network calls, or writes files.
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+DEFAULT_TASK_DIR = "docs/operations/M0"
+
+STATUS_NOT_STARTED = "Not started"
+STATUS_IN_PROGRESS = "In progress"
+STATUS_BLOCKED = "Blocked"
+STATUS_COMPLETE = "Complete"
+
+STATUS_ALIASES = {
+    "not started": STATUS_NOT_STARTED,
+    "not-started": STATUS_NOT_STARTED,
+    "in progress": STATUS_IN_PROGRESS,
+    "in-progress": STATUS_IN_PROGRESS,
+    "blocked": STATUS_BLOCKED,
+    "complete": STATUS_COMPLETE,
+    "completed": STATUS_COMPLETE,
+    "done": STATUS_COMPLETE,
+}
+
+TASK_ID_HEADING_RE = re.compile(
+    r"^#\s+([A-Za-z][A-Za-z0-9]*-[0-9][A-Za-z0-9._-]*)\b", re.MULTILINE
+)
+TASK_ID_RE = re.compile(
+    r"^(?P<prefix>[A-Za-z][A-Za-z0-9]*)-(?P<body>[0-9][A-Za-z0-9._-]*)$"
+)
+RANGE_SEPARATOR_RE = re.compile(r"\s*[\u2013\u2014]\s*")
+DEPENDENCY_SEPARATOR_RE = re.compile(r"[,;]")
+
+
+class BadInput(Exception):
+    """Raised when task data or arguments are malformed."""
+
+
+@dataclass
+class Task:
+    task_id: str
+    path: Path
+    order: int
+    status: str
+    dependency_tokens: list[str]
+    dependencies: list[str] = field(default_factory=list)
+
+
+def parse_field(text: str, label: str) -> str | None:
+    patterns = (
+        rf"^\s*[-*]\s*\*\*{label}:?\*\*\s*:?\s*(.+?)\s*$",
+        rf"^\s*\*\*{label}:?\*\*\s*:?\s*(.+?)\s*$",
+        rf"^\s*[-*]\s*{label}\s*:\s*(.+?)\s*$",
+        rf"^\s*{label}\s*:\s*(.+?)\s*$",
+    )
+    for line in text.splitlines():
+        for pattern in patterns:
+            match = re.match(pattern, line, re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+    return None
+
+
+def normalize_status(value: str, path: Path) -> str:
+    normalized = value.strip().rstrip(".").lower()
+    if normalized not in STATUS_ALIASES:
+        raise BadInput(
+            f"{path}: unsupported Status value {value!r}; "
+            f"expected one of {sorted(set(STATUS_ALIASES.values()))}"
+        )
+    return STATUS_ALIASES[normalized]
+
+
+def parse_order(value: str, path: Path) -> int:
+    match = re.search(r"\d+", value)
+    if not match:
+        raise BadInput(f"{path}: Order must contain an integer, got {value!r}")
+    return int(match.group(0))
+
+
+def parse_dependency_tokens(value: str) -> list[str]:
+    if value.strip().lower() in {"", "-", "none", "n/a"}:
+        return []
+    tokens = []
+    for token in DEPENDENCY_SEPARATOR_RE.split(value):
+        token = token.strip()
+        if token:
+            tokens.append(token)
+    return tokens
+
+
+def parse_id_key(task_id: str) -> tuple[str, tuple[int, ...]]:
+    match = TASK_ID_RE.match(task_id)
+    if not match:
+        raise BadInput(f"cannot parse task ID {task_id!r}")
+    numbers = tuple(int(part) for part in re.findall(r"\d+", match.group("body")))
+    if not numbers:
+        raise BadInput(f"task ID {task_id!r} has no numeric component")
+    return match.group("prefix"), numbers
+
+
+def load_tasks(task_dir: Path) -> list[Task]:
+    if not task_dir.exists():
+        raise BadInput(f"task directory does not exist: {task_dir}")
+    if not task_dir.is_dir():
+        raise BadInput(f"task path is not a directory: {task_dir}")
+
+    tasks: list[Task] = []
+    seen_ids: dict[str, Path] = {}
+    markdown_files = sorted(
+        (path for path in task_dir.rglob("*.md") if path.is_file()),
+        key=lambda path: str(path),
+    )
+
+    for path in markdown_files:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            raise BadInput(f"{path}: not valid UTF-8: {exc}") from exc
+
+        heading = TASK_ID_HEADING_RE.search(text)
+        if not heading:
+            continue
+
+        task_id = heading.group(1)
+        if task_id in seen_ids:
+            raise BadInput(
+                f"duplicate task ID {task_id!r} in {seen_ids[task_id]} and {path}"
+            )
+        seen_ids[task_id] = path
+
+        status_value = parse_field(text, "Status")
+        order_value = parse_field(text, "Order")
+        dependencies_value = parse_field(text, "Depends on")
+        missing = [
+            label
+            for label, value in (
+                ("Status", status_value),
+                ("Order", order_value),
+                ("Depends on", dependencies_value),
+            )
+            if value is None
+        ]
+        if missing:
+            raise BadInput(f"{path}: missing required field(s): {', '.join(missing)}")
+
+        tasks.append(
+            Task(
+                task_id=task_id,
+                path=path,
+                order=parse_order(order_value or "", path),
+                status=normalize_status(status_value or "", path),
+                dependency_tokens=parse_dependency_tokens(dependencies_value or ""),
+            )
+        )
+
+    tasks.sort(key=lambda task: (task.order, task.task_id))
+    by_id = {task.task_id: task for task in tasks}
+
+    for task in tasks:
+        expanded: list[str] = []
+        seen_dependencies: set[str] = set()
+        for token in task.dependency_tokens:
+            if token.strip().lower() in {"and all prior tasks", "all prior tasks"}:
+                for candidate in tasks:
+                    if candidate.order < task.order and candidate.task_id not in seen_dependencies:
+                        expanded.append(candidate.task_id)
+                        seen_dependencies.add(candidate.task_id)
+            elif RANGE_SEPARATOR_RE.search(token):
+                start, end = RANGE_SEPARATOR_RE.split(token, maxsplit=1)
+                start_prefix, start_key = parse_id_key(start.strip())
+                end_prefix, end_key = parse_id_key(end.strip())
+                if start_prefix != end_prefix:
+                    raise BadInput(
+                        f"{task.path}: dependency range {token!r} crosses prefixes"
+                    )
+                if start_key > end_key:
+                    raise BadInput(
+                        f"{task.path}: dependency range {token!r} is descending"
+                    )
+                matching = [
+                    candidate.task_id
+                    for candidate in tasks
+                    if parse_id_key(candidate.task_id)[0] == start_prefix
+                    and start_key <= parse_id_key(candidate.task_id)[1] <= end_key
+                ]
+                if not matching:
+                    raise BadInput(
+                        f"{task.path}: dependency range {token!r} matches no tasks"
+                    )
+                for candidate_id in matching:
+                    if candidate_id not in seen_dependencies:
+                        expanded.append(candidate_id)
+                        seen_dependencies.add(candidate_id)
+            else:
+                dependency_id = token.strip()
+                if dependency_id not in by_id:
+                    raise BadInput(
+                        f"{task.path}: unknown dependency {dependency_id!r}"
+                    )
+                if dependency_id not in seen_dependencies:
+                    expanded.append(dependency_id)
+                    seen_dependencies.add(dependency_id)
+
+        if task.task_id in expanded:
+            raise BadInput(f"{task.path}: task depends on itself")
+        task.dependencies = expanded
+
+    return tasks
+
+
+def is_eligible(
+    task: Task, complete_ids: set[str], include_in_progress: bool
+) -> bool:
+    if task.status == STATUS_BLOCKED or task.status == STATUS_COMPLETE:
+        return False
+    if task.status == STATUS_IN_PROGRESS and not include_in_progress:
+        return False
+    if task.status not in {STATUS_NOT_STARTED, STATUS_IN_PROGRESS}:
+        return False
+    return all(dependency in complete_ids for dependency in task.dependencies)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Select the next eligible task deterministically."
+    )
+    parser.add_argument(
+        "task_dir",
+        nargs="?",
+        default=DEFAULT_TASK_DIR,
+        help=f"task directory (default: {DEFAULT_TASK_DIR})",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="list every parsed task with status, eligibility, and dependencies",
+    )
+    parser.add_argument(
+        "--include-in-progress",
+        action="store_true",
+        help="allow In progress tasks to be selected for resume",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+
+    try:
+        tasks = load_tasks(Path(args.task_dir))
+        complete_ids = {
+            task.task_id for task in tasks if task.status == STATUS_COMPLETE
+        }
+
+        if args.list:
+            print("ORDER  STATUS        ELIGIBLE  TASK            DEPENDS ON")
+            for task in tasks:
+                eligible = (
+                    "yes"
+                    if is_eligible(task, complete_ids, args.include_in_progress)
+                    else "no"
+                )
+                dependencies = ", ".join(task.dependencies) if task.dependencies else "none"
+                print(
+                    f"{task.order:>5}  {task.status:<12}  {eligible:<8}  "
+                    f"{task.task_id:<14}  {dependencies}"
+                )
+            return 0
+
+        for task in tasks:
+            if is_eligible(task, complete_ids, args.include_in_progress):
+                print(task.path)
+                return 0
+        return 1
+    except BadInput as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

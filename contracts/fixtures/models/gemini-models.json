@@ -1,0 +1,37 @@
+{
+  "models": [
+    {
+      "name": "models/gemini-2.5-flash",
+      "baseModelId": "gemini-2.5-flash",
+      "version": "001",
+      "displayName": "Gemini 2.5 Flash",
+      "description": "Synthetic fast multimodal model.",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "streamGenerateContent"
+      ],
+      "temperature": 1,
+      "topP": 0.95,
+      "topK": 64
+    },
+    {
+      "name": "models/gemini-2.5-pro",
+      "baseModelId": "gemini-2.5-pro",
+      "version": "001",
+      "displayName": "Gemini 2.5 Pro",
+      "description": "Synthetic long-context multimodal model.",
+      "inputTokenLimit": 1048576,
+      "outputTokenLimit": 65536,
+      "supportedGenerationMethods": [
+        "generateContent",
+        "streamGenerateContent"
+      ],
+      "temperature": 1,
+      "topP": 0.95,
+      "topK": 64
+    }
+  ],
+  "nextPageToken": null
+}

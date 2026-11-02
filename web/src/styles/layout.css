@@ -1,0 +1,121 @@
+/*
+ * Shell layout, density modes, focus visibility, and reduced-motion handling.
+ *
+ * Density is applied through data-density on the document element. The
+ * comfortable values are the defaults; compact reduces spacing and control
+ * height without changing the semantic spacing scale in tokens.css.
+ */
+:root {
+  --density-space-1: var(--space-1);
+  --density-space-2: var(--space-2);
+  --density-space-3: var(--space-3);
+  --density-space-4: var(--space-4);
+  --density-space-5: var(--space-5);
+  --density-space-6: var(--space-6);
+  --density-space-7: var(--space-7);
+  --density-control-height: 2.5rem;
+  --density-gap: var(--space-3);
+  --density-padding: var(--space-4);
+}
+
+:root[data-density='comfortable'] {
+  --density-space-1: var(--space-1);
+  --density-space-2: var(--space-2);
+  --density-space-3: var(--space-3);
+  --density-space-4: var(--space-4);
+  --density-space-5: var(--space-5);
+  --density-space-6: var(--space-6);
+  --density-space-7: var(--space-7);
+  --density-control-height: 2.5rem;
+  --density-gap: var(--space-3);
+  --density-padding: var(--space-4);
+}
+
+:root[data-density='compact'] {
+  --density-space-1: 2px;
+  --density-space-2: 4px;
+  --density-space-3: 8px;
+  --density-space-4: 12px;
+  --density-space-5: 16px;
+  --density-space-6: 24px;
+  --density-space-7: 32px;
+  --density-control-height: 2rem;
+  --density-gap: var(--space-2);
+  --density-padding: var(--space-3);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg-canvas);
+  color: var(--color-fg-primary);
+  font-family: var(--font-body-family);
+  font-size: var(--font-body-size);
+  line-height: var(--font-body-line-height);
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--color-bg-canvas);
+  color: var(--color-fg-primary);
+}
+
+.app-shell__header {
+  padding: var(--density-space-4) var(--density-space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+}
+
+.app-shell__title {
+  margin: 0;
+  font-family: var(--font-heading-family);
+  font-size: var(--font-heading-size-2);
+  font-weight: var(--font-heading-weight);
+  line-height: var(--font-heading-line-height);
+}
+
+.app-shell__main {
+  flex: 1;
+  padding: var(--density-space-5);
+}
+
+.route-placeholder {
+  max-width: 48rem;
+}
+
+/*
+ * Keyboard focus must remain visible in every theme. :focus-visible avoids
+ * drawing the ring for pointer activation while keeping it for keyboard users.
+ */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/*
+ * Respect the operating-system reduced-motion preference. Layout never depends
+ * on animation, so disabling motion cannot hide content or change structure.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

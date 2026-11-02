@@ -1,0 +1,344 @@
+{
+  "data": [
+    {
+      "id": "openai/gpt-4o-mini-2024-07-18",
+      "canonical_slug": "openai/gpt-4o-mini",
+      "name": "OpenAI: GPT-4o mini (2024-07-18)",
+      "created": 1721174400,
+      "description": "Synthetic paid text model used for contract tests.",
+      "context_length": 128000,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.0000006",
+        "request": "0",
+        "image": "0",
+        "internal_reasoning": "0"
+      },
+      "top_provider": {
+        "context_length": 128000,
+        "max_completion_tokens": 16384,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "stop",
+        "stream",
+        "tools",
+        "tool_choice"
+      ]
+    },
+    {
+      "id": "meta-llama/llama-3.2-3b-instruct:free",
+      "canonical_slug": "meta-llama/llama-3.2-3b-instruct",
+      "name": "Meta: Llama 3.2 3B Instruct (free)",
+      "created": 1727222400,
+      "description": "Synthetic free model with zero pricing.",
+      "context_length": 131072,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Llama3",
+        "instruct_type": "llama3"
+      },
+      "pricing": {
+        "prompt": "0",
+        "completion": "0",
+        "request": "0",
+        "image": "0",
+        "internal_reasoning": "0"
+      },
+      "top_provider": {
+        "context_length": 131072,
+        "max_completion_tokens": 8192,
+        "is_moderated": false
+      },
+      "per_request_limits": {
+        "requests_per_minute": 20
+      },
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "stop",
+        "stream"
+      ]
+    },
+    {
+      "id": "google/gemini-2.5-flash",
+      "canonical_slug": "google/gemini-2.5-flash",
+      "name": "Google: Gemini 2.5 Flash",
+      "created": 1749600000,
+      "description": "Synthetic vision and file-capable model.",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Gemini",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000003",
+        "completion": "0.0000025",
+        "request": "0",
+        "image": "0.0001",
+        "internal_reasoning": "0"
+      },
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "stop",
+        "stream",
+        "tools",
+        "tool_choice",
+        "response_format",
+        "reasoning"
+      ],
+      "default_parameters": {
+        "temperature": 0.7,
+        "top_p": 0.95
+      }
+    },
+    {
+      "id": "deepseek/deepseek-r1",
+      "canonical_slug": "deepseek/deepseek-r1",
+      "name": "DeepSeek: R1",
+      "created": 1737331200,
+      "description": "Synthetic reasoning model with internal reasoning pricing.",
+      "context_length": 163840,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "DeepSeek",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000055",
+        "completion": "0.00000219",
+        "request": "0",
+        "image": "0",
+        "internal_reasoning": "0.00000219"
+      },
+      "top_provider": {
+        "context_length": 163840,
+        "max_completion_tokens": 32768,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "include_reasoning",
+        "reasoning",
+        "stream"
+      ]
+    },
+    {
+      "id": "anthropic/claude-sonnet-4.5",
+      "canonical_slug": "anthropic/claude-sonnet-4.5",
+      "name": "Anthropic: Claude Sonnet 4.5",
+      "created": 1759104000,
+      "description": "Synthetic tool-capable model.",
+      "context_length": 200000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "request": "0",
+        "image": "0.0000048",
+        "internal_reasoning": "0"
+      },
+      "top_provider": {
+        "context_length": 200000,
+        "max_completion_tokens": 64000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "tools",
+        "tool_choice",
+        "reasoning",
+        "include_reasoning",
+        "max_tokens",
+        "temperature",
+        "top_p",
+        "stop",
+        "stream"
+      ]
+    },
+    {
+      "id": "google/gemini-2.5-pro",
+      "canonical_slug": "google/gemini-2.5-pro",
+      "name": "Google: Gemini 2.5 Pro",
+      "created": 1749600000,
+      "description": "Synthetic long-context model.",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Gemini",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "request": "0",
+        "image": "0.0001",
+        "internal_reasoning": "0"
+      },
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "stop",
+        "stream",
+        "tools",
+        "tool_choice",
+        "reasoning"
+      ]
+    },
+    {
+      "id": "example/unusual-pricing",
+      "canonical_slug": "example/unusual-pricing-v2",
+      "name": "Example: Unusual Pricing",
+      "created": 1761868800,
+      "description": "Synthetic model with very small decimal price strings and a per-request charge.",
+      "context_length": 32000,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Example",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000000000001",
+        "completion": "0.000000000002",
+        "request": "0.0005",
+        "image": "0.0000001",
+        "internal_reasoning": "0"
+      },
+      "top_provider": {
+        "context_length": 32000,
+        "max_completion_tokens": 4096,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "temperature",
+        "max_tokens",
+        "stream"
+      ],
+      "experimental_routing": {
+        "note": "synthetic unknown field"
+      }
+    },
+    {
+      "id": "example/unknown-fields",
+      "canonical_slug": "example/unknown-fields",
+      "name": "Example: Unknown Fields",
+      "created": 1761868801,
+      "description": "Synthetic model with unknown fields that clients must ignore safely.",
+      "context_length": 8000,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Example",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000002",
+        "request": "0",
+        "image": "0",
+        "internal_reasoning": "0"
+      },
+      "top_provider": {
+        "context_length": 8000,
+        "max_completion_tokens": 2048,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "temperature",
+        "stream"
+      ],
+      "x_provider_note": "ignore this unknown field",
+      "future_capability_flags": {
+        "synthetic": true
+      }
+    }
+  ]
+}

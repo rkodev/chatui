@@ -1,0 +1,36 @@
+name: Contracts
+
+"on":
+  pull_request:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: npm
+          cache-dependency-path: scripts/package-lock.json
+
+      - name: Install contract validator dependencies
+        run: npm ci --prefix scripts
+
+      - name: Validate contracts
+        run: make contracts-check

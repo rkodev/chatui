@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": 402,
+    "message": "Insufficient credits. Add more credits to continue.",
+    "metadata": {
+      "provider_name": "OpenRouter"
+    }
+  }
+}

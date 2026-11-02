@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rkodev/chatui/contracts/schema/backup-manifest.schema.json",
+  "title": "ChatUI Backup Manifest",
+  "contractVersion": 1,
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "v",
+    "createdAt",
+    "updatedAt",
+    "objectType",
+    "objectKey",
+    "alg",
+    "kdf",
+    "iterations",
+    "salt"
+  ],
+  "properties": {
+    "contractVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "v": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "objectType": {
+      "type": "string",
+      "enum": [
+        "manifest",
+        "conversation",
+        "message",
+        "attachment",
+        "settings",
+        "provider",
+        "model",
+        "backup-config"
+      ]
+    },
+    "objectKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "alg": {
+      "type": "string",
+      "const": "AES-256-GCM"
+    },
+    "kdf": {
+      "type": "string",
+      "enum": [
+        "pbkdf2-sha256",
+        "argon2id"
+      ]
+    },
+    "iterations": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "salt": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

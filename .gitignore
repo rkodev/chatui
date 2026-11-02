@@ -28,6 +28,12 @@ coverage/
 *.lcov
 junit.xml
 
+# Python test/tooling caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
 # Gradle and Android
 android/.gradle/
 android/local.properties

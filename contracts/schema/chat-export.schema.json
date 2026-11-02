@@ -1,0 +1,1142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rkodev/chatui/contracts/schema/chat-export.schema.json",
+  "title": "ChatUI Chat Export",
+  "contractVersion": 1,
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "formatVersion",
+    "exportedAt",
+    "appVersion",
+    "conversations",
+    "messages",
+    "attachments",
+    "providers",
+    "models",
+    "settings"
+  ],
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "chatui.export"
+    },
+    "formatVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "appVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([+-].*)?$"
+    },
+    "conversations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/conversation"
+      }
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/message"
+      }
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/exportAttachment"
+      }
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/provider"
+      }
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/model"
+      }
+    },
+    "settings": {
+      "$ref": "#/$defs/settings"
+    }
+  },
+  "$defs": {
+    "chatParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "temperature",
+        "topP",
+        "maxOutputTokens",
+        "stop",
+        "reasoningEffort",
+        "streaming",
+        "extra"
+      ],
+      "properties": {
+        "temperature": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 2
+        },
+        "topP": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maxOutputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "stop": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reasoningEffort": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            null
+          ]
+        },
+        "streaming": {
+          "type": "boolean"
+        },
+        "extra": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputTokens",
+        "outputTokens",
+        "totalTokens",
+        "costUsd",
+        "estimated"
+      ],
+      "properties": {
+        "inputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "totalTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "costUsd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "estimated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "chatError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "providerId",
+        "status",
+        "retryable",
+        "retryAfterSeconds",
+        "requestId",
+        "details",
+        "at"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "auth",
+            "permission",
+            "rate_limit",
+            "quota",
+            "model_not_found",
+            "context_length",
+            "content_filter",
+            "invalid_request",
+            "network",
+            "cors",
+            "timeout",
+            "cancelled",
+            "provider",
+            "parse",
+            "storage",
+            "unknown"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "retryAfterSeconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "details": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": true
+            }
+          ]
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "contentPart": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "text"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "attachmentId",
+            "mimeType",
+            "alt"
+          ],
+          "properties": {
+            "type": {
+              "const": "image"
+            },
+            "attachmentId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mimeType": {
+              "type": "string",
+              "minLength": 1
+            },
+            "alt": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "attachmentId",
+            "mimeType",
+            "name"
+          ],
+          "properties": {
+            "type": {
+              "const": "file"
+            },
+            "attachmentId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mimeType": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "reasoning"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "name",
+            "argumentsJson"
+          ],
+          "properties": {
+            "type": {
+              "const": "tool-call"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "argumentsJson": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "toolCallId",
+            "content"
+          ],
+          "properties": {
+            "type": {
+              "const": "tool-result"
+            },
+            "toolCallId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "content": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "conversation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "systemPrompt",
+        "providerId",
+        "modelId",
+        "modelLabel",
+        "params",
+        "pinned",
+        "archived",
+        "temporary",
+        "createdAt",
+        "updatedAt",
+        "lastMessageAt",
+        "messageCount",
+        "lastError",
+        "sync"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string"
+        },
+        "systemPrompt": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modelId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modelLabel": {
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/chatParams"
+        },
+        "pinned": {
+          "type": "boolean"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "temporary": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastMessageAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "messageCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastError": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/chatError"
+            }
+          ]
+        },
+        "sync": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": true
+            }
+          ]
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "conversationId",
+        "sequence",
+        "role",
+        "parts",
+        "status",
+        "providerId",
+        "modelId",
+        "modelLabel",
+        "usage",
+        "finishReason",
+        "error",
+        "latencyMs",
+        "firstTokenMs",
+        "createdAt",
+        "updatedAt",
+        "deletedAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conversationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "system",
+            "user",
+            "assistant",
+            "tool"
+          ]
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contentPart"
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "streaming",
+            "complete",
+            "cancelled",
+            "error"
+          ]
+        },
+        "providerId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "modelId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "modelLabel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "usage": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/usage"
+            }
+          ]
+        },
+        "finishReason": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "stop",
+                "length",
+                "content_filter",
+                "tool_calls",
+                "cancelled",
+                "error",
+                "unknown"
+              ]
+            }
+          ]
+        },
+        "error": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/chatError"
+            }
+          ]
+        },
+        "latencyMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "firstTokenMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deletedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "exportAttachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "mimeType",
+        "sha256",
+        "size"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dataBase64": {
+          "type": "string"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "presetId",
+        "label",
+        "kind",
+        "baseUrl",
+        "authType",
+        "secretId",
+        "headers",
+        "enabled",
+        "browserCors",
+        "metadata",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "presetId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "openai-compatible",
+            "anthropic",
+            "google-gemini"
+          ]
+        },
+        "baseUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authType": {
+          "type": "string",
+          "enum": [
+            "bearer",
+            "x-api-key",
+            "query-key",
+            "none"
+          ]
+        },
+        "secretId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "browserCors": {
+          "type": "string",
+          "enum": [
+            "supported",
+            "unsupported",
+            "unknown"
+          ]
+        },
+        "metadata": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": true
+            }
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "providerId",
+        "remoteId",
+        "label",
+        "contextWindow",
+        "maxOutputTokens",
+        "capabilities",
+        "pricing",
+        "canonicalSlug",
+        "inputModalities",
+        "outputModalities",
+        "supportedParameters",
+        "metadata",
+        "hidden",
+        "pinned",
+        "source",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "providerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remoteId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextWindow": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "maxOutputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "text",
+              "vision",
+              "files",
+              "tools",
+              "reasoning",
+              "streaming"
+            ]
+          }
+        },
+        "pricing": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "inputPerMTok": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "outputPerMTok": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "perRequest": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "currency": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        },
+        "canonicalSlug": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inputModalities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image",
+              "file",
+              "audio",
+              "video"
+            ]
+          }
+        },
+        "outputModalities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image",
+              "audio"
+            ]
+          }
+        },
+        "supportedParameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "metadata": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": true
+            }
+          ]
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "pinned": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "discovered",
+            "preset",
+            "manual"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "theme",
+        "density",
+        "chatFontSize",
+        "sendKey",
+        "defaultProviderId",
+        "defaultModelId",
+        "defaultSystemPrompt",
+        "defaultParams",
+        "rememberKeysOnWeb",
+        "showTokenUsage",
+        "loadRemoteImages",
+        "lastActiveConversationId",
+        "backup",
+        "onboardingCompleted"
+      ],
+      "properties": {
+        "theme": {
+          "type": "string",
+          "enum": [
+            "system",
+            "light",
+            "dark"
+          ]
+        },
+        "density": {
+          "type": "string",
+          "enum": [
+            "comfortable",
+            "compact"
+          ]
+        },
+        "chatFontSize": {
+          "type": "string",
+          "enum": [
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "sendKey": {
+          "type": "string",
+          "enum": [
+            "enter",
+            "mod-enter"
+          ]
+        },
+        "defaultProviderId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "defaultModelId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "defaultSystemPrompt": {
+          "type": "string"
+        },
+        "defaultParams": {
+          "$ref": "#/$defs/chatParams"
+        },
+        "rememberKeysOnWeb": {
+          "type": "boolean"
+        },
+        "showTokenUsage": {
+          "type": "boolean"
+        },
+        "loadRemoteImages": {
+          "type": "boolean"
+        },
+        "lastActiveConversationId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "backup": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/backupConfig"
+            }
+          ]
+        },
+        "onboardingCompleted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "backupConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "backend",
+        "endpoint",
+        "region",
+        "bucket",
+        "prefix",
+        "credentialSecretId",
+        "encryption",
+        "kdf",
+        "kdfSalt",
+        "lastSyncAt",
+        "lastManifestEtag",
+        "deviceId"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "backend": {
+          "type": "string",
+          "enum": [
+            "s3",
+            "azure-blob",
+            "gcs",
+            "webdav"
+          ]
+        },
+        "endpoint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "region": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "credentialSecretId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "encryption": {
+          "type": "string",
+          "const": "aes-256-gcm"
+        },
+        "kdf": {
+          "type": "string",
+          "enum": [
+            "pbkdf2-sha256",
+            "argon2id"
+          ]
+        },
+        "kdfSalt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastSyncAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastManifestEtag": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deviceId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

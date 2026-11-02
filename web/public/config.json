@@ -1,0 +1,13 @@
+{
+  "appName": "ChatUI",
+  "defaultTheme": "system",
+  "defaultProviderPreset": "openrouter",
+  "enabledPresets": ["openrouter", "openai", "anthropic", "google", "groq", "ollama", "custom"],
+  "allowCustomProviders": true,
+  "openRouter": {
+    "attributionOrigin": "https://chat.example.com",
+    "appTitle": "ChatUI"
+  },
+  "docsUrl": "https://github.com/rkodev/chatui",
+  "telemetry": false
+}
