@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+TASK_DIR="${1:-docs/operations/M0}"
+AGENT_NAME="${AGENT_NAME:-task-runner}"
+MAX_TASKS="${MAX_TASKS:-0}"
+OPENCODE_AUTO="${OPENCODE_AUTO:-1}"
+INCLUDE_IN_PROGRESS="${INCLUDE_IN_PROGRESS:-0}"
+
+if ! [[ "$MAX_TASKS" =~ ^[0-9]+$ ]]; then
+  echo "error: MAX_TASKS must be a non-negative integer, got '$MAX_TASKS'" >&2
+  exit 2
+fi
+
+if [[ ! -d "$TASK_DIR" ]]; then
+  echo "error: task directory does not exist: $TASK_DIR" >&2
+  exit 2
+fi
+
+selector=(scripts/next-task "$TASK_DIR")
+if [[ "$INCLUDE_IN_PROGRESS" != "0" ]]; then
+  selector+=(--include-in-progress)
+fi
+
+attempted=0
+last_task=""
+
+while :; do
+  if (( MAX_TASKS > 0 && attempted >= MAX_TASKS )); then
+    echo "Reached MAX_TASKS=$MAX_TASKS; stopping." >&2
+    break
+  fi
+
+  set +e
+  task_path="$("${selector[@]}")"
+  selector_status=$?
+  set -e
+
+  if (( selector_status == 1 )); then
+    echo "No eligible tasks remain." >&2
+    break
+  fi
+  if (( selector_status != 0 )); then
+    exit "$selector_status"
+  fi
+  if [[ -z "$task_path" ]]; then
+    echo "error: task selector returned an empty path" >&2
+    exit 2
+  fi
+  if [[ "$task_path" == "$last_task" ]]; then
+    echo "error: no progress: '$task_path' was selected twice in a row" >&2
+    exit 1
+  fi
+
+  last_task="$task_path"
+  command=(opencode run --agent "$AGENT_NAME")
+  if [[ "$OPENCODE_AUTO" != "0" ]]; then
+    command+=(--auto)
+  fi
+  command+=(
+    "Implement exactly one task: $task_path. Read the task file, follow the task-runner instructions, and stop after that task is Complete or Blocked. Do not start another task."
+  )
+
+  echo "Running task: $task_path" >&2
+  "${command[@]}"
+  attempted=$((attempted + 1))
+done
+
+echo "run-tasks finished: $attempted task(s) attempted." >&2
+exit 0

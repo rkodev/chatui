@@ -3,7 +3,7 @@
 - Source plan: [M0 Foundations Implementation Plan](../M0-foundations-implementation-plan.md)
 - Milestone: [M0 Foundations](../../milestones/M0-foundations.md)
 - Status: Not started
-- Last updated: 2026-10-31
+- Last updated: 2026-11-02
 - Ordering: complete tasks in the numbered order unless the dependency column says otherwise.
 
 ## How to use these tasks
@@ -64,3 +64,56 @@
 ## Completion rule
 
 The M0 milestone is complete only when M0-06.3 records exit-gate evidence, `contracts/parity.md` is truthful, no provider calls or chat features exist, and the milestone status tables are updated.
+
+## Task orchestration
+
+The runner executes one task per fresh opencode session. It never reuses a session across tasks.
+
+Select the next task:
+
+```bash
+scripts/next-task docs/operations/M0
+scripts/next-task docs/operations/M0 --list
+scripts/next-task docs/operations/M0 --include-in-progress
+```
+
+`next-task` prints only the selected task path. It exits `0` on success, `1` when no task is eligible, and `2` for bad input. `--list` shows every parsed task with order, status, eligibility, task ID, and expanded dependencies.
+
+Run a batch:
+
+```bash
+scripts/run-tasks docs/operations/M0
+MAX_TASKS=3 scripts/run-tasks docs/operations/M0
+OPENCODE_AUTO=0 scripts/run-tasks docs/operations/M0
+INCLUDE_IN_PROGRESS=1 scripts/run-tasks docs/operations/M0
+```
+
+- `MAX_TASKS=0` means unlimited attempts.
+- `OPENCODE_AUTO=0` disables `--auto`. Without auto-approval, a batch can stall on permission prompts and is not suitable for unattended runs.
+- `INCLUDE_IN_PROGRESS=1` lets the selector resume `In progress` tasks.
+- `run-tasks` passes `--auto` before the message argument by default and stops when the selector has no eligible task, when the same task is selected twice in a row, or when `MAX_TASKS` is reached.
+- A selector exit code of `2` is propagated as `2`.
+
+Run exactly one task through the command:
+
+```text
+/run-task docs/operations/M0
+/run-task docs/operations/M0/M0-01.5-contract-validator.md
+```
+
+The command delegates to the `task-runner` agent, which reads one task file, follows its `Implementation steps`, obeys its `Out of scope` section, runs its verification commands, updates the task status and this index, and makes one commit. A folder argument uses `scripts/next-task`; a file argument is used directly.
+
+### Resuming and blockers
+
+- To resume an `In progress` task in a batch, use `INCLUDE_IN_PROGRESS=1 scripts/run-tasks docs/operations/M0` or select it directly with `scripts/next-task docs/operations/M0 --include-in-progress`.
+- To resume through the command, pass the task file directly, for example `/run-task docs/operations/M0/M0-01.5-contract-validator.md`.
+- `Blocked` tasks are never selected automatically. Resolve the decision, update the task's `## Blockers` notes and status, then rerun the selector.
+- If a verification command is denied, the agent must report the denial rather than retrying through a shell wrapper.
+
+Batch runs are unattended: the agent does not ask questions. Explicit deny rules in `.opencode/agent/task-runner.md` still apply, even with `--auto`. The agent prompt and model are kept stable across tasks so provider prefix caching can work; task-specific text is passed only in the user message.
+
+Runner tests:
+
+```bash
+python3 -m unittest discover -s scripts/tests -v
+```
