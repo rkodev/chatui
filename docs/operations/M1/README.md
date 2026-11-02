@@ -32,7 +32,7 @@
 
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [M1-01.1 Expected OpenRouter normalized vectors](M1-01.1-openrouter-expected-vectors.md) | Not started | none | contracts | none; unblocks adapters |
+| 1 | [M1-01.1 Expected OpenRouter normalized vectors](M1-01.1-openrouter-expected-vectors.md) | Complete | none | contracts | none; unblocks adapters |
 | 2 | [M1-01.2 Request vectors and CORS evidence template](M1-01.2-request-vectors-and-cors-template.md) | Not started | M1-01.1 | contracts | none |
 | 3 | [M1-02.1 Web contract registry and config gating](M1-02.1-web-contract-registry.md) | Not started | M1-01.2 | web | M1-06.1 |
 | 4 | [M1-02.2 Web SSE transport](M1-02.2-web-sse-transport.md) | Not started | M1-02.1 | web | M1-02.3, M1-06.2 |

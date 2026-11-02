@@ -1,0 +1,101 @@
+{
+  "source": "openrouter-errors",
+  "cases": [
+    {
+      "name": "402-insufficient-credits",
+      "fixture": "errors/openrouter-402.json",
+      "status": 402,
+      "error": {
+        "code": "quota",
+        "message": "Insufficient credits. Add more credits to continue.",
+        "providerId": "openrouter",
+        "status": 402,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": {
+          "providerName": "OpenRouter"
+        }
+      }
+    },
+    {
+      "name": "429-rate-limit",
+      "fixture": "errors/openrouter-429.json",
+      "status": 429,
+      "error": {
+        "code": "rate_limit",
+        "message": "Rate limit exceeded. Please retry after 2 seconds.",
+        "providerId": "openrouter",
+        "status": 429,
+        "retryable": true,
+        "retryAfterSeconds": 2,
+        "requestId": null,
+        "details": {
+          "retryAfterSeconds": 2
+        }
+      }
+    },
+    {
+      "name": "503-no-upstream-provider",
+      "fixture": "errors/openrouter-503.json",
+      "status": 503,
+      "error": {
+        "code": "provider",
+        "message": "No available upstream provider could serve the request.",
+        "providerId": "openrouter",
+        "status": 503,
+        "retryable": true,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": {
+          "providerName": "Synthetic Provider"
+        }
+      }
+    },
+    {
+      "name": "401-invalid-key",
+      "synthetic": true,
+      "status": 401,
+      "error": {
+        "code": "auth",
+        "message": "Authentication failed. Check your OpenRouter API key.",
+        "providerId": "openrouter",
+        "status": 401,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "404-model-not-found",
+      "synthetic": true,
+      "status": 404,
+      "error": {
+        "code": "model_not_found",
+        "message": "The requested model was not found.",
+        "providerId": "openrouter",
+        "status": 404,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "400-context-length",
+      "synthetic": true,
+      "status": 400,
+      "error": {
+        "code": "context_length",
+        "message": "The request exceeds the model's context length.",
+        "providerId": "openrouter",
+        "status": 400,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    }
+  ]
+}

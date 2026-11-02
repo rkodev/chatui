@@ -1,0 +1,22 @@
+{
+  "source": "openrouter-usage.sse",
+  "events": [
+    { "type": "start", "responseId": "gen-example-usage" },
+    { "type": "text-delta", "text": "Usage" },
+    { "type": "text-delta", "text": " is reported at the end." },
+    { "type": "finish", "reason": "stop" },
+    {
+      "type": "usage",
+      "usage": {
+        "inputTokens": 42,
+        "outputTokens": 12,
+        "totalTokens": 54,
+        "costUsd": 0.000081,
+        "estimated": false
+      }
+    }
+  ],
+  "text": "Usage is reported at the end.",
+  "reasoning": "",
+  "retryAllowed": false
+}

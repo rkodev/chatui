@@ -18,7 +18,60 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..');
 const contractsDir = path.join(repoRoot, 'contracts');
 const fixturesDir = path.join(contractsDir, 'fixtures');
+const expectedDir = path.join(fixturesDir, 'expected');
 const schemaDir = path.join(contractsDir, 'schema');
+
+const EXPECTED_STREAM_SOURCES = new Map([
+  ['openrouter-text.json', 'openrouter-text.sse'],
+  ['openrouter-keepalive.json', 'openrouter-keepalive.sse'],
+  ['openrouter-reasoning.json', 'openrouter-reasoning.sse'],
+  ['openrouter-usage.json', 'openrouter-usage.sse'],
+  ['openrouter-error-200.json', 'openrouter-error-200.sse'],
+]);
+const EXPECTED_KEY_FILE = 'openrouter-key.json';
+const EXPECTED_ERRORS_FILE = 'openrouter-errors.json';
+const EXPECTED_FILES = new Set([
+  ...EXPECTED_STREAM_SOURCES.keys(),
+  EXPECTED_KEY_FILE,
+  EXPECTED_ERRORS_FILE,
+]);
+
+const EVENT_TYPES = [
+  'start',
+  'text-delta',
+  'reasoning-delta',
+  'tool-call-delta',
+  'usage',
+  'finish',
+  'error',
+];
+const FINISH_REASONS = [
+  'stop',
+  'length',
+  'content_filter',
+  'tool_calls',
+  'cancelled',
+  'error',
+  'unknown',
+];
+const CHAT_ERROR_CODES = [
+  'auth',
+  'permission',
+  'rate_limit',
+  'quota',
+  'model_not_found',
+  'context_length',
+  'content_filter',
+  'invalid_request',
+  'network',
+  'cors',
+  'timeout',
+  'cancelled',
+  'provider',
+  'parse',
+  'storage',
+  'unknown',
+];
 
 const REQUIRED_SCHEMA_FILES = [
   'provider-preset.schema.json',
@@ -359,6 +412,392 @@ function validateModelFixtures(validators) {
   }
 }
 
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function checkObjectShape(filePath, field, value, allowedKeys, requiredKeys) {
+  if (!isPlainObject(value)) {
+    addError(filePath, field || '$', 'must be an object');
+    return false;
+  }
+
+  for (const key of requiredKeys) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) {
+      addError(filePath, `${field}/${key}`, 'required property is missing');
+    }
+  }
+
+  for (const key of Object.keys(value)) {
+    if (!allowedKeys.includes(key)) {
+      addError(filePath, `${field}/${key}`, `unexpected property "${key}"`);
+    }
+  }
+
+  return true;
+}
+
+function validateUsage(filePath, field, usage) {
+  const fields = ['inputTokens', 'outputTokens', 'totalTokens', 'costUsd', 'estimated'];
+  if (!checkObjectShape(filePath, field, usage, fields, fields)) {
+    return;
+  }
+
+  for (const key of ['inputTokens', 'outputTokens', 'totalTokens']) {
+    const value = usage[key];
+    if (value !== null && !Number.isInteger(value)) {
+      addError(filePath, `${field}/${key}`, 'must be an integer or null');
+    } else if (Number.isInteger(value) && value < 0) {
+      addError(filePath, `${field}/${key}`, 'must be greater than or equal to 0');
+    }
+  }
+
+  if (usage.costUsd !== null && (typeof usage.costUsd !== 'number' || !Number.isFinite(usage.costUsd))) {
+    addError(filePath, `${field}/costUsd`, 'must be a finite number or null');
+  } else if (typeof usage.costUsd === 'number' && usage.costUsd < 0) {
+    addError(filePath, `${field}/costUsd`, 'must be greater than or equal to 0');
+  }
+
+  if (typeof usage.estimated !== 'boolean') {
+    addError(filePath, `${field}/estimated`, 'must be a boolean');
+  }
+}
+
+function validateChatError(filePath, field, error) {
+  const fields = [
+    'code',
+    'message',
+    'providerId',
+    'status',
+    'retryable',
+    'retryAfterSeconds',
+    'requestId',
+    'details',
+  ];
+  if (!checkObjectShape(filePath, field, error, fields, fields)) {
+    return;
+  }
+
+  if (!CHAT_ERROR_CODES.includes(error.code)) {
+    addError(filePath, `${field}/code`, `must be one of ${JSON.stringify(CHAT_ERROR_CODES)}`);
+  }
+  if (typeof error.message !== 'string' || error.message.length === 0) {
+    addError(filePath, `${field}/message`, 'must be a non-empty string');
+  }
+  if (error.providerId !== null && typeof error.providerId !== 'string') {
+    addError(filePath, `${field}/providerId`, 'must be a string or null');
+  }
+  if (error.status !== null && !Number.isInteger(error.status)) {
+    addError(filePath, `${field}/status`, 'must be an integer or null');
+  }
+  if (typeof error.retryable !== 'boolean') {
+    addError(filePath, `${field}/retryable`, 'must be a boolean');
+  }
+  if (
+    error.retryAfterSeconds !== null &&
+    (typeof error.retryAfterSeconds !== 'number' ||
+      !Number.isFinite(error.retryAfterSeconds) ||
+      error.retryAfterSeconds < 0)
+  ) {
+    addError(filePath, `${field}/retryAfterSeconds`, 'must be a non-negative number or null');
+  }
+  if (error.requestId !== null && typeof error.requestId !== 'string') {
+    addError(filePath, `${field}/requestId`, 'must be a string or null');
+  }
+  if (error.details !== null && !isPlainObject(error.details)) {
+    addError(filePath, `${field}/details`, 'must be an object or null');
+  }
+}
+
+function validateEvent(filePath, field, event) {
+  if (!isPlainObject(event)) {
+    addError(filePath, field, 'must be an object');
+    return;
+  }
+
+  if (typeof event.type !== 'string') {
+    addError(filePath, `${field}/type`, 'must be a string');
+    return;
+  }
+
+  switch (event.type) {
+    case 'start':
+      checkObjectShape(filePath, field, event, ['type', 'responseId'], ['type', 'responseId']);
+      if (event.responseId !== null && typeof event.responseId !== 'string') {
+        addError(filePath, `${field}/responseId`, 'must be a string or null');
+      }
+      break;
+    case 'text-delta':
+    case 'reasoning-delta':
+      checkObjectShape(filePath, field, event, ['type', 'text'], ['type', 'text']);
+      if (typeof event.text !== 'string') {
+        addError(filePath, `${field}/text`, 'must be a string');
+      }
+      break;
+    case 'tool-call-delta':
+      checkObjectShape(
+        filePath,
+        field,
+        event,
+        ['type', 'index', 'id', 'name', 'argumentsDelta'],
+        ['type', 'index', 'id', 'name', 'argumentsDelta'],
+      );
+      if (!Number.isInteger(event.index) || event.index < 0) {
+        addError(filePath, `${field}/index`, 'must be a non-negative integer');
+      }
+      if (event.id !== null && typeof event.id !== 'string') {
+        addError(filePath, `${field}/id`, 'must be a string or null');
+      }
+      if (event.name !== null && typeof event.name !== 'string') {
+        addError(filePath, `${field}/name`, 'must be a string or null');
+      }
+      if (typeof event.argumentsDelta !== 'string') {
+        addError(filePath, `${field}/argumentsDelta`, 'must be a string');
+      }
+      break;
+    case 'usage':
+      checkObjectShape(filePath, field, event, ['type', 'usage'], ['type', 'usage']);
+      validateUsage(filePath, `${field}/usage`, event.usage);
+      break;
+    case 'finish':
+      checkObjectShape(filePath, field, event, ['type', 'reason'], ['type', 'reason']);
+      if (!FINISH_REASONS.includes(event.reason)) {
+        addError(filePath, `${field}/reason`, `must be one of ${JSON.stringify(FINISH_REASONS)}`);
+      }
+      break;
+    case 'error':
+      checkObjectShape(filePath, field, event, ['type', 'error'], ['type', 'error']);
+      validateChatError(filePath, `${field}/error`, event.error);
+      break;
+    default:
+      addError(filePath, `${field}/type`, `must be one of ${JSON.stringify(EVENT_TYPES)}`);
+  }
+}
+
+function validateStreamExpected(filePath, document, expectedSource) {
+  const fields = ['source', 'events', 'text', 'reasoning', 'retryAllowed'];
+  if (!checkObjectShape(filePath, '', document, fields, fields)) {
+    return;
+  }
+
+  if (document.source !== expectedSource) {
+    addError(filePath, '/source', `must be "${expectedSource}"`);
+  }
+
+  if (!Array.isArray(document.events)) {
+    addError(filePath, '/events', 'must be an array');
+  } else {
+    if (document.events.length === 0) {
+      addError(filePath, '/events', 'must contain at least one event');
+    }
+    document.events.forEach((event, index) => validateEvent(filePath, `/events/${index}`, event));
+
+    const text = document.events
+      .filter((event) => isPlainObject(event) && event.type === 'text-delta' && typeof event.text === 'string')
+      .map((event) => event.text)
+      .join('');
+    const reasoning = document.events
+      .filter(
+        (event) => isPlainObject(event) && event.type === 'reasoning-delta' && typeof event.text === 'string',
+      )
+      .map((event) => event.text)
+      .join('');
+
+    if (typeof document.text === 'string' && document.text !== text) {
+      addError(filePath, '/text', `must equal the concatenated text-delta events (${JSON.stringify(text)})`);
+    }
+    if (typeof document.reasoning === 'string' && document.reasoning !== reasoning) {
+      addError(
+        filePath,
+        '/reasoning',
+        `must equal the concatenated reasoning-delta events (${JSON.stringify(reasoning)})`,
+      );
+    }
+  }
+
+  if (typeof document.text !== 'string') {
+    addError(filePath, '/text', 'must be a string');
+  }
+  if (typeof document.reasoning !== 'string') {
+    addError(filePath, '/reasoning', 'must be a string');
+  }
+  if (typeof document.retryAllowed !== 'boolean') {
+    addError(filePath, '/retryAllowed', 'must be a boolean');
+  }
+}
+
+function validateKeyExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'providerId', 'key'], ['source', 'providerId', 'key'])) {
+    return;
+  }
+
+  if (document.source !== 'openrouter-key.json') {
+    addError(filePath, '/source', 'must be "openrouter-key.json"');
+  }
+  if (document.providerId !== 'openrouter') {
+    addError(filePath, '/providerId', 'must be "openrouter"');
+  }
+
+  const keyFields = ['label', 'usageUsd', 'limitUsd', 'limitRemainingUsd', 'isFreeTier', 'rateLimit'];
+  if (!checkObjectShape(filePath, '/key', document.key, keyFields, keyFields)) {
+    return;
+  }
+
+  if (typeof document.key.label !== 'string' || document.key.label.length === 0) {
+    addError(filePath, '/key/label', 'must be a non-empty string');
+  }
+  if (typeof document.key.usageUsd !== 'number' || !Number.isFinite(document.key.usageUsd)) {
+    addError(filePath, '/key/usageUsd', 'must be a finite number');
+  }
+  for (const field of ['limitUsd', 'limitRemainingUsd']) {
+    const value = document.key[field];
+    if (value !== null && (typeof value !== 'number' || !Number.isFinite(value))) {
+      addError(filePath, `/key/${field}`, 'must be a finite number or null');
+    }
+  }
+  if (typeof document.key.isFreeTier !== 'boolean') {
+    addError(filePath, '/key/isFreeTier', 'must be a boolean');
+  }
+
+  if (document.key.rateLimit !== null) {
+    if (!checkObjectShape(filePath, '/key/rateLimit', document.key.rateLimit, ['requests', 'interval'], ['requests', 'interval'])) {
+      return;
+    }
+    if (!Number.isInteger(document.key.rateLimit.requests) || document.key.rateLimit.requests < 0) {
+      addError(filePath, '/key/rateLimit/requests', 'must be a non-negative integer');
+    }
+    if (typeof document.key.rateLimit.interval !== 'string' || document.key.rateLimit.interval.length === 0) {
+      addError(filePath, '/key/rateLimit/interval', 'must be a non-empty string');
+    }
+  }
+}
+
+function validateErrorsExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'cases'], ['source', 'cases'])) {
+    return;
+  }
+
+  if (document.source !== 'openrouter-errors') {
+    addError(filePath, '/source', 'must be "openrouter-errors"');
+  }
+
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'fixture', 'synthetic', 'status', 'error'],
+        ['name', 'status', 'error'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (item.fixture !== undefined) {
+      if (typeof item.fixture !== 'string' || item.fixture.length === 0) {
+        addError(filePath, `${field}/fixture`, 'must be a non-empty string');
+      } else {
+        const fixturePath = path.resolve(fixturesDir, item.fixture);
+        const errorsDir = path.join(fixturesDir, 'errors');
+        if (!fixturePath.startsWith(`${errorsDir}${path.sep}`)) {
+          addError(filePath, `${field}/fixture`, 'must reference a file under fixtures/errors');
+        } else if (!existsSync(fixturePath)) {
+          addError(filePath, `${field}/fixture`, `references missing fixture "${item.fixture}"`);
+        }
+      }
+    } else if (item.synthetic !== true) {
+      addError(filePath, `${field}/fixture`, 'must reference a fixture or set synthetic to true');
+    }
+
+    if (item.synthetic !== undefined && typeof item.synthetic !== 'boolean') {
+      addError(filePath, `${field}/synthetic`, 'must be a boolean');
+    }
+    if (!Number.isInteger(item.status)) {
+      addError(filePath, `${field}/status`, 'must be an integer');
+    }
+
+    validateChatError(filePath, `${field}/error`, item.error);
+    if (isPlainObject(item.error) && item.error.status !== item.status) {
+      addError(filePath, `${field}/error/status`, 'must match the case status');
+    }
+  });
+}
+
+function validateExpectedVectors() {
+  const expectedFiles = walkFiles(expectedDir).filter((file) => file.endsWith('.json'));
+  const seen = new Set();
+
+  for (const filePath of expectedFiles) {
+    const name = path.basename(filePath);
+    if (!EXPECTED_FILES.has(name)) {
+      addError(filePath, '$', `unexpected expected vector "${name}"`);
+      continue;
+    }
+
+    seen.add(name);
+    const document = readJson(filePath);
+    if (document === undefined) {
+      continue;
+    }
+
+    if (EXPECTED_STREAM_SOURCES.has(name)) {
+      validateStreamExpected(filePath, document, EXPECTED_STREAM_SOURCES.get(name));
+    } else if (name === EXPECTED_KEY_FILE) {
+      validateKeyExpected(filePath, document);
+    } else if (name === EXPECTED_ERRORS_FILE) {
+      validateErrorsExpected(filePath, document);
+    }
+  }
+
+  for (const name of EXPECTED_FILES) {
+    if (!seen.has(name)) {
+      addError(path.join(expectedDir, name), '$', 'required expected vector is missing');
+    }
+  }
+
+  const streamDir = path.join(fixturesDir, 'streams');
+  const expectedSources = new Set(EXPECTED_STREAM_SOURCES.values());
+  for (const filePath of walkFiles(streamDir).filter((file) => file.endsWith('.sse'))) {
+    const name = path.basename(filePath);
+    if (name.startsWith('openrouter-') && !expectedSources.has(name)) {
+      addError(filePath, '$', 'OpenRouter stream fixture has no expected vector');
+    }
+  }
+
+  for (const [name, source] of EXPECTED_STREAM_SOURCES) {
+    if (!existsSync(path.join(streamDir, source))) {
+      addError(path.join(expectedDir, name), '/source', `references missing fixture "${source}"`);
+    }
+  }
+
+  if (!existsSync(path.join(fixturesDir, 'models', 'openrouter-key.json'))) {
+    addError(
+      path.join(expectedDir, EXPECTED_KEY_FILE),
+      '/source',
+      'references missing fixture "openrouter-key.json"',
+    );
+  }
+}
+
 function validateFixtureEncoding() {
   const fixtureFiles = walkFiles(fixturesDir);
   if (fixtureFiles.length === 0) {
@@ -464,6 +903,7 @@ function main() {
   validateAllJsonFiles();
   validateProviders(validators);
   validateModelFixtures(validators);
+  validateExpectedVectors();
   validateFixtureEncoding();
   validateParity();
 
