@@ -36,7 +36,7 @@
 | 2 | [M1-01.2 Request vectors and CORS evidence template](M1-01.2-request-vectors-and-cors-template.md) | Complete | M1-01.1 | contracts | none |
 | 3 | [M1-02.1 Web contract registry and config gating](M1-02.1-web-contract-registry.md) | Complete | M1-01.2 | web | M1-06.1 |
 | 4 | [M1-02.2 Web SSE transport](M1-02.2-web-sse-transport.md) | Complete | M1-02.1 | web | M1-02.3, M1-06.2 |
-| 5 | [M1-02.3 Web OpenRouter key validation and catalog](M1-02.3-web-openrouter-key-catalog.md) | Not started | M1-02.1 | web | M1-02.2, M1-06.3 |
+| 5 | [M1-02.3 Web OpenRouter key validation and catalog](M1-02.3-web-openrouter-key-catalog.md) | Complete | M1-02.1 | web | M1-02.2, M1-06.3 |
 | 6 | [M1-02.4 Web OpenRouter streaming, retry, errors, routing](M1-02.4-web-openrouter-streaming.md) | Not started | M1-01.2, M1-02.2, M1-02.3 | web | M1-06.4 |
 | 7 | [M1-03.1 Web settings and provider/model services](M1-03.1-web-settings-provider-services.md) | Not started | M1-02.4 | web | M1-05.1, M1-07.1 |
 | 8 | [M1-05.1 Web conversation service](M1-05.1-web-conversation-service.md) | Not started | M1-03.1 | web | M1-03.2, M1-08.1 |
