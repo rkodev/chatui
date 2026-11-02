@@ -11,6 +11,8 @@ import {
   OnboardingServiceProvider,
   type OnboardingServiceLike,
 } from '../features/onboarding'
+import { ProviderManagementProvider } from '../features/providers'
+import { createFakeProviderManagementService } from '../features/providers/testSupport'
 import { useToast } from '../ui/primitives'
 import { useTheme } from '../ui/theme'
 
@@ -40,9 +42,11 @@ function renderShell(path = '/') {
   return render(
     <ConfigContext.Provider value={validConfig}>
       <AppProviders>
-        <OnboardingServiceProvider service={onboardingService}>
-          <App router={router} />
-        </OnboardingServiceProvider>
+        <ProviderManagementProvider service={createFakeProviderManagementService()}>
+          <OnboardingServiceProvider service={onboardingService}>
+            <App router={router} />
+          </OnboardingServiceProvider>
+        </ProviderManagementProvider>
       </AppProviders>
     </ConfigContext.Provider>,
   )
@@ -122,10 +126,10 @@ describe('web shell smoke tests', () => {
     ['/', 'Welcome to ChatUI'],
     ['/chat/conversation-1', 'Chat placeholder'],
     ['/settings/appearance', 'Appearance settings placeholder'],
-    ['/settings/providers', 'Providers settings placeholder'],
+    ['/settings/providers', 'Providers'],
     ['/settings/providers/new', 'Welcome to ChatUI'],
-    ['/settings/providers/provider-1', 'Provider details placeholder'],
-    ['/settings/models', 'Models settings placeholder'],
+    ['/settings/providers/provider-1', 'OpenRouter'],
+    ['/settings/models', 'Models'],
     ['/settings/data', 'Data settings placeholder'],
     ['/settings/backup', 'Backup settings placeholder'],
     ['/settings/about', 'About settings placeholder'],

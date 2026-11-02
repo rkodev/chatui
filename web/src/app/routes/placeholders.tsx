@@ -39,38 +39,17 @@ export function SettingsAppearancePlaceholder() {
   )
 }
 
-export function SettingsProvidersPlaceholder() {
-  return (
-    <RoutePlaceholder
-      title="Providers settings placeholder"
-      description="Provider management arrives in M1."
-    />
-  )
-}
+export {
+  ProviderDetailRoute as SettingsProviderDetailPlaceholder,
+  ProvidersSettingsRoute as SettingsProvidersPlaceholder,
+} from '../../features/providers'
+export { ModelsSettingsRoute as SettingsModelsPlaceholder } from '../../features/settings'
 
 export function SettingsProviderNewPlaceholder() {
   return (
     <RoutePlaceholder
       title="New provider placeholder"
       description="Provider onboarding arrives in M1."
-    />
-  )
-}
-
-export function SettingsProviderDetailPlaceholder() {
-  return (
-    <RoutePlaceholder
-      title="Provider details placeholder"
-      description="Provider details and key rotation arrive in M1."
-    />
-  )
-}
-
-export function SettingsModelsPlaceholder() {
-  return (
-    <RoutePlaceholder
-      title="Models settings placeholder"
-      description="Global model defaults arrive in M1."
     />
   )
 }

@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ConfigContext, type AppConfig } from './config'
 import { OnboardingServiceProvider, type OnboardingServiceLike } from '../features/onboarding'
+import { ProviderManagementProvider } from '../features/providers'
+import { createFakeProviderManagementService } from '../features/providers/testSupport'
 import { createAppRouter } from './router'
 
 const testConfig: AppConfig = {
@@ -29,9 +31,11 @@ function renderRoute(path: string) {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }))
   render(
     <ConfigContext.Provider value={testConfig}>
-      <OnboardingServiceProvider service={onboardingService}>
-        <RouterProvider router={router} />
-      </OnboardingServiceProvider>
+      <ProviderManagementProvider service={createFakeProviderManagementService()}>
+        <OnboardingServiceProvider service={onboardingService}>
+          <RouterProvider router={router} />
+        </OnboardingServiceProvider>
+      </ProviderManagementProvider>
     </ConfigContext.Provider>,
   )
   return router
@@ -42,10 +46,10 @@ describe('app router', () => {
     ['/', 'Welcome to ChatUI'],
     ['/chat/conversation-1', 'Chat placeholder'],
     ['/settings/appearance', 'Appearance settings placeholder'],
-    ['/settings/providers', 'Providers settings placeholder'],
+    ['/settings/providers', 'Providers'],
     ['/settings/providers/new', 'Welcome to ChatUI'],
-    ['/settings/providers/provider-1', 'Provider details placeholder'],
-    ['/settings/models', 'Models settings placeholder'],
+    ['/settings/providers/provider-1', 'OpenRouter'],
+    ['/settings/models', 'Models'],
     ['/settings/data', 'Data settings placeholder'],
     ['/settings/backup', 'Backup settings placeholder'],
     ['/settings/about', 'About settings placeholder'],

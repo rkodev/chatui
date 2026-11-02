@@ -1,0 +1,72 @@
+/*
+ * Settings model/defaults surfaces. Shared provider styles live in
+ * features/providers/providers.css; this file only adds settings-specific
+ * spacing and reuses the same semantic tokens.
+ */
+
+.models-settings {
+  display: grid;
+  max-width: 56rem;
+  gap: var(--density-space-5);
+}
+
+.models-settings__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--density-space-3);
+}
+
+.models-settings h2 {
+  margin: 0;
+  font-family: var(--font-heading-family);
+  font-size: var(--font-heading-size-2);
+  font-weight: var(--font-heading-weight);
+  line-height: var(--font-heading-line-height);
+}
+
+.models-settings h3 {
+  margin: 0;
+  font-family: var(--font-heading-family);
+  font-size: var(--font-heading-size-3);
+  font-weight: var(--font-heading-weight);
+}
+
+.models-settings__panel {
+  display: grid;
+  gap: var(--density-space-3);
+  padding: var(--density-space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.models-settings__muted {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: 0.875rem;
+}
+
+.models-settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--density-space-2);
+}
+
+.models-settings__error {
+  margin: 0;
+  padding: var(--density-space-2);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  color: var(--color-danger);
+}
+
+.models-settings__warning {
+  margin: 0;
+  padding: var(--density-space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface-raised);
+  color: var(--color-warning);
+}
