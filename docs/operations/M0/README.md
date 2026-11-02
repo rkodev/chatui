@@ -34,7 +34,7 @@
 | 3 | [M0-01.3 Stream, catalog, and error fixtures](M0-01.3-fixtures.md) | Complete | M0-01.1, M0-01.2 | contracts | M0-01.4 |
 | 4 | [M0-01.4 Parity checklist](M0-01.4-parity.md) | Complete | none | contracts | M0-01.1 to M0-01.3 |
 | 5 | [M0-01.5 Contract validator and tooling](M0-01.5-contract-validator.md) | Complete | M0-01.1 to M0-01.4 | contracts | none |
-| 6 | [M0-02.1 Web scaffold and toolchain](M0-02.1-web-scaffold.md) | Not started | M0-01.5 | web | M0-04.1 |
+| 6 | [M0-02.1 Web scaffold and toolchain](M0-02.1-web-scaffold.md) | Complete | M0-01.5 | web | M0-04.1 |
 | 7 | [M0-02.2 Runtime config and domain model](M0-02.2-web-config-domain.md) | Not started | M0-02.1 | web | M0-04.2 |
 | 8 | [M0-02.3 IndexedDB schema, migrations, repositories](M0-02.3-web-indexeddb.md) | Not started | M0-02.2 | web | M0-04.3 |
 | 9 | [M0-02.4 OPFS attachment store and fallback](M0-02.4-web-opfs.md) | Not started | M0-02.3 | web | M0-04.4 |
