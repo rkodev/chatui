@@ -47,7 +47,7 @@
 | 16 | [M0-04.3 Room schema, DAOs, FTS, migrations](M0-04.3-android-room.md) | Complete | M0-04.2 | android | M0-02.3 |
 | 17 | [M0-04.4 DataStore, Tink secret storage, backup exclusion](M0-04.4-android-datastore-secrets.md) | Complete | M0-04.3 | android | M0-02.4, M0-02.5 |
 | 18 | [M0-05.1 Android design system and theme](M0-05.1-android-designsystem.md) | Complete | M0-04.4 | android | M0-03.3 |
-| 19 | [M0-05.2 App shell, navigation, Hilt, Android verification](M0-05.2-android-app-shell.md) | Not started | M0-05.1 | android | M0-03.3 |
+| 19 | [M0-05.2 App shell, navigation, Hilt, Android verification](M0-05.2-android-app-shell.md) | Complete | M0-05.1 | android | M0-03.3 |
 | 20 | [M0-06.1 Contracts and web workflows](M0-06.1-contracts-web-ci.md) | Not started | M0-01.5, M0-03.3 | ci | M0-06.2 |
 | 21 | [M0-06.2 Android workflow](M0-06.2-android-ci.md) | Not started | M0-05.2 | ci | M0-06.1 |
 | 22 | [M0-06.3 CI guardrails and final M0 verification](M0-06.3-final-verification.md) | Not started | M0-06.1, M0-06.2, and all prior tasks | ci | none |
