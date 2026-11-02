@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API 26-30 full-backup rules.
+
+  allowBackup="false" already disables backup, but these explicit exclusions
+  keep the database, DataStore, and secret keyset out of any backup or
+  device-transfer path that might be enabled later.
+-->
+<full-backup-content>
+    <exclude domain="database" path="chatui.db" />
+    <exclude domain="database" path="chatui.db-shm" />
+    <exclude domain="database" path="chatui.db-wal" />
+    <exclude domain="database" path="chatui.db-journal" />
+    <exclude domain="file" path="datastore/" />
+    <exclude domain="sharedpref" path="chatui_secret_keyset_prefs.xml" />
+</full-backup-content>

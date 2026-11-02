@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API 31+ data-extraction rules.
+
+  Exclude the database, DataStore, and secret keyset from both cloud backup
+  and device-to-device transfer. allowBackup="false" is not relied on alone.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="chatui.db" />
+        <exclude domain="database" path="chatui.db-shm" />
+        <exclude domain="database" path="chatui.db-wal" />
+        <exclude domain="database" path="chatui.db-journal" />
+        <exclude domain="file" path="datastore/" />
+        <exclude domain="sharedpref" path="chatui_secret_keyset_prefs.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="chatui.db" />
+        <exclude domain="database" path="chatui.db-shm" />
+        <exclude domain="database" path="chatui.db-wal" />
+        <exclude domain="database" path="chatui.db-journal" />
+        <exclude domain="file" path="datastore/" />
+        <exclude domain="sharedpref" path="chatui_secret_keyset_prefs.xml" />
+    </device-transfer>
+</data-extraction-rules>
