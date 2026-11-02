@@ -1,0 +1,80 @@
+/*
+ * Shell typography and chat font-size modes.
+ *
+ * Chat font size is applied through data-chat-font-size on the document
+ * element. The token is consumed by chat text in later milestones; no chat
+ * component exists in M0.
+ */
+:root[data-chat-font-size='sm'] {
+  --font-chat-size: 0.875rem;
+  --font-chat-line-height: 1.45;
+}
+
+:root[data-chat-font-size='md'] {
+  --font-chat-size: 1rem;
+  --font-chat-line-height: 1.5;
+}
+
+:root[data-chat-font-size='lg'] {
+  --font-chat-size: 1.125rem;
+  --font-chat-line-height: 1.6;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin-block: 0 var(--space-3);
+  color: var(--color-fg-primary);
+  font-family: var(--font-heading-family);
+  font-weight: var(--font-heading-weight);
+  line-height: var(--font-heading-line-height);
+}
+
+h1 {
+  font-size: var(--font-heading-size-1);
+}
+
+h2 {
+  font-size: var(--font-heading-size-2);
+}
+
+h3 {
+  font-size: var(--font-heading-size-3);
+}
+
+h4,
+h5,
+h6 {
+  font-size: var(--font-heading-size);
+}
+
+p {
+  margin-block: 0 var(--space-3);
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-code-family);
+  font-size: var(--font-code-size);
+}
+
+pre {
+  overflow: auto;
+  padding: var(--density-space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-code);
+}
+
+a {
+  color: var(--color-accent);
+}
+
+a:hover {
+  color: var(--color-accent-hover);
+}

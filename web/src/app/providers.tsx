@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { ThemeProvider } from '../ui/theme'
+import { useConfig } from './config'
 
 interface AppProvidersProps {
   children: ReactNode
@@ -6,8 +8,11 @@ interface AppProvidersProps {
 
 /**
  * Application-wide provider slot. Runtime config is supplied by bootstrap;
- * the theme provider is added by M0-03.2 and the toast provider by M0-03.3.
+ * the theme provider applies the configured default appearance, and the toast
+ * provider is added by M0-03.3.
  */
 export function AppProviders({ children }: AppProvidersProps) {
-  return <>{children}</>
+  const config = useConfig()
+
+  return <ThemeProvider initialTheme={config.defaultTheme}>{children}</ThemeProvider>
 }

@@ -1,0 +1,89 @@
+/*
+ * Semantic design tokens from spec section 11.12.
+ *
+ * Token names are the CSS custom-property form of the shared names:
+ *   color.bg.canvas -> --color-bg-canvas
+ *   space.1         -> --space-1
+ *   radius.sm       -> --radius-sm
+ *   font.body.size  -> --font-body-size
+ *
+ * Light values live here as the default so the shell is usable before the
+ * theme provider applies a data-theme attribute. themes.css owns the explicit
+ * light, dark, and system overrides.
+ */
+:root {
+  /* Color: background */
+  --color-bg-canvas: #ffffff;
+  --color-bg-surface: #f7f7f8;
+  --color-bg-surface-raised: #ffffff;
+  --color-bg-user-bubble: #e8f0fe;
+  --color-bg-code: #f3f4f6;
+
+  /* Color: foreground */
+  --color-fg-primary: #1a1a1a;
+  --color-fg-secondary: #4a4a4a;
+  --color-fg-muted: #5f6368;
+  --color-fg-on-accent: #ffffff;
+
+  /* Color: accent */
+  --color-accent: #1a56db;
+  --color-accent-hover: #1e40af;
+
+  /* Color: borders */
+  --color-border-subtle: #d1d5db;
+  --color-border-strong: #6b7280;
+
+  /* Color: status */
+  --color-danger: #b91c1c;
+  --color-warning: #92400e;
+  --color-success: #166534;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* Typography: body */
+  --font-body-family:
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-body-size: 1rem;
+  --font-body-line-height: 1.5;
+
+  /* Typography: code */
+  --font-code-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-code-size: 0.875rem;
+
+  /* Typography: headings */
+  --font-heading-family: var(--font-body-family);
+  --font-heading-size: 1.25rem;
+  --font-heading-size-1: 2rem;
+  --font-heading-size-2: 1.5rem;
+  --font-heading-size-3: 1.25rem;
+  --font-heading-line-height: 1.25;
+  --font-heading-weight: 600;
+
+  /* Typography: chat text, adjusted by data-chat-font-size */
+  --font-chat-size: var(--font-body-size);
+  --font-chat-line-height: var(--font-body-line-height);
+
+  /* Focus */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color: var(--color-accent);
+
+  /* Motion */
+  --motion-duration-fast: 120ms;
+  --motion-duration-normal: 200ms;
+  --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+}
