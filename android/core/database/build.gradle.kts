@@ -5,6 +5,16 @@ plugins {
 
 android {
     namespace = "dev.chatui.core.database"
+
+    sourceSets {
+        // MigrationTestHelper reads the exported schema from test assets using
+        // the database class's canonical name as the asset folder.
+        getByName("test").assets.directories.add("$projectDir/schemas")
+    }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -18,4 +28,5 @@ dependencies {
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

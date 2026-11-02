@@ -44,7 +44,7 @@
 | 13 | [M0-03.3 Shared primitives, shell tests, web verification](M0-03.3-web-primitives-verification.md) | Complete | M0-03.1, M0-03.2 | web | M0-05.1 |
 | 14 | [M0-04.1 Gradle project, wrapper, catalog, module graph](M0-04.1-android-gradle.md) | Complete | M0-01.5 | android | M0-02.1 |
 | 15 | [M0-04.2 Core model, common utilities, network interfaces](M0-04.2-android-core.md) | Complete | M0-04.1 | android | M0-02.2 |
-| 16 | [M0-04.3 Room schema, DAOs, FTS, migrations](M0-04.3-android-room.md) | Not started | M0-04.2 | android | M0-02.3 |
+| 16 | [M0-04.3 Room schema, DAOs, FTS, migrations](M0-04.3-android-room.md) | Complete | M0-04.2 | android | M0-02.3 |
 | 17 | [M0-04.4 DataStore, Tink secret storage, backup exclusion](M0-04.4-android-datastore-secrets.md) | Not started | M0-04.3 | android | M0-02.4, M0-02.5 |
 | 18 | [M0-05.1 Android design system and theme](M0-05.1-android-designsystem.md) | Not started | M0-04.4 | android | M0-03.3 |
 | 19 | [M0-05.2 App shell, navigation, Hilt, Android verification](M0-05.2-android-app-shell.md) | Not started | M0-05.1 | android | M0-03.3 |
