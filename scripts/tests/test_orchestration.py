@@ -16,6 +16,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 NEXT_TASK = REPO_ROOT / "scripts" / "next-task"
 RUN_TASKS = REPO_ROOT / "scripts" / "run-tasks"
+TASK_STATUS = REPO_ROOT / "scripts" / "task-status"
 
 FAKE_OPENCODE = """#!{python}
 import json
@@ -355,14 +356,14 @@ class RunTasksTests(unittest.TestCase):
                 any(value.startswith("Implement exactly one task: ") for value in calls[0])
             )
 
-    def test_stops_when_same_task_is_selected_twice(self) -> None:
+    def test_fails_when_task_is_not_finalized(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             task_dir = root / "tasks"
             bin_dir = root / "bin"
             task_dir.mkdir()
             bin_dir.mkdir()
-            write_task(task_dir, "T-001", 1)
+            task = write_task(task_dir, "T-001", 1)
             log = root / "calls.jsonl"
             install_fake_opencode(bin_dir)
 
@@ -377,9 +378,53 @@ class RunTasksTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 1)
-            self.assertIn("no progress", result.stderr)
+            self.assertIn("did not reach Complete or Blocked", result.stderr)
+            self.assertIn("Not started", task.read_text(encoding="utf-8"))
             calls = [json.loads(line) for line in log.read_text().splitlines()]
             self.assertEqual(len(calls), 1)
+
+    def test_syncs_index_when_task_is_complete(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            task_dir = root / "tasks"
+            bin_dir = root / "bin"
+            task_dir.mkdir()
+            bin_dir.mkdir()
+            task = write_task(task_dir, "T-001", 1)
+            other = write_task(task_dir, "T-002", 2)
+            readme = task_dir / "README.md"
+            readme.write_text(
+                textwrap.dedent(
+                    """\
+                    # Tasks
+
+                    | Order | Task | Status | Depends on |
+                    | --- | --- | --- | --- |
+                    | 1 | [T-001](t-001.md) | Not started | none |
+                    | 2 | [T-002](t-002.md) | Not started | none |
+                    """
+                ),
+                encoding="utf-8",
+            )
+            log = root / "calls.jsonl"
+            install_fake_opencode(bin_dir)
+
+            result = run_tasks(
+                task_dir,
+                {
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "FAKE_OPENCODE_LOG": str(log),
+                    "FAKE_OPENCODE_COMPLETE": "1",
+                    "MAX_TASKS": "1",
+                },
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            index_text = readme.read_text(encoding="utf-8")
+            self.assertIn("| [T-001](t-001.md) | Complete |", index_text)
+            self.assertIn("| [T-002](t-002.md) | Not started |", index_text)
+            self.assertIn("Complete", task.read_text(encoding="utf-8"))
+            self.assertIn("Not started", other.read_text(encoding="utf-8"))
 
     def test_propagates_missing_task_folder(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -427,6 +472,82 @@ class RunTasksTests(unittest.TestCase):
             calls = [json.loads(line) for line in log.read_text().splitlines()]
             self.assertEqual(len(calls), 1)
             self.assertIn(str(in_progress), calls[0][-1])
+
+
+class TaskStatusTests(unittest.TestCase):
+    def run_status(
+        self, *args: str
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [str(TASK_STATUS), *args],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def test_get_supports_bullet_and_bold_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            task_dir = Path(tmp)
+            bullet = write_task(task_dir, "T-001", 1, status="In progress")
+            bold = write_task(task_dir, "T-002", 2, status="Complete", bold=True)
+
+            result = self.run_status("get", str(bullet))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), "In progress")
+
+            result = self.run_status("get", str(bold))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), "Complete")
+
+    def test_get_rejects_missing_or_unknown_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            task_dir = Path(tmp)
+            missing = task_dir / "missing.md"
+            missing.write_text("# T-001 - Missing\n", encoding="utf-8")
+            unknown = write_task(task_dir, "T-002", 2, status="Waiting")
+
+            self.assertEqual(self.run_status("get", str(missing)).returncode, 2)
+            self.assertEqual(self.run_status("get", str(unknown)).returncode, 2)
+
+    def test_sync_index_updates_only_the_matching_row(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            task_dir = Path(tmp)
+            task = write_task(task_dir, "T-001", 1, status="Complete")
+            write_task(task_dir, "T-002", 2)
+            readme = task_dir / "README.md"
+            readme.write_text(
+                textwrap.dedent(
+                    """\
+                    # Tasks
+
+                    | Order | Task | Status | Depends on |
+                    | --- | --- | --- | --- |
+                    | 1 | [T-001](t-001.md) | In progress | none |
+                    | 2 | [T-002](t-002.md) | Not started | none |
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_status("sync-index", str(task_dir), str(task))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            index_text = readme.read_text(encoding="utf-8")
+            self.assertIn("| [T-001](t-001.md) | Complete |", index_text)
+            self.assertIn("| [T-002](t-002.md) | Not started |", index_text)
+
+    def test_sync_index_errors_when_row_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            task_dir = Path(tmp)
+            task = write_task(task_dir, "T-001", 1, status="Complete")
+            (task_dir / "README.md").write_text(
+                "# Tasks\n\n| Order | Task | Status | Depends on |\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_status("sync-index", str(task_dir), str(task))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("no index row links to", result.stderr)
 
 
 if __name__ == "__main__":

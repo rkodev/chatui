@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""Read a task's status and keep the task index in sync.
+
+The runner uses this after a task session to verify the agent finalized the
+task and to mirror a final status into the task folder's README table.
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+STATUS_ALIASES = {
+    "not started": "Not started",
+    "not-started": "Not started",
+    "in progress": "In progress",
+    "in-progress": "In progress",
+    "blocked": "Blocked",
+    "complete": "Complete",
+    "completed": "Complete",
+    "done": "Complete",
+    "cancelled": "Cancelled",
+    "canceled": "Cancelled",
+}
+
+STATUS_PATTERNS = (
+    re.compile(r"^\s*[-*]\s*\*\*Status:?\*\*\s*:?\s*(.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*\*\*Status:?\*\*\s*:?\s*(.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*[-*]\s*Status\s*:\s*(.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*Status\s*:\s*(.+?)\s*$", re.IGNORECASE),
+)
+
+LINK_RE = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+
+
+class StatusError(Exception):
+    """Raised when a task status or index row cannot be processed."""
+
+
+def read_status(task_file: Path) -> str:
+    try:
+        text = task_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise StatusError(f"{task_file}: cannot read task file: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise StatusError(f"{task_file}: task file is not valid UTF-8: {exc}") from exc
+
+    for line in text.splitlines():
+        for pattern in STATUS_PATTERNS:
+            match = pattern.match(line)
+            if not match:
+                continue
+            raw = match.group(1).strip().rstrip(".").lower()
+            if raw not in STATUS_ALIASES:
+                raise StatusError(
+                    f"{task_file}: unsupported Status value {match.group(1)!r}"
+                )
+            return STATUS_ALIASES[raw]
+
+    raise StatusError(f"{task_file}: no Status field found")
+
+
+def sync_index(task_dir: Path, task_file: Path, status: str) -> None:
+    index = task_dir / "README.md"
+    if not index.exists():
+        return
+
+    task_name = task_file.name
+    try:
+        lines = index.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise StatusError(f"{index}: cannot read index: {exc}") from exc
+
+    updated = False
+    result = []
+    for line in lines:
+        if not line.lstrip().startswith("|"):
+            result.append(line)
+            continue
+
+        links = LINK_RE.findall(line)
+        if not any(Path(target).name == task_name for target in links):
+            result.append(line)
+            continue
+
+        cells = line.split("|")
+        if len(cells) < 5:
+            raise StatusError(f"{index}: malformed index row for {task_name}")
+        cells[3] = f" {status} "
+        result.append("|".join(cells))
+        updated = True
+
+    if not updated:
+        raise StatusError(f"{index}: no index row links to {task_name}")
+
+    index.write_text("\n".join(result) + "\n", encoding="utf-8")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Read or sync task status.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    get_parser = subparsers.add_parser("get", help="print a task's status")
+    get_parser.add_argument("task_file", type=Path)
+
+    sync_parser = subparsers.add_parser(
+        "sync-index", help="mirror a task's status into the folder README"
+    )
+    sync_parser.add_argument("task_dir", type=Path)
+    sync_parser.add_argument("task_file", type=Path)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+
+    try:
+        status = read_status(args.task_file)
+        if args.command == "get":
+            print(status)
+        elif args.command == "sync-index":
+            sync_index(args.task_dir, args.task_file, status)
+    except StatusError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

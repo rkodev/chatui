@@ -92,7 +92,15 @@ INCLUDE_IN_PROGRESS=1 scripts/run-tasks docs/operations/M0
 - `OPENCODE_AUTO=0` disables `--auto`. Without auto-approval, a batch can stall on permission prompts and is not suitable for unattended runs.
 - `INCLUDE_IN_PROGRESS=1` lets the selector resume `In progress` tasks.
 - `run-tasks` passes `--auto` before the message argument by default and stops when the selector has no eligible task, when the same task is selected twice in a row, or when `MAX_TASKS` is reached.
+- After each session, `run-tasks` reads the task status with `scripts/task-status`. It fails with a non-zero exit if the task is still `Not started` or `In progress`, and mirrors a `Complete` status into the task folder's `README.md` index row.
 - A selector exit code of `2` is propagated as `2`.
+
+Inspect or sync a task status directly:
+
+```bash
+scripts/task-status get docs/operations/M0/M0-01.5-contract-validator.md
+scripts/task-status sync-index docs/operations/M0 docs/operations/M0/M0-01.5-contract-validator.md
+```
 
 Run exactly one task through the command:
 

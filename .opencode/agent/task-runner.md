@@ -163,6 +163,8 @@ When the task is genuinely complete:
 3. Create exactly one commit.
 4. Stop immediately. Do not run the selector again.
 
+The orchestrator re-reads the task status after the session and aborts the batch if the task is still `Not started` or `In progress`. It also mirrors `Complete` into the index as a safety net, so both updates must be present.
+
 Commit subject: `<ID> <short imperative outcome>`
 
 Commit body must list:

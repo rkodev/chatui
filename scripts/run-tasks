@@ -20,7 +20,9 @@ if [[ ! -d "$TASK_DIR" ]]; then
   exit 2
 fi
 
-selector=(scripts/next-task "$TASK_DIR")
+scripts_dir="$REPO_ROOT/scripts"
+selector=("$scripts_dir/next-task" "$TASK_DIR")
+status_tool="$scripts_dir/task-status"
 if [[ "$INCLUDE_IN_PROGRESS" != "0" ]]; then
   selector+=(--include-in-progress)
 fi
@@ -67,6 +69,27 @@ while :; do
   echo "Running task: $task_path" >&2
   "${command[@]}"
   attempted=$((attempted + 1))
+
+  if ! task_status="$("$status_tool" get "$task_path")"; then
+    echo "error: could not read the status of '$task_path'" >&2
+    exit 1
+  fi
+
+  case "$task_status" in
+    Complete)
+      if ! "$status_tool" sync-index "$TASK_DIR" "$task_path"; then
+        echo "error: task is Complete but its index row could not be updated" >&2
+        exit 1
+      fi
+      ;;
+    Blocked)
+      ;;
+    *)
+      echo "error: task did not reach Complete or Blocked: '$task_path' (status: $task_status)" >&2
+      echo "error: the task runner must finalize its task before stopping" >&2
+      exit 1
+      ;;
+  esac
 done
 
 echo "run-tasks finished: $attempted task(s) attempted." >&2
