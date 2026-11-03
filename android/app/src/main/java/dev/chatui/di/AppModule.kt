@@ -11,6 +11,8 @@ import dev.chatui.core.database.repository.ConversationRepository
 import dev.chatui.core.database.repository.MessageRepository
 import dev.chatui.core.database.repository.ModelRepository
 import dev.chatui.core.database.repository.ProviderRepository
+import dev.chatui.core.database.recovery.InterruptedMessageRecovery
+import dev.chatui.core.database.recovery.StreamingRecoveryService
 import dev.chatui.core.datastore.secret.SecretCipher
 import dev.chatui.core.datastore.secret.SecretStore
 import dev.chatui.core.datastore.secret.TinkSecretCipher
@@ -114,6 +116,13 @@ object AppModule {
         database: ChatUiDatabase,
         clock: Clock,
     ): MessageRepository = MessageRepository(database.messageDao(), clock)
+
+    @Provides
+    @Singleton
+    fun provideInterruptedMessageRecovery(
+        messages: MessageRepository,
+        clock: Clock,
+    ): InterruptedMessageRecovery = StreamingRecoveryService(messages, clock)
 
     @Provides
     @Singleton

@@ -10,6 +10,7 @@ import dev.chatui.core.database.repository.ConversationRepository
 import dev.chatui.core.database.repository.MessageRepository
 import dev.chatui.core.database.repository.ModelRepository
 import dev.chatui.core.database.repository.ProviderRepository
+import dev.chatui.core.database.recovery.StreamingRecoveryService
 import dev.chatui.core.datastore.secret.SecretCipher
 import dev.chatui.core.datastore.secret.SecretStore
 import dev.chatui.core.network.ProviderRegistry
@@ -113,6 +114,18 @@ class AppModuleTest {
             .isInstanceOf(ProviderRepository::class.java)
         assertThat(AppModule.provideModelRepository(database))
             .isInstanceOf(ModelRepository::class.java)
+    }
+
+    @Test
+    fun `provides interrupted message recovery`() {
+        val clock = AppModule.provideClock()
+
+        val recovery = AppModule.provideInterruptedMessageRecovery(
+            messages = AppModule.provideMessageRepository(database, clock),
+            clock = clock,
+        )
+
+        assertThat(recovery).isInstanceOf(StreamingRecoveryService::class.java)
     }
 
     @Test
