@@ -33,6 +33,8 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:datastore"))
     implementation(project(":core:network"))
+    implementation(project(":core:providers"))
+    implementation(libs.androidx.room.runtime)
     implementation(project(":feature:onboarding"))
     implementation(project(":feature:chat"))
     implementation(project(":feature:conversations"))
