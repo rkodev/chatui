@@ -50,7 +50,7 @@
 | 16 | [M1-06.1 Android contract registry and dependencies](M1-06.1-android-contract-registry.md) | Complete | M1-01.2 | android | M1-02.1 |
 | 17 | [M1-06.2 Android SSE transport](M1-06.2-android-sse-transport.md) | Complete | M1-06.1 | android | M1-02.2, M1-06.3 |
 | 18 | [M1-06.3 Android key validation and catalog](M1-06.3-android-key-catalog.md) | Complete | M1-06.1 | android | M1-06.2, M1-02.3 |
-| 19 | [M1-06.4 Android OpenRouter streaming, retry, errors, routing](M1-06.4-android-openrouter-streaming.md) | Not started | M1-01.2, M1-06.2, M1-06.3 | android | M1-02.4 |
+| 19 | [M1-06.4 Android OpenRouter streaming, retry, errors, routing](M1-06.4-android-openrouter-streaming.md) | Complete | M1-01.2, M1-06.2, M1-06.3 | android | M1-02.4 |
 | 20 | [M1-08.1 Android repositories and transactions](M1-08.1-android-repositories.md) | Not started | M1-06.4 | android | M1-05.1 |
 | 21 | [M1-07.1 Android provider/model services and Hilt wiring](M1-07.1-android-provider-services.md) | Not started | M1-06.4, M1-08.1 | android | M1-03.1 |
 | 22 | [M1-07.2 Android onboarding and key entry](M1-07.2-android-onboarding-key-entry.md) | Not started | M1-07.1 | android | M1-03.2 |

@@ -1,17 +1,22 @@
 package dev.chatui.core.network
 
 import dev.chatui.core.model.ChatErrorCode
+import dev.chatui.core.model.ProviderKind
+import dev.chatui.core.model.StreamEvent
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
@@ -37,22 +42,81 @@ class OpenRouterRequestException(
     val status: Int? = null,
     val retryable: Boolean = false,
     val retryAfterSeconds: Double? = null,
+    val requestId: String? = null,
+    val details: JsonObject? = null,
     cause: Throwable? = null,
-) : Exception(message, cause)
+) : Exception(message, cause) {
+    /** Return a copy with a different retryability flag. */
+    fun withRetryable(retryable: Boolean): OpenRouterRequestException =
+        OpenRouterRequestException(
+            code = code,
+            message = message,
+            providerId = providerId,
+            status = status,
+            retryable = retryable,
+            retryAfterSeconds = retryAfterSeconds,
+            requestId = requestId,
+            details = details,
+            cause = cause,
+        )
+
+    /** Return a copy with a provider ID filled in. */
+    fun withProviderId(providerId: String): OpenRouterRequestException =
+        OpenRouterRequestException(
+            code = code,
+            message = message,
+            providerId = providerId,
+            status = status,
+            retryable = retryable,
+            retryAfterSeconds = retryAfterSeconds,
+            requestId = requestId,
+            details = details,
+            cause = cause,
+        )
+}
 
 /**
- * OpenRouter key validation and public model catalog.
+ * OpenRouter key validation, public model catalog, and chat streaming.
  *
- * This class intentionally does not implement [ProviderAdapter] yet: chat
- * streaming is added by M1-06.4. The key and catalog methods already use the
- * same mapping and cache semantics as the web client.
+ * The key and catalog methods use the same mapping and cache semantics as the
+ * web client. [streamChat] emits normalized events and never throws for
+ * provider, network, or timeout failures; coroutine cancellation cancels the
+ * underlying OkHttp call.
  */
 class OpenRouterAdapter(
     private val client: OkHttpClient,
     private val attribution: OpenRouterAttribution? = null,
     private val cache: CatalogCache = getDefaultCatalogCache(),
     private val now: () -> Long = System::currentTimeMillis,
-) {
+    private val retryPolicy: OpenRouterRetryPolicy = OpenRouterRetryPolicy(),
+    private val inactivityTimeoutMillis: Long = DEFAULT_INACTIVITY_TIMEOUT_MS,
+    private val random: Random = Random.Default,
+    private val sleep: suspend (Long) -> Unit = { delay(it) },
+    private val supportedParameters: List<String> = DEFAULT_SUPPORTED_PARAMETERS,
+) : ProviderAdapter {
+    override val kind: ProviderKind = ProviderKind.OPENAI_COMPATIBLE
+
+    /**
+     * Streaming uses a dedicated client so a long-lived response is not cut
+     * off by the JSON request timeouts. The 120 s inactivity watchdog in
+     * [OpenRouterStreamer] bounds a stalled stream instead.
+     */
+    private val streamClient: OkHttpClient = client.newBuilder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .callTimeout(0, TimeUnit.MILLISECONDS)
+        .build()
+
+    private val streamer = OpenRouterStreamer(
+        client = streamClient,
+        attribution = attribution,
+        now = now,
+        retryPolicy = retryPolicy,
+        inactivityTimeoutMillis = inactivityTimeoutMillis,
+        random = random,
+        sleep = sleep,
+    )
+
     /**
      * Validate an OpenRouter key with `GET /key`.
      *
@@ -60,7 +124,7 @@ class OpenRouterAdapter(
      * the URL, and provider error messages are redacted before they reach the
      * caller.
      */
-    suspend fun validateKey(context: ProviderContext): ProviderKeyInfo {
+    override suspend fun validateKey(context: ProviderContext): ProviderKeyInfo {
         if (context.apiKey.isNullOrBlank()) {
             throw OpenRouterRequestException(
                 code = ChatErrorCode.AUTH,
@@ -158,12 +222,35 @@ class OpenRouterAdapter(
      * Returns the normalized models. Use [loadCatalog] when the caller needs
      * the cache, staleness, and refresh-error flags.
      */
-    suspend fun listModels(context: ProviderContext): List<ModelInfo> =
+    override suspend fun listModels(context: ProviderContext): List<ModelInfo> =
         loadCatalog(context).models
 
     /** Force a catalog refresh while preserving last-known-good behavior. */
     suspend fun refreshCatalog(context: ProviderContext): CatalogResult =
         loadCatalog(context, forceRefresh = true)
+
+    /**
+     * Stream a normalized chat response.
+     *
+     * The returned flow is cold: the request starts when collection starts and
+     * is cancelled when collection is cancelled.
+     */
+    override fun streamChat(
+        context: ProviderContext,
+        request: NormalizedChatRequest,
+    ): Flow<StreamEvent> = streamer.stream(context, request, supportedParameters)
+
+    /**
+     * Stream with the model's catalog-supported parameters.
+     *
+     * Callers that have catalog metadata should use this overload so optional
+     * sampling and reasoning controls are only serialized when supported.
+     */
+    fun streamChat(
+        context: ProviderContext,
+        request: NormalizedChatRequest,
+        supportedParameters: List<String>,
+    ): Flow<StreamEvent> = streamer.stream(context, request, supportedParameters)
 
     private suspend fun fetchModels(context: ProviderContext): List<ModelInfo> {
         val payload = requestJson(context, "/models", includeAuth = false)
@@ -205,11 +292,12 @@ class OpenRouterAdapter(
                 val body = result.body.string()
 
                 if (!result.isSuccessful) {
-                    throw httpError(
+                    throw mapHttpError(
                         context = context,
                         status = result.code,
-                        retryAfter = result.header("Retry-After"),
+                        headers = result.headers,
                         body = body,
+                        nowMillis = now(),
                     )
                 }
 
@@ -274,72 +362,5 @@ class OpenRouterAdapter(
         }
 
         return builder.build()
-    }
-
-    private fun httpError(
-        context: ProviderContext,
-        status: Int,
-        retryAfter: String?,
-        body: String,
-    ): OpenRouterRequestException = OpenRouterRequestException(
-        code = statusToCode(status),
-        message = redactSecret(readErrorMessage(status, body), context.apiKey),
-        providerId = context.provider.id,
-        status = status,
-        retryable = isRetryableStatus(status),
-        retryAfterSeconds = parseRetryAfter(retryAfter),
-    )
-}
-
-private fun joinUrl(baseUrl: String, path: String): String =
-    "${baseUrl.trimEnd('/')}/${path.trimStart('/')}"
-
-private fun redactSecret(message: String, secret: String?): String {
-    if (secret.isNullOrEmpty()) {
-        return message
-    }
-
-    return message.replace(secret, "[redacted]")
-}
-
-private fun statusToCode(status: Int): ChatErrorCode = when (status) {
-    401 -> ChatErrorCode.AUTH
-    402 -> ChatErrorCode.QUOTA
-    403 -> ChatErrorCode.PERMISSION
-    404 -> ChatErrorCode.MODEL_NOT_FOUND
-    429 -> ChatErrorCode.RATE_LIMIT
-    else -> ChatErrorCode.PROVIDER
-}
-
-private fun isRetryableStatus(status: Int): Boolean = status == 429 || status >= 500
-
-private fun parseRetryAfter(value: String?): Double? {
-    if (value.isNullOrBlank()) {
-        return null
-    }
-
-    val seconds = value.trim().toDoubleOrNull() ?: return null
-    return seconds.takeIf { it >= 0.0 }
-}
-
-private fun readErrorMessage(status: Int, body: String): String {
-    if (body.isBlank()) {
-        return "OpenRouter request failed with HTTP $status"
-    }
-
-    return try {
-        val parsed = Json.parseToJsonElement(body)
-        val obj = parsed as? JsonObject
-        val error = obj?.get("error") as? JsonObject
-        val errorMessage = (error?.get("message") as? JsonPrimitive)
-            ?.takeIf { it.isString }
-            ?.content
-        val message = (obj?.get("message") as? JsonPrimitive)
-            ?.takeIf { it.isString }
-            ?.content
-
-        errorMessage ?: message ?: body.take(500)
-    } catch (_: Exception) {
-        body.take(500)
     }
 }
