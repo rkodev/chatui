@@ -9,19 +9,26 @@ import { ChatService, type ChatRunnerLike } from './chatService'
 import { createStreamingState } from './streamingStore'
 import { createTestMessage } from './testSupport'
 
-function createHarness(overrides: {
-  conversation?: Conversation
-  messages?: Message[]
-  provider?: ReturnType<typeof createTestProvider> | null
-  model?: ReturnType<typeof createTestModel> | null
-  apiKey?: string | null
-  runner?: Partial<ChatRunnerLike>
-} = {}) {
+function createHarness(
+  overrides: {
+    conversation?: Conversation
+    messages?: Message[]
+    provider?: ReturnType<typeof createTestProvider> | null
+    model?: ReturnType<typeof createTestModel> | null
+    apiKey?: string | null
+    runner?: Partial<ChatRunnerLike>
+  } = {},
+) {
   const conversation = overrides.conversation ?? createTestConversation()
   const provider = overrides.provider === undefined ? createTestProvider() : overrides.provider
   const model = overrides.model === undefined ? createTestModel() : overrides.model
   const messages = overrides.messages ?? [
-    createTestMessage({ id: 'm1', sequence: 1, role: 'user', parts: [{ type: 'text', text: 'Hello' }] }),
+    createTestMessage({
+      id: 'm1',
+      sequence: 1,
+      role: 'user',
+      parts: [{ type: 'text', text: 'Hello' }],
+    }),
   ]
   const assistant = createTestMessage({
     id: 'm2',
@@ -64,10 +71,11 @@ function createHarness(overrides: {
       get: async () => model,
     },
     secrets: {
-      getSecret: async () => overrides.apiKey === undefined ? 'sk-test' : overrides.apiKey,
+      getSecret: async () => (overrides.apiKey === undefined ? 'sk-test' : overrides.apiKey),
     },
     settings: {
       getShowTokenUsage: async () => true,
+      getSendKey: async () => 'enter',
     },
     runner,
     runtime: { fetch: globalThis.fetch },
@@ -150,7 +158,12 @@ describe('ChatService', () => {
     })
     const { service, conversation, runner } = createHarness({
       messages: [
-        createTestMessage({ id: 'm1', sequence: 1, role: 'user', parts: [{ type: 'text', text: 'Hello' }] }),
+        createTestMessage({
+          id: 'm1',
+          sequence: 1,
+          role: 'user',
+          parts: [{ type: 'text', text: 'Hello' }],
+        }),
         target,
       ],
     })

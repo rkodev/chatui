@@ -1,5 +1,8 @@
 export { ChatScreen, type ChatScreenProps } from './ChatScreen'
 export { ChatRoute } from './ChatRoute'
+export { Composer, type ComposerProps } from './Composer'
+export { MAX_COMPOSER_LINES, resizeComposerTextarea } from './composerTextarea'
+export { useOnlineStatus } from './useOnlineStatus'
 export { ChatServiceProvider, type ChatServiceProviderProps } from './ChatServiceProvider'
 export { useChatService } from './chatServiceContext'
 export {
@@ -24,4 +27,8 @@ export {
   type UseConversationMessagesOptions,
   type UseConversationMessagesResult,
 } from './useConversationMessages'
-export { useWindowedList, type UseWindowedListOptions, type UseWindowedListResult } from './useWindowedList'
+export {
+  useWindowedList,
+  type UseWindowedListOptions,
+  type UseWindowedListResult,
+} from './useWindowedList'

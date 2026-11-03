@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { newId, nowIso, type Conversation, type Message } from '../../domain'
+import { newId, nowIso, type Conversation, type Message, type SendKey } from '../../domain'
 import { useChatService } from './chatServiceContext'
 import type { ChatAvailability } from './chatService'
 import { describeChatError } from './chatErrorCopy'
@@ -18,11 +18,12 @@ export interface ChatSession {
   error: string | null
   availability: ChatAvailability | null
   showTokenUsage: boolean
+  sendKey: SendKey
   streamingMessageId: string | null
   isStreaming: boolean
   announcement: string
   loadOlder: () => Promise<void>
-  send: (text: string) => Promise<void>
+  send: (text: string) => Promise<boolean>
   cancel: () => Promise<void>
   retry: (message: Message) => Promise<void>
   reload: () => Promise<void>
@@ -58,6 +59,7 @@ export function useChatSession(conversationId: string): ChatSession {
   const [error, setError] = useState<string | null>(null)
   const [availability, setAvailability] = useState<ChatAvailability | null>(null)
   const [showTokenUsage, setShowTokenUsage] = useState(true)
+  const [sendKey, setSendKey] = useState<SendKey>('enter')
   const [announcement, setAnnouncement] = useState('')
 
   const streamingMessageId = useStreamingStore(
@@ -71,18 +73,25 @@ export function useChatSession(conversationId: string): ChatSession {
     const value = await service.getConversation(conversationId)
 
     if (!value) {
-      return { conversation: null, availability: null, showTokenUsage: true }
+      return {
+        conversation: null,
+        availability: null,
+        showTokenUsage: true,
+        sendKey: 'enter' as SendKey,
+      }
     }
 
-    const [nextAvailability, nextShowTokenUsage] = await Promise.all([
+    const [nextAvailability, nextShowTokenUsage, nextSendKey] = await Promise.all([
       service.getAvailability(value),
       service.getShowTokenUsage(),
+      service.getSendKey(),
     ])
 
     return {
       conversation: value,
       availability: nextAvailability,
       showTokenUsage: nextShowTokenUsage,
+      sendKey: nextSendKey,
     }
   }, [conversationId, service])
 
@@ -98,6 +107,7 @@ export function useChatSession(conversationId: string): ChatSession {
       setConversation(result.conversation)
       setAvailability(result.availability)
       setShowTokenUsage(result.showTokenUsage)
+      setSendKey(result.sendKey)
 
       if (!service.isStreaming(conversationId)) {
         useStreamingStore.getState().clearStream(conversationId)
@@ -196,15 +206,15 @@ export function useChatSession(conversationId: string): ChatSession {
   }, [conversationId, loadNewest])
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string): Promise<boolean> => {
       if (!conversation) {
-        return
+        return false
       }
 
       const trimmed = text.trim()
 
       if (trimmed === '') {
-        return
+        return false
       }
 
       const timestamp = nowIso()
@@ -237,13 +247,15 @@ export function useChatSession(conversationId: string): ChatSession {
         if (!result.ok) {
           setError(result.message)
           await loadNewest()
-          return
+          return false
         }
 
         await load()
+        return true
       } catch (cause) {
         setError(errorMessage(cause))
         await loadNewest()
+        return false
       }
     },
     [appendOptimistic, conversation, conversationId, load, loadNewest, service],
@@ -301,6 +313,7 @@ export function useChatSession(conversationId: string): ChatSession {
     error: isCurrent ? (error ?? messagesError) : null,
     availability: isCurrent ? availability : null,
     showTokenUsage,
+    sendKey,
     streamingMessageId,
     isStreaming,
     announcement,

@@ -1,4 +1,4 @@
-import type { ChatError, Conversation, Message, Model, Provider } from '../../domain'
+import type { ChatError, Conversation, Message, Model, Provider, SendKey } from '../../domain'
 import type { ProviderRuntime } from '../providers/types'
 import type { SecretStoreLike } from '../providers/types'
 import type { ConversationStore } from '../conversations/types'
@@ -17,12 +17,7 @@ export type ChatAvailability =
   | { ok: false; reason: 'no_provider' | 'model_unavailable'; message: string }
 
 export type ChatSendFailureReason =
-  | 'no_provider'
-  | 'model_unavailable'
-  | 'no_key'
-  | 'busy'
-  | 'storage'
-  | 'invalid_target'
+  'no_provider' | 'model_unavailable' | 'no_key' | 'busy' | 'storage' | 'invalid_target'
 
 export type ChatSendResult =
   | { ok: true; message: Message }
@@ -40,6 +35,7 @@ export interface ChatServiceLike {
   listMessages(conversationId: string, options?: MessageListOptions): Promise<MessagePage>
   getAvailability(conversation: Conversation): Promise<ChatAvailability>
   getShowTokenUsage(): Promise<boolean>
+  getSendKey(): Promise<SendKey>
   send(conversation: Conversation, userMessage?: Message): Promise<ChatSendResult>
   retry(conversation: Conversation, target: Message): Promise<ChatSendResult>
   cancel(conversationId: string): Promise<Message | null>
@@ -71,6 +67,7 @@ export interface ChatServiceOptions {
   secrets: Pick<SecretStoreLike, 'getSecret'>
   settings: {
     getShowTokenUsage(): Promise<boolean>
+    getSendKey(): Promise<SendKey>
   }
   runner: ChatRunnerLike
   runtime: ProviderRuntime
@@ -130,6 +127,10 @@ export class ChatService implements ChatServiceLike {
 
   async getShowTokenUsage(): Promise<boolean> {
     return this.settings.getShowTokenUsage()
+  }
+
+  async getSendKey(): Promise<SendKey> {
+    return this.settings.getSendKey()
   }
 
   isStreaming(conversationId: string): boolean {

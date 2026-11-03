@@ -38,9 +38,7 @@ export function createTestMessage(overrides: Partial<Message> = {}): Message {
  * It mirrors the real service's observable behavior without IndexedDB or
  * network access. Individual tests override only the methods they exercise.
  */
-export function createFakeChatService(
-  overrides: Partial<ChatServiceLike> = {},
-): ChatServiceLike {
+export function createFakeChatService(overrides: Partial<ChatServiceLike> = {}): ChatServiceLike {
   const conversation = createTestConversation()
   const model = createTestModel()
   const provider = createTestProvider()
@@ -51,6 +49,7 @@ export function createFakeChatService(
     listMessages: async () => ({ items: [], nextCursor: null }),
     getAvailability: async () => ({ ok: true, model, provider }),
     getShowTokenUsage: async () => true,
+    getSendKey: async () => 'enter',
     send: async () => ({ ok: true, message }),
     retry: async () => ({ ok: true, message }),
     cancel: async () => null,
@@ -74,11 +73,12 @@ export function createTestChatSession(overrides: Partial<ChatSession> = {}): Cha
     error: null,
     availability: { ok: true, model, provider },
     showTokenUsage: true,
+    sendKey: 'enter',
     streamingMessageId: null,
     isStreaming: false,
     announcement: '',
     loadOlder: async () => undefined,
-    send: async () => undefined,
+    send: async () => true,
     cancel: async () => undefined,
     retry: async () => undefined,
     reload: async () => undefined,

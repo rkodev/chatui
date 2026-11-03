@@ -1,7 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createTestConversation, createTestModel, createTestProvider } from '../providers/testSupport'
+import {
+  createTestConversation,
+  createTestModel,
+  createTestProvider,
+} from '../providers/testSupport'
 import { ChatServiceContext } from './chatServiceContext'
 import type { ChatServiceLike } from './chatService'
 import { createStreamingState, useStreamingStore } from './streamingStore'
@@ -29,6 +33,7 @@ describe('useChatSession', () => {
       listMessages: async () => ({ items: [message], nextCursor: null }),
       getAvailability: async () => ({ ok: true, model, provider }),
       getShowTokenUsage: async () => false,
+      getSendKey: async () => 'mod-enter',
     })
 
     const { result } = renderHook(() => useChatSession(conversation.id), {
@@ -41,6 +46,7 @@ describe('useChatSession', () => {
     expect(result.current.messages).toEqual([message])
     expect(result.current.availability).toEqual({ ok: true, model, provider })
     expect(result.current.showTokenUsage).toBe(false)
+    expect(result.current.sendKey).toBe('mod-enter')
   })
 
   it('announces start, complete, and error but not token updates', async () => {
