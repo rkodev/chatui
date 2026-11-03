@@ -7,6 +7,7 @@ import androidx.navigation.createGraph
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.datastore.settings.AndroidSettings
+import dev.chatui.shell.ChatDestination
 import dev.chatui.shell.ShellDestination
 import dev.chatui.shell.shellDestinations
 import dev.chatui.shell.shellStartDestination
@@ -20,21 +21,12 @@ import org.robolectric.annotation.Config
 class ShellNavigationTest {
     @Test
     fun `navigation graph resolves every shell destination`() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val navController = NavHostController(context).apply {
-            navigatorProvider.addNavigator(ComposeNavigator())
-        }
-
-        val graph = navController.createGraph(
-            startDestination = ShellDestination.Conversations.route,
-        ) {
-            shellDestinations(navController)
-        }
-        navController.graph = graph
+        val navController = navController()
 
         ShellDestination.entries.forEach { destination ->
             assertThat(navController.graph.findNode(destination.route)).isNotNull()
         }
+        assertThat(navController.graph.findNode(ChatDestination.ROUTE)).isNotNull()
         assertThat(navController.graph.startDestinationRoute)
             .isEqualTo(ShellDestination.Conversations.route)
     }
@@ -49,5 +41,45 @@ class ShellNavigationTest {
     fun `completed onboarding starts on conversations`() {
         assertThat(shellStartDestination(AndroidSettings(onboardingCompleted = true)))
             .isEqualTo(ShellDestination.Conversations.route)
+    }
+
+    @Test
+    fun `completed onboarding restores the last active conversation`() {
+        assertThat(
+            shellStartDestination(
+                AndroidSettings(
+                    onboardingCompleted = true,
+                    lastActiveConversationId = "conversation-1",
+                ),
+            ),
+        ).isEqualTo(ChatDestination.createRoute("conversation-1"))
+    }
+
+    @Test
+    fun `chat destination accepts a conversation id`() {
+        val navController = navController()
+
+        navController.navigate(ChatDestination.createRoute("conversation-1"))
+
+        assertThat(navController.currentDestination?.route).isEqualTo(ChatDestination.ROUTE)
+        assertThat(
+            navController.currentBackStackEntry
+                ?.arguments
+                ?.getString(ChatDestination.ARG_CONVERSATION_ID),
+        ).isEqualTo("conversation-1")
+    }
+
+    private fun navController(): NavHostController {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val navController = NavHostController(context).apply {
+            navigatorProvider.addNavigator(ComposeNavigator())
+        }
+
+        navController.graph = navController.createGraph(
+            startDestination = ShellDestination.Conversations.route,
+        ) {
+            shellDestinations(navController)
+        }
+        return navController
     }
 }

@@ -55,7 +55,7 @@
 | 21 | [M1-07.1 Android provider/model services and Hilt wiring](M1-07.1-android-provider-services.md) | Complete | M1-06.4, M1-08.1 | android | M1-03.1 |
 | 22 | [M1-07.2 Android onboarding and key entry](M1-07.2-android-onboarding-key-entry.md) | Complete | M1-07.1 | android | M1-03.2 |
 | 23 | [M1-07.3 Android provider, model, defaults, and routing UI](M1-07.3-android-provider-model-management.md) | Complete | M1-07.1, M1-07.2 | android | M1-03.3 |
-| 24 | [M1-08.2 Android conversations and navigation](M1-08.2-android-conversations-recovery.md) | Not started | M1-08.1, M1-07.3 | android | M1-05.2 |
+| 24 | [M1-08.2 Android conversations and navigation](M1-08.2-android-conversations-recovery.md) | Complete | M1-08.1, M1-07.3 | android | M1-05.2 |
 | 25 | [M1-08.3 Android recovery and conversation tests](M1-08.3-android-recovery-tests.md) | Not started | M1-08.2, M1-07.3 | android | M1-05.2 |
 | 26 | [M1-09.1 Android chat runner and ViewModel](M1-09.1-android-chat-runner.md) | Not started | M1-06.4, M1-08.1, M1-08.2 | android | M1-04.1 |
 | 27 | [M1-09.2 Android chat screen and composer](M1-09.2-android-chat-screen.md) | Not started | M1-09.1 | android | M1-04.2, M1-04.3 |
