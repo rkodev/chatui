@@ -26,6 +26,8 @@ export interface ChatSession {
   send: (text: string) => Promise<boolean>
   cancel: () => Promise<void>
   retry: (message: Message) => Promise<void>
+  regenerate: (message: Message) => Promise<void>
+  editLastUser: (message: Message, text: string) => Promise<boolean>
   reload: () => Promise<void>
 }
 
@@ -271,7 +273,7 @@ export function useChatSession(conversationId: string): ChatSession {
     }
   }, [conversationId, load, loadNewest, service])
 
-  const retry = useCallback(
+  const runRetry = useCallback(
     async (message: Message) => {
       if (!conversation) {
         return
@@ -292,6 +294,40 @@ export function useChatSession(conversationId: string): ChatSession {
       } catch (cause) {
         setError(errorMessage(cause))
         await loadNewest()
+      }
+    },
+    [conversation, load, loadNewest, service],
+  )
+
+  const editLastUser = useCallback(
+    async (message: Message, text: string): Promise<boolean> => {
+      if (!conversation) {
+        return false
+      }
+
+      const trimmed = text.trim()
+
+      if (trimmed === '') {
+        return false
+      }
+
+      setError(null)
+
+      try {
+        const result = await service.editLastUser(conversation, message, trimmed)
+
+        if (!result.ok) {
+          setError(result.message)
+          await loadNewest()
+          return false
+        }
+
+        await load()
+        return true
+      } catch (cause) {
+        setError(errorMessage(cause))
+        await loadNewest()
+        return false
       }
     },
     [conversation, load, loadNewest, service],
@@ -320,7 +356,9 @@ export function useChatSession(conversationId: string): ChatSession {
     loadOlder,
     send,
     cancel,
-    retry,
+    retry: runRetry,
+    regenerate: runRetry,
+    editLastUser,
     reload,
   }
 }

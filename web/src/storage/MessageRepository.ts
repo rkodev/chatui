@@ -115,6 +115,67 @@ export class MessageRepository {
     )
   }
 
+  /**
+   * Delete every message after `sequence` and update conversation metadata.
+   *
+   * Used by edit-last-user. The target message itself is kept; the caller
+   * rewrites it and appends the replacement assistant response.
+   */
+  async truncateAfter(
+    conversationId: string,
+    sequence: number,
+  ): Promise<{ deleted: number; conversation: Conversation }> {
+    return runTransaction(
+      this.db,
+      ['messages', 'conversations'],
+      'readwrite',
+      async (transaction) => {
+        const messages = transaction.objectStore('messages')
+        const conversations = transaction.objectStore('conversations')
+        const existingConversation = await conversations.get(conversationId)
+
+        if (!existingConversation) {
+          throw new Error(`Conversation ${conversationId} not found`)
+        }
+
+        const index = messages.index('conversationId+sequence')
+        const range = IDBKeyRange.bound(
+          [conversationId, sequence],
+          [conversationId, Number.POSITIVE_INFINITY],
+          true,
+          false,
+        )
+        let cursor = await index.openCursor(range)
+        let deleted = 0
+
+        while (cursor) {
+          await cursor.delete()
+          deleted += 1
+          cursor = await cursor.continue()
+        }
+
+        const remaining = await messages.index('conversationId').count(conversationId)
+        const lastCursor = await index.openCursor(
+          IDBKeyRange.bound(
+            [conversationId, Number.NEGATIVE_INFINITY],
+            [conversationId, Number.POSITIVE_INFINITY],
+          ),
+          'prev',
+        )
+        const conversation = fromConversationRecord(existingConversation)
+        const updated: Conversation = {
+          ...conversation,
+          messageCount: remaining,
+          lastMessageAt: lastCursor ? lastCursor.value.createdAt : conversation.createdAt,
+          updatedAt: nowIso(),
+        }
+
+        await conversations.put(toConversationRecord(updated))
+        return { deleted, conversation: updated }
+      },
+    )
+  }
+
   async count(conversationId: string): Promise<number> {
     return this.db.countFromIndex('messages', 'conversationId', conversationId)
   }

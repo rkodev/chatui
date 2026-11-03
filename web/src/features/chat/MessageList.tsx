@@ -29,6 +29,8 @@ export interface MessageListProps {
   onLoadOlder: () => void
   showTokenUsage: boolean
   onRetry?: (message: Message) => void
+  onRegenerate?: (message: Message) => void
+  onEditLastUser?: (message: Message, text: string) => void
 }
 
 interface MessageRowProps {
@@ -84,6 +86,8 @@ export function MessageList({
   onLoadOlder,
   showTokenUsage,
   onRetry,
+  onRegenerate,
+  onEditLastUser,
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -99,6 +103,24 @@ export function MessageList({
     [isStreaming, messages, streamingMessageId],
   )
   const keys = useMemo(() => visibleMessages.map((message) => message.id), [visibleMessages])
+  const lastAssistantId = useMemo(() => {
+    for (let index = visibleMessages.length - 1; index >= 0; index -= 1) {
+      if (visibleMessages[index].role === 'assistant') {
+        return visibleMessages[index].id
+      }
+    }
+
+    return null
+  }, [visibleMessages])
+  const lastUserId = useMemo(() => {
+    for (let index = visibleMessages.length - 1; index >= 0; index -= 1) {
+      if (visibleMessages[index].role === 'user') {
+        return visibleMessages[index].id
+      }
+    }
+
+    return null
+  }, [visibleMessages])
   const persistedStreaming =
     streamingMessageId !== null && messages.some((message) => message.id === streamingMessageId)
 
@@ -212,6 +234,10 @@ export function MessageList({
               message={message}
               showTokenUsage={showTokenUsage}
               onRetry={onRetry}
+              onRegenerate={onRegenerate}
+              onEditLastUser={onEditLastUser}
+              canRegenerate={!isStreaming && message.id === lastAssistantId}
+              canEditLastUser={!isStreaming && message.id === lastUserId}
             />
           </MessageRow>
         ))}

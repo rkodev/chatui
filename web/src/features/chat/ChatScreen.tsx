@@ -126,6 +126,8 @@ export function ChatScreen({ session, composer }: ChatScreenProps) {
             onLoadOlder={session.loadOlder}
             showTokenUsage={session.showTokenUsage}
             onRetry={session.retry}
+            onRegenerate={session.regenerate}
+            onEditLastUser={session.editLastUser}
           />
         )}
       </div>

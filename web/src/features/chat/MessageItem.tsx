@@ -3,6 +3,8 @@ import type { ContentPart, Message, MessageRole, Usage } from '../../domain'
 import { formatUsd } from '../providers/format'
 import { Button } from '../../ui/primitives'
 import { describeChatError } from './chatErrorCopy'
+import { MarkdownRenderer } from './MarkdownRenderer'
+import { MessageActions } from './MessageActions'
 import { messageItemPropsEqual, type MessageItemProps } from './messageItemProps'
 import './chat.css'
 
@@ -60,6 +62,10 @@ function MessageItemComponent({
   message,
   showTokenUsage,
   onRetry,
+  onRegenerate,
+  onEditLastUser,
+  canRegenerate = false,
+  canEditLastUser = false,
   isActiveStream = false,
 }: MessageItemProps) {
   const roleLabel = ROLE_LABELS[message.role]
@@ -97,9 +103,7 @@ function MessageItemComponent({
         )}
 
         {text.map((part, index) => (
-          <p key={index} className="message__text">
-            {part}
-          </p>
+          <MarkdownRenderer key={index} markdown={part} className="message__markdown" />
         ))}
 
         {!hasText && message.status === 'streaming' && isActiveStream && (
@@ -146,14 +150,23 @@ function MessageItemComponent({
         )}
       </div>
 
-      <footer className="message__meta">
-        {message.role === 'assistant' && (message.modelLabel || message.modelId) && (
-          <span className="message__model">
-            {message.modelLabel ?? message.modelId}
-            {message.providerId ? ` · ${message.providerId}` : ''}
-          </span>
-        )}
-        {showTokenUsage && usage !== '' && <span className="message__usage">{usage}</span>}
+      <footer className="message__footer">
+        <MessageActions
+          message={message}
+          canRegenerate={canRegenerate}
+          canEditLastUser={canEditLastUser}
+          onRegenerate={onRegenerate}
+          onEditLastUser={onEditLastUser}
+        />
+        <div className="message__meta">
+          {message.role === 'assistant' && (message.modelLabel || message.modelId) && (
+            <span className="message__model">
+              {message.modelLabel ?? message.modelId}
+              {message.providerId ? ` · ${message.providerId}` : ''}
+            </span>
+          )}
+          {showTokenUsage && usage !== '' && <span className="message__usage">{usage}</span>}
+        </div>
       </footer>
     </article>
   )

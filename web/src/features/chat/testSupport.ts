@@ -52,6 +52,7 @@ export function createFakeChatService(overrides: Partial<ChatServiceLike> = {}):
     getSendKey: async () => 'enter',
     send: async () => ({ ok: true, message }),
     retry: async () => ({ ok: true, message }),
+    editLastUser: async () => ({ ok: true, message }),
     cancel: async () => null,
     isStreaming: () => false,
     ...overrides,
@@ -81,6 +82,8 @@ export function createTestChatSession(overrides: Partial<ChatSession> = {}): Cha
     send: async () => true,
     cancel: async () => undefined,
     retry: async () => undefined,
+    regenerate: async () => undefined,
+    editLastUser: async () => true,
     reload: async () => undefined,
     ...overrides,
   }

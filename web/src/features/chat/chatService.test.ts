@@ -49,10 +49,35 @@ function createHarness(
     ...overrides.runner,
   }
   const appendMessage = vi.fn(async (message: Message) => {
+    const existing = messages.find((candidate) => candidate.id === message.id)
+
+    if (existing) {
+      Object.assign(existing, message)
+      return {
+        message,
+        conversation: { ...conversation, messageCount: messages.length },
+      }
+    }
+
     messages.push(message)
     return {
       message,
       conversation: { ...conversation, messageCount: conversation.messageCount + 1 },
+    }
+  })
+  const truncateAfter = vi.fn(async (_conversationId: string, sequence: number) => {
+    let deleted = 0
+
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].sequence > sequence) {
+        messages.splice(index, 1)
+        deleted += 1
+      }
+    }
+
+    return {
+      deleted,
+      conversation: { ...conversation, messageCount: messages.length },
     }
   })
   const service = new ChatService({
@@ -62,6 +87,7 @@ function createHarness(
     },
     messages: {
       listByConversation: async () => ({ items: [...messages], nextCursor: null }),
+      truncateAfter,
     },
     providers: {
       get: async () => provider,
@@ -81,7 +107,17 @@ function createHarness(
     runtime: { fetch: globalThis.fetch },
   })
 
-  return { service, conversation, provider, model, messages, assistant, runner, appendMessage }
+  return {
+    service,
+    conversation,
+    provider,
+    model,
+    messages,
+    assistant,
+    runner,
+    appendMessage,
+    truncateAfter,
+  }
 }
 
 describe('ChatService', () => {
@@ -180,6 +216,65 @@ describe('ChatService', () => {
         }),
       }),
     )
+  })
+
+  it('edits the last user message, truncates later messages, and resends', async () => {
+    const user = createTestMessage({
+      id: 'm1',
+      sequence: 1,
+      role: 'user',
+      parts: [{ type: 'text', text: 'Old question' }],
+    })
+    const assistant = createTestMessage({
+      id: 'm2',
+      sequence: 2,
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'Old answer' }],
+    })
+    const { service, conversation, runner, messages, truncateAfter } = createHarness({
+      messages: [user, assistant],
+    })
+
+    const result = await service.editLastUser(conversation, user, 'New question')
+
+    expect(result.ok).toBe(true)
+    expect(truncateAfter).toHaveBeenCalledWith(conversation.id, 1)
+    expect(messages.map((message) => message.id)).toEqual(['m1'])
+    expect(messages[0].parts).toEqual([{ type: 'text', text: 'New question' }])
+    expect(runner.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sequence: 2,
+        request: expect.objectContaining({
+          messages: [{ role: 'user', parts: [{ type: 'text', text: 'New question' }] }],
+        }),
+      }),
+    )
+  })
+
+  it('rejects editing a user message that is not the last user message', async () => {
+    const first = createTestMessage({
+      id: 'm1',
+      sequence: 1,
+      role: 'user',
+      parts: [{ type: 'text', text: 'First' }],
+    })
+    const second = createTestMessage({
+      id: 'm2',
+      sequence: 2,
+      role: 'user',
+      parts: [{ type: 'text', text: 'Second' }],
+    })
+    const { service, conversation, runner, truncateAfter } = createHarness({
+      messages: [first, second],
+    })
+
+    await expect(service.editLastUser(conversation, first, 'Changed')).resolves.toEqual({
+      ok: false,
+      reason: 'invalid_target',
+      message: 'Only the last user message can be edited.',
+    })
+    expect(truncateAfter).not.toHaveBeenCalled()
+    expect(runner.send).not.toHaveBeenCalled()
   })
 
   it('maps a busy runner result to a send failure', async () => {

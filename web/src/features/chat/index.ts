@@ -19,6 +19,20 @@ export { buildChatRequest } from './chatRequest'
 export { describeChatError, type ChatErrorCopy } from './chatErrorCopy'
 export { MessageItem } from './MessageItem'
 export { messageItemPropsEqual, type MessageItemProps } from './messageItemProps'
+export { MessageActions, type MessageActionsProps } from './MessageActions'
+export { messageText } from './messageText'
+export { CodeBlock, type CodeBlockProps } from './CodeBlock'
+export { MarkdownRenderer, type MarkdownRendererProps } from './MarkdownRenderer'
+export {
+  closeIncompleteFence,
+  sanitizeMarkdownUrl,
+  MARKDOWN_SANITIZE_SCHEMA,
+} from './markdownSanitize'
+export {
+  SUPPORTED_LANGUAGES,
+  normalizeLanguage,
+  type SupportedLanguage,
+} from './highlighter'
 export { MessageList, type MessageListProps } from './MessageList'
 export { StreamingMessage, type StreamingMessageProps } from './StreamingMessage'
 export { useChatSession, type ChatSession, type ChatSessionStatus } from './useChatSession'

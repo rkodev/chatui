@@ -97,6 +97,30 @@ describe('MessageItem', () => {
     expect(screen.getByText(/interrupted/i)).toBeInTheDocument()
   })
 
+  it('renders Markdown and exposes last-message actions', async () => {
+    const user = userEvent.setup()
+    const onRegenerate = vi.fn()
+    const message = createTestMessage({
+      role: 'assistant',
+      parts: [{ type: 'text', text: '**bold** answer' }],
+    })
+
+    render(
+      <MessageItem
+        message={message}
+        showTokenUsage={false}
+        canRegenerate
+        onRegenerate={onRegenerate}
+      />,
+    )
+
+    expect(screen.getByText('bold').tagName).toBe('STRONG')
+
+    await user.click(screen.getByRole('button', { name: 'Regenerate response' }))
+
+    expect(onRegenerate).toHaveBeenCalledWith(message)
+  })
+
   it('shows usage only when enabled', () => {
     const message = createTestMessage({
       role: 'assistant',

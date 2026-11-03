@@ -1,4 +1,4 @@
-import type { ChatError, Conversation, Message, Model, Provider, SendKey } from '../../domain'
+import { nowIso, type ChatError, type Conversation, type Message, type Model, type Provider, type SendKey } from '../../domain'
 import type { ProviderRuntime } from '../providers/types'
 import type { SecretStoreLike } from '../providers/types'
 import type { ConversationStore } from '../conversations/types'
@@ -38,6 +38,7 @@ export interface ChatServiceLike {
   getSendKey(): Promise<SendKey>
   send(conversation: Conversation, userMessage?: Message): Promise<ChatSendResult>
   retry(conversation: Conversation, target: Message): Promise<ChatSendResult>
+  editLastUser(conversation: Conversation, target: Message, text: string): Promise<ChatSendResult>
   cancel(conversationId: string): Promise<Message | null>
   isStreaming(conversationId: string): boolean
 }
@@ -56,6 +57,10 @@ export interface ChatServiceOptions {
   }
   messages: {
     listByConversation(conversationId: string, options?: MessageListOptions): Promise<MessagePage>
+    truncateAfter(
+      conversationId: string,
+      sequence: number,
+    ): Promise<{ deleted: number; conversation: Conversation }>
   }
   providers: {
     get(id: string): Promise<Provider | null>
@@ -331,6 +336,111 @@ export class ChatService implements ChatServiceLike {
         ok: false,
         reason: 'storage',
         message: error instanceof Error ? error.message : 'Could not regenerate the message.',
+      }
+    }
+  }
+
+  /**
+   * Edit the last user message, truncate later messages, and resend.
+   *
+   * The caller must confirm the truncation before invoking this method. The
+   * edited message keeps its id and sequence, so the conversation is rewritten
+   * in place rather than branched.
+   */
+  async editLastUser(
+    conversation: Conversation,
+    target: Message,
+    text: string,
+  ): Promise<ChatSendResult> {
+    if (target.role !== 'user' || target.conversationId !== conversation.id) {
+      return {
+        ok: false,
+        reason: 'invalid_target',
+        message: 'Only the last user message can be edited.',
+      }
+    }
+
+    const trimmed = text.trim()
+
+    if (trimmed === '') {
+      return {
+        ok: false,
+        reason: 'invalid_target',
+        message: 'The message must not be empty.',
+      }
+    }
+
+    if (this.runner.isStreaming(conversation.id)) {
+      return { ok: false, reason: 'busy', message: failureMessage('busy') }
+    }
+
+    const availability = await this.getAvailability(conversation)
+
+    if (!availability.ok) {
+      return { ok: false, reason: availability.reason, message: availability.message }
+    }
+
+    const apiKey = await this.getApiKey(availability.provider)
+
+    if (apiKey === null) {
+      return {
+        ok: false,
+        reason: 'no_key',
+        message: 'The API key for this provider is unavailable. Re-enter the key and try again.',
+      }
+    }
+
+    try {
+      const history = await this.loadAllMessages(conversation.id)
+      const lastUser = [...history].reverse().find((message) => message.role === 'user')
+
+      if (!lastUser || lastUser.id !== target.id) {
+        return {
+          ok: false,
+          reason: 'invalid_target',
+          message: 'Only the last user message can be edited.',
+        }
+      }
+
+      await this.messages.truncateAfter(conversation.id, target.sequence)
+
+      const updatedTarget: Message = {
+        ...target,
+        parts: [{ type: 'text', text: trimmed }],
+        status: 'complete',
+        usage: null,
+        finishReason: null,
+        error: null,
+        updatedAt: nowIso(),
+      }
+      const appended = await this.conversations.appendMessage(updatedTarget)
+      const current = appended.conversation
+      const remaining = await this.loadAllMessages(current.id)
+      const request = buildChatRequest(current, availability.model.remoteId, remaining)
+      const context = buildProviderContext(availability.provider, this.runtime, apiKey)
+      const result = await this.runner.send({
+        conversation: current,
+        context,
+        request,
+        sequence: current.messageCount + 1,
+        streamOptions: { supportedParameters: availability.model.supportedParameters },
+      })
+
+      if (!result.ok) {
+        return {
+          ok: false,
+          reason: result.reason,
+          message: failureMessage(result.reason, result.error),
+          ...(result.error === undefined ? {} : { error: result.error }),
+        }
+      }
+
+      return { ok: true, message: result.message }
+    } catch (error) {
+      return {
+        ok: false,
+        reason: 'storage',
+        message: error instanceof Error ? error.message : 'Could not edit the message.',
       }
     }
   }
