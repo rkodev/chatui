@@ -28,6 +28,7 @@ class ShellThemeTest {
                 settings = AndroidSettings(
                     theme = Theme.DARK,
                     density = Density.COMPACT,
+                    onboardingCompleted = true,
                 ),
             )
         }

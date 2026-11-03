@@ -53,7 +53,7 @@
 | 19 | [M1-06.4 Android OpenRouter streaming, retry, errors, routing](M1-06.4-android-openrouter-streaming.md) | Complete | M1-01.2, M1-06.2, M1-06.3 | android | M1-02.4 |
 | 20 | [M1-08.1 Android repositories and transactions](M1-08.1-android-repositories.md) | Complete | M1-06.4 | android | M1-05.1 |
 | 21 | [M1-07.1 Android provider/model services and Hilt wiring](M1-07.1-android-provider-services.md) | Complete | M1-06.4, M1-08.1 | android | M1-03.1 |
-| 22 | [M1-07.2 Android onboarding and key entry](M1-07.2-android-onboarding-key-entry.md) | Not started | M1-07.1 | android | M1-03.2 |
+| 22 | [M1-07.2 Android onboarding and key entry](M1-07.2-android-onboarding-key-entry.md) | Complete | M1-07.1 | android | M1-03.2 |
 | 23 | [M1-07.3 Android provider, model, defaults, and routing UI](M1-07.3-android-provider-model-management.md) | Not started | M1-07.1, M1-07.2 | android | M1-03.3 |
 | 24 | [M1-08.2 Android conversations and navigation](M1-08.2-android-conversations-recovery.md) | Not started | M1-08.1, M1-07.3 | android | M1-05.2 |
 | 25 | [M1-08.3 Android recovery and conversation tests](M1-08.3-android-recovery-tests.md) | Not started | M1-08.2, M1-07.3 | android | M1-05.2 |

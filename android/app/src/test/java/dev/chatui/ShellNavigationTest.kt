@@ -6,8 +6,10 @@ import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.createGraph
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.shell.ShellDestination
 import dev.chatui.shell.shellDestinations
+import dev.chatui.shell.shellStartDestination
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -26,7 +28,7 @@ class ShellNavigationTest {
         val graph = navController.createGraph(
             startDestination = ShellDestination.Conversations.route,
         ) {
-            shellDestinations()
+            shellDestinations(navController)
         }
         navController.graph = graph
 
@@ -34,6 +36,18 @@ class ShellNavigationTest {
             assertThat(navController.graph.findNode(destination.route)).isNotNull()
         }
         assertThat(navController.graph.startDestinationRoute)
+            .isEqualTo(ShellDestination.Conversations.route)
+    }
+
+    @Test
+    fun `first run starts on onboarding`() {
+        assertThat(shellStartDestination(AndroidSettings()))
+            .isEqualTo(ShellDestination.Onboarding.route)
+    }
+
+    @Test
+    fun `completed onboarding starts on conversations`() {
+        assertThat(shellStartDestination(AndroidSettings(onboardingCompleted = true)))
             .isEqualTo(ShellDestination.Conversations.route)
     }
 }

@@ -42,6 +42,7 @@ fun ChatUiApp(
         val navController = rememberNavController()
         ShellScaffold(
             navController = navController,
+            startDestination = shellStartDestination(settings),
             modifier = modifier.testTag(
                 ShellTestTags.appearance(settings.theme, settings.density),
             ),
@@ -55,6 +56,7 @@ fun ChatUiApp(
 fun ShellScaffold(
     navController: NavHostController,
     modifier: Modifier = Modifier,
+    startDestination: String = ShellDestination.Conversations.route,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -81,6 +83,7 @@ fun ShellScaffold(
         ShellNavHost(
             navController = navController,
             modifier = Modifier.padding(innerPadding),
+            startDestination = startDestination,
         )
     }
 }
