@@ -1,5 +1,5 @@
 import type { IDBPDatabase } from 'idb'
-import { nowIso, type Conversation, type Message } from '../domain'
+import { nowIso, type Conversation, type Message, type MessageStatus } from '../domain'
 import { fromConversationRecord, runTransaction, toConversationRecord, type ChatUiDB } from './db'
 
 export interface MessageListOptions {
@@ -178,5 +178,38 @@ export class MessageRepository {
 
   async count(conversationId: string): Promise<number> {
     return this.db.countFromIndex('messages', 'conversationId', conversationId)
+  }
+
+  /**
+   * Return every message with the given status.
+   *
+   * The v1 schema has no status index, so this is a bounded full-store scan.
+   * Startup recovery uses it once per launch to find messages left in
+   * `streaming`; callers should not use it on a hot path. An optional
+   * `conversationIds` filter keeps the scan bounded when the caller only cares
+   * about the active or last conversations.
+   */
+  async listByStatus(
+    status: MessageStatus,
+    options: { conversationIds?: readonly string[] } = {},
+  ): Promise<Message[]> {
+    const allowed =
+      options.conversationIds === undefined ? null : new Set(options.conversationIds)
+    const transaction = this.db.transaction('messages', 'readonly')
+    const items: Message[] = []
+    let cursor = await transaction.store.openCursor()
+
+    while (cursor) {
+      const message = cursor.value
+
+      if (message.status === status && (allowed === null || allowed.has(message.conversationId))) {
+        items.push(message)
+      }
+
+      cursor = await cursor.continue()
+    }
+
+    await transaction.done
+    return items
   }
 }
