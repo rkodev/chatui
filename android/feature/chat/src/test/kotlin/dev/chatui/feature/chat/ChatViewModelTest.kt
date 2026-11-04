@@ -14,8 +14,8 @@ import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -62,12 +62,12 @@ class ChatViewModelTest {
             assertThat(awaitItem().draft).isEqualTo("Hello")
 
             viewModel.onSend()
-            advanceUntilIdle()
+            runCurrent()
             adapter.started.await()
             adapter.events.send(StreamEvent.TextDelta("Hi"))
             adapter.events.send(StreamEvent.Finish(FinishReason.STOP))
             adapter.events.close()
-            advanceUntilIdle()
+            runCurrent()
 
             val final = expectMostRecentItem()
             assertThat(final.draft).isEmpty()
@@ -108,7 +108,7 @@ class ChatViewModelTest {
 
         viewModel.onDraftChange("Hello")
         viewModel.onSend()
-        advanceUntilIdle()
+        runCurrent()
 
         assertThat(viewModel.state.value.draft).isEqualTo("Hello")
         assertThat(viewModel.state.value.error?.code).isEqualTo(ChatErrorCode.AUTH)
@@ -131,13 +131,13 @@ class ChatViewModelTest {
 
         viewModel.onDraftChange("Hello")
         viewModel.onSend()
-        advanceUntilIdle()
+        runCurrent()
         adapter.started.await()
         adapter.events.send(StreamEvent.TextDelta("Partial"))
-        advanceUntilIdle()
+        runCurrent()
 
         viewModel.onStop()
-        advanceUntilIdle()
+        runCurrent()
 
         assertThat(adapter.cancelled).isTrue()
         assertThat(viewModel.state.value.streaming?.status)
@@ -173,12 +173,12 @@ class ChatViewModelTest {
         )
 
         viewModel.onRegenerate(target)
-        advanceUntilIdle()
+        runCurrent()
         adapter.started.await()
         adapter.events.send(StreamEvent.TextDelta("New"))
         adapter.events.send(StreamEvent.Finish(FinishReason.STOP))
         adapter.events.close()
-        advanceUntilIdle()
+        runCurrent()
 
         assertThat(store.all("conversation-1").map { it.id })
             .containsExactly("user-1", "assistant-1")
