@@ -112,6 +112,9 @@ class ChatViewModelTest {
 
         assertThat(viewModel.state.value.draft).isEqualTo("Hello")
         assertThat(viewModel.state.value.error?.code).isEqualTo(ChatErrorCode.AUTH)
+        assertThat(viewModel.state.value.availability?.available).isFalse()
+        assertThat(viewModel.state.value.availability?.reason)
+            .isEqualTo(ChatUnavailableReason.NO_KEY)
     }
 
     @Test
@@ -185,4 +188,104 @@ class ChatViewModelTest {
             .inOrder()
         assertThat(viewModel.state.value.streaming?.text).isEqualTo("New")
     }
+
+    @Test
+    fun `loads the newest page and pages older messages on demand`() = runTest(dispatcher) {
+        val allMessages = (1L..60L).map { sequence ->
+            testMessage(
+                id = "message-$sequence",
+                sequence = sequence,
+                role = if (sequence % 2L == 0L) MessageRole.ASSISTANT else MessageRole.USER,
+                text = "Message $sequence",
+            )
+        }
+        val store = FakeChatMessageStore(allMessages)
+        val viewModel = ChatViewModel(
+            conversationId = "conversation-1",
+            conversations = FakeChatConversationSource(),
+            messages = store,
+            contextResolver = FakeChatContextResolver(),
+            adapter = FakeProviderAdapter(),
+            clock = clock,
+        )
+        runCurrent()
+
+        assertThat(viewModel.state.value.messages).hasSize(CHAT_MESSAGE_PAGE_SIZE)
+        assertThat(viewModel.state.value.messages.first().sequence).isEqualTo(11L)
+        assertThat(viewModel.state.value.hasOlder).isTrue()
+
+        viewModel.onLoadOlder()
+        runCurrent()
+
+        assertThat(viewModel.state.value.messages).hasSize(60)
+        assertThat(viewModel.state.value.messages.first().sequence).isEqualTo(1L)
+        assertThat(viewModel.state.value.hasOlder).isFalse()
+    }
+
+    @Test
+    fun `announcements change on start and completion but not on tokens`() = runTest(dispatcher) {
+        val adapter = FakeProviderAdapter()
+        val store = FakeChatMessageStore()
+        val viewModel = ChatViewModel(
+            conversationId = "conversation-1",
+            conversations = FakeChatConversationSource(),
+            messages = store,
+            contextResolver = FakeChatContextResolver(),
+            adapter = adapter,
+            clock = clock,
+            newId = { "id-1" },
+        )
+
+        viewModel.onDraftChange("Hello")
+        viewModel.onSend()
+        runCurrent()
+        adapter.started.await()
+        runCurrent()
+
+        assertThat(viewModel.state.value.announcement).isEqualTo("Response started")
+
+        adapter.events.send(StreamEvent.TextDelta("Hi"))
+        runCurrent()
+        assertThat(viewModel.state.value.announcement).isEqualTo("Response started")
+
+        adapter.events.send(StreamEvent.Finish(FinishReason.STOP))
+        adapter.events.close()
+        runCurrent()
+        assertThat(viewModel.state.value.announcement).isEqualTo("Response complete")
+    }
+
+    @Test
+    fun `per-conversation drafts are restored and cleared after a successful send`() =
+        runTest(dispatcher) {
+            val adapter = FakeProviderAdapter()
+            val store = FakeChatMessageStore()
+            val drafts = InMemoryChatDrafts().apply {
+                setDraft("conversation-1", "Saved draft")
+            }
+            val viewModel = ChatViewModel(
+                conversationId = "conversation-1",
+                conversations = FakeChatConversationSource(),
+                messages = store,
+                contextResolver = FakeChatContextResolver(),
+                adapter = adapter,
+                clock = clock,
+                newId = { "id-1" },
+                drafts = drafts,
+            )
+            runCurrent()
+
+            assertThat(viewModel.state.value.draft).isEqualTo("Saved draft")
+            assertThat(drafts.draftFor("conversation-1")).isEqualTo("Saved draft")
+
+            viewModel.onSend()
+            runCurrent()
+            adapter.started.await()
+            adapter.events.send(StreamEvent.TextDelta("Hi"))
+            adapter.events.send(StreamEvent.Finish(FinishReason.STOP))
+            adapter.events.close()
+            runCurrent()
+
+            assertThat(viewModel.state.value.draft).isEmpty()
+            assertThat(drafts.draftFor("conversation-1")).isEmpty()
+        }
 }

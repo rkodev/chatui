@@ -34,6 +34,14 @@ class FakeChatMessageStore(
     override suspend fun latest(conversationId: String, limit: Int): List<Message> =
         all(conversationId).takeLast(limit)
 
+    override suspend fun older(
+        conversationId: String,
+        beforeSequence: Long,
+        limit: Int,
+    ): List<Message> = all(conversationId)
+        .filter { it.sequence < beforeSequence }
+        .takeLast(limit)
+
     override suspend fun appendMessage(message: Message): Message {
         recordWrite(message)
         messages.update { list -> list.filterNot { it.id == message.id } + message }

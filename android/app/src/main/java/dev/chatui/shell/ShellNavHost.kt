@@ -14,7 +14,9 @@ import androidx.navigation.navArgument
 import dagger.hilt.android.EntryPointAccessors
 import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.feature.backup.BackupPlaceholder
+import dev.chatui.feature.chat.ChatEntryPoint
 import dev.chatui.feature.chat.ChatPlaceholder
+import dev.chatui.feature.chat.ChatRoute
 import dev.chatui.feature.conversations.ConversationEntryPoint
 import dev.chatui.feature.conversations.ConversationRoute
 import dev.chatui.feature.conversations.ConversationService
@@ -63,9 +65,34 @@ fun NavGraphBuilder.shellDestinations(
         ),
     ) { entry ->
         val conversationId = entry.arguments?.getString(ChatDestination.ARG_CONVERSATION_ID)
-        ChatPlaceholder(
-            modifier = Modifier.testTag(ChatDestinationTestTags.conversation(conversationId)),
-        )
+        val context = LocalContext.current
+
+        if (conversationId == null) {
+            ChatPlaceholder(
+                modifier = Modifier.testTag(ChatDestinationTestTags.conversation(null)),
+            )
+        } else {
+            val dependencies = remember(context.applicationContext) {
+                EntryPointAccessors.fromApplication(
+                    context.applicationContext,
+                    ChatEntryPoint::class.java,
+                ).chatDependencies()
+            }
+
+            ChatRoute(
+                conversationId = conversationId,
+                dependencies = dependencies,
+                onBack = { navController.popBackStack() },
+                onOpenProviders = {
+                    navController.navigate(ShellDestination.Providers.route) {
+                        launchSingleTop = true
+                    }
+                },
+                modifier = Modifier.testTag(
+                    ChatDestinationTestTags.conversation(conversationId),
+                ),
+            )
+        }
     }
     composable(ShellDestination.Conversations.route) {
         val context = LocalContext.current

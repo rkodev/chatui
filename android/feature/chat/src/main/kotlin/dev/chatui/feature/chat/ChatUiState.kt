@@ -3,6 +3,14 @@ package dev.chatui.feature.chat
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.Conversation
 import dev.chatui.core.model.Message
+import dev.chatui.core.model.SendKey
+
+/** Why the conversation cannot currently send and what to show the user. */
+data class ChatAvailability(
+    val available: Boolean,
+    val reason: ChatUnavailableReason? = null,
+    val message: String? = null,
+)
 
 /**
  * One immutable state for the chat screen.
@@ -18,6 +26,12 @@ data class ChatUiState(
     val draft: String = "",
     val sending: Boolean = false,
     val loading: Boolean = true,
+    val loadingOlder: Boolean = false,
+    val hasOlder: Boolean = false,
+    val availability: ChatAvailability? = null,
+    val sendKey: SendKey = SendKey.ENTER,
+    val showTokenUsage: Boolean = false,
+    val announcement: String = "",
     val error: ChatError? = null,
     val notice: String? = null,
 ) {
@@ -25,7 +39,14 @@ data class ChatUiState(
     val isStreaming: Boolean
         get() = streaming?.done == false
 
+    /** True when the user can stop the active response. */
+    val canStop: Boolean
+        get() = sending || isStreaming
+
     /** True when the composer may start a new response. */
     val canSend: Boolean
-        get() = !sending && !isStreaming && draft.isNotBlank()
+        get() = !sending &&
+            !isStreaming &&
+            draft.isNotBlank() &&
+            availability?.available != false
 }

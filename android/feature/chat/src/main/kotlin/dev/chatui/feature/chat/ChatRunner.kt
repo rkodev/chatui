@@ -319,6 +319,8 @@ class ChatRunner(
             )
         }
 
+        _streams.update { streams -> streams + (conversationId to activeStream.state.value) }
+
         activeStream.job = scope.launch {
             run(
                 activeStream = activeStream,

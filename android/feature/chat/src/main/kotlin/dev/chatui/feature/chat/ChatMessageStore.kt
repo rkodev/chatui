@@ -18,6 +18,13 @@ interface ChatMessageStore {
     /** Newest page, oldest message first. */
     suspend fun latest(conversationId: String, limit: Int = 50): List<Message>
 
+    /** Older page before [beforeSequence], oldest message first. */
+    suspend fun older(
+        conversationId: String,
+        beforeSequence: Long,
+        limit: Int = 50,
+    ): List<Message>
+
     suspend fun appendMessage(message: Message): Message
 
     suspend fun updateMessage(message: Message): Message

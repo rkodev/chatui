@@ -18,6 +18,12 @@ class RepositoryChatMessageStore(
     override suspend fun latest(conversationId: String, limit: Int): List<Message> =
         repository.latest(conversationId, limit)
 
+    override suspend fun older(
+        conversationId: String,
+        beforeSequence: Long,
+        limit: Int,
+    ): List<Message> = repository.older(conversationId, beforeSequence, limit)
+
     override suspend fun appendMessage(message: Message): Message =
         repository.appendMessage(message).message
 
