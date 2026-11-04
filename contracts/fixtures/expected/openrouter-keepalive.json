@@ -1,0 +1,13 @@
+{
+  "source": "openrouter-keepalive.sse",
+  "events": [
+    { "type": "start", "responseId": "gen-example-keepalive" },
+    { "type": "text-delta", "text": "Keep" },
+    { "type": "text-delta", "text": " alive" },
+    { "type": "text-delta", "text": " comments" },
+    { "type": "finish", "reason": "stop" }
+  ],
+  "text": "Keep alive comments",
+  "reasoning": "",
+  "retryAllowed": false
+}

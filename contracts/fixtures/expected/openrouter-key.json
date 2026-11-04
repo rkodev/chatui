@@ -1,0 +1,15 @@
+{
+  "source": "openrouter-key.json",
+  "providerId": "openrouter",
+  "key": {
+    "label": "Example OpenRouter Key",
+    "usageUsd": 12.34,
+    "limitUsd": 100,
+    "limitRemainingUsd": 87.66,
+    "isFreeTier": false,
+    "rateLimit": {
+      "requests": 60,
+      "interval": "1m"
+    }
+  }
+}

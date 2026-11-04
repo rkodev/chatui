@@ -1,5 +1,5 @@
 import type { IDBPDatabase } from 'idb'
-import { nowIso, type Conversation, type Message } from '../domain'
+import { nowIso, type Conversation, type Message, type MessageStatus } from '../domain'
 import { fromConversationRecord, runTransaction, toConversationRecord, type ChatUiDB } from './db'
 
 export interface MessageListOptions {
@@ -115,7 +115,101 @@ export class MessageRepository {
     )
   }
 
+  /**
+   * Delete every message after `sequence` and update conversation metadata.
+   *
+   * Used by edit-last-user. The target message itself is kept; the caller
+   * rewrites it and appends the replacement assistant response.
+   */
+  async truncateAfter(
+    conversationId: string,
+    sequence: number,
+  ): Promise<{ deleted: number; conversation: Conversation }> {
+    return runTransaction(
+      this.db,
+      ['messages', 'conversations'],
+      'readwrite',
+      async (transaction) => {
+        const messages = transaction.objectStore('messages')
+        const conversations = transaction.objectStore('conversations')
+        const existingConversation = await conversations.get(conversationId)
+
+        if (!existingConversation) {
+          throw new Error(`Conversation ${conversationId} not found`)
+        }
+
+        const index = messages.index('conversationId+sequence')
+        const range = IDBKeyRange.bound(
+          [conversationId, sequence],
+          [conversationId, Number.POSITIVE_INFINITY],
+          true,
+          false,
+        )
+        let cursor = await index.openCursor(range)
+        let deleted = 0
+
+        while (cursor) {
+          await cursor.delete()
+          deleted += 1
+          cursor = await cursor.continue()
+        }
+
+        const remaining = await messages.index('conversationId').count(conversationId)
+        const lastCursor = await index.openCursor(
+          IDBKeyRange.bound(
+            [conversationId, Number.NEGATIVE_INFINITY],
+            [conversationId, Number.POSITIVE_INFINITY],
+          ),
+          'prev',
+        )
+        const conversation = fromConversationRecord(existingConversation)
+        const updated: Conversation = {
+          ...conversation,
+          messageCount: remaining,
+          lastMessageAt: lastCursor ? lastCursor.value.createdAt : conversation.createdAt,
+          updatedAt: nowIso(),
+        }
+
+        await conversations.put(toConversationRecord(updated))
+        return { deleted, conversation: updated }
+      },
+    )
+  }
+
   async count(conversationId: string): Promise<number> {
     return this.db.countFromIndex('messages', 'conversationId', conversationId)
+  }
+
+  /**
+   * Return every message with the given status.
+   *
+   * The v1 schema has no status index, so this is a bounded full-store scan.
+   * Startup recovery uses it once per launch to find messages left in
+   * `streaming`; callers should not use it on a hot path. An optional
+   * `conversationIds` filter keeps the scan bounded when the caller only cares
+   * about the active or last conversations.
+   */
+  async listByStatus(
+    status: MessageStatus,
+    options: { conversationIds?: readonly string[] } = {},
+  ): Promise<Message[]> {
+    const allowed =
+      options.conversationIds === undefined ? null : new Set(options.conversationIds)
+    const transaction = this.db.transaction('messages', 'readonly')
+    const items: Message[] = []
+    let cursor = await transaction.store.openCursor()
+
+    while (cursor) {
+      const message = cursor.value
+
+      if (message.status === status && (allowed === null || allowed.has(message.conversationId))) {
+        items.push(message)
+      }
+
+      cursor = await cursor.continue()
+    }
+
+    await transaction.done
+    return items
   }
 }

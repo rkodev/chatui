@@ -48,4 +48,14 @@ enum class ShellDestination(
         shortLabel = "BK",
         title = "Backup",
     ),
+    ;
+
+    /**
+     * True when [route] belongs to this destination.
+     *
+     * The chat destination has a second route with a conversation argument, so
+     * an exact match is not enough for the bottom-navigation selection.
+     */
+    fun matches(route: String?): Boolean =
+        route == this.route || (this == Chat && route?.startsWith("chat/") == true)
 }

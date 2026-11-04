@@ -6,7 +6,9 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import dev.chatui.core.database.entity.ConversationEntity
 import dev.chatui.core.database.entity.MessageEntity
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -104,6 +106,88 @@ abstract class MessageDao {
         deleteFts(messageId)
         deleteMessage(messageId)
     }
+
+    @Query("SELECT * FROM conversations WHERE id = :id")
+    abstract suspend fun getConversation(id: String): ConversationEntity?
+
+    @Query(
+        "UPDATE conversations SET lastMessageAt = :lastMessageAt, " +
+            "messageCount = :messageCount, updatedAt = :updatedAt WHERE id = :id",
+    )
+    abstract suspend fun updateConversationMessageMetadata(
+        id: String,
+        lastMessageAt: String,
+        messageCount: Int,
+        updatedAt: String,
+    )
+
+    /**
+     * Insert or update a message, synchronize its FTS row, and update the
+     * conversation's `lastMessageAt`, `messageCount`, and `updatedAt` in one
+     * transaction.
+     *
+     * Returns the updated conversation, or `null` when the conversation does
+     * not exist. Re-appending an existing message id does not increment the
+     * count.
+     */
+    @Transaction
+    open suspend fun appendWithConversation(
+        message: MessageEntity,
+        searchText: String,
+        updatedAt: String,
+    ): ConversationEntity? {
+        val existingMessage = getById(message.id)
+        val conversation = getConversation(message.conversationId) ?: return null
+
+        if (existingMessage == null) {
+            insertMessage(message)
+            insertFts(message.id, searchText)
+        } else {
+            updateMessage(message)
+            deleteFts(message.id)
+            insertFts(message.id, searchText)
+        }
+
+        val lastMessageAt = maxOf(
+            Instant.parse(conversation.lastMessageAt),
+            Instant.parse(message.createdAt),
+        ).toString()
+        val messageCount = if (existingMessage == null) {
+            conversation.messageCount + 1
+        } else {
+            conversation.messageCount
+        }
+
+        updateConversationMessageMetadata(
+            id = conversation.id,
+            lastMessageAt = lastMessageAt,
+            messageCount = messageCount,
+            updatedAt = updatedAt,
+        )
+
+        return conversation.copy(
+            lastMessageAt = lastMessageAt,
+            messageCount = messageCount,
+            updatedAt = updatedAt,
+        )
+    }
+
+    /** Messages left in the `streaming` state, oldest first. */
+    @Query(
+        "SELECT * FROM messages WHERE status = 'streaming' AND deletedAt IS NULL " +
+            "ORDER BY createdAt",
+    )
+    abstract suspend fun streaming(): List<MessageEntity>
+
+    /** Mark every `streaming` message as `cancelled`; returns the affected row count. */
+    @Query(
+        "UPDATE messages SET status = 'cancelled', updatedAt = :updatedAt " +
+            "WHERE status = 'streaming'",
+    )
+    abstract suspend fun cancelStreaming(updatedAt: String): Int
+
+    @Query("UPDATE messages SET status = :status, updatedAt = :updatedAt WHERE id = :id")
+    abstract suspend fun updateStatus(id: String, status: String, updatedAt: String)
 
     @Query(
         "SELECT messages.* FROM messages " +

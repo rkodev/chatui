@@ -1,0 +1,58 @@
+{
+  "name": "openrouter-basic",
+  "kind": "chat-request",
+  "providerId": "openrouter",
+  "request": {
+    "model": "openai/gpt-4o-mini-2024-07-18",
+    "system": "You are a concise assistant.",
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Hello"
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": 256,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {}
+    }
+  },
+  "supportedParameters": [
+    "temperature",
+    "top_p",
+    "max_tokens",
+    "stop",
+    "stream",
+    "tools",
+    "tool_choice"
+  ],
+  "expected": {
+    "body": {
+      "model": "openai/gpt-4o-mini-2024-07-18",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a concise assistant."
+        },
+        {
+          "role": "user",
+          "content": "Hello"
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "max_tokens": 256
+    }
+  }
+}

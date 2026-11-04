@@ -1,0 +1,93 @@
+{
+  "name": "openrouter-default-model",
+  "kind": "default-model",
+  "providerId": "openrouter",
+  "cases": [
+    {
+      "name": "preset-default-present",
+      "presetDefaultModelId": "openrouter/auto",
+      "catalog": [
+        {
+          "remoteId": "openrouter/auto",
+          "hidden": false,
+          "outputModalities": [
+            "text"
+          ]
+        },
+        {
+          "remoteId": "openai/gpt-4o-mini-2024-07-18",
+          "hidden": false,
+          "outputModalities": [
+            "text"
+          ]
+        }
+      ],
+      "expected": {
+        "selectedModelId": "openrouter/auto",
+        "notice": null
+      }
+    },
+    {
+      "name": "preset-default-missing",
+      "presetDefaultModelId": "openrouter/auto",
+      "catalog": [
+        {
+          "remoteId": "aaa/hidden-text",
+          "hidden": true,
+          "outputModalities": [
+            "text"
+          ]
+        },
+        {
+          "remoteId": "google/gemini-2.5-flash",
+          "hidden": false,
+          "outputModalities": [
+            "text"
+          ]
+        },
+        {
+          "remoteId": "meta-llama/llama-3.2-3b-instruct:free",
+          "hidden": false,
+          "outputModalities": [
+            "text"
+          ]
+        },
+        {
+          "remoteId": "openai/gpt-4o-mini-2024-07-18",
+          "hidden": false,
+          "outputModalities": [
+            "text"
+          ]
+        }
+      ],
+      "expected": {
+        "selectedModelId": "google/gemini-2.5-flash",
+        "notice": "Default model openrouter/auto is unavailable; using google/gemini-2.5-flash."
+      }
+    },
+    {
+      "name": "no-text-model",
+      "presetDefaultModelId": "openrouter/auto",
+      "catalog": [
+        {
+          "remoteId": "aaa/hidden-text",
+          "hidden": true,
+          "outputModalities": [
+            "text"
+          ]
+        },
+        {
+          "remoteId": "example/image-only",
+          "hidden": false,
+          "outputModalities": [
+            "image"
+          ]
+        }
+      ],
+      "expected": {
+        "selectedModelId": null,
+        "notice": "Default model openrouter/auto is unavailable; no text model is available."
+      }
+    }
+  ]
+}

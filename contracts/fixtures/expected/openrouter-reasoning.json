@@ -1,0 +1,22 @@
+{
+  "source": "openrouter-reasoning.sse",
+  "events": [
+    { "type": "start", "responseId": "gen-example-reasoning" },
+    { "type": "reasoning-delta", "text": "Let me compare the available models." },
+    { "type": "text-delta", "text": "The free tier is the cheapest option." },
+    { "type": "finish", "reason": "stop" },
+    {
+      "type": "usage",
+      "usage": {
+        "inputTokens": 20,
+        "outputTokens": 8,
+        "totalTokens": 28,
+        "costUsd": 0.000024,
+        "estimated": false
+      }
+    }
+  ],
+  "text": "The free tier is the cheapest option.",
+  "reasoning": "Let me compare the available models.",
+  "retryAllowed": false
+}

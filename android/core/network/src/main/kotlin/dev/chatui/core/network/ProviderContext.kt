@@ -19,6 +19,7 @@ data class ProviderKeyInfo(
     val label: String? = null,
     val usageUsd: Double? = null,
     val limitUsd: Double? = null,
+    val limitRemainingUsd: Double? = null,
     val isFreeTier: Boolean? = null,
     val rateLimit: JsonObject? = null,
 )

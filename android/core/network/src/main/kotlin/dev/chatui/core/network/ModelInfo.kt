@@ -25,4 +25,5 @@ data class ModelInfo(
     val outputModalities: List<OutputModality> = emptyList(),
     val supportedParameters: List<String> = emptyList(),
     val metadata: JsonObject? = null,
+    val isFree: Boolean = false,
 )

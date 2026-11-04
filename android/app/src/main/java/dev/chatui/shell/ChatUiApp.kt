@@ -20,6 +20,7 @@ import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.Density
 import dev.chatui.core.model.Theme
+import dev.chatui.feature.conversations.ConversationService
 
 /** Test tags exposed by the shell for composition and navigation tests. */
 object ShellTestTags {
@@ -31,17 +32,20 @@ object ShellTestTags {
  * Themed application shell.
  *
  * The persisted theme and density are applied before the navigation host is
- * composed, so every placeholder destination renders with the selected tokens.
+ * composed, so every destination renders with the selected tokens.
  */
 @Composable
 fun ChatUiApp(
     settings: AndroidSettings,
     modifier: Modifier = Modifier,
+    conversationService: ConversationService? = null,
 ) {
     ChatUiTheme(themeMode = settings.theme, density = settings.density) {
         val navController = rememberNavController()
         ShellScaffold(
             navController = navController,
+            startDestination = shellStartDestination(settings),
+            conversationService = conversationService,
             modifier = modifier.testTag(
                 ShellTestTags.appearance(settings.theme, settings.density),
             ),
@@ -49,16 +53,18 @@ fun ChatUiApp(
     }
 }
 
-/** Scaffold, top bar, and bottom navigation for the placeholder shell. */
+/** Scaffold, top bar, and bottom navigation for the shell. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShellScaffold(
     navController: NavHostController,
     modifier: Modifier = Modifier,
+    startDestination: String = ShellDestination.Conversations.route,
+    conversationService: ConversationService? = null,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val currentDestination = ShellDestination.entries.firstOrNull { it.route == currentRoute }
+    val currentDestination = ShellDestination.entries.firstOrNull { it.matches(currentRoute) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -69,7 +75,7 @@ fun ShellScaffold(
             NavigationBar {
                 ShellDestination.entries.forEach { destination ->
                     NavigationBarItem(
-                        selected = currentRoute == destination.route,
+                        selected = destination.matches(currentRoute),
                         onClick = { navController.navigateToShellDestination(destination) },
                         icon = { Text(destination.shortLabel) },
                         label = { Text(destination.label) },
@@ -81,6 +87,8 @@ fun ShellScaffold(
         ShellNavHost(
             navController = navController,
             modifier = Modifier.padding(innerPadding),
+            startDestination = startDestination,
+            conversationService = conversationService,
         )
     }
 }

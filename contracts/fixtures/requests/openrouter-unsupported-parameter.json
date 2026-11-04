@@ -1,0 +1,51 @@
+{
+  "name": "openrouter-unsupported-parameter",
+  "kind": "chat-request",
+  "providerId": "openrouter",
+  "request": {
+    "model": "meta-llama/llama-3.2-3b-instruct:free",
+    "system": null,
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Think briefly."
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": null,
+      "stop": [],
+      "reasoningEffort": "medium",
+      "streaming": true,
+      "extra": {}
+    }
+  },
+  "supportedParameters": [
+    "temperature",
+    "top_p",
+    "max_tokens",
+    "stop",
+    "stream"
+  ],
+  "expected": {
+    "body": {
+      "model": "meta-llama/llama-3.2-3b-instruct:free",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Think briefly."
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    }
+  }
+}

@@ -1,23 +1,59 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { ConfigContext, type AppConfig } from './config'
+import { ChatServiceProvider } from '../features/chat'
+import { createFakeChatService } from '../features/chat/testSupport'
+import { OnboardingServiceProvider, type OnboardingServiceLike } from '../features/onboarding'
+import { ProviderManagementProvider } from '../features/providers'
+import { createFakeProviderManagementService } from '../features/providers/testSupport'
 import { createAppRouter } from './router'
+
+const testConfig: AppConfig = {
+  appName: 'ChatUI',
+  defaultTheme: 'system',
+  defaultProviderPreset: 'openrouter',
+  enabledPresets: ['openrouter'],
+  allowCustomProviders: false,
+  openRouter: {
+    attributionOrigin: 'https://chat.example.com',
+    appTitle: 'ChatUI',
+  },
+  docsUrl: 'https://github.com/rkodev/chatui',
+  telemetry: false,
+}
+
+const onboardingService: OnboardingServiceLike = {
+  loadCatalog: async () => [],
+  connect: async () => ({ conversationId: 'conversation-1', notice: null }),
+  isOnboardingComplete: async () => false,
+}
 
 function renderRoute(path: string) {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }))
-  render(<RouterProvider router={router} />)
+  render(
+    <ConfigContext.Provider value={testConfig}>
+      <ChatServiceProvider service={createFakeChatService()}>
+        <ProviderManagementProvider service={createFakeProviderManagementService()}>
+          <OnboardingServiceProvider service={onboardingService}>
+            <RouterProvider router={router} />
+          </OnboardingServiceProvider>
+        </ProviderManagementProvider>
+      </ChatServiceProvider>
+    </ConfigContext.Provider>,
+  )
   return router
 }
 
 describe('app router', () => {
   it.each([
-    ['/', 'No conversation selected'],
-    ['/chat/conversation-1', 'Chat placeholder'],
+    ['/', 'Welcome to ChatUI'],
+    ['/chat/conversation-1', 'New chat'],
     ['/settings/appearance', 'Appearance settings placeholder'],
-    ['/settings/providers', 'Providers settings placeholder'],
-    ['/settings/providers/new', 'New provider placeholder'],
-    ['/settings/providers/provider-1', 'Provider details placeholder'],
-    ['/settings/models', 'Models settings placeholder'],
+    ['/settings/providers', 'Providers'],
+    ['/settings/providers/new', 'Welcome to ChatUI'],
+    ['/settings/providers/provider-1', 'OpenRouter'],
+    ['/settings/models', 'Models'],
     ['/settings/data', 'Data settings placeholder'],
     ['/settings/backup', 'Backup settings placeholder'],
     ['/settings/about', 'About settings placeholder'],

@@ -1,0 +1,26 @@
+{
+  "source": "openrouter-error-200.sse",
+  "events": [
+    { "type": "start", "responseId": "gen-example-error-200" },
+    { "type": "text-delta", "text": "Partial answer" },
+    {
+      "type": "error",
+      "error": {
+        "code": "provider",
+        "message": "Upstream provider returned an error.",
+        "providerId": "openrouter",
+        "status": 502,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": "gen-example-error-200",
+        "details": {
+          "providerName": "Synthetic Provider",
+          "raw": "synthetic-error-detail"
+        }
+      }
+    }
+  ],
+  "text": "Partial answer",
+  "reasoning": "",
+  "retryAllowed": false
+}

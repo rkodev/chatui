@@ -1,12 +1,17 @@
 import { createContext, useContext } from 'react'
 import { z } from 'zod'
+import {
+  isPresetEnabledInM1,
+  providerPresets,
+  type ProviderPreset,
+} from '../providers/registry'
 
 /**
  * Public runtime configuration served from `/config.json`.
  *
- * This file must never contain secrets. Validation is intentionally shape-only
- * in M0: `enabledPresets` is not cross-checked against `contracts/providers.json`
- * until M1, when provider presets are loaded at runtime.
+ * This file must never contain secrets. The schema validates the config shape;
+ * `loadConfig` also cross-checks preset IDs against `contracts/providers.json`
+ * and enforces the M1 OpenRouter-only gate.
  */
 export const configSchema = z
   .object({
@@ -59,12 +64,58 @@ function formatIssues(error: z.ZodError): string[] {
 }
 
 /**
+ * Cross-check runtime config against the provider contracts.
+ *
+ * M1 exposes OpenRouter only. Other presets may remain in contracts, but a
+ * deployment cannot enable them or custom-provider creation yet.
+ */
+export function validateConfigPresets(
+  config: AppConfig,
+  presets: readonly ProviderPreset[] = providerPresets,
+): string[] {
+  const issues: string[] = []
+  const known = new Set(presets.map((preset) => preset.id))
+
+  if (!known.has(config.defaultProviderPreset)) {
+    issues.push(
+      `defaultProviderPreset: unknown provider preset "${config.defaultProviderPreset}"`,
+    )
+  }
+
+  if (!config.enabledPresets.includes(config.defaultProviderPreset)) {
+    issues.push(
+      `defaultProviderPreset: "${config.defaultProviderPreset}" is not in enabledPresets`,
+    )
+  }
+
+  for (const id of config.enabledPresets) {
+    if (!known.has(id)) {
+      issues.push(`enabledPresets: unknown provider preset "${id}"`)
+      continue
+    }
+
+    if (!isPresetEnabledInM1(id)) {
+      issues.push(`enabledPresets: "${id}" is not available in M1`)
+    }
+  }
+
+  if (config.allowCustomProviders) {
+    issues.push('allowCustomProviders: custom providers are not available in M1')
+  }
+
+  return issues
+}
+
+/**
  * Fetch and validate the public runtime configuration.
  *
  * The request uses a no-cache policy so a redeployed `config.json` is picked up
  * without relying on the browser cache. Any failure throws `ConfigError`.
  */
-export async function loadConfig(fetchImpl: FetchLike = fetch): Promise<AppConfig> {
+export async function loadConfig(
+  fetchImpl: FetchLike = fetch,
+  presets: readonly ProviderPreset[] = providerPresets,
+): Promise<AppConfig> {
   let response: Response
 
   try {
@@ -95,6 +146,14 @@ export async function loadConfig(fetchImpl: FetchLike = fetch): Promise<AppConfi
   if (!result.success) {
     const issues = formatIssues(result.error)
     throw new ConfigError(`/config.json is invalid:\n${issues.join('\n')}`, { issues })
+  }
+
+  const presetIssues = validateConfigPresets(result.data, presets)
+
+  if (presetIssues.length > 0) {
+    throw new ConfigError(`/config.json is invalid:\n${presetIssues.join('\n')}`, {
+      issues: presetIssues,
+    })
   }
 
   return result.data

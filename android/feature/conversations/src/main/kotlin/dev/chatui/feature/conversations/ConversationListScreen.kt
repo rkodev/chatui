@@ -1,0 +1,419 @@
+package dev.chatui.feature.conversations
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.model.Conversation
+import java.time.Instant
+import java.time.ZoneId
+
+/** Test tags exposed by the conversation list and drawer. */
+object ConversationListTestTags {
+    const val Screen = "conversation-list-screen"
+    const val Drawer = "conversation-drawer"
+    const val NewChat = "conversation-list-new-chat"
+    const val Loading = "conversation-list-loading"
+    const val Empty = "conversation-list-empty"
+    const val Error = "conversation-list-error"
+    const val RenameDialog = "conversation-rename-dialog"
+    const val RenameField = "conversation-rename-field"
+    const val RenameSave = "conversation-rename-save"
+    const val DeleteDialog = "conversation-delete-dialog"
+    const val DeleteConfirm = "conversation-delete-confirm"
+
+    fun group(key: ConversationGroupKey): String =
+        "conversation-group-${key.name.lowercase()}"
+
+    fun item(id: String): String = "conversation-item-$id"
+
+    fun actions(id: String): String = "conversation-actions-$id"
+
+    fun rename(id: String): String = "conversation-rename-$id"
+
+    fun delete(id: String): String = "conversation-delete-$id"
+}
+
+/**
+ * Conversation history list.
+ *
+ * The list renders the required date groups, a New chat action, and per-item
+ * rename/delete actions. Delete always opens a confirmation dialog. The
+ * composable is presentational; storage and navigation live in the ViewModel
+ * and route.
+ */
+@Composable
+fun ConversationListScreen(
+    state: ConversationListUiState,
+    onNewChat: () -> Unit,
+    onSelect: (Conversation) -> Unit,
+    onRename: (Conversation, String) -> Unit,
+    onDeleteRequested: (Conversation) -> Unit,
+    onDeleteDismissed: () -> Unit,
+    onDeleteConfirmed: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    now: Instant = Instant.now(),
+    zoneId: ZoneId = ZoneId.systemDefault(),
+) {
+    val dimens = LocalDimens.current
+    var renameTarget by remember { mutableStateOf<Conversation?>(null) }
+    var renameValue by remember { mutableStateOf("") }
+    var renameError by remember { mutableStateOf<String?>(null) }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag(ConversationListTestTags.Screen),
+        contentPadding = PaddingValues(dimens.padding),
+        verticalArrangement = Arrangement.spacedBy(dimens.gap),
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Chats",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Button(
+                    onClick = onNewChat,
+                    modifier = Modifier.testTag(ConversationListTestTags.NewChat),
+                ) {
+                    Text("New chat")
+                }
+            }
+        }
+
+        state.error?.let { message ->
+            item {
+                Column(
+                    modifier = Modifier.testTag(ConversationListTestTags.Error),
+                    verticalArrangement = Arrangement.spacedBy(dimens.space1),
+                ) {
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    TextButton(onClick = onRetry) { Text("Retry") }
+                }
+            }
+        }
+
+        when {
+            state.loading && state.groups.isEmpty() -> item {
+                Text(
+                    text = "Loading conversations…",
+                    modifier = Modifier.testTag(ConversationListTestTags.Loading),
+                )
+            }
+
+            state.groups.isEmpty() -> item {
+                Text(
+                    text = "No conversations yet.",
+                    modifier = Modifier.testTag(ConversationListTestTags.Empty),
+                )
+            }
+
+            else -> state.groups.forEach { group ->
+                item(key = "group-${group.key.name}") {
+                    Text(
+                        text = group.label,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag(ConversationListTestTags.group(group.key)),
+                    )
+                }
+
+                items(group.conversations, key = { it.id }) { conversation ->
+                    ConversationRow(
+                        conversation = conversation,
+                        active = conversation.id == state.activeConversationId,
+                        now = now,
+                        zoneId = zoneId,
+                        onSelect = { onSelect(conversation) },
+                        onRename = {
+                            renameTarget = conversation
+                            renameValue = conversation.title
+                            renameError = null
+                        },
+                        onDelete = { onDeleteRequested(conversation) },
+                    )
+                }
+            }
+        }
+    }
+
+    renameTarget?.let { target ->
+        RenameDialog(
+            value = renameValue,
+            error = renameError,
+            onValueChange = {
+                renameValue = it
+                renameError = null
+            },
+            onDismiss = { renameTarget = null },
+            onSave = {
+                val trimmed = renameValue.trim()
+                if (trimmed.isEmpty()) {
+                    renameError = "Enter a title."
+                } else {
+                    onRename(target, trimmed)
+                    renameTarget = null
+                }
+            },
+        )
+    }
+
+    state.pendingDelete?.let { target ->
+        DeleteDialog(
+            conversation = target,
+            onDismiss = onDeleteDismissed,
+            onConfirm = onDeleteConfirmed,
+        )
+    }
+}
+
+/**
+ * Modal drawer wrapper for the conversation list.
+ *
+ * The chat screen uses this in M1-09; the Conversations destination renders
+ * [ConversationListScreen] directly.
+ */
+@Composable
+fun ConversationDrawer(
+    drawerState: DrawerState,
+    state: ConversationListUiState,
+    onNewChat: () -> Unit,
+    onSelect: (Conversation) -> Unit,
+    onRename: (Conversation, String) -> Unit,
+    onDeleteRequested: (Conversation) -> Unit,
+    onDeleteDismissed: () -> Unit,
+    onDeleteConfirmed: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    now: Instant = Instant.now(),
+    zoneId: ZoneId = ZoneId.systemDefault(),
+    content: @Composable () -> Unit,
+) {
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        modifier = modifier,
+        drawerContent = {
+            ModalDrawerSheet(
+                modifier = Modifier.testTag(ConversationListTestTags.Drawer),
+            ) {
+                ConversationListScreen(
+                    state = state,
+                    onNewChat = onNewChat,
+                    onSelect = onSelect,
+                    onRename = onRename,
+                    onDeleteRequested = onDeleteRequested,
+                    onDeleteDismissed = onDeleteDismissed,
+                    onDeleteConfirmed = onDeleteConfirmed,
+                    onRetry = onRetry,
+                    now = now,
+                    zoneId = zoneId,
+                )
+            }
+        },
+        content = content,
+    )
+}
+
+@Composable
+private fun ConversationRow(
+    conversation: Conversation,
+    active: Boolean,
+    now: Instant,
+    zoneId: ZoneId,
+    onSelect: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val dimens = LocalDimens.current
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ConversationListTestTags.item(conversation.id)),
+        colors = CardDefaults.cardColors(
+            containerColor = if (active) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(dimens.space3),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onSelect),
+            ) {
+                Text(
+                    text = conversation.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                )
+                Text(
+                    text = formatConversationTimestamp(
+                        instant = conversation.lastMessageAt,
+                        now = now,
+                        zoneId = zoneId,
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.testTag(
+                        ConversationListTestTags.actions(conversation.id),
+                    ),
+                ) {
+                    Text("⋯")
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Rename") },
+                        onClick = {
+                            menuExpanded = false
+                            onRename()
+                        },
+                        modifier = Modifier.testTag(
+                            ConversationListTestTags.rename(conversation.id),
+                        ),
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        onClick = {
+                            menuExpanded = false
+                            onDelete()
+                        },
+                        modifier = Modifier.testTag(
+                            ConversationListTestTags.delete(conversation.id),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenameDialog(
+    value: String,
+    error: String?,
+    onValueChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(ConversationListTestTags.RenameDialog),
+        title = { Text("Rename conversation") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    label = { Text("Title") },
+                    singleLine = true,
+                    isError = error != null,
+                    modifier = Modifier.testTag(ConversationListTestTags.RenameField),
+                )
+                if (error != null) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onSave,
+                enabled = value.trim().isNotEmpty(),
+                modifier = Modifier.testTag(ConversationListTestTags.RenameSave),
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+private fun DeleteDialog(
+    conversation: Conversation,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(ConversationListTestTags.DeleteDialog),
+        title = { Text("Delete conversation?") },
+        text = {
+            Text("“${conversation.title}” and its messages will be deleted.")
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.testTag(ConversationListTestTags.DeleteConfirm),
+            ) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}

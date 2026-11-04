@@ -1,0 +1,47 @@
+package dev.chatui.feature.onboarding
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+/**
+ * Stateful onboarding entry point.
+ *
+ * The ViewModel is scoped to the current navigation back-stack entry. A
+ * successful connection emits one event so the shell can navigate to chat
+ * without re-navigating on recomposition.
+ */
+@Composable
+fun OnboardingRoute(
+    service: OnboardingService,
+    onConnected: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val viewModel: OnboardingViewModel = viewModel(
+        factory = OnboardingViewModel.factory(service),
+    )
+    val state by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                OnboardingEvent.Connected -> onConnected()
+            }
+        }
+    }
+
+    OnboardingScreen(
+        state = state,
+        onApiKeyChanged = viewModel::onApiKeyChanged,
+        onLabelChanged = viewModel::onLabelChanged,
+        onProviderSelected = viewModel::onProviderSelected,
+        onContinue = viewModel::onContinue,
+        onBack = viewModel::onBack,
+        onConnect = viewModel::onConnect,
+        onRetryCatalog = viewModel::onRetryCatalog,
+        modifier = modifier,
+    )
+}
