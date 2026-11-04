@@ -2,12 +2,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  M2_ENABLED_PRESET_IDS,
   ProviderRegistryError,
   getDefaultPreset,
   getEnabledPresets,
   getPreset,
   getPresetAvailability,
-  isPresetEnabledInM1,
+  isPresetEnabledInM2,
   loadProviderPresets,
   providerPresets,
   type ProviderPreset,
@@ -103,16 +104,45 @@ describe('preset lookup', () => {
   })
 })
 
-describe('M1 gating', () => {
-  it('enables OpenRouter only', () => {
-    expect(getEnabledPresets().map((preset) => preset.id)).toEqual(['openrouter'])
-    expect(isPresetEnabledInM1('openrouter')).toBe(true)
-    expect(isPresetEnabledInM1('openai')).toBe(false)
-    expect(isPresetEnabledInM1('custom')).toBe(false)
+describe('M2 enablement', () => {
+  it('enables every launch OpenAI-compatible preset', () => {
+    expect(M2_ENABLED_PRESET_IDS).toEqual([
+      'openrouter',
+      'openai',
+      'groq',
+      'mistral',
+      'deepseek',
+      'xai',
+      'together',
+      'fireworks',
+      'lmstudio',
+      'llamacpp',
+      'custom',
+    ])
+    expect(getEnabledPresets().map((preset) => preset.id)).toEqual([
+      ...M2_ENABLED_PRESET_IDS,
+    ])
+    expect(isPresetEnabledInM2('openrouter')).toBe(true)
+    expect(isPresetEnabledInM2('openai')).toBe(true)
+    expect(isPresetEnabledInM2('custom')).toBe(true)
+    expect(isPresetEnabledInM2('anthropic')).toBe(false)
+    expect(isPresetEnabledInM2('google')).toBe(false)
+    expect(isPresetEnabledInM2('ollama')).toBe(false)
   })
 
-  it('labels other contract presets as coming later', () => {
-    const availability = getPresetAvailability()
+  it('only enables presets that exist in contracts', () => {
+    const contractIds = new Set(providerPresets.map((preset) => preset.id))
+
+    for (const id of M2_ENABLED_PRESET_IDS) {
+      expect(contractIds.has(id)).toBe(true)
+    }
+  })
+
+  it('labels enabled, disabled, and coming-later presets', () => {
+    const availability = getPresetAvailability(providerPresets, [
+      'openrouter',
+      'openai',
+    ])
 
     expect(availability.find((entry) => entry.preset.id === 'openrouter')).toMatchObject({
       enabled: true,
@@ -120,14 +150,27 @@ describe('M1 gating', () => {
       status: 'available',
     })
     expect(availability.find((entry) => entry.preset.id === 'openai')).toMatchObject({
-      enabled: false,
-      selectable: false,
-      status: 'coming-later',
+      enabled: true,
+      selectable: true,
+      status: 'available',
     })
     expect(availability.find((entry) => entry.preset.id === 'custom')).toMatchObject({
       enabled: false,
       selectable: false,
+      status: 'disabled',
+    })
+    expect(availability.find((entry) => entry.preset.id === 'anthropic')).toMatchObject({
+      enabled: false,
+      selectable: false,
       status: 'coming-later',
     })
+  })
+
+  it('filters enabled presets by the runtime allow-list', () => {
+    expect(
+      getEnabledPresets(providerPresets, ['openrouter', 'groq']).map(
+        (preset) => preset.id,
+      ),
+    ).toEqual(['openrouter', 'groq'])
   })
 })

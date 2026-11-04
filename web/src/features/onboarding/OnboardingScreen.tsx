@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { ModelInfo } from '../../providers/openrouter'
-import { getPresetAvailability } from '../../providers/registry'
+import { getPresetAvailability, providerPresets } from '../../providers/registry'
 import { Button } from '../../ui/primitives'
 import { describeCatalogError, describeOnboardingError, type OnboardingErrorCopy } from './errorCopy'
 import type { OnboardingServiceLike } from './types'
@@ -101,7 +101,7 @@ export function OnboardingScreen({ service, onConnected }: OnboardingScreenProps
     }
   }
 
-  const providers = getPresetAvailability()
+  const providers = getPresetAvailability(providerPresets, ['openrouter'])
   const connectDisabled = testing || connected || apiKey.trim() === ''
 
   return (
@@ -114,8 +114,8 @@ export function OnboardingScreen({ service, onConnected }: OnboardingScreenProps
           ChatUI server.
         </p>
         <p>
-          OpenRouter is recommended for this preview. Other providers are visible below but
-          are coming later.
+          OpenRouter is required for this preview. Other enabled providers can be added
+          from Settings after you connect.
         </p>
       </div>
 
@@ -138,6 +138,9 @@ export function OnboardingScreen({ service, onConnected }: OnboardingScreenProps
             <span className="onboarding__provider-name">{preset.label}</span>
             {preset.id === 'openrouter' && (
               <span className="onboarding__badge">Recommended</span>
+            )}
+            {status === 'disabled' && (
+              <span className="onboarding__muted">Add from Settings</span>
             )}
             {status === 'coming-later' && (
               <span className="onboarding__muted">Coming later</span>

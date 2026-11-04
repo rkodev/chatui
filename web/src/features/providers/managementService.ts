@@ -12,7 +12,7 @@ import {
   withRoutingPreferences,
   type RoutingPreferences,
 } from './routing'
-import type { ManualModelInput, RefreshModelsResult } from './types'
+import type { ManualModelInput, CreateCustomProviderInput, RefreshModelsResult } from './types'
 
 /**
  * Provider, model, defaults, and routing facade used by the settings UI.
@@ -45,6 +45,10 @@ export class ProviderManagementService implements ProviderManagementServiceLike 
 
   async getProvider(providerId: string): Promise<Provider | null> {
     return this.providerService.getProvider(providerId)
+  }
+
+  async createCustomProvider(input: CreateCustomProviderInput): Promise<Provider> {
+    return this.providerService.createCustomProvider(input)
   }
 
   async validateProviderKey(providerId: string): Promise<Provider> {

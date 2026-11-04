@@ -1,7 +1,7 @@
 import type { Conversation, Model, Provider, Settings } from '../../domain'
 import type { ConversationStore } from '../conversations/types'
 import type { SettingsDefaults } from '../settings/settingsService'
-import type { ManualModelInput, RefreshModelsResult } from './types'
+import type { CreateCustomProviderInput, ManualModelInput, RefreshModelsResult } from './types'
 import type { RoutingPreferences } from './routing'
 
 /**
@@ -14,6 +14,7 @@ import type { RoutingPreferences } from './routing'
 export interface ProviderManagementServiceLike {
   listProviders(): Promise<Provider[]>
   getProvider(providerId: string): Promise<Provider | null>
+  createCustomProvider(input: CreateCustomProviderInput): Promise<Provider>
   validateProviderKey(providerId: string): Promise<Provider>
   rotateKey(providerId: string, apiKey: string, rememberKeys?: boolean): Promise<Provider>
   removeKey(providerId: string): Promise<Provider>
@@ -70,6 +71,7 @@ export interface ProviderManagementServiceOptions {
   providerService: {
     listProviders(options?: { enabled?: boolean }): Promise<Provider[]>
     getProvider(providerId: string): Promise<Provider | null>
+    createCustomProvider(input: CreateCustomProviderInput): Promise<Provider>
     validateProviderKey(providerId: string): Promise<Provider>
     rotateKey(providerId: string, apiKey: string, rememberKeys?: boolean): Promise<Provider>
     removeKey(providerId: string): Promise<Provider>

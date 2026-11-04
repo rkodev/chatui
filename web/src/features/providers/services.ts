@@ -47,6 +47,8 @@ export async function createProviderManagementService(
     adapter: openRouterAdapter,
     fetch: globalThis.fetch,
     attribution,
+    enabledPresetIds: config.enabledPresets,
+    allowCustomProviders: config.allowCustomProviders,
   })
 
   return new ProviderManagementService({

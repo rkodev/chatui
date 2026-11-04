@@ -5,14 +5,14 @@ export type {
   ProviderRegistryValue,
 } from './provider-registry-context'
 export {
-  M1_ENABLED_PRESET_IDS,
+  M2_ENABLED_PRESET_IDS,
   ProviderRegistryError,
   browserCorsSchema,
   getDefaultPreset,
   getEnabledPresets,
   getPreset,
   getPresetAvailability,
-  isPresetEnabledInM1,
+  isPresetEnabledInM2,
   keyValidationSchema,
   loadProviderPresets,
   modelDiscoveryFormatSchema,
@@ -24,7 +24,7 @@ export {
   providerPresets,
 } from './registry'
 export type {
-  M1EnabledPresetId,
+  M2EnabledPresetId,
   PresetAvailability,
   PresetAvailabilityStatus,
   ProviderPreset,

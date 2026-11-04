@@ -168,18 +168,34 @@ export function getDefaultPreset(
 }
 
 /**
- * M1 exposes OpenRouter only. Other presets remain in contracts so later
- * milestones can enable them without duplicating provider metadata.
+ * Presets the M2 web client can use without source edits.
+ *
+ * The list is deliberately limited to OpenAI-compatible presets. Anthropic,
+ * Gemini, and Ollama stay in contracts but are labelled as coming later until
+ * their native adapters land. `custom` is included because Custom providers use
+ * the same OpenAI-compatible transport.
  */
-export const M1_ENABLED_PRESET_IDS = ['openrouter'] as const
+export const M2_ENABLED_PRESET_IDS = [
+  'openrouter',
+  'openai',
+  'groq',
+  'mistral',
+  'deepseek',
+  'xai',
+  'together',
+  'fireworks',
+  'lmstudio',
+  'llamacpp',
+  'custom',
+] as const
 
-export type M1EnabledPresetId = (typeof M1_ENABLED_PRESET_IDS)[number]
+export type M2EnabledPresetId = (typeof M2_ENABLED_PRESET_IDS)[number]
 
-export function isPresetEnabledInM1(id: string): boolean {
-  return (M1_ENABLED_PRESET_IDS as readonly string[]).includes(id)
+export function isPresetEnabledInM2(id: string): boolean {
+  return (M2_ENABLED_PRESET_IDS as readonly string[]).includes(id)
 }
 
-export type PresetAvailabilityStatus = 'available' | 'coming-later'
+export type PresetAvailabilityStatus = 'available' | 'disabled' | 'coming-later'
 
 export interface PresetAvailability {
   preset: ProviderPreset
@@ -189,26 +205,42 @@ export interface PresetAvailability {
 }
 
 /**
- * Describe every contract preset for UI code. Only OpenRouter is selectable in
- * M1; the rest are labelled as coming later rather than hidden from contracts.
+ * Describe every contract preset for UI code.
+ *
+ * `enabledIds` is the deployment's runtime allow-list. A preset that M2
+ * supports but the deployment does not enable is `disabled`; a preset that M2
+ * does not support yet is `coming-later`. Neither is silently hidden.
  */
 export function getPresetAvailability(
   presets: readonly ProviderPreset[] = providerPresets,
+  enabledIds: readonly string[] = M2_ENABLED_PRESET_IDS,
 ): PresetAvailability[] {
   return presets.map((preset) => {
-    const enabled = isPresetEnabledInM1(preset.id)
+    if (!isPresetEnabledInM2(preset.id)) {
+      return {
+        preset,
+        enabled: false,
+        selectable: false,
+        status: 'coming-later',
+      }
+    }
+
+    const enabled = enabledIds.includes(preset.id)
 
     return {
       preset,
       enabled,
       selectable: enabled,
-      status: enabled ? 'available' : 'coming-later',
+      status: enabled ? 'available' : 'disabled',
     }
   })
 }
 
 export function getEnabledPresets(
   presets: readonly ProviderPreset[] = providerPresets,
+  enabledIds: readonly string[] = M2_ENABLED_PRESET_IDS,
 ): ProviderPreset[] {
-  return presets.filter((preset) => isPresetEnabledInM1(preset.id))
+  return presets.filter(
+    (preset) => isPresetEnabledInM2(preset.id) && enabledIds.includes(preset.id),
+  )
 }

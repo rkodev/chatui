@@ -2,14 +2,14 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import type { IDBPDatabase } from 'idb'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { newId, nowIso, type Model } from '../../domain'
+import { newId, nowIso, type Model, type Provider } from '../../domain'
 import { openRouterAdapter } from '../../providers/openrouter'
 import { deleteDatabase, openDatabase, type ChatUiDB } from '../../storage/db'
 import { ModelRepository } from '../../storage/ModelRepository'
 import { ProviderRepository } from '../../storage/ProviderRepository'
 import type { SecretMode } from '../../storage/SecretStore'
 import { getProviderKeyMetadata, ProviderService } from './providerService'
-import type { SecretStoreLike } from './types'
+import type { ProviderStore, SecretStoreLike } from './types'
 
 class FakeSecretStore implements SecretStoreLike {
   readonly values = new Map<string, { value: string; mode: SecretMode }>()
@@ -56,6 +56,7 @@ describe('ProviderService', () => {
       adapter: openRouterAdapter,
       fetch: globalThis.fetch,
       attribution: { origin: 'https://chat.example', title: 'ChatUI' },
+      allowCustomProviders: true,
     })
   })
 
@@ -247,5 +248,301 @@ describe('ProviderService', () => {
 
     expect(JSON.stringify(listed)).not.toContain('sk-test-key')
     expect(JSON.stringify(fetched)).not.toContain('sk-test-key')
+  })
+
+  it('creates a custom provider with non-secret headers and a separate secret', async () => {
+    const provider = await service.createCustomProvider({
+      label: 'Local',
+      baseUrl: 'https://api.example.com/v1',
+      authType: 'bearer',
+      apiKey: 'sk-custom',
+      headers: { 'X-Organization': 'team' },
+    })
+
+    expect(provider).toMatchObject({
+      presetId: 'custom',
+      label: 'Local',
+      kind: 'openai-compatible',
+      baseUrl: 'https://api.example.com/v1',
+      authType: 'bearer',
+      headers: { 'X-Organization': 'team' },
+      enabled: true,
+      browserCors: 'unknown',
+      metadata: null,
+    })
+    expect(provider.secretId).toEqual(expect.any(String))
+    expect(JSON.stringify(provider)).not.toContain('sk-custom')
+    expect(secrets.values.get(provider.secretId ?? '')).toEqual({
+      value: 'sk-custom',
+      mode: 'remember',
+    })
+  })
+
+  it('creates a custom provider without a secret when auth is none', async () => {
+    const provider = await service.createCustomProvider({
+      baseUrl: 'http://localhost:8080/v1',
+      authType: 'none',
+    })
+
+    expect(provider.secretId).toBeNull()
+    expect(provider.authType).toBe('none')
+    expect(secrets.values.size).toBe(0)
+  })
+
+  it('rejects an invalid custom base URL', async () => {
+    await expect(
+      service.createCustomProvider({
+        baseUrl: 'not-a-url',
+        authType: 'bearer',
+        apiKey: 'sk-custom',
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_input',
+      message: expect.stringContaining('http(s) base URL'),
+    })
+  })
+
+  it('rejects a custom provider without an auth style', async () => {
+    await expect(
+      service.createCustomProvider({
+        baseUrl: 'https://api.example.com/v1',
+        authType: undefined as never,
+        apiKey: 'sk-custom',
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_input',
+      message: expect.stringContaining('Choose an authentication style'),
+    })
+  })
+
+  it('rejects a custom provider without a key for key-based auth', async () => {
+    await expect(
+      service.createCustomProvider({
+        baseUrl: 'https://api.example.com/v1',
+        authType: 'bearer',
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_input',
+      message: expect.stringContaining('Enter an API key'),
+    })
+  })
+
+  it('rejects authentication headers in custom headers', async () => {
+    await expect(
+      service.createCustomProvider({
+        baseUrl: 'https://api.example.com/v1',
+        authType: 'bearer',
+        apiKey: 'sk-custom',
+        headers: { Authorization: 'Bearer sk-custom' },
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_input',
+      message: expect.stringContaining('reserved for authentication'),
+    })
+  })
+
+  it('rejects duplicate provider labels', async () => {
+    await service.createCustomProvider({
+      label: 'Local',
+      baseUrl: 'https://api.example.com/v1',
+      authType: 'bearer',
+      apiKey: 'sk-custom',
+    })
+
+    await expect(
+      service.createCustomProvider({
+        label: 'local',
+        baseUrl: 'https://api.example.com/v2',
+        authType: 'bearer',
+        apiKey: 'sk-custom-2',
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_input',
+      message: expect.stringContaining('already exists'),
+    })
+  })
+
+  it('creates a provider from another enabled preset', async () => {
+    const provider = await service.createPresetProvider({
+      presetId: 'openai',
+      apiKey: 'sk-openai',
+      label: 'OpenAI work',
+    })
+
+    expect(provider).toMatchObject({
+      presetId: 'openai',
+      label: 'OpenAI work',
+      baseUrl: 'https://api.openai.com/v1',
+      authType: 'bearer',
+    })
+    expect(secrets.values.get(provider.secretId ?? '')).toEqual({
+      value: 'sk-openai',
+      mode: 'remember',
+    })
+  })
+
+  it('creates a keyless provider for a no-auth preset', async () => {
+    const provider = await service.createPresetProvider({ presetId: 'lmstudio' })
+
+    expect(provider).toMatchObject({
+      presetId: 'lmstudio',
+      authType: 'none',
+      secretId: null,
+    })
+    expect(secrets.values.size).toBe(0)
+  })
+
+  it('rejects presets that are not available in M2', async () => {
+    await expect(
+      service.createPresetProvider({ presetId: 'anthropic', apiKey: 'sk-ant' }),
+    ).rejects.toMatchObject({
+      code: 'invalid_input',
+      message: expect.stringContaining('not available in M2'),
+    })
+  })
+
+  it('rejects presets disabled by the runtime allow-list', async () => {
+    const restricted = new ProviderService({
+      providers,
+      secrets,
+      adapter: openRouterAdapter,
+      enabledPresetIds: ['openrouter'],
+      allowCustomProviders: false,
+    })
+
+    await expect(
+      restricted.createPresetProvider({ presetId: 'openai', apiKey: 'sk-openai' }),
+    ).rejects.toMatchObject({
+      code: 'invalid_input',
+      message: expect.stringContaining('not enabled in this deployment'),
+    })
+  })
+
+  it('rejects custom creation when the deployment disables it', async () => {
+    const restricted = new ProviderService({
+      providers,
+      secrets,
+      adapter: openRouterAdapter,
+      allowCustomProviders: false,
+    })
+
+    await expect(
+      restricted.createCustomProvider({
+        baseUrl: 'https://api.example.com/v1',
+        authType: 'bearer',
+        apiKey: 'sk-custom',
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_input',
+      message: expect.stringContaining('not enabled in this deployment'),
+    })
+  })
+
+  it('rejects the custom preset through the generic preset path', async () => {
+    await expect(
+      service.createPresetProvider({ presetId: 'custom', apiKey: 'sk-custom' }),
+    ).rejects.toMatchObject({
+      code: 'invalid_input',
+      message: expect.stringContaining('createCustomProvider'),
+    })
+  })
+})
+
+class FakeProviderStore implements ProviderStore {
+  readonly providers = new Map<string, Provider>()
+
+  async create(provider: Provider): Promise<Provider> {
+    this.providers.set(provider.id, provider)
+    return provider
+  }
+
+  async get(id: string): Promise<Provider | null> {
+    return this.providers.get(id) ?? null
+  }
+
+  async list(): Promise<Provider[]> {
+    return [...this.providers.values()]
+  }
+
+  async update(
+    id: string,
+    patch: Partial<Omit<Provider, 'id' | 'createdAt'>>,
+  ): Promise<Provider> {
+    const existing = this.providers.get(id)
+
+    if (!existing) {
+      throw new Error(`Provider ${id} not found`)
+    }
+
+    const updated: Provider = {
+      ...existing,
+      ...patch,
+      id,
+      createdAt: existing.createdAt,
+      updatedAt: patch.updatedAt ?? nowIso(),
+    }
+    this.providers.set(id, updated)
+    return updated
+  }
+
+  async delete(id: string): Promise<void> {
+    this.providers.delete(id)
+  }
+}
+
+class FailingProviderStore extends FakeProviderStore {
+  async create(): Promise<Provider> {
+    throw new Error('provider write failed')
+  }
+}
+
+class FailingSecretStore extends FakeSecretStore {
+  async setSecret(): Promise<void> {
+    throw new Error('secret write failed')
+  }
+}
+
+describe('ProviderService rollback', () => {
+  it('removes the secret when the provider write fails', async () => {
+    const providers = new FailingProviderStore()
+    const secrets = new FakeSecretStore()
+    const service = new ProviderService({
+      providers,
+      secrets,
+      adapter: openRouterAdapter,
+      allowCustomProviders: true,
+    })
+
+    await expect(
+      service.createCustomProvider({
+        baseUrl: 'https://api.example.com/v1',
+        authType: 'bearer',
+        apiKey: 'sk-custom',
+      }),
+    ).rejects.toMatchObject({ code: 'storage' })
+
+    expect(providers.providers.size).toBe(0)
+    expect(secrets.values.size).toBe(0)
+  })
+
+  it('does not write a provider when the secret write fails', async () => {
+    const providers = new FakeProviderStore()
+    const secrets = new FailingSecretStore()
+    const service = new ProviderService({
+      providers,
+      secrets,
+      adapter: openRouterAdapter,
+      allowCustomProviders: true,
+    })
+
+    await expect(
+      service.createCustomProvider({
+        baseUrl: 'https://api.example.com/v1',
+        authType: 'bearer',
+        apiKey: 'sk-custom',
+      }),
+    ).rejects.toMatchObject({ code: 'storage' })
+
+    expect(providers.providers.size).toBe(0)
   })
 })

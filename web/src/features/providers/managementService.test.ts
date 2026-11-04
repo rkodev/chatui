@@ -236,6 +236,26 @@ function setup() {
   const providerService: ProviderManagementServiceOptions['providerService'] = {
     listProviders: async (options) => providers.list(options),
     getProvider: async (id) => providers.get(id),
+    createCustomProvider: async (input) => {
+      const now = nowIso()
+      const provider: Provider = {
+        id: 'custom-provider',
+        presetId: 'custom',
+        label: input.label?.trim() || 'Custom OpenAI-compatible',
+        kind: 'openai-compatible',
+        baseUrl: input.baseUrl,
+        authType: input.authType,
+        secretId: input.authType === 'none' ? null : 'custom-secret',
+        headers: input.headers ?? {},
+        enabled: true,
+        browserCors: 'unknown',
+        metadata: null,
+        createdAt: now,
+        updatedAt: now,
+      }
+      providers.values.set(provider.id, provider)
+      return provider
+    },
     validateProviderKey: async (id) => {
       const value = await providers.get(id)
       if (!value) throw new Error('missing provider')

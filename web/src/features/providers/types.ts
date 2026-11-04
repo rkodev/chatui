@@ -5,6 +5,7 @@ import type {
   ModelPricing,
   OutputModality,
   Provider,
+  ProviderAuthType,
 } from '../../domain'
 import type {
   CatalogCache,
@@ -75,6 +76,10 @@ export interface ProviderServiceOptions extends ProviderRuntime {
   adapter: ProviderAdapter
   nowIso?: () => string
   newId?: () => string
+  /** Runtime allow-list from `/config.json`. Defaults to the M2 preset list. */
+  enabledPresetIds?: readonly string[]
+  /** Whether Custom provider creation is enabled in this deployment. */
+  allowCustomProviders?: boolean
 }
 
 export interface ModelServiceOptions extends ProviderRuntime {
@@ -90,6 +95,34 @@ export interface CreateOpenRouterProviderInput {
   label?: string
   /** Defaults to true, matching the spec's convenience default. */
   rememberKeys?: boolean
+}
+
+/** Create a provider from any enabled OpenAI-compatible contract preset. */
+export interface CreatePresetProviderInput {
+  presetId: string
+  apiKey?: string
+  label?: string
+  /** Defaults to true, matching the spec's convenience default. */
+  rememberKeys?: boolean
+  /** Optional non-secret headers. Authentication headers are rejected. */
+  headers?: Record<string, string>
+}
+
+/**
+ * Create a Custom OpenAI-compatible provider.
+ *
+ * The base URL and auth style are required. The key is written only to the
+ * secret store; `headers` may contain non-secret headers only.
+ */
+export interface CreateCustomProviderInput {
+  label?: string
+  baseUrl: string
+  authType: ProviderAuthType
+  apiKey?: string
+  /** Defaults to true, matching the spec's convenience default. */
+  rememberKeys?: boolean
+  /** Optional non-secret headers. Authentication headers are rejected. */
+  headers?: Record<string, string>
 }
 
 /**
