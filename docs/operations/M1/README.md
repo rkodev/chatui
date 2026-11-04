@@ -60,7 +60,7 @@
 | 26 | [M1-09.1 Android chat runner and ViewModel](M1-09.1-android-chat-runner.md) | Complete | M1-06.4, M1-08.1, M1-08.2 | android | M1-04.1 |
 | 27 | [M1-09.2 Android chat screen and composer](M1-09.2-android-chat-screen.md) | Complete | M1-09.1 | android | M1-04.2, M1-04.3 |
 | 28 | [M1-09.3 Android Markdown, code, and actions](M1-09.3-android-markdown-actions.md) | Complete | M1-09.2 | android | M1-04.4 |
-| 29 | [M1-10.1 Browser CORS verification and browserCors update](M1-10.1-cors-verification.md) | Not started | M1-02.4, M1-06.4, M1-03.2, M1-07.2 | verification | none |
+| 29 | [M1-10.1 Browser CORS verification and browserCors update](M1-10.1-cors-verification.md) | Complete | M1-02.4, M1-06.4, M1-03.2, M1-07.2 | verification | none |
 | 30 | [M1-10.2 Conformance, parity, verification, and exit gate](M1-10.2-conformance-exit-gate.md) | Not started | all prior tasks | verification | none |
 
 ## Parallel execution groups

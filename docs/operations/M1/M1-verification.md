@@ -31,19 +31,29 @@ check has actually run and the evidence is linked or quoted.
 
 ## 2. CORS matrix
 
-Run from a browser against `https://openrouter.ai/api/v1` with a disposable,
-redacted test key. Record the preflight result, final status, and conclusion for
-each endpoint. Update `contracts/providers.json` `browserCors` only after the
-matrix is complete.
+Verified 2026-11-04 against `https://openrouter.ai/api/v1` from the Vite dev
+origin `http://localhost:5173`. Preflight and header inspection used
+`curl 8.18.0`; browser enforcement was confirmed with headless Google Chrome
+157.0.8103.38 (UA reports `HeadlessChrome/157.0.0.0`). The valid-key checks used
+a disposable key that was deleted after the run and is not recorded here.
+Browser `fetch()` responses were readable and reported `type: "cors"` for every
+request, with no CORS error.
 
-| Endpoint | Method | Preflight | Status | Conclusion | Evidence |
-| --- | --- | --- | --- | --- | --- |
-| `/key` | `GET` | Pending | Pending | Pending | |
-| `/models` | `GET` | Pending | Pending | Pending | |
-| `/chat/completions` | `POST` | Pending | Pending | Pending | |
+| Endpoint | Method | Origin | Preflight | Status | Response headers observed | Timestamp (UTC) | Conclusion | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `/key` | `GET` | `http://localhost:5173` | `204`; ACAO `*`; methods include `GET`; headers include `Authorization`, `HTTP-Referer`, `X-Title` | `200` valid key; `401` invalid key | ACAO `*`; `content-type: application/json`; `cache-control: private, no-store`; `access-control-expose-headers` includes `X-Generation-Id`, `request-id`, `cf-ray` | Preflight `17:02:15Z`; invalid `17:02:16Z`; valid `17:06:32Z` | Supported. Valid key returns key metadata; invalid key is a readable `401`. | OPTIONS/GET probes; headless Chrome `/key` invalid-key fetch was `type: cors`, status `401`. |
+| `/models` | `GET` | `http://localhost:5173` | `204`; ACAO `*`; methods include `GET`; headers include `Authorization`, `HTTP-Referer`, `X-Title` | `200` without a key | ACAO `*`; `content-type: application/json`; `cache-control: public, max-age=120`; `cf-cache-status: HIT` | Preflight `17:02:14Z`; GET `17:02:15Z`; browser `17:07:03Z` | Supported. Public catalog is readable without a key. | OPTIONS/GET probes; headless Chrome `/models` fetch was `type: cors`, status `200`. |
+| `/chat/completions` | `POST` | `http://localhost:5173` | `204`; ACAO `*`; methods include `POST`; headers include `Authorization`, `Content-Type`, `HTTP-Referer`, `X-Title` | `200` streaming with valid key; `401` invalid key | ACAO `*`; `content-type: text/event-stream`; `cache-control: no-cache`; `x-generation-id` exposed; invalid-key response is `application/json` | Preflight `17:02:16Z`; invalid `17:02:33Z`; stream `17:06:39Z` | Supported. Streaming request returned 5 SSE data lines ending in `[DONE]`, plus a final usage chunk. Invalid key is a readable `401`. | OPTIONS/POST probes; headless Chrome `/chat/completions` invalid-key fetch was `type: cors`, status `401`. |
 
-If any required endpoint is blocked, record the web release as blocked and keep
-Android as the fallback. Do not add a hidden proxy.
+Observed preflight allow-list includes `Authorization`, `Content-Type`,
+`HTTP-Referer`, `X-Openrouter-Title`, and `X-Title`, so the attribution headers
+used by the app are allowed. `access-control-allow-methods` is
+`GET,OPTIONS,PATCH,DELETE,POST,PUT`. No `access-control-max-age` header was
+returned. No intermittent CORS behavior was observed.
+
+Conclusion: browser-direct OpenRouter access is supported for all three required
+endpoints. The web release is not blocked, and `contracts/providers.json`
+`browserCors` is set to `supported`. No proxy was added.
 
 ## 3. OpenRouter conformance checklist
 

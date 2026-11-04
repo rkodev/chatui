@@ -24,7 +24,7 @@
       "HTTP-Referer": "app.origin",
       "X-Title": "app.name"
     },
-    "browserCors": "unknown",
+    "browserCors": "supported",
     "docsUrl": "https://openrouter.ai/docs",
     "defaultModelId": "openrouter/auto",
     "default": true,
