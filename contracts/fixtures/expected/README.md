@@ -134,6 +134,71 @@ The required normalized error codes are `auth`, `permission`, `rate_limit`,
 `timeout`, and `provider`. The validator fails if any code is missing from
 `provider-errors.json`.
 
+## Catalog vectors
+
+`catalogs.json` maps the raw model fixtures to normalized catalog entries for
+OpenAI, Anthropic, Gemini, and Ollama. Each case carries the preset defaults
+used for inference and the expected entries:
+
+```json
+{
+  "name": "openai",
+  "providerId": "openai",
+  "fixture": "models/openai-models.json",
+  "preset": {
+    "inputModalities": ["text"],
+    "outputModalities": ["text"],
+    "capabilities": ["text", "streaming"],
+    "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"]
+  },
+  "expected": [
+    {
+      "remoteId": "gpt-4o-mini",
+      "label": "gpt-4o-mini",
+      "contextWindow": null,
+      "maxOutputTokens": null,
+      "inputModalities": ["text"],
+      "outputModalities": ["text"],
+      "capabilities": ["text", "streaming"],
+      "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+      "pricing": null,
+      "hidden": false
+    }
+  ]
+}
+```
+
+The validator recomputes the mapping and rejects a mismatched field. Embedding
+models are marked `hidden` and excluded from text fallback.
+
+## Capability inference vectors
+
+`capability-inference.json` defines the defaults used when a provider omits
+modalities, capabilities, context, output limits, or supported parameters. Raw
+provider values win over preset defaults. Missing capabilities are derived in
+the order `text`, `vision`, `files`, `tools`, `reasoning`, `streaming`.
+
+## Fallback model vectors
+
+`fallback-models.json` lists the fallback model ids for each non-OpenRouter
+preset and encodes the default-model rule. When discovery succeeds, the preset
+default wins, then the first non-hidden text model by `remoteId`. When discovery
+is blocked and the catalog is empty, the first fallback id is selected. The
+validator recomputes the selection and notice.
+
+## Math vectors
+
+`math.json` defines inline, block, mixed, invalid, and streaming-incomplete math
+input. Valid cases list ordered text and math segments. Invalid or incomplete
+input falls back to one raw text segment with `"fallback": "raw"`.
+
+## Export vector
+
+`chatui-export.json` is a schema-valid `chatui.export` document with stable ids,
+per-conversation message ordering, model snapshots, provider records, and
+attachments with and without `dataBase64`. The validator checks the schema plus
+id uniqueness, ordering, references, and base64 shape.
+
 ## Naming conventions
 
 - Stream expectations use the raw fixture basename: `<fixture>.json`.

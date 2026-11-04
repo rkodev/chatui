@@ -1,0 +1,75 @@
+{
+  "name": "ollama-attachments",
+  "kind": "chat-request",
+  "providerId": "ollama",
+  "request": {
+    "model": "llama3.2:latest",
+    "system": null,
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Describe these."
+          },
+          {
+            "type": "image",
+            "attachmentId": "att-image-1",
+            "mimeType": "image/png",
+            "alt": "A single pixel."
+          },
+          {
+            "type": "file",
+            "attachmentId": "att-file-1",
+            "mimeType": "text/plain",
+            "name": "notes.txt"
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": 256,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {}
+    }
+  },
+  "attachments": {
+    "att-image-1": {
+      "mimeType": "image/png",
+      "name": "pixel.png",
+      "dataBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z0ZkAAAAASUVORK5CYII="
+    },
+    "att-file-1": {
+      "mimeType": "text/plain",
+      "name": "notes.txt",
+      "dataBase64": "SGVsbG8gYXR0YWNobWVudC4="
+    }
+  },
+  "supportedParameters": [
+    "stream",
+    "max_tokens"
+  ],
+  "expected": {
+    "body": {
+      "model": "llama3.2:latest",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Describe these.\n\n[File: notes.txt]\nHello attachment.",
+          "images": [
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z0ZkAAAAASUVORK5CYII="
+          ]
+        }
+      ],
+      "stream": true,
+      "options": {
+        "num_predict": 256
+      }
+    }
+  }
+}

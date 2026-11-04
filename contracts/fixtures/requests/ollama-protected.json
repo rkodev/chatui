@@ -1,0 +1,53 @@
+{
+  "name": "ollama-protected",
+  "kind": "protected-fields",
+  "providerId": "ollama",
+  "request": {
+    "model": "llama3.2:latest",
+    "system": null,
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Hello"
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": null,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {
+        "ollama": {
+          "model": "attacker/model",
+          "messages": [],
+          "stream": false,
+          "stream_options": {
+            "include_usage": false
+          }
+        }
+      }
+    }
+  },
+  "supportedParameters": ["stream"],
+  "expected": {
+    "error": {
+      "code": "invalid_request",
+      "message": "Advanced JSON cannot override protected fields: messages, model, stream, stream_options.",
+      "providerId": "ollama",
+      "status": null,
+      "retryable": false,
+      "retryAfterSeconds": null,
+      "requestId": null,
+      "details": {
+        "protectedFields": ["messages", "model", "stream", "stream_options"]
+      }
+    }
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "source": "fallback-models",
+  "presets": [
+    {
+      "providerId": "openai",
+      "fallbackModelIds": ["gpt-4o-mini", "gpt-4o"]
+    },
+    {
+      "providerId": "anthropic",
+      "fallbackModelIds": ["claude-sonnet-4-5", "claude-haiku-4-5"]
+    },
+    {
+      "providerId": "google",
+      "fallbackModelIds": ["gemini-2.5-flash", "gemini-2.5-pro"]
+    },
+    {
+      "providerId": "ollama",
+      "fallbackModelIds": ["llama3.2:latest"]
+    }
+  ],
+  "cases": [
+    {
+      "name": "openai-default-present",
+      "providerId": "openai",
+      "presetDefaultModelId": "gpt-4o-mini",
+      "fallbackModelIds": ["gpt-4o-mini", "gpt-4o"],
+      "catalog": [
+        {
+          "remoteId": "gpt-4o-mini",
+          "hidden": false,
+          "outputModalities": ["text"]
+        },
+        {
+          "remoteId": "gpt-4o",
+          "hidden": false,
+          "outputModalities": ["text"]
+        }
+      ],
+      "expected": {
+        "selectedModelId": "gpt-4o-mini",
+        "notice": null
+      }
+    },
+    {
+      "name": "anthropic-default-missing",
+      "providerId": "anthropic",
+      "presetDefaultModelId": "claude-sonnet-4-5",
+      "fallbackModelIds": ["claude-sonnet-4-5", "claude-haiku-4-5"],
+      "catalog": [
+        {
+          "remoteId": "claude-haiku-4-5",
+          "hidden": false,
+          "outputModalities": ["text"]
+        }
+      ],
+      "expected": {
+        "selectedModelId": "claude-haiku-4-5",
+        "notice": "Default model claude-sonnet-4-5 is unavailable; using claude-haiku-4-5."
+      }
+    },
+    {
+      "name": "google-discovery-blocked",
+      "providerId": "google",
+      "presetDefaultModelId": "gemini-2.5-flash",
+      "fallbackModelIds": ["gemini-2.5-flash", "gemini-2.5-pro"],
+      "catalog": [],
+      "expected": {
+        "selectedModelId": "gemini-2.5-flash",
+        "notice": "Discovery unavailable; using fallback model gemini-2.5-flash."
+      }
+    },
+    {
+      "name": "ollama-no-text-model",
+      "providerId": "ollama",
+      "presetDefaultModelId": "llama3.2:latest",
+      "fallbackModelIds": ["llama3.2:latest"],
+      "catalog": [
+        {
+          "remoteId": "aaa-hidden-text",
+          "hidden": true,
+          "outputModalities": ["text"]
+        },
+        {
+          "remoteId": "example/image-only",
+          "hidden": false,
+          "outputModalities": ["image"]
+        }
+      ],
+      "expected": {
+        "selectedModelId": null,
+        "notice": "Default model llama3.2:latest is unavailable; no text model is available."
+      }
+    },
+    {
+      "name": "openai-discovery-blocked-without-fallback",
+      "providerId": "openai",
+      "presetDefaultModelId": "gpt-4o-mini",
+      "fallbackModelIds": [],
+      "catalog": [],
+      "expected": {
+        "selectedModelId": null,
+        "notice": "Discovery unavailable; no fallback model is available."
+      }
+    }
+  ]
+}

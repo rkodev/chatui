@@ -123,6 +123,70 @@ The rule is deterministic and testable:
 cases. The validator recomputes the selection and rejects a vector whose
 expected result does not match the rule.
 
+## Non-OpenRouter provider vectors
+
+M2 adds vectors for `openai` (OpenAI-compatible), `anthropic`, `google`
+(Gemini), and `ollama`. They use the same top-level shape as the OpenRouter
+vectors. `providerId` must be one of `openrouter`, `openai`, `anthropic`,
+`google`, or `ollama`.
+
+Each provider has four vectors:
+
+- `<provider>-basic.json`: system prompt and one text message.
+- `<provider>-attachments.json`: text, image, and file content parts.
+- `<provider>-extras.json`: provider-specific JSON under
+  `params.extra[<providerId>]`.
+- `<provider>-protected.json`: protected-field rejection.
+
+### Resolved attachments
+
+Normalized parts reference attachments by id. The vector supplies the resolved
+bytes in an optional `attachments` map:
+
+```json
+{
+  "att-image-1": {
+    "mimeType": "image/png",
+    "name": "pixel.png",
+    "dataBase64": "..."
+  }
+}
+```
+
+File parts are appended as text with the deterministic header
+`\n\n[File: <name>]\n<utf-8 content>`.
+
+### Provider serialization
+
+- OpenAI-compatible: system becomes the first `messages` entry. Text and file
+  parts concatenate into `content`; if an image is present, `content` is an
+  ordered array of text and `image_url` parts. `stream_options` is always
+  `{ "include_usage": true }`.
+- Anthropic: system is the top-level `system` field. Messages use text and
+  base64 image blocks. `max_tokens` is always emitted; when unset the adapter
+  uses `1024`. `stop` maps to `stop_sequences`.
+- Gemini: system is `systemInstruction`. Messages become `contents[]` with
+  `role: "model"` for assistant turns. Images use `inlineData`. Generation
+  controls live under `generationConfig`; `stop` maps to `stopSequences`.
+  Streaming is selected by the endpoint, not the body.
+- Ollama native: system becomes the first `messages` entry. Text and file parts
+  concatenate into `content`; images become the message `images` array.
+  Generation controls live under `options`; `maxOutputTokens` maps to
+  `num_predict` and `stop` maps to `stop`.
+
+### Extras namespace
+
+Provider-specific JSON is namespaced by preset id under `params.extra`. Only the
+active namespace is read. Non-protected keys are merged into the provider body
+at the top level. OpenRouter keeps its existing curated `openrouter` namespace.
+
+### Protected fields
+
+`model`, `messages`, `stream`, and `stream_options` are protected for every
+provider. A protected-field vector must expect an `invalid_request` error with
+`details.protectedFields` sorted ascending and must not contain an expected
+body.
+
 ## Secrets
 
 These vectors contain no keys, real prompts, or personal data. Do not add a real

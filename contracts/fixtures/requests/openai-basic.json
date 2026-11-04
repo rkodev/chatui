@@ -1,0 +1,50 @@
+{
+  "name": "openai-basic",
+  "kind": "chat-request",
+  "providerId": "openai",
+  "request": {
+    "model": "gpt-4o-mini",
+    "system": "You are a concise assistant.",
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Hello"
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": 256,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {}
+    }
+  },
+  "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+  "expected": {
+    "body": {
+      "model": "gpt-4o-mini",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a concise assistant."
+        },
+        {
+          "role": "user",
+          "content": "Hello"
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "max_tokens": 256
+    }
+  }
+}

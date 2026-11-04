@@ -1,0 +1,120 @@
+{
+  "source": "capability-inference",
+  "cases": [
+    {
+      "name": "missing-modalities-use-preset-defaults",
+      "preset": {
+        "id": "openai",
+        "kind": "openai-compatible",
+        "inputModalities": ["text"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"]
+      },
+      "raw": {
+        "id": "gpt-4o-mini"
+      },
+      "expected": {
+        "inputModalities": ["text"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "name": "raw-modalities-override-preset",
+      "preset": {
+        "id": "openai",
+        "kind": "openai-compatible",
+        "inputModalities": ["text"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"]
+      },
+      "raw": {
+        "id": "vision-model",
+        "inputModalities": ["text", "image"],
+        "outputModalities": ["text"]
+      },
+      "expected": {
+        "inputModalities": ["text", "image"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "vision", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "name": "missing-capabilities-are-derived",
+      "preset": {
+        "id": "anthropic",
+        "kind": "anthropic",
+        "inputModalities": ["text", "image"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "vision", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"]
+      },
+      "raw": {
+        "id": "claude-sonnet-4-5",
+        "inputModalities": ["text", "image"],
+        "outputModalities": ["text"],
+        "supportedParameters": ["temperature", "max_tokens", "stream", "tools", "reasoning"]
+      },
+      "expected": {
+        "inputModalities": ["text", "image"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "vision", "tools", "reasoning", "streaming"],
+        "supportedParameters": ["temperature", "max_tokens", "stream", "tools", "reasoning"],
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "name": "missing-supported-parameters-use-preset-defaults",
+      "preset": {
+        "id": "google",
+        "kind": "google-gemini",
+        "inputModalities": ["text", "image", "file"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "vision", "files", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"]
+      },
+      "raw": {
+        "id": "gemini-2.5-flash"
+      },
+      "expected": {
+        "inputModalities": ["text", "image", "file"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "vision", "files", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "name": "missing-context-and-output-limits-are-null",
+      "preset": {
+        "id": "ollama",
+        "kind": "openai-compatible",
+        "inputModalities": ["text"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"]
+      },
+      "raw": {
+        "id": "llama3.2:latest"
+      },
+      "expected": {
+        "inputModalities": ["text"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    }
+  ]
+}

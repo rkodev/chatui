@@ -1,0 +1,57 @@
+{
+  "name": "anthropic-extras",
+  "kind": "chat-request",
+  "providerId": "anthropic",
+  "request": {
+    "model": "claude-sonnet-4-5",
+    "system": null,
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Hello"
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": 256,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {
+        "anthropic": {
+          "metadata": {
+            "user_id": "contract-test"
+          }
+        }
+      }
+    }
+  },
+  "supportedParameters": ["stream"],
+  "expected": {
+    "body": {
+      "model": "claude-sonnet-4-5",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hello"
+            }
+          ]
+        }
+      ],
+      "max_tokens": 256,
+      "stream": true,
+      "metadata": {
+        "user_id": "contract-test"
+      }
+    }
+  }
+}

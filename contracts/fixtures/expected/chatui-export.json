@@ -1,0 +1,176 @@
+{
+  "format": "chatui.export",
+  "formatVersion": 1,
+  "exportedAt": "2026-11-04T12:00:00.000Z",
+  "appVersion": "0.1.0",
+  "conversations": [
+    {
+      "id": "conv-1",
+      "title": "Contract export",
+      "systemPrompt": "You are a concise assistant.",
+      "providerId": "provider-openai",
+      "modelId": "model-openai-gpt-4o-mini",
+      "modelLabel": "gpt-4o-mini",
+      "params": {
+        "temperature": null,
+        "topP": null,
+        "maxOutputTokens": 256,
+        "stop": [],
+        "reasoningEffort": null,
+        "streaming": true,
+        "extra": {}
+      },
+      "pinned": false,
+      "archived": false,
+      "temporary": false,
+      "createdAt": "2026-11-04T11:00:00.000Z",
+      "updatedAt": "2026-11-04T11:05:00.000Z",
+      "lastMessageAt": "2026-11-04T11:05:00.000Z",
+      "messageCount": 2,
+      "lastError": null,
+      "sync": null
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg-1",
+      "conversationId": "conv-1",
+      "sequence": 0,
+      "role": "user",
+      "parts": [
+        { "type": "text", "text": "Describe this image." },
+        {
+          "type": "image",
+          "attachmentId": "att-image-1",
+          "mimeType": "image/png",
+          "alt": "A single pixel."
+        },
+        {
+          "type": "file",
+          "attachmentId": "att-file-1",
+          "mimeType": "text/plain",
+          "name": "notes.txt"
+        }
+      ],
+      "status": "complete",
+      "providerId": null,
+      "modelId": null,
+      "modelLabel": null,
+      "usage": null,
+      "finishReason": null,
+      "error": null,
+      "latencyMs": null,
+      "firstTokenMs": null,
+      "createdAt": "2026-11-04T11:00:00.000Z",
+      "updatedAt": "2026-11-04T11:00:00.000Z",
+      "deletedAt": null
+    },
+    {
+      "id": "msg-2",
+      "conversationId": "conv-1",
+      "sequence": 1,
+      "role": "assistant",
+      "parts": [
+        { "type": "text", "text": "It is a single pixel." }
+      ],
+      "status": "complete",
+      "providerId": "provider-openai",
+      "modelId": "model-openai-gpt-4o-mini",
+      "modelLabel": "gpt-4o-mini",
+      "usage": {
+        "inputTokens": 8,
+        "outputTokens": 5,
+        "totalTokens": 13,
+        "costUsd": null,
+        "estimated": false
+      },
+      "finishReason": "stop",
+      "error": null,
+      "latencyMs": 120,
+      "firstTokenMs": 40,
+      "createdAt": "2026-11-04T11:05:00.000Z",
+      "updatedAt": "2026-11-04T11:05:00.000Z",
+      "deletedAt": null
+    }
+  ],
+  "attachments": [
+    {
+      "id": "att-image-1",
+      "name": "pixel.png",
+      "mimeType": "image/png",
+      "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "size": 68,
+      "dataBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z0ZkAAAAASUVORK5CYII="
+    },
+    {
+      "id": "att-file-1",
+      "name": "notes.txt",
+      "mimeType": "text/plain",
+      "sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+      "size": 17
+    }
+  ],
+  "providers": [
+    {
+      "id": "provider-openai",
+      "presetId": "openai",
+      "label": "OpenAI",
+      "kind": "openai-compatible",
+      "baseUrl": "https://api.openai.com/v1",
+      "authType": "bearer",
+      "secretId": null,
+      "headers": {},
+      "enabled": true,
+      "browserCors": "unknown",
+      "metadata": null,
+      "createdAt": "2026-11-04T10:00:00.000Z",
+      "updatedAt": "2026-11-04T10:00:00.000Z"
+    }
+  ],
+  "models": [
+    {
+      "id": "model-openai-gpt-4o-mini",
+      "providerId": "provider-openai",
+      "remoteId": "gpt-4o-mini",
+      "label": "gpt-4o-mini",
+      "contextWindow": null,
+      "maxOutputTokens": null,
+      "capabilities": ["text", "streaming"],
+      "pricing": null,
+      "canonicalSlug": null,
+      "inputModalities": ["text"],
+      "outputModalities": ["text"],
+      "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+      "metadata": null,
+      "hidden": false,
+      "pinned": false,
+      "source": "discovered",
+      "createdAt": "2026-11-04T10:00:00.000Z",
+      "updatedAt": "2026-11-04T10:00:00.000Z"
+    }
+  ],
+  "settings": {
+    "theme": "system",
+    "density": "comfortable",
+    "chatFontSize": "md",
+    "sendKey": "enter",
+    "defaultProviderId": "provider-openai",
+    "defaultModelId": "model-openai-gpt-4o-mini",
+    "defaultSystemPrompt": "",
+    "defaultParams": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": 256,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {}
+    },
+    "rememberKeysOnWeb": false,
+    "showTokenUsage": true,
+    "loadRemoteImages": false,
+    "lastActiveConversationId": "conv-1",
+    "backup": null,
+    "onboardingCompleted": true
+  }
+}

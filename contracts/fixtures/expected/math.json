@@ -1,0 +1,66 @@
+{
+  "source": "math",
+  "cases": [
+    {
+      "name": "inline",
+      "input": "Euler: $e^{i\\pi}+1=0$.",
+      "valid": true,
+      "expected": {
+        "segments": [
+          { "type": "text", "text": "Euler: " },
+          { "type": "math", "display": false, "source": "e^{i\\pi}+1=0" },
+          { "type": "text", "text": "." }
+        ],
+        "fallback": null
+      }
+    },
+    {
+      "name": "block",
+      "input": "$$\n\\int_0^1 x^2 dx\n$$",
+      "valid": true,
+      "expected": {
+        "segments": [
+          { "type": "math", "display": true, "source": "\\int_0^1 x^2 dx" }
+        ],
+        "fallback": null
+      }
+    },
+    {
+      "name": "mixed-inline-and-block",
+      "input": "Inline $a+b$ and block $$c+d$$.",
+      "valid": true,
+      "expected": {
+        "segments": [
+          { "type": "text", "text": "Inline " },
+          { "type": "math", "display": false, "source": "a+b" },
+          { "type": "text", "text": " and block " },
+          { "type": "math", "display": true, "source": "c+d" },
+          { "type": "text", "text": "." }
+        ],
+        "fallback": null
+      }
+    },
+    {
+      "name": "invalid-unbalanced-braces",
+      "input": "$\\frac{1}{$",
+      "valid": false,
+      "expected": {
+        "segments": [
+          { "type": "text", "text": "$\\frac{1}{$" }
+        ],
+        "fallback": "raw"
+      }
+    },
+    {
+      "name": "streaming-incomplete",
+      "input": "Here is $x^2",
+      "valid": false,
+      "expected": {
+        "segments": [
+          { "type": "text", "text": "Here is $x^2" }
+        ],
+        "fallback": "raw"
+      }
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "source": "catalogs",
+  "cases": [
+    {
+      "name": "openai",
+      "providerId": "openai",
+      "fixture": "models/openai-models.json",
+      "preset": {
+        "inputModalities": ["text"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"]
+      },
+      "expected": [
+        {
+          "remoteId": "gpt-4o-mini",
+          "label": "gpt-4o-mini",
+          "contextWindow": null,
+          "maxOutputTokens": null,
+          "inputModalities": ["text"],
+          "outputModalities": ["text"],
+          "capabilities": ["text", "streaming"],
+          "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+          "pricing": null,
+          "hidden": false
+        },
+        {
+          "remoteId": "gpt-4o",
+          "label": "gpt-4o",
+          "contextWindow": null,
+          "maxOutputTokens": null,
+          "inputModalities": ["text"],
+          "outputModalities": ["text"],
+          "capabilities": ["text", "streaming"],
+          "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+          "pricing": null,
+          "hidden": false
+        },
+        {
+          "remoteId": "text-embedding-3-small",
+          "label": "text-embedding-3-small",
+          "contextWindow": null,
+          "maxOutputTokens": null,
+          "inputModalities": ["text"],
+          "outputModalities": ["text"],
+          "capabilities": ["text", "streaming"],
+          "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+          "pricing": null,
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "name": "anthropic",
+      "providerId": "anthropic",
+      "fixture": "models/anthropic-models.json",
+      "preset": {
+        "inputModalities": ["text", "image"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "vision", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"]
+      },
+      "expected": [
+        {
+          "remoteId": "claude-sonnet-4-5",
+          "label": "Claude Sonnet 4.5",
+          "contextWindow": null,
+          "maxOutputTokens": null,
+          "inputModalities": ["text", "image"],
+          "outputModalities": ["text"],
+          "capabilities": ["text", "vision", "streaming"],
+          "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+          "pricing": null,
+          "hidden": false
+        },
+        {
+          "remoteId": "claude-haiku-4-5",
+          "label": "Claude Haiku 4.5",
+          "contextWindow": null,
+          "maxOutputTokens": null,
+          "inputModalities": ["text", "image"],
+          "outputModalities": ["text"],
+          "capabilities": ["text", "vision", "streaming"],
+          "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+          "pricing": null,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "name": "google",
+      "providerId": "google",
+      "fixture": "models/gemini-models.json",
+      "preset": {
+        "inputModalities": ["text", "image", "file"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "vision", "files", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"]
+      },
+      "expected": [
+        {
+          "remoteId": "gemini-2.5-flash",
+          "label": "Gemini 2.5 Flash",
+          "contextWindow": 1048576,
+          "maxOutputTokens": 65536,
+          "inputModalities": ["text", "image", "file"],
+          "outputModalities": ["text"],
+          "capabilities": ["text", "vision", "files", "streaming"],
+          "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+          "pricing": null,
+          "hidden": false
+        },
+        {
+          "remoteId": "gemini-2.5-pro",
+          "label": "Gemini 2.5 Pro",
+          "contextWindow": 1048576,
+          "maxOutputTokens": 65536,
+          "inputModalities": ["text", "image", "file"],
+          "outputModalities": ["text"],
+          "capabilities": ["text", "vision", "files", "streaming"],
+          "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+          "pricing": null,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "name": "ollama",
+      "providerId": "ollama",
+      "fixture": "models/ollama-tags.json",
+      "preset": {
+        "inputModalities": ["text"],
+        "outputModalities": ["text"],
+        "capabilities": ["text", "streaming"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"]
+      },
+      "expected": [
+        {
+          "remoteId": "llama3.2:latest",
+          "label": "llama3.2:latest",
+          "contextWindow": null,
+          "maxOutputTokens": null,
+          "inputModalities": ["text"],
+          "outputModalities": ["text"],
+          "capabilities": ["text", "streaming"],
+          "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+          "pricing": null,
+          "hidden": false
+        },
+        {
+          "remoteId": "nomic-embed-text:latest",
+          "label": "nomic-embed-text:latest",
+          "contextWindow": null,
+          "maxOutputTokens": null,
+          "inputModalities": ["text"],
+          "outputModalities": ["text"],
+          "capabilities": ["text", "streaming"],
+          "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+          "pricing": null,
+          "hidden": true
+        }
+      ]
+    }
+  ]
+}
