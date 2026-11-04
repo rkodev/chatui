@@ -461,6 +461,86 @@ describe('ProviderManagementService', () => {
     expect(cleared.params.extra).toEqual({})
   })
 
+  it('persists system prompt and parameters immediately', async () => {
+    const { service, conversation } = setup()
+    const nextParams: ChatParams = {
+      ...params,
+      temperature: 0.4,
+      topP: 0.8,
+      stop: ['DONE'],
+      reasoningEffort: 'medium',
+      streaming: false,
+    }
+
+    const updated = await service.setConversationSettings(conversation.id, {
+      systemPrompt: 'Answer briefly.',
+      params: nextParams,
+    })
+
+    expect(updated.systemPrompt).toBe('Answer briefly.')
+    expect(updated.params).toEqual(nextParams)
+    expect(await service.getConversation(conversation.id)).toMatchObject({
+      systemPrompt: 'Answer briefly.',
+      params: nextParams,
+    })
+  })
+
+  it('preserves core parameters and prunes stale extras across a provider switch', async () => {
+    const { service, conversations, models, providers, conversation, firstModel } = setup()
+    const anthropicProvider = createTestProvider({
+      id: 'provider-2',
+      presetId: 'anthropic',
+      label: 'Anthropic',
+      kind: 'anthropic',
+    })
+    const anthropicModel = createTestModel({
+      id: 'model-3',
+      providerId: anthropicProvider.id,
+      remoteId: 'claude-sonnet',
+      label: 'Claude Sonnet',
+      supportedParameters: ['temperature', 'top_p', 'max_tokens', 'stop'],
+    })
+    providers.values.set(anthropicProvider.id, anthropicProvider)
+    models.values.set(anthropicModel.id, anthropicModel)
+
+    const withParameters: Conversation = {
+      ...conversation,
+      params: {
+        ...params,
+        temperature: 0.4,
+        stop: ['END'],
+        extra: {
+          openrouter: { provider: { sort: 'price' } },
+          anthropic: { metadata: { user_id: 'abc' } },
+        },
+      },
+    }
+    conversations.values.set(withParameters.id, withParameters)
+
+    await service.setConversationModel(conversation.id, firstModel.id)
+    expect((await service.getConversation(conversation.id))?.params.extra).toEqual(
+      withParameters.params.extra,
+    )
+
+    const updated = await service.setConversationModel(conversation.id, anthropicModel.id)
+
+    expect(updated.providerId).toBe(anthropicProvider.id)
+    expect(updated.modelId).toBe(anthropicModel.id)
+    expect(updated.params.temperature).toBe(0.4)
+    expect(updated.params.stop).toEqual(['END'])
+    expect(updated.params.extra).toEqual({ anthropic: { metadata: { user_id: 'abc' } } })
+  })
+
+  it('deletes a conversation and clears the matching last-active pointer', async () => {
+    const { service, conversations, settings, conversation } = setup()
+    settings.lastActive = conversation.id
+
+    await service.deleteConversation(conversation.id)
+
+    expect(conversations.values.has(conversation.id)).toBe(false)
+    expect(settings.lastActive).toBeNull()
+  })
+
   it('persists pin, hide, and manual model state', async () => {
     const { service, provider, firstModel } = setup()
 

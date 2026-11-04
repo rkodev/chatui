@@ -6,7 +6,7 @@ import {
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router'
-import { ChatRoute } from '../features/chat'
+import { ChatRoute, ConversationSettingsRoute } from '../features/chat'
 import { HomeRoute, OnboardingRoute } from '../features/onboarding'
 import { RootLayout } from './routes/RootLayout'
 import {
@@ -35,6 +35,12 @@ const chatRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'chat/$conversationId',
   component: ChatRoute,
+})
+
+const conversationSettingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'chat/$conversationId/settings',
+  component: ConversationSettingsRoute,
 })
 
 const settingsRoute = createRoute({
@@ -106,6 +112,7 @@ const settingsAboutRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   chatRoute,
+  conversationSettingsRoute,
   settingsRoute.addChildren([
     settingsIndexRoute,
     settingsAppearanceRoute,

@@ -1,4 +1,4 @@
-import type { Conversation, Model, Provider, Settings } from '../../domain'
+import type { ChatParams, Conversation, Model, Provider, Settings } from '../../domain'
 import type { SettingsDefaults } from '../settings/settingsService'
 import {
   ProviderManagementError,
@@ -12,6 +12,7 @@ import {
   withRoutingPreferences,
   type RoutingPreferences,
 } from './routing'
+import { pruneExtrasForPreset } from './parameterSupport'
 import type { ManualModelInput, CreateCustomProviderInput, RefreshModelsResult } from './types'
 
 /**
@@ -198,11 +199,45 @@ export class ProviderManagementService implements ProviderManagementServiceLike 
       )
     }
 
-    return this.conversations.update(conversation.id, {
+    const patch: Partial<Omit<Conversation, 'id' | 'createdAt'>> = {
       providerId: provider.id,
       modelId: model.id,
       modelLabel: model.label,
-    })
+    }
+
+    if (provider.id !== conversation.providerId) {
+      patch.params = {
+        ...conversation.params,
+        stop: [...conversation.params.stop],
+        extra: pruneExtrasForPreset(conversation.params.extra, provider.presetId),
+      }
+    }
+
+    return this.conversations.update(conversation.id, patch)
+  }
+
+  /** Persist the system prompt and generation parameters immediately. */
+  async setConversationSettings(
+    conversationId: string,
+    patch: { systemPrompt?: string; params?: ChatParams },
+  ): Promise<Conversation> {
+    await this.requireConversation(conversationId)
+    return this.conversations.update(conversationId, patch)
+  }
+
+  /**
+   * Delete one conversation and clear the last-active pointer when it matches.
+   *
+   * Message deletion is handled by the repository transaction. Attachments are
+   * left for the orphan-cleanup path, matching `ConversationService`.
+   */
+  async deleteConversation(conversationId: string): Promise<void> {
+    await this.requireConversation(conversationId)
+    await this.conversations.delete(conversationId)
+
+    if ((await this.settings.getLastActiveConversationId()) === conversationId) {
+      await this.settings.setLastActiveConversationId(null)
+    }
   }
 
   async setConversationRouting(

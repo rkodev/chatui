@@ -9,6 +9,8 @@ import './providers.css'
 
 export interface ConversationModelControlProps {
   conversationId: string
+  /** Called after a model switch persists so surrounding settings can refresh. */
+  onConversationChange?: (conversation: Conversation) => void
 }
 
 function errorMessage(cause: unknown): string {
@@ -22,7 +24,10 @@ function errorMessage(cause: unknown): string {
  * reads the conversation record, so the new model applies without rewriting
  * past messages or their provider/model snapshots.
  */
-export function ConversationModelControl({ conversationId }: ConversationModelControlProps) {
+export function ConversationModelControl({
+  conversationId,
+  onConversationChange,
+}: ConversationModelControlProps) {
   const service = useProviderManagement()
   const [conversation, setConversation] = useState<Conversation | null | undefined>(undefined)
   const [models, setModels] = useState<Model[]>([])
@@ -102,6 +107,7 @@ export function ConversationModelControl({ conversationId }: ConversationModelCo
     await run(async () => {
       const updated = await service.setConversationModel(conversation.id, model.id)
       setConversation(updated)
+      onConversationChange?.(updated)
     })
   }
 

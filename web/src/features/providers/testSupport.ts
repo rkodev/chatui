@@ -175,6 +175,11 @@ export function createFakeProviderManagementService(
       modelId,
       modelLabel: model.label,
     }),
+    setConversationSettings: async (_conversationId, patch) => ({
+      ...conversation,
+      ...patch,
+    }),
+    deleteConversation: async () => undefined,
     setConversationRouting: async (_conversationId, preferences) => ({
       ...conversation,
       params: withRoutingPreferences(conversation.params, preferences),

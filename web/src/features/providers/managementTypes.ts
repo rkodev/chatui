@@ -1,4 +1,4 @@
-import type { Conversation, Model, Provider, Settings } from '../../domain'
+import type { ChatParams, Conversation, Model, Provider, Settings } from '../../domain'
 import type { ConversationStore } from '../conversations/types'
 import type { SettingsDefaults } from '../settings/settingsService'
 import type { CreateCustomProviderInput, ManualModelInput, RefreshModelsResult } from './types'
@@ -29,6 +29,11 @@ export interface ProviderManagementServiceLike {
   setDefaults(patch: Partial<SettingsDefaults>): Promise<Settings>
   getConversation(conversationId: string): Promise<Conversation | null>
   setConversationModel(conversationId: string, modelId: string): Promise<Conversation>
+  setConversationSettings(
+    conversationId: string,
+    patch: { systemPrompt?: string; params?: ChatParams },
+  ): Promise<Conversation>
+  deleteConversation(conversationId: string): Promise<void>
   setConversationRouting(
     conversationId: string,
     preferences: RoutingPreferences,
@@ -88,6 +93,8 @@ export interface ProviderManagementServiceOptions {
   settings: {
     getDefaults(): Promise<SettingsDefaults>
     setDefaults(patch: Partial<SettingsDefaults>): Promise<Settings>
+    getLastActiveConversationId(): Promise<string | null>
+    setLastActiveConversationId(value: string | null): Promise<void>
   }
   conversations: ConversationStore
 }

@@ -1,5 +1,10 @@
 export { ChatScreen, type ChatScreenProps } from './ChatScreen'
 export { ChatRoute } from './ChatRoute'
+export { ConversationSettingsRoute } from './ConversationSettingsRoute'
+export {
+  ConversationSettingsScreen,
+  type ConversationSettingsScreenProps,
+} from './ConversationSettingsScreen'
 export { Composer, type ComposerProps } from './Composer'
 export { MAX_COMPOSER_LINES, resizeComposerTextarea } from './composerTextarea'
 export { useOnlineStatus } from './useOnlineStatus'

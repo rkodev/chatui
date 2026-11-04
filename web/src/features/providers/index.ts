@@ -58,6 +58,22 @@ export {
   type ModelPickerOptions,
 } from './modelPicker'
 export {
+  CORE_PARAMETER_DEFINITIONS,
+  PROTECTED_EXTRA_FIELDS,
+  extraNamespaceForPreset,
+  parseProviderExtras,
+  pruneExtrasForPreset,
+  readProviderExtras,
+  stringifyProviderExtras,
+  unsupportedParameterNote,
+  unsupportedParameters,
+  withProviderExtras,
+  type CoreParameterDefinition,
+  type CoreParameterKey,
+  type ProtectedExtraField,
+  type ProviderExtrasParseResult,
+} from './parameterSupport'
+export {
   DEFAULT_ROUTING_PREFERENCES,
   buildProviderRouting,
   readRoutingPreferences,
