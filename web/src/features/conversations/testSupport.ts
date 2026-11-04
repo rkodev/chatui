@@ -28,6 +28,16 @@ export function createFakeConversationHistoryService(
       id,
       title,
     }),
+    setConversationPinned: async (id: string, pinned: boolean): Promise<Conversation> => ({
+      ...conversation,
+      id,
+      pinned,
+    }),
+    setConversationArchived: async (id: string, archived: boolean): Promise<Conversation> => ({
+      ...conversation,
+      id,
+      archived,
+    }),
     deleteConversation: async () => undefined,
     getLastActiveConversation: async () => conversation,
     setLastActiveConversation: async () => undefined,

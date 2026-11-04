@@ -35,6 +35,8 @@ export interface ConversationHistoryServiceLike {
   ): Promise<ConversationSearchResult>
   createConversation(input?: CreateConversationInput): Promise<CreateConversationResult>
   renameConversation(id: string, title: string): Promise<Conversation>
+  setConversationPinned(id: string, pinned: boolean): Promise<Conversation>
+  setConversationArchived(id: string, archived: boolean): Promise<Conversation>
   deleteConversation(id: string): Promise<void>
   getLastActiveConversation(): Promise<Conversation | null>
   setLastActiveConversation(id: string | null): Promise<void>

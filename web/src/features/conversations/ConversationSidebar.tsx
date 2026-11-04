@@ -26,6 +26,8 @@ export interface ConversationSidebarSearchProps {
   onQueryChange: (query: string) => void
 }
 
+export type ConversationSidebarView = 'active' | 'archived'
+
 export interface ConversationSidebarProps {
   conversations: Conversation[]
   activeConversationId: string | null
@@ -34,9 +36,13 @@ export interface ConversationSidebarProps {
   online: boolean
   pendingDelete: Conversation | null
   search: ConversationSidebarSearchProps
+  view: ConversationSidebarView
+  onViewChange: (view: ConversationSidebarView) => void
   onNewChat: () => void
   onSelect: (conversation: Conversation) => void
   onRename: (conversation: Conversation, title: string) => Promise<void> | void
+  onTogglePin: (conversation: Conversation) => void
+  onToggleArchive: (conversation: Conversation) => void
   onConfirmDelete: (conversation: Conversation) => void
   onUndoDelete: () => void
   onClose?: () => void
@@ -60,9 +66,13 @@ export function ConversationSidebar({
   online,
   pendingDelete,
   search,
+  view,
+  onViewChange,
   onNewChat,
   onSelect,
   onRename,
+  onTogglePin,
+  onToggleArchive,
   onConfirmDelete,
   onUndoDelete,
   onClose,
@@ -73,8 +83,11 @@ export function ConversationSidebar({
   const [renameValue, setRenameValue] = useState('')
   const [renameError, setRenameError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null)
-  const groups = groupConversationsByDate(conversations, now)
+  const pinnedConversations = conversations.filter((conversation) => conversation.pinned)
+  const unpinnedConversations = conversations.filter((conversation) => !conversation.pinned)
+  const groups = groupConversationsByDate(unpinnedConversations, now)
   const searching = search.query.trim() !== ''
+  const archivedView = view === 'archived'
 
   const openRename = (conversation: Conversation) => {
     setRenameTarget(conversation)
@@ -113,6 +126,58 @@ export function ConversationSidebar({
     setDeleteTarget(null)
   }
 
+  const renderConversationItem = (conversation: Conversation) => {
+    const active = conversation.id === activeConversationId
+
+    return (
+      <li
+        key={conversation.id}
+        className="conversation-sidebar__item"
+        data-active={active ? 'true' : undefined}
+      >
+        <button
+          type="button"
+          className="conversation-sidebar__item-button"
+          onClick={() => onSelect(conversation)}
+          aria-current={active ? 'page' : undefined}
+        >
+          <span className="conversation-sidebar__item-title">
+            {conversation.title}
+            {conversation.pinned && (
+              <span className="conversation-sidebar__pinned-badge">Pinned</span>
+            )}
+          </span>
+          <time className="conversation-sidebar__item-time" dateTime={conversation.lastMessageAt}>
+            {formatConversationTimestamp(conversation.lastMessageAt, now)}
+          </time>
+        </button>
+
+        <Menu>
+          <MenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="conversation-sidebar__item-actions"
+              aria-label={`Actions for ${conversation.title}`}
+            >
+              ⋯
+            </Button>
+          </MenuTrigger>
+          <MenuContent>
+            <MenuItem onSelect={() => onTogglePin(conversation)}>
+              {conversation.pinned ? 'Unpin' : 'Pin'}
+            </MenuItem>
+            <MenuItem onSelect={() => onToggleArchive(conversation)}>
+              {conversation.archived ? 'Unarchive' : 'Archive'}
+            </MenuItem>
+            <MenuItem onSelect={() => openRename(conversation)}>Rename</MenuItem>
+            <MenuItem onSelect={() => setDeleteTarget(conversation)}>Delete</MenuItem>
+          </MenuContent>
+        </Menu>
+      </li>
+    )
+  }
+
   return (
     <>
       <aside
@@ -121,7 +186,7 @@ export function ConversationSidebar({
         aria-label="Conversation history"
       >
         <div className="conversation-sidebar__header">
-          <h2 className="conversation-sidebar__title">Chats</h2>
+          <h2 className="conversation-sidebar__title">{archivedView ? 'Archived' : 'Chats'}</h2>
           {onClose && (
             <Button
               variant="ghost"
@@ -137,6 +202,15 @@ export function ConversationSidebar({
 
         <Button className="conversation-sidebar__new" onClick={onNewChat}>
           New chat
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="conversation-sidebar__view-toggle"
+          onClick={() => onViewChange(archivedView ? 'active' : 'archived')}
+        >
+          {archivedView ? 'Back to chats' : 'Archived'}
         </Button>
 
         <div className="conversation-sidebar__search" role="search">
@@ -263,7 +337,26 @@ export function ConversationSidebar({
             )}
 
             {status === 'ready' && conversations.length === 0 && (
-              <p className="conversation-sidebar__empty">No conversations yet.</p>
+              <p className="conversation-sidebar__empty">
+                {archivedView ? 'No archived conversations.' : 'No conversations yet.'}
+              </p>
+            )}
+
+            {status === 'ready' && pinnedConversations.length > 0 && (
+              <section
+                className="conversation-sidebar__group"
+                aria-labelledby="history-group-pinned"
+              >
+                <h3
+                  id="history-group-pinned"
+                  className="conversation-sidebar__group-title"
+                >
+                  Pinned
+                </h3>
+                <ul className="conversation-sidebar__list">
+                  {pinnedConversations.map(renderConversationItem)}
+                </ul>
+              </section>
             )}
 
             {status === 'ready' &&
@@ -280,53 +373,7 @@ export function ConversationSidebar({
                     {group.label}
                   </h3>
                   <ul className="conversation-sidebar__list">
-                    {group.conversations.map((conversation) => {
-                      const active = conversation.id === activeConversationId
-
-                      return (
-                        <li
-                          key={conversation.id}
-                          className="conversation-sidebar__item"
-                          data-active={active ? 'true' : undefined}
-                        >
-                          <button
-                            type="button"
-                            className="conversation-sidebar__item-button"
-                            onClick={() => onSelect(conversation)}
-                            aria-current={active ? 'page' : undefined}
-                          >
-                            <span className="conversation-sidebar__item-title">
-                              {conversation.title}
-                            </span>
-                            <time
-                              className="conversation-sidebar__item-time"
-                              dateTime={conversation.lastMessageAt}
-                            >
-                              {formatConversationTimestamp(conversation.lastMessageAt, now)}
-                            </time>
-                          </button>
-
-                          <Menu>
-                            <MenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="conversation-sidebar__item-actions"
-                                aria-label={`Actions for ${conversation.title}`}
-                              >
-                                ⋯
-                              </Button>
-                            </MenuTrigger>
-                            <MenuContent>
-                              <MenuItem onSelect={() => openRename(conversation)}>Rename</MenuItem>
-                              <MenuItem onSelect={() => setDeleteTarget(conversation)}>
-                                Delete
-                              </MenuItem>
-                            </MenuContent>
-                          </Menu>
-                        </li>
-                      )
-                    })}
+                    {group.conversations.map(renderConversationItem)}
                   </ul>
                 </section>
               ))}

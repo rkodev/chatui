@@ -25,6 +25,7 @@ const yesterday = conversation('yesterday', 1, 'Conversation B')
 const week = conversation('week', 3, 'Conversation C')
 const month = conversation('month', 10, 'Conversation D')
 const older = conversation('older', 40, 'Conversation E')
+const conversationsWithoutOlder = [today, yesterday, week, month]
 
 function renderSidebar(overrides: Partial<ConversationSidebarProps> = {}) {
   const props: ConversationSidebarProps = {
@@ -42,9 +43,13 @@ function renderSidebar(overrides: Partial<ConversationSidebarProps> = {}) {
       truncated: false,
       onQueryChange: vi.fn(),
     },
+    view: 'active',
+    onViewChange: vi.fn(),
     onNewChat: vi.fn(),
     onSelect: vi.fn(),
     onRename: vi.fn(async () => undefined),
+    onTogglePin: vi.fn(),
+    onToggleArchive: vi.fn(),
     onConfirmDelete: vi.fn(),
     onUndoDelete: vi.fn(),
     now,
@@ -143,12 +148,71 @@ describe('ConversationSidebar', () => {
     expect(screen.getByText('Conversation A')).toBeInTheDocument()
   })
 
-  it('adds a search field but not pin or archive controls', () => {
-    renderSidebar()
+  it('adds search, archive navigation, and pin/archive actions', async () => {
+    const user = userEvent.setup()
+    const props = renderSidebar()
 
     expect(screen.getByRole('searchbox', { name: 'Search conversations' })).toBeInTheDocument()
-    expect(screen.queryByText(/pin/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/archive/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Archived' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Conversation A' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Pin' }))
+    expect(props.onTogglePin).toHaveBeenCalledWith(today)
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Conversation A' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Archive' }))
+    expect(props.onToggleArchive).toHaveBeenCalledWith(today)
+
+    await user.click(screen.getByRole('button', { name: 'Archived' }))
+    expect(props.onViewChange).toHaveBeenCalledWith('archived')
+  })
+
+  it('renders pinned conversations first in their own group', () => {
+    const pinnedOlder = { ...older, pinned: true }
+    renderSidebar({ conversations: [pinnedOlder, ...conversationsWithoutOlder] })
+
+    const headings = screen
+      .getAllByRole('heading', { level: 3 })
+      .map((heading) => heading.textContent)
+
+    expect(headings[0]).toBe('Pinned')
+    expect(screen.getAllByText('Pinned')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /^Conversation E/ })).toBeInTheDocument()
+  })
+
+  it('shows pin and archive state in the actions menu', async () => {
+    const user = userEvent.setup()
+    const props = renderSidebar({
+      conversations: [{ ...today, pinned: true, archived: true }],
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Conversation A' }))
+
+    await user.click(await screen.findByRole('menuitem', { name: 'Unpin' }))
+    expect(props.onTogglePin).toHaveBeenCalledWith({ ...today, pinned: true, archived: true })
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Conversation A' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Unarchive' }))
+    expect(props.onToggleArchive).toHaveBeenCalledWith({
+      ...today,
+      pinned: true,
+      archived: true,
+    })
+  })
+
+  it('renders the archive view with its own heading, navigation, and empty state', () => {
+    renderSidebar({ view: 'archived', conversations: [] })
+
+    expect(screen.getByRole('heading', { name: 'Archived' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to chats' })).toBeInTheDocument()
+    expect(screen.getByText('No archived conversations.')).toBeInTheDocument()
+  })
+
+  it('keeps the active empty state separate from the archive empty state', () => {
+    renderSidebar({ view: 'active', conversations: [] })
+
+    expect(screen.getByText('No conversations yet.')).toBeInTheDocument()
+    expect(screen.queryByText('No archived conversations.')).not.toBeInTheDocument()
   })
 
   it('reports search query changes and clears on Escape', async () => {

@@ -218,6 +218,37 @@ describe('storage repositories', () => {
       expect(page2.nextCursor).toBeNull()
     })
 
+    it('filters archived and pinned conversations while persisting flags', async () => {
+      const repository = new ConversationRepository(db)
+      const active = await repository.create(
+        conversation({ title: 'Active', updatedAt: '2026-01-01T00:00:00.000Z' }),
+      )
+      const pinned = await repository.create(
+        conversation({ title: 'Pinned', pinned: true, updatedAt: '2026-01-02T00:00:00.000Z' }),
+      )
+      const archived = await repository.create(
+        conversation({
+          title: 'Archived',
+          archived: true,
+          pinned: true,
+          updatedAt: '2026-01-03T00:00:00.000Z',
+        }),
+      )
+
+      const activePage = await repository.list({ archived: false })
+      expect(activePage.items.map((item) => item.id)).toEqual([pinned.id, active.id])
+
+      const archivedPage = await repository.list({ archived: true })
+      expect(archivedPage.items.map((item) => item.id)).toEqual([archived.id])
+
+      const pinnedPage = await repository.list({ pinned: true })
+      expect(pinnedPage.items.map((item) => item.id)).toEqual([archived.id, pinned.id])
+
+      const updated = await repository.update(archived.id, { archived: false, pinned: false })
+      expect(updated).toMatchObject({ archived: false, pinned: false })
+      expect((await repository.get(archived.id))?.archived).toBe(false)
+    })
+
     it('searches titles and message text with grouped context', async () => {
       const repository = new ConversationRepository(db)
       const messages = new MessageRepository(db)

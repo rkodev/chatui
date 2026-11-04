@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Conversation } from '../../domain'
 import { useSidebarStore } from '../../app/stores'
 import { useOnlineStatus } from '../chat/useOnlineStatus'
-import { ConversationSidebar } from './ConversationSidebar'
+import { ConversationSidebar, type ConversationSidebarView } from './ConversationSidebar'
 import { useConversationHistoryService } from './historyContext'
 import { useConversationHistory } from './useConversationHistory'
 import { useConversationSearch } from './useConversationSearch'
@@ -28,9 +28,11 @@ export function ConversationSidebarContainer({
   const online = useOnlineStatus()
   const isOpen = useSidebarStore((state) => state.isOpen)
   const close = useSidebarStore((state) => state.close)
+  const [view, setView] = useState<ConversationSidebarView>('active')
   const history = useConversationHistory({
     service,
     activeConversationId,
+    showArchived: view === 'archived',
     onDeleteCommitted: (conversation) => {
       if (conversation.id === activeConversationId) {
         navigate({ to: '/', replace: true })
@@ -73,6 +75,18 @@ export function ConversationSidebarContainer({
     })
   }
 
+  const handleTogglePin = (conversation: Conversation) => {
+    void history.setPinned(conversation.id, !conversation.pinned)
+  }
+
+  const handleToggleArchive = async (conversation: Conversation) => {
+    await history.setArchived(conversation.id, !conversation.archived)
+
+    if (!conversation.archived && conversation.id === activeConversationId) {
+      navigate({ to: '/', replace: true })
+    }
+  }
+
   return (
     <ConversationSidebar
       conversations={history.conversations}
@@ -82,9 +96,13 @@ export function ConversationSidebarContainer({
       online={online}
       pendingDelete={history.pendingDelete}
       search={{ ...search, onQueryChange: setSearchQuery }}
+      view={view}
+      onViewChange={setView}
       onNewChat={() => void handleNewChat()}
       onSelect={handleSelect}
       onRename={(conversation, title) => history.rename(conversation.id, title)}
+      onTogglePin={handleTogglePin}
+      onToggleArchive={(conversation) => void handleToggleArchive(conversation)}
       onConfirmDelete={history.confirmDelete}
       onUndoDelete={history.undoDelete}
       onClose={close}

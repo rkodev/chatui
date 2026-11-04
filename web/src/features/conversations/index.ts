@@ -47,6 +47,7 @@ export {
 } from './ConversationHistoryProvider'
 export {
   DEFAULT_UNDO_WINDOW_MS,
+  sortConversations,
   useConversationHistory,
   type UseConversationHistoryOptions,
   type UseConversationHistoryResult,
@@ -62,6 +63,7 @@ export {
   ConversationSidebar,
   type ConversationSidebarProps,
   type ConversationSidebarSearchProps,
+  type ConversationSidebarView,
 } from './ConversationSidebar'
 export { formatConversationTimestamp } from './formatConversationTimestamp'
 export {

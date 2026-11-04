@@ -12,6 +12,8 @@ export interface UseConversationHistoryOptions {
   service: ConversationHistoryServiceLike
   activeConversationId?: string | null
   undoWindowMs?: number
+  /** Show the archive view instead of the active history list. */
+  showArchived?: boolean
   /** Called after a buffered delete is committed to storage. */
   onDeleteCommitted?: (conversation: Conversation) => void
 }
@@ -24,6 +26,8 @@ export interface UseConversationHistoryResult {
   refresh: () => Promise<void>
   createNewChat: () => Promise<Conversation | null>
   rename: (id: string, title: string) => Promise<void>
+  setPinned: (id: string, pinned: boolean) => Promise<void>
+  setArchived: (id: string, archived: boolean) => Promise<void>
   confirmDelete: (conversation: Conversation) => void
   undoDelete: () => void
   commitPendingDelete: () => Promise<void>
@@ -43,18 +47,30 @@ function timestamp(conversation: Conversation): number {
   return Number.isNaN(updated) ? 0 : updated
 }
 
-function sortConversations(items: readonly Conversation[]): Conversation[] {
-  return [...items].sort((left, right) => timestamp(right) - timestamp(left))
+/**
+ * Sort active history with pinned conversations first, then newest-first.
+ *
+ * Pin state is per conversation, so it applies across date groups as well.
+ */
+export function sortConversations(items: readonly Conversation[]): Conversation[] {
+  return [...items].sort((left, right) => {
+    if (left.pinned !== right.pinned) {
+      return left.pinned ? -1 : 1
+    }
+
+    return timestamp(right) - timestamp(left)
+  })
 }
 
 async function loadAllConversations(
   service: ConversationHistoryServiceLike,
+  archived: boolean,
 ): Promise<Conversation[]> {
   const all: Conversation[] = []
   let cursor: string | null = null
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
-    const result = await service.listConversations({ limit: PAGE_SIZE, cursor })
+    const result = await service.listConversations({ limit: PAGE_SIZE, cursor, archived })
     all.push(...result.items)
 
     if (result.nextCursor === null) {
@@ -79,6 +95,7 @@ export function useConversationHistory({
   service,
   activeConversationId = null,
   undoWindowMs = DEFAULT_UNDO_WINDOW_MS,
+  showArchived = false,
   onDeleteCommitted,
 }: UseConversationHistoryOptions): UseConversationHistoryResult {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -120,18 +137,18 @@ export function useConversationHistory({
 
   const refresh = useCallback(async () => {
     try {
-      applyLoaded(await loadAllConversations(service))
+      applyLoaded(await loadAllConversations(service, showArchived))
     } catch (cause) {
       applyError(cause)
     }
-  }, [applyError, applyLoaded, service])
+  }, [applyError, applyLoaded, service, showArchived])
 
   useEffect(() => {
     let cancelled = false
 
     const run = async () => {
       try {
-        const items = await loadAllConversations(service)
+        const items = await loadAllConversations(service, showArchived)
 
         if (!cancelled) {
           applyLoaded(items)
@@ -148,7 +165,7 @@ export function useConversationHistory({
     return () => {
       cancelled = true
     }
-  }, [applyError, applyLoaded, service])
+  }, [applyError, applyLoaded, service, showArchived])
 
   const commitDelete = useCallback(
     async (conversation: Conversation) => {
@@ -236,6 +253,50 @@ export function useConversationHistory({
       }
     },
     [service],
+  )
+
+  const setPinned = useCallback(
+    async (id: string, pinned: boolean) => {
+      try {
+        const updated = await service.setConversationPinned(id, pinned)
+
+        if (mountedRef.current) {
+          setConversations((current) =>
+            sortConversations(current.map((item) => (item.id === id ? updated : item))),
+          )
+          setError(null)
+        }
+      } catch (cause) {
+        if (mountedRef.current) {
+          setError(errorMessage(cause))
+        }
+      }
+    },
+    [service],
+  )
+
+  const setArchived = useCallback(
+    async (id: string, archived: boolean) => {
+      try {
+        const updated = await service.setConversationArchived(id, archived)
+
+        if (mountedRef.current) {
+          setConversations((current) => {
+            if (updated.archived !== showArchived) {
+              return current.filter((item) => item.id !== id)
+            }
+
+            return sortConversations(current.map((item) => (item.id === id ? updated : item)))
+          })
+          setError(null)
+        }
+      } catch (cause) {
+        if (mountedRef.current) {
+          setError(errorMessage(cause))
+        }
+      }
+    },
+    [service, showArchived],
   )
 
   const confirmDelete = useCallback(
@@ -328,6 +389,8 @@ export function useConversationHistory({
     refresh,
     createNewChat,
     rename,
+    setPinned,
+    setArchived,
     confirmDelete,
     undoDelete,
     commitPendingDelete,
