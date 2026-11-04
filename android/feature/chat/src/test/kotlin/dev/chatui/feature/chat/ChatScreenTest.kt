@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.ChatError
@@ -57,6 +58,8 @@ class ChatScreenTest {
         onStop: () -> Unit = {},
         onLoadOlder: () -> Unit = {},
         onRetryMessage: (dev.chatui.core.model.Message) -> Unit = {},
+        onRegenerateMessage: (dev.chatui.core.model.Message) -> Unit = {},
+        onEditLastUser: (dev.chatui.core.model.Message, String) -> Unit = { _, _ -> },
         onOpenProviders: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -69,6 +72,8 @@ class ChatScreenTest {
                     onLoadOlder = onLoadOlder,
                     onRetryMessage = onRetryMessage,
                     onDismissError = {},
+                    onRegenerateMessage = onRegenerateMessage,
+                    onEditLastUser = onEditLastUser,
                     onOpenProviders = onOpenProviders,
                     zoneId = java.time.ZoneOffset.UTC,
                 )
@@ -199,6 +204,41 @@ class ChatScreenTest {
         composeRule.onNodeWithTag(ChatMessageTestTags.Retry).performClick()
 
         assertThat(retried?.id).isEqualTo("assistant-1")
+    }
+
+    @Test
+    fun `actions target the last assistant and last user messages`() {
+        var regenerated: dev.chatui.core.model.Message? = null
+        var edited: Pair<dev.chatui.core.model.Message, String>? = null
+        val assistant = testMessage(
+            id = "assistant-1",
+            sequence = 1,
+            role = MessageRole.ASSISTANT,
+            text = "Answer",
+        )
+        val lastUser = testMessage(
+            id = "user-2",
+            sequence = 2,
+            role = MessageRole.USER,
+            text = "Second",
+        )
+
+        screen(
+            state(messages = listOf(assistant, lastUser)),
+            onRegenerateMessage = { regenerated = it },
+            onEditLastUser = { target, text -> edited = target to text },
+        )
+
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Regenerate).performClick()
+        assertThat(regenerated?.id).isEqualTo("assistant-1")
+
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Edit).performClick()
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.EditInput)
+            .performTextReplacement("Updated")
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.EditConfirm).performClick()
+
+        assertThat(edited?.first?.id).isEqualTo("user-2")
+        assertThat(edited?.second).isEqualTo("Updated")
     }
 
     @Test

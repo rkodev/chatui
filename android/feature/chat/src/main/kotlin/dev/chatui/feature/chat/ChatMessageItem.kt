@@ -83,9 +83,9 @@ private fun formatUsage(usage: Usage): String {
 /**
  * One chat message.
  *
- * Text is rendered as plain text in M1-09.2; Markdown and the action row are
- * added by M1-09.3. The item still exposes cancelled, interrupted, and inline
- * error states required by the chat screen task.
+ * Text is rendered through the safe Markdown renderer, and persisted messages
+ * expose copy/regenerate/edit actions. The item also renders cancelled,
+ * interrupted, and inline error states.
  */
 @Composable
 fun ChatMessageItem(
@@ -94,7 +94,12 @@ fun ChatMessageItem(
     chatFontSize: ChatFontSize = ChatFontSize.MD,
     showTokenUsage: Boolean = false,
     isActiveStream: Boolean = false,
+    showActions: Boolean = true,
+    canRegenerate: Boolean = false,
+    canEditLastUser: Boolean = false,
     onRetry: ((Message) -> Unit)? = null,
+    onRegenerate: ((Message) -> Unit)? = null,
+    onEditLastUser: ((Message, String) -> Unit)? = null,
     zoneId: ZoneId = ZoneId.systemDefault(),
     onComposed: ((String) -> Unit)? = null,
 ) {
@@ -171,10 +176,10 @@ fun ChatMessageItem(
             }
 
             text.forEach { part ->
-                Text(
-                    text = part,
-                    style = bodyStyle,
+                ChatMarkdown(
+                    content = part,
                     modifier = Modifier.testTag(ChatMessageTestTags.text(message.id)),
+                    chatFontSize = chatFontSize,
                 )
             }
 
@@ -263,6 +268,16 @@ fun ChatMessageItem(
                     }
                 }
             }
+        }
+
+        if (showActions) {
+            ChatMessageActions(
+                message = message,
+                canRegenerate = canRegenerate,
+                canEditLastUser = canEditLastUser,
+                onRegenerate = onRegenerate,
+                onEditLastUser = onEditLastUser,
+            )
         }
 
         val usage = message.usage?.let(::formatUsage).orEmpty()

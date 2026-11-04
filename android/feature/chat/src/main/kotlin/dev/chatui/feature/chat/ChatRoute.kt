@@ -52,6 +52,8 @@ fun ChatRoute(
         onLoadOlder = viewModel::onLoadOlder,
         onRetryMessage = viewModel::onRetry,
         onDismissError = viewModel::onDismissError,
+        onRegenerateMessage = viewModel::onRegenerate,
+        onEditLastUser = viewModel::onEditAndResend,
         onBack = onBack,
         onOpenProviders = onOpenProviders,
         sendKey = settings.sendKey,
