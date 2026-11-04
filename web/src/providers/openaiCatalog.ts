@@ -424,6 +424,66 @@ export function mapGeminiModel(
   }
 }
 
+/**
+ * Map an Ollama `/api/tags` entry.
+ *
+ * Ollama reports the model id in `model` (with `name` as a fallback) and no
+ * capability metadata. Missing fields therefore fall back to the shared Ollama
+ * preset defaults from `contracts/fixtures/expected/catalogs.json`. Embedding
+ * models are marked hidden so they never become the default chat model.
+ */
+export function mapOllamaModel(
+  raw: unknown,
+  defaults: OpenAICatalogDefaults = catalogDefaultsForPreset('ollama'),
+): ModelInfo | null {
+  if (!isRecord(raw)) {
+    return null
+  }
+
+  const remoteId =
+    typeof raw.model === 'string' && raw.model.trim() !== ''
+      ? raw.model.trim()
+      : typeof raw.name === 'string'
+        ? raw.name.trim()
+        : ''
+
+  if (remoteId === '') {
+    return null
+  }
+
+  const inferred = inferOpenAIModelMetadata(raw, defaults)
+
+  return {
+    remoteId,
+    label: remoteId,
+    contextWindow: inferred.contextWindow,
+    maxOutputTokens: inferred.maxOutputTokens,
+    capabilities: inferred.capabilities,
+    pricing: null,
+    canonicalSlug: null,
+    inputModalities: inferred.inputModalities,
+    outputModalities: inferred.outputModalities,
+    supportedParameters: inferred.supportedParameters,
+    metadata: null,
+    isFree: false,
+    hidden: /embed/i.test(remoteId),
+  }
+}
+
+/** Map an Ollama `/api/tags` envelope to normalized entries. */
+export function mapOllamaModels(
+  payload: unknown,
+  defaults: OpenAICatalogDefaults = catalogDefaultsForPreset('ollama'),
+): ModelInfo[] {
+  if (!isRecord(payload) || !Array.isArray(payload.models)) {
+    throw new OpenAICatalogError('Ollama /api/tags response must contain a models array')
+  }
+
+  return payload.models
+    .map((entry) => mapOllamaModel(entry, defaults))
+    .filter((model): model is ModelInfo => model !== null)
+}
+
 /** Map a Gemini `/models` envelope to normalized entries. */
 export function mapGeminiModels(
   payload: unknown,

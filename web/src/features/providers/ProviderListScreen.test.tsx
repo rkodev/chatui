@@ -43,7 +43,8 @@ describe('ProviderListScreen', () => {
     expect(screen.getByText('OpenAI')).toBeInTheDocument()
     expect(screen.getAllByText('Available').length).toBeGreaterThan(0)
     expect(screen.getByText('Anthropic')).toBeInTheDocument()
-    expect(screen.getAllByText('Coming later').length).toBeGreaterThan(0)
+    expect(screen.getByText('Ollama')).toBeInTheDocument()
+    expect(screen.queryByText('Coming later')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Add a custom provider' })).toBeInTheDocument()
   })
 

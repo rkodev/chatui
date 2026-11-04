@@ -392,13 +392,15 @@ describe('ProviderService', () => {
     expect(secrets.values.size).toBe(0)
   })
 
-  it('rejects presets that are not available in M2', async () => {
-    await expect(
-      service.createPresetProvider({ presetId: 'ollama' }),
-    ).rejects.toMatchObject({
-      code: 'invalid_input',
-      message: expect.stringContaining('not available in M2'),
+  it('creates a keyless provider for the Ollama preset', async () => {
+    const provider = await service.createPresetProvider({ presetId: 'ollama' })
+
+    expect(provider).toMatchObject({
+      presetId: 'ollama',
+      authType: 'none',
+      secretId: null,
     })
+    expect(secrets.values.size).toBe(0)
   })
 
   it('rejects presets disabled by the runtime allow-list', async () => {

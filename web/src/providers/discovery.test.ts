@@ -23,6 +23,9 @@ const openRouterModels = JSON.parse(
 const geminiModels = JSON.parse(
   readFileSync(resolve(process.cwd(), '../contracts/fixtures/models/gemini-models.json'), 'utf8'),
 ) as unknown
+const ollamaModels = JSON.parse(
+  readFileSync(resolve(process.cwd(), '../contracts/fixtures/models/ollama-tags.json'), 'utf8'),
+) as unknown
 
 const API_KEY = 'sk-discovery-test'
 
@@ -64,7 +67,9 @@ describe('per-preset model discovery', () => {
         ? openRouterModels
         : preset.modelDiscovery.format === 'gemini'
           ? geminiModels
-          : openAIModels
+          : preset.modelDiscovery.format === 'ollama-tags'
+            ? ollamaModels
+            : openAIModels
     const fetchMock = vi.fn(async () => jsonResponse(payload))
     const result = await loadCatalog(
       makeContext(presetId, fetchMock as unknown as typeof fetch),
@@ -80,9 +85,10 @@ describe('per-preset model discovery', () => {
       RequestInfo | URL,
       RequestInit?,
     ]
-    expect(url).toBe(
-      `${preset.baseUrl.replace(/\/+$/, '')}/${preset.modelDiscovery.path.replace(/^\/+/, '')}`,
-    )
+    const expectedUrl = /^https?:\/\//i.test(preset.modelDiscovery.path)
+      ? preset.modelDiscovery.path
+      : `${preset.baseUrl.replace(/\/+$/, '')}/${preset.modelDiscovery.path.replace(/^\/+/, '')}`
+    expect(url).toBe(expectedUrl)
 
     const headers = new Headers(init?.headers)
 

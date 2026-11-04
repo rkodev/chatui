@@ -14,6 +14,7 @@ import {
 } from './openaiCompatible'
 import { streamAnthropicChat } from './anthropic'
 import { streamGeminiChat } from './gemini'
+import { streamOllamaChat } from './ollama'
 import { OPENROUTER_PRESET } from './openrouterPreset'
 
 export {
@@ -69,6 +70,10 @@ export async function streamChat(
 
   if (preset.kind === 'google-gemini') {
     return streamGeminiChat(context, request, signal, onEvent, { ...options, preset })
+  }
+
+  if (preset.modelDiscovery.format === 'ollama-tags') {
+    return streamOllamaChat(context, request, signal, onEvent, { ...options, preset })
   }
 
   return streamGenericChat(context, request, signal, onEvent, { ...options, preset })

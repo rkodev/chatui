@@ -32,6 +32,12 @@ import {
   refreshCatalog as refreshGeminiCatalog,
   validateKey as validateGeminiKey,
 } from './gemini'
+import {
+  loadCatalog as loadOllamaCatalog,
+  listModels as listOllamaModels,
+  refreshCatalog as refreshOllamaCatalog,
+  validateKey as validateOllamaKey,
+} from './ollama'
 
 export type {
   CatalogCache,
@@ -79,6 +85,10 @@ export async function validateKey(
     return validateGeminiKey(context, signal)
   }
 
+  if (context.preset?.modelDiscovery.format === 'ollama-tags') {
+    return validateOllamaKey(context, signal)
+  }
+
   return validateGenericKey(withPreset(context), signal)
 }
 
@@ -105,6 +115,13 @@ export async function loadCatalog(
 
   if (context.preset?.kind === 'google-gemini') {
     return loadGeminiCatalog(context, signal, {
+      ...options,
+      preset: options.preset ?? context.preset,
+    })
+  }
+
+  if (context.preset?.modelDiscovery.format === 'ollama-tags') {
+    return loadOllamaCatalog(context, signal, {
       ...options,
       preset: options.preset ?? context.preset,
     })
@@ -141,6 +158,13 @@ export async function listModels(
     })
   }
 
+  if (context.preset?.modelDiscovery.format === 'ollama-tags') {
+    return listOllamaModels(context, signal, {
+      ...options,
+      preset: options.preset ?? context.preset,
+    })
+  }
+
   return listGenericModels(withPreset(context), signal, {
     ...options,
     preset: options.preset ?? context.preset ?? OPENROUTER_PRESET,
@@ -162,6 +186,13 @@ export async function refreshCatalog(
 
   if (context.preset?.kind === 'google-gemini') {
     return refreshGeminiCatalog(context, signal, {
+      ...options,
+      preset: options.preset ?? context.preset,
+    })
+  }
+
+  if (context.preset?.modelDiscovery.format === 'ollama-tags') {
+    return refreshOllamaCatalog(context, signal, {
       ...options,
       preset: options.preset ?? context.preset,
     })

@@ -134,14 +134,14 @@ describe('loadConfig', () => {
     })
   })
 
-  it('rejects presets that are not available in M2', async () => {
+  it('accepts the Ollama preset now that its native adapter exists', async () => {
     const fetchMock = vi.fn<FetchLike>(async () =>
-      fakeResponse({ ...validConfig, enabledPresets: ['openrouter', 'ollama'] }),
+      fakeResponse({ ...validConfig, enabledPresets: ['openrouter', 'ollama', 'custom'] }),
     )
 
-    await expect(loadConfig(fetchMock)).rejects.toThrow(
-      '"ollama" is not available in M2',
-    )
+    await expect(loadConfig(fetchMock)).resolves.toMatchObject({
+      enabledPresets: ['openrouter', 'ollama', 'custom'],
+    })
   })
 
   it('rejects unknown presets', async () => {

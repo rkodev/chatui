@@ -117,6 +117,7 @@ describe('M2 enablement', () => {
       'xai',
       'together',
       'fireworks',
+      'ollama',
       'lmstudio',
       'llamacpp',
       'custom',
@@ -128,8 +129,8 @@ describe('M2 enablement', () => {
     expect(isPresetEnabledInM2('openai')).toBe(true)
     expect(isPresetEnabledInM2('anthropic')).toBe(true)
     expect(isPresetEnabledInM2('google')).toBe(true)
+    expect(isPresetEnabledInM2('ollama')).toBe(true)
     expect(isPresetEnabledInM2('custom')).toBe(true)
-    expect(isPresetEnabledInM2('ollama')).toBe(false)
   })
 
   it('only enables presets that exist in contracts', () => {

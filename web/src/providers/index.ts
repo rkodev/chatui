@@ -86,3 +86,31 @@ export {
   streamGeminiChat,
 } from './gemini'
 export type { GeminiAttachment, GeminiChatRequest } from './gemini'
+export {
+  DEFAULT_MAX_NDJSON_BUFFER_CHARS,
+  DEFAULT_OLLAMA_SUPPORTED_PARAMETERS,
+  NdjsonAbortError,
+  NdjsonBufferOverflowError,
+  NdjsonMissingBodyError,
+  NdjsonTransportError,
+  OLLAMA_EXTRA_NAMESPACE,
+  OLLAMA_ORIGINS_GUIDANCE,
+  OllamaStreamMapper,
+  buildOllamaChatUrl,
+  buildOllamaHeaders,
+  buildOllamaRequestBody,
+  mapOllamaFinishReason,
+  mapOllamaModels,
+  ollamaAdapter,
+  ollamaNativeBaseUrl,
+  readNdjson,
+  selectOllamaTransport,
+  streamOllamaChat,
+} from './ollama'
+export type {
+  NdjsonResponse,
+  OllamaAttachment,
+  OllamaChatRequest,
+  OllamaTransport,
+  ReadNdjsonOptions,
+} from './ollama'

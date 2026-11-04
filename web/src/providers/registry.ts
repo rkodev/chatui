@@ -170,10 +170,9 @@ export function getDefaultPreset(
 /**
  * Presets the M2 web client can use without source edits.
  *
- * The list is deliberately limited to OpenAI-compatible presets. Anthropic,
- * Gemini, and Ollama stay in contracts but are labelled as coming later until
- * their native adapters land. `custom` is included because Custom providers use
- * the same OpenAI-compatible transport.
+ * Anthropic, Gemini, and Ollama have native adapters and dispatch from the
+ * shared provider entry points. `custom` is included because Custom providers
+ * use the OpenAI-compatible transport.
  */
 export const M2_ENABLED_PRESET_IDS = [
   'openrouter',
@@ -186,6 +185,7 @@ export const M2_ENABLED_PRESET_IDS = [
   'xai',
   'together',
   'fireworks',
+  'ollama',
   'lmstudio',
   'llamacpp',
   'custom',
