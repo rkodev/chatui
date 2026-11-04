@@ -145,6 +145,12 @@ export interface RefreshModelsResult {
   models: Model[]
   created: number
   updated: number
+  /** True when discovery failed and cached or fallback models were used. */
+  degraded?: boolean
+  /** Non-blocking notice for the UI. Never blocks sending. */
+  notice?: string | null
+  /** Discovery failure retained for diagnostics; never rendered raw. */
+  refreshError?: Error | null
 }
 
 export interface ManualModelInput {

@@ -166,7 +166,7 @@ export function ProviderDetailScreen() {
     try {
       const result = await service.refreshModels(provider.id)
       setModels(result.models)
-      setNotice(`Refreshed ${result.models.length} models.`)
+      setNotice(result.notice ?? `Refreshed ${result.models.length} models.`)
     } catch (cause) {
       setError(errorMessage(cause))
     } finally {
@@ -212,6 +212,7 @@ export function ProviderDetailScreen() {
   const preset = getPreset(provider.presetId)
   const docsUrl = preset?.docsUrl ?? null
   const rateLimit = formatRateLimit(metadata?.rateLimit)
+  const isOpenRouter = provider.presetId === 'openrouter'
 
   return (
     <section className="provider-detail" aria-labelledby="provider-detail-title">
@@ -237,6 +238,8 @@ export function ProviderDetailScreen() {
       <section className="provider-detail__panel" aria-labelledby="provider-key-title">
         <h3 id="provider-key-title">Key and usage</h3>
         <dl className="provider-detail__details">
+          <dt>Preset</dt>
+          <dd>{preset?.label ?? provider.presetId}</dd>
           <dt>Key label</dt>
           <dd>{metadata?.label ?? provider.label}</dd>
           <dt>Usage</dt>
@@ -267,8 +270,9 @@ export function ProviderDetailScreen() {
           <dd>{formatCors(provider.browserCors)}</dd>
         </dl>
         <p className="provider-detail__muted">
-          OpenRouter may route the same model to different upstream providers with
-          different data policies.
+          {isOpenRouter
+            ? 'OpenRouter may route the same model to different upstream providers with different data policies.'
+            : 'This OpenAI-compatible provider uses the shared preset transport. Browser CORS support is provider-specific; blocked discovery falls back to cached or fallback models without stopping chat.'}
         </p>
         {docsUrl && (
           <a
@@ -277,7 +281,7 @@ export function ProviderDetailScreen() {
             target="_blank"
             rel="noreferrer"
           >
-            OpenRouter documentation
+            {preset?.label ?? provider.presetId} documentation
           </a>
         )}
       </section>

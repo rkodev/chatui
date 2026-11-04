@@ -7,7 +7,7 @@ import type {
   Provider,
   Usage,
 } from '../domain'
-import { mapOpenAIModels } from './openaiCatalog'
+import { catalogDefaultsForPreset, mapOpenAIModels } from './openaiCatalog'
 import {
   getDefaultCatalogCache,
   isCatalogFresh,
@@ -783,7 +783,7 @@ function mapModels(payload: unknown, preset: OpenAICompatiblePreset): ModelInfo[
     case 'openrouter':
       return mapOpenRouterModels(payload)
     case 'openai':
-      return mapOpenAIModels(payload)
+      return mapOpenAIModels(payload, catalogDefaultsForPreset(preset.id))
     default:
       throw new Error(`Unsupported model discovery format: ${preset.modelDiscovery.format}`)
   }
@@ -1156,8 +1156,17 @@ class StreamMapper {
         }
 
         const reasoning = reasoningToText(delta)
-        if (reasoning !== '' && !this.emittedReasoning.has(reasoning)) {
-          this.emittedReasoning.add(reasoning)
+        const duplicateOpenRouter =
+          this.preset.reasoningStyle === 'openrouter' && this.emittedReasoning.has(reasoning)
+
+        if (reasoning !== '' && !duplicateOpenRouter) {
+          // OpenRouter may repeat the same reasoning text in both `reasoning`
+          // and `reasoning_details`; its M1 behavior emits it once. Other
+          // OpenAI-compatible providers stream independent chunks.
+          if (this.preset.reasoningStyle === 'openrouter') {
+            this.emittedReasoning.add(reasoning)
+          }
+
           this.emit({ type: 'reasoning-delta', text: reasoning })
         }
       }

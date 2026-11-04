@@ -102,4 +102,50 @@ describe('ProviderDetailScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh models' }))
     await waitFor(() => expect(refreshModels).toHaveBeenCalledWith('provider-1'))
   })
+
+  it('shows generic preset details for non-OpenRouter providers', async () => {
+    const provider = createTestProvider({
+      presetId: 'openai',
+      label: 'OpenAI',
+      baseUrl: 'https://api.openai.com/v1',
+      metadata: null,
+      browserCors: 'unknown',
+    })
+    renderDetail(
+      createFakeProviderManagementService({ getProvider: async () => provider }),
+    )
+
+    expect(await screen.findByRole('heading', { name: 'OpenAI' })).toBeInTheDocument()
+    expect(screen.getByText('Preset')).toBeInTheDocument()
+    expect(screen.getAllByText('Not available').length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: 'OpenAI documentation' })).toHaveAttribute(
+      'href',
+      'https://platform.openai.com/docs',
+    )
+    expect(
+      screen.queryByText(/OpenRouter may route the same model/),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Browser CORS support is provider-specific/),
+    ).toBeInTheDocument()
+  })
+
+  it('shows a non-blocking notice when discovery falls back', async () => {
+    const user = userEvent.setup()
+    const refreshModels = vi.fn(async () => ({
+      models: [],
+      created: 0,
+      updated: 0,
+      degraded: true,
+      notice: 'Discovery unavailable; using 2 fallback models.',
+    }))
+    renderDetail(createFakeProviderManagementService({ refreshModels }))
+
+    await screen.findByRole('heading', { name: 'OpenRouter' })
+    await user.click(screen.getByRole('button', { name: 'Refresh models' }))
+
+    expect(
+      await screen.findByText('Discovery unavailable; using 2 fallback models.'),
+    ).toBeInTheDocument()
+  })
 })

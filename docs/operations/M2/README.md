@@ -39,7 +39,7 @@
 | 2 | [M2-00.2 Catalogs, request vectors, math/export fixtures, and CORS plan](M2-00.2-catalogs-requests-fixtures.md) | Complete | M2-00.1 | contracts | none |
 | 3 | [M2-01.1 Web OpenAI-compatible transport](M2-01.1-web-openai-compatible-transport.md) | Complete | M2-00.2 | web | M2-05.1 |
 | 4 | [M2-01.2 Web preset enablement and Custom providers](M2-01.2-web-preset-enablement-custom.md) | Complete | M2-01.1 | web | M2-05.2 |
-| 5 | [M2-01.3 Web discovery, fallback, capabilities, reasoning, and provider UI](M2-01.3-web-discovery-capability-reasoning-ui.md) | Not started | M2-01.2 | web | M2-05.3 |
+| 5 | [M2-01.3 Web discovery, fallback, capabilities, reasoning, and provider UI](M2-01.3-web-discovery-capability-reasoning-ui.md) | Complete | M2-01.2 | web | M2-05.3 |
 | 6 | [M2-02.1 Web Anthropic adapter](M2-02.1-web-anthropic-adapter.md) | Not started | M2-01.3 | web | M2-02.2, M2-02.3, M2-06.1 |
 | 7 | [M2-02.2 Web Gemini adapter](M2-02.2-web-gemini-adapter.md) | Not started | M2-01.3 | web | M2-02.1, M2-02.3, M2-06.2 |
 | 8 | [M2-02.3 Web Ollama adapter](M2-02.3-web-ollama-adapter.md) | Not started | M2-01.3 | web | M2-02.1, M2-02.2, M2-06.3 |

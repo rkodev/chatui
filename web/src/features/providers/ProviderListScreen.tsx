@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { useConfig } from '../../app/config'
 import type { Provider } from '../../domain'
-import { getPresetAvailability, providerPresets } from '../../providers/registry'
+import { getPreset, getPresetAvailability, providerPresets } from '../../providers/registry'
 import { CustomProviderForm } from './CustomProviderForm'
 import { formatCors } from './format'
 import { useProviderManagement } from './providerManagementContext'
@@ -80,29 +80,34 @@ export function ProviderListScreen() {
 
       {providers !== null && providers.length > 0 && (
         <ul className="providers-list">
-          {providers.map((provider) => (
-            <li key={provider.id} className="providers-list__item">
-              <Link
-                to="/settings/providers/$providerId"
-                params={{ providerId: provider.id }}
-                className="providers-list__link"
-              >
-                <span className="providers-list__name">{provider.label}</span>
-                <span className="providers-list__meta">
-                  {provider.enabled ? 'Enabled' : 'Disabled'} · CORS{' '}
-                  {formatCors(provider.browserCors)}
-                </span>
-              </Link>
-            </li>
-          ))}
+          {providers.map((provider) => {
+            const preset = getPreset(provider.presetId)
+            return (
+              <li key={provider.id} className="providers-list__item">
+                <Link
+                  to="/settings/providers/$providerId"
+                  params={{ providerId: provider.id }}
+                  className="providers-list__link"
+                >
+                  <span className="providers-list__name">{provider.label}</span>
+                  <span className="providers-list__meta">
+                    {preset?.label ?? provider.presetId} ·{' '}
+                    {provider.enabled ? 'Enabled' : 'Disabled'} · CORS{' '}
+                    {formatCors(provider.browserCors)}
+                  </span>
+                </Link>
+              </li>
+            )
+          })}
         </ul>
       )}
 
       <section className="providers-screen__other" aria-labelledby="other-providers-title">
         <h3 id="other-providers-title">Other providers</h3>
         <p className="providers-screen__muted">
-          These presets come from the shared contracts. Only enabled presets can be
-          added.
+          Enabled presets come from the shared contracts. Disabled presets can be
+          enabled in deployment config, and coming-later presets need a native adapter.
+          Custom providers use the form below.
         </p>
         <ul>
           {otherPresets.map(({ preset, status }) => (

@@ -47,6 +47,22 @@ describe('ProviderListScreen', () => {
     expect(screen.getByRole('heading', { name: 'Add a custom provider' })).toBeInTheDocument()
   })
 
+  it('lists a configured Custom provider with its preset label', async () => {
+    const custom = createTestProvider({
+      id: 'custom-1',
+      presetId: 'custom',
+      label: 'Local',
+      baseUrl: 'http://localhost:1234/v1',
+    })
+    renderList(createFakeProviderManagementService({ listProviders: async () => [custom] }))
+
+    expect(await screen.findByRole('link', { name: /Local/ })).toHaveAttribute(
+      'href',
+      '/settings/providers/custom-1',
+    )
+    expect(screen.getByText(/Custom OpenAI-compatible/)).toBeInTheDocument()
+  })
+
   it('shows an empty state when no provider exists', async () => {
     renderList(createFakeProviderManagementService({ listProviders: async () => [] }))
 

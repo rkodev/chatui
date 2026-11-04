@@ -263,6 +263,43 @@ describe('OpenAI-compatible streaming fixtures', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps reasoning separate from answer text and never deduplicates chunks', async () => {
+    const chunk = (delta: Record<string, unknown>) =>
+      `data: ${JSON.stringify({
+        id: 'chatcmpl-reasoning-mix',
+        choices: [{ index: 0, delta, finish_reason: null }],
+      })}\n\n`
+    const sse = [
+      chunk({ reasoning_content: 'I' }),
+      chunk({ reasoning_content: 'I' }),
+      chunk({ reasoning: ' think' }),
+      chunk({ reasoning_details: [{ type: 'reasoning.text', text: ' more' }] }),
+      chunk({ content: 'Answer' }),
+      `data: ${JSON.stringify({
+        id: 'chatcmpl-reasoning-mix',
+        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+      })}\n\n`,
+      'data: [DONE]\n\n',
+    ].join('')
+    const fetchMock = vi.fn(async () => sseResponse(sse))
+
+    const events = await collect(
+      makeContext(fetchMock as unknown as typeof fetch),
+      baseRequest(),
+      { now: () => FIXED_NOW },
+    )
+
+    expect(events.filter((event) => event.type === 'reasoning-delta')).toEqual([
+      { type: 'reasoning-delta', text: 'I' },
+      { type: 'reasoning-delta', text: 'I' },
+      { type: 'reasoning-delta', text: ' think' },
+      { type: 'reasoning-delta', text: ' more' },
+    ])
+    expect(events.filter((event) => event.type === 'text-delta')).toEqual([
+      { type: 'text-delta', text: 'Answer' },
+    ])
+  })
+
   it('maps an in-stream OpenAI error without emitting a start event', async () => {
     const expected = loadExpectedErrors().cases.find(
       (entry) => entry.name === 'openai-stream-server-error',
