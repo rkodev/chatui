@@ -61,3 +61,14 @@ export type {
   StreamEvent,
 } from './openaiCompatible'
 export { getOpenAICompatiblePreset, toOpenAICompatiblePreset } from './presets'
+export {
+  ANTHROPIC_EXTRA_NAMESPACE,
+  AnthropicStreamMapper,
+  DEFAULT_ANTHROPIC_SUPPORTED_PARAMETERS,
+  anthropicAdapter,
+  buildAnthropicHeaders,
+  buildAnthropicRequestBody,
+  mapAnthropicModels,
+  streamAnthropicChat,
+} from './anthropic'
+export type { AnthropicChatRequest, ResolvedAttachment } from './anthropic'

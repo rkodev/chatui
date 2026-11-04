@@ -109,6 +109,7 @@ describe('M2 enablement', () => {
     expect(M2_ENABLED_PRESET_IDS).toEqual([
       'openrouter',
       'openai',
+      'anthropic',
       'groq',
       'mistral',
       'deepseek',
@@ -124,8 +125,8 @@ describe('M2 enablement', () => {
     ])
     expect(isPresetEnabledInM2('openrouter')).toBe(true)
     expect(isPresetEnabledInM2('openai')).toBe(true)
+    expect(isPresetEnabledInM2('anthropic')).toBe(true)
     expect(isPresetEnabledInM2('custom')).toBe(true)
-    expect(isPresetEnabledInM2('anthropic')).toBe(false)
     expect(isPresetEnabledInM2('google')).toBe(false)
     expect(isPresetEnabledInM2('ollama')).toBe(false)
   })
@@ -160,6 +161,11 @@ describe('M2 enablement', () => {
       status: 'disabled',
     })
     expect(availability.find((entry) => entry.preset.id === 'anthropic')).toMatchObject({
+      enabled: false,
+      selectable: false,
+      status: 'disabled',
+    })
+    expect(availability.find((entry) => entry.preset.id === 'google')).toMatchObject({
       enabled: false,
       selectable: false,
       status: 'coming-later',

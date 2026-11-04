@@ -304,3 +304,68 @@ export function mapOpenAIModels(
     .map((entry) => mapOpenAIModel(entry, defaults))
     .filter((model): model is ModelInfo => model !== null)
 }
+
+/**
+ * Map an Anthropic `/models` entry.
+ *
+ * Anthropic reports `display_name` and `created_at` but no capability metadata.
+ * Missing fields therefore fall back to the shared Anthropic preset defaults
+ * from `contracts/fixtures/expected/catalogs.json`.
+ */
+export function mapAnthropicModel(
+  raw: unknown,
+  defaults: OpenAICatalogDefaults = catalogDefaultsForPreset('anthropic'),
+): ModelInfo | null {
+  if (!isRecord(raw)) {
+    return null
+  }
+
+  const remoteId = typeof raw.id === 'string' ? raw.id.trim() : ''
+  if (remoteId === '') {
+    return null
+  }
+
+  const label =
+    typeof raw.display_name === 'string' && raw.display_name.trim() !== ''
+      ? raw.display_name
+      : typeof raw.name === 'string' && raw.name.trim() !== ''
+        ? raw.name
+        : remoteId
+  const inferred = inferOpenAIModelMetadata(raw, defaults)
+
+  return {
+    remoteId,
+    label,
+    contextWindow: inferred.contextWindow,
+    maxOutputTokens: inferred.maxOutputTokens,
+    capabilities: inferred.capabilities,
+    pricing: null,
+    canonicalSlug: null,
+    inputModalities: inferred.inputModalities,
+    outputModalities: inferred.outputModalities,
+    supportedParameters: inferred.supportedParameters,
+    metadata: null,
+    isFree: false,
+    hidden: false,
+  }
+}
+
+/** Map an Anthropic `/models` envelope to normalized entries. */
+export function mapAnthropicModels(
+  payload: unknown,
+  defaults: OpenAICatalogDefaults = catalogDefaultsForPreset('anthropic'),
+): ModelInfo[] {
+  let entries: unknown[]
+
+  if (Array.isArray(payload)) {
+    entries = payload
+  } else if (isRecord(payload) && Array.isArray(payload.data)) {
+    entries = payload.data
+  } else {
+    throw new OpenAICatalogError('Anthropic /models response must contain a data array')
+  }
+
+  return entries
+    .map((entry) => mapAnthropicModel(entry, defaults))
+    .filter((model): model is ModelInfo => model !== null)
+}

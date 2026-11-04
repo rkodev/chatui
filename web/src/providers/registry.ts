@@ -178,6 +178,7 @@ export function getDefaultPreset(
 export const M2_ENABLED_PRESET_IDS = [
   'openrouter',
   'openai',
+  'anthropic',
   'groq',
   'mistral',
   'deepseek',

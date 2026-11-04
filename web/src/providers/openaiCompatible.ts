@@ -7,7 +7,7 @@ import type {
   Provider,
   Usage,
 } from '../domain'
-import { catalogDefaultsForPreset, mapOpenAIModels } from './openaiCatalog'
+import { catalogDefaultsForPreset, mapAnthropicModels, mapOpenAIModels } from './openaiCatalog'
 import {
   getDefaultCatalogCache,
   isCatalogFresh,
@@ -100,6 +100,7 @@ export type ReasoningStyle = 'openrouter' | 'openai'
 export interface OpenAICompatiblePreset {
   id: string
   displayName: string
+  kind?: Provider['kind']
   baseUrl: string
   auth: ProviderAuthConfig
   defaultHeaders: Record<string, string>
@@ -784,6 +785,8 @@ function mapModels(payload: unknown, preset: OpenAICompatiblePreset): ModelInfo[
       return mapOpenRouterModels(payload)
     case 'openai':
       return mapOpenAIModels(payload, catalogDefaultsForPreset(preset.id))
+    case 'anthropic':
+      return mapAnthropicModels(payload, catalogDefaultsForPreset(preset.id))
     default:
       throw new Error(`Unsupported model discovery format: ${preset.modelDiscovery.format}`)
   }

@@ -5,6 +5,7 @@
   "enabledPresets": [
     "openrouter",
     "openai",
+    "anthropic",
     "groq",
     "mistral",
     "deepseek",

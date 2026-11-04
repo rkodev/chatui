@@ -20,6 +20,12 @@ import {
 } from './openaiCompatible'
 import { OPENROUTER_PRESET } from './openrouterPreset'
 import { streamChat } from './openrouterStream'
+import {
+  loadCatalog as loadAnthropicCatalog,
+  listModels as listAnthropicModels,
+  refreshCatalog as refreshAnthropicCatalog,
+  validateKey as validateAnthropicKey,
+} from './anthropic'
 
 export type {
   CatalogCache,
@@ -59,6 +65,10 @@ export async function validateKey(
   context: ProviderContext,
   signal: AbortSignal,
 ): Promise<ProviderKeyInfo> {
+  if (context.preset?.kind === 'anthropic') {
+    return validateAnthropicKey(context, signal)
+  }
+
   return validateGenericKey(withPreset(context), signal)
 }
 
@@ -76,6 +86,13 @@ export async function loadCatalog(
   signal: AbortSignal,
   options: ListModelsOptions = {},
 ): Promise<CatalogResult> {
+  if (context.preset?.kind === 'anthropic') {
+    return loadAnthropicCatalog(context, signal, {
+      ...options,
+      preset: options.preset ?? context.preset,
+    })
+  }
+
   return loadGenericCatalog(withPreset(context), signal, {
     ...options,
     preset: options.preset ?? context.preset ?? OPENROUTER_PRESET,
@@ -93,6 +110,13 @@ export async function listModels(
   signal: AbortSignal,
   options: ListModelsOptions = {},
 ): Promise<ModelInfo[]> {
+  if (context.preset?.kind === 'anthropic') {
+    return listAnthropicModels(context, signal, {
+      ...options,
+      preset: options.preset ?? context.preset,
+    })
+  }
+
   return listGenericModels(withPreset(context), signal, {
     ...options,
     preset: options.preset ?? context.preset ?? OPENROUTER_PRESET,
@@ -105,6 +129,13 @@ export async function refreshCatalog(
   signal: AbortSignal,
   options: Omit<ListModelsOptions, 'forceRefresh'> = {},
 ): Promise<CatalogResult> {
+  if (context.preset?.kind === 'anthropic') {
+    return refreshAnthropicCatalog(context, signal, {
+      ...options,
+      preset: options.preset ?? context.preset,
+    })
+  }
+
   return refreshGenericCatalog(withPreset(context), signal, {
     ...options,
     preset: options.preset ?? context.preset ?? OPENROUTER_PRESET,

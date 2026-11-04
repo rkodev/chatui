@@ -12,6 +12,7 @@ import {
   type StreamChatOptions,
   type StreamEvent,
 } from './openaiCompatible'
+import { streamAnthropicChat } from './anthropic'
 import { OPENROUTER_PRESET } from './openrouterPreset'
 
 export {
@@ -60,6 +61,11 @@ export async function streamChat(
   options: StreamChatOptions = {},
 ): Promise<void> {
   const preset = options.preset ?? context.preset ?? OPENROUTER_PRESET
+
+  if (preset.kind === 'anthropic') {
+    return streamAnthropicChat(context, request, signal, onEvent, { ...options, preset })
+  }
+
   return streamGenericChat(context, request, signal, onEvent, { ...options, preset })
 }
 

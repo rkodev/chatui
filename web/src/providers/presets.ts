@@ -42,6 +42,7 @@ export function toOpenAICompatiblePreset(preset: ProviderPreset): OpenAICompatib
   const base: OpenAICompatiblePreset = {
     id: preset.id,
     displayName: preset.label,
+    kind: preset.kind,
     baseUrl: preset.baseUrl,
     auth: preset.auth,
     defaultHeaders: preset.defaultHeaders,

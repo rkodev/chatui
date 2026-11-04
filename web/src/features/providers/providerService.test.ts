@@ -394,7 +394,7 @@ describe('ProviderService', () => {
 
   it('rejects presets that are not available in M2', async () => {
     await expect(
-      service.createPresetProvider({ presetId: 'anthropic', apiKey: 'sk-ant' }),
+      service.createPresetProvider({ presetId: 'google', apiKey: 'sk-google' }),
     ).rejects.toMatchObject({
       code: 'invalid_input',
       message: expect.stringContaining('not available in M2'),
