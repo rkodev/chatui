@@ -26,6 +26,12 @@ import {
   refreshCatalog as refreshAnthropicCatalog,
   validateKey as validateAnthropicKey,
 } from './anthropic'
+import {
+  loadCatalog as loadGeminiCatalog,
+  listModels as listGeminiModels,
+  refreshCatalog as refreshGeminiCatalog,
+  validateKey as validateGeminiKey,
+} from './gemini'
 
 export type {
   CatalogCache,
@@ -69,6 +75,10 @@ export async function validateKey(
     return validateAnthropicKey(context, signal)
   }
 
+  if (context.preset?.kind === 'google-gemini') {
+    return validateGeminiKey(context, signal)
+  }
+
   return validateGenericKey(withPreset(context), signal)
 }
 
@@ -88,6 +98,13 @@ export async function loadCatalog(
 ): Promise<CatalogResult> {
   if (context.preset?.kind === 'anthropic') {
     return loadAnthropicCatalog(context, signal, {
+      ...options,
+      preset: options.preset ?? context.preset,
+    })
+  }
+
+  if (context.preset?.kind === 'google-gemini') {
+    return loadGeminiCatalog(context, signal, {
       ...options,
       preset: options.preset ?? context.preset,
     })
@@ -117,6 +134,13 @@ export async function listModels(
     })
   }
 
+  if (context.preset?.kind === 'google-gemini') {
+    return listGeminiModels(context, signal, {
+      ...options,
+      preset: options.preset ?? context.preset,
+    })
+  }
+
   return listGenericModels(withPreset(context), signal, {
     ...options,
     preset: options.preset ?? context.preset ?? OPENROUTER_PRESET,
@@ -131,6 +155,13 @@ export async function refreshCatalog(
 ): Promise<CatalogResult> {
   if (context.preset?.kind === 'anthropic') {
     return refreshAnthropicCatalog(context, signal, {
+      ...options,
+      preset: options.preset ?? context.preset,
+    })
+  }
+
+  if (context.preset?.kind === 'google-gemini') {
+    return refreshGeminiCatalog(context, signal, {
       ...options,
       preset: options.preset ?? context.preset,
     })

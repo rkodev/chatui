@@ -6,6 +6,7 @@
     "openrouter",
     "openai",
     "anthropic",
+    "google",
     "groq",
     "mistral",
     "deepseek",

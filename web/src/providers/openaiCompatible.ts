@@ -7,7 +7,7 @@ import type {
   Provider,
   Usage,
 } from '../domain'
-import { catalogDefaultsForPreset, mapAnthropicModels, mapOpenAIModels } from './openaiCatalog'
+import { catalogDefaultsForPreset, mapAnthropicModels, mapGeminiModels, mapOpenAIModels } from './openaiCatalog'
 import {
   getDefaultCatalogCache,
   isCatalogFresh,
@@ -787,6 +787,8 @@ function mapModels(payload: unknown, preset: OpenAICompatiblePreset): ModelInfo[
       return mapOpenAIModels(payload, catalogDefaultsForPreset(preset.id))
     case 'anthropic':
       return mapAnthropicModels(payload, catalogDefaultsForPreset(preset.id))
+    case 'gemini':
+      return mapGeminiModels(payload, catalogDefaultsForPreset(preset.id))
     default:
       throw new Error(`Unsupported model discovery format: ${preset.modelDiscovery.format}`)
   }

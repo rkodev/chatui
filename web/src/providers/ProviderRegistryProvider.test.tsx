@@ -30,7 +30,7 @@ describe('ProviderRegistryProvider', () => {
 
     expect(screen.getByTestId('preset-count')).toHaveTextContent(String(providerPresets.length))
     expect(screen.getByTestId('enabled-presets')).toHaveTextContent(
-      'openrouter,openai,anthropic,groq,mistral,deepseek,xai,together,fireworks,lmstudio,llamacpp,custom',
+      'openrouter,openai,anthropic,google,groq,mistral,deepseek,xai,together,fireworks,lmstudio,llamacpp,custom',
     )
     expect(screen.getByTestId('default-preset')).toHaveTextContent('openrouter')
     expect(screen.getByTestId('openrouter-label')).toHaveTextContent('OpenRouter')

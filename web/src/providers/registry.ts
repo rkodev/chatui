@@ -179,6 +179,7 @@ export const M2_ENABLED_PRESET_IDS = [
   'openrouter',
   'openai',
   'anthropic',
+  'google',
   'groq',
   'mistral',
   'deepseek',

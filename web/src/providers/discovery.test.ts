@@ -20,6 +20,9 @@ const openRouterModels = JSON.parse(
     'utf8',
   ),
 ) as unknown
+const geminiModels = JSON.parse(
+  readFileSync(resolve(process.cwd(), '../contracts/fixtures/models/gemini-models.json'), 'utf8'),
+) as unknown
 
 const API_KEY = 'sk-discovery-test'
 
@@ -56,7 +59,12 @@ describe('per-preset model discovery', () => {
       throw new Error(`Missing preset ${presetId}`)
     }
 
-    const payload = preset.modelDiscovery.format === 'openrouter' ? openRouterModels : openAIModels
+    const payload =
+      preset.modelDiscovery.format === 'openrouter'
+        ? openRouterModels
+        : preset.modelDiscovery.format === 'gemini'
+          ? geminiModels
+          : openAIModels
     const fetchMock = vi.fn(async () => jsonResponse(payload))
     const result = await loadCatalog(
       makeContext(presetId, fetchMock as unknown as typeof fetch),
@@ -81,8 +89,9 @@ describe('per-preset model discovery', () => {
     if (preset.modelDiscovery.public || preset.auth.type === 'none') {
       expect(headers.get('Authorization')).toBeNull()
       expect(headers.get('x-api-key')).toBeNull()
+      expect(headers.get('x-goog-api-key')).toBeNull()
     } else if (preset.auth.type === 'x-api-key') {
-      expect(headers.get('x-api-key')).toBe(API_KEY)
+      expect(headers.get(preset.auth.headerName ?? 'x-api-key')).toBe(API_KEY)
     } else {
       expect(headers.get('Authorization')).toBe(`Bearer ${API_KEY}`)
     }

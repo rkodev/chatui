@@ -136,11 +136,11 @@ describe('loadConfig', () => {
 
   it('rejects presets that are not available in M2', async () => {
     const fetchMock = vi.fn<FetchLike>(async () =>
-      fakeResponse({ ...validConfig, enabledPresets: ['openrouter', 'google'] }),
+      fakeResponse({ ...validConfig, enabledPresets: ['openrouter', 'ollama'] }),
     )
 
     await expect(loadConfig(fetchMock)).rejects.toThrow(
-      '"google" is not available in M2',
+      '"ollama" is not available in M2',
     )
   })
 

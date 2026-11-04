@@ -72,3 +72,17 @@ export {
   streamAnthropicChat,
 } from './anthropic'
 export type { AnthropicChatRequest, ResolvedAttachment } from './anthropic'
+export {
+  DEFAULT_GEMINI_SUPPORTED_PARAMETERS,
+  GEMINI_EXTRA_NAMESPACE,
+  GeminiStreamMapper,
+  buildGeminiChatUrl,
+  buildGeminiHeaders,
+  buildGeminiRequestBody,
+  geminiAdapter,
+  geminiModelPath,
+  mapGeminiFinishReason,
+  mapGeminiModels,
+  streamGeminiChat,
+} from './gemini'
+export type { GeminiAttachment, GeminiChatRequest } from './gemini'

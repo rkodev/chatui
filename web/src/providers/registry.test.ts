@@ -110,6 +110,7 @@ describe('M2 enablement', () => {
       'openrouter',
       'openai',
       'anthropic',
+      'google',
       'groq',
       'mistral',
       'deepseek',
@@ -126,8 +127,8 @@ describe('M2 enablement', () => {
     expect(isPresetEnabledInM2('openrouter')).toBe(true)
     expect(isPresetEnabledInM2('openai')).toBe(true)
     expect(isPresetEnabledInM2('anthropic')).toBe(true)
+    expect(isPresetEnabledInM2('google')).toBe(true)
     expect(isPresetEnabledInM2('custom')).toBe(true)
-    expect(isPresetEnabledInM2('google')).toBe(false)
     expect(isPresetEnabledInM2('ollama')).toBe(false)
   })
 
@@ -168,7 +169,7 @@ describe('M2 enablement', () => {
     expect(availability.find((entry) => entry.preset.id === 'google')).toMatchObject({
       enabled: false,
       selectable: false,
-      status: 'coming-later',
+      status: 'disabled',
     })
   })
 

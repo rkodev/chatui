@@ -369,3 +369,71 @@ export function mapAnthropicModels(
     .map((entry) => mapAnthropicModel(entry, defaults))
     .filter((model): model is ModelInfo => model !== null)
 }
+
+/**
+ * Map a Gemini `/models` entry.
+ *
+ * Gemini reports `name` (`models/<id>`), `baseModelId`, `displayName`, and
+ * token limits but no normalized capability metadata. Missing fields fall back
+ * to the shared Google preset defaults from
+ * `contracts/fixtures/expected/catalogs.json`.
+ */
+export function mapGeminiModel(
+  raw: unknown,
+  defaults: OpenAICatalogDefaults = catalogDefaultsForPreset('google'),
+): ModelInfo | null {
+  if (!isRecord(raw)) {
+    return null
+  }
+
+  const name = typeof raw.name === 'string' ? raw.name.trim() : ''
+  const baseModelId =
+    typeof raw.baseModelId === 'string' ? raw.baseModelId.trim() : ''
+  const remoteId = baseModelId !== '' ? baseModelId : name.replace(/^models\//, '')
+
+  if (remoteId === '') {
+    return null
+  }
+
+  const label =
+    typeof raw.displayName === 'string' && raw.displayName.trim() !== ''
+      ? raw.displayName
+      : remoteId
+  const inferred = inferOpenAIModelMetadata(
+    {
+      contextWindow: raw.inputTokenLimit,
+      maxOutputTokens: raw.outputTokenLimit,
+    },
+    defaults,
+  )
+
+  return {
+    remoteId,
+    label,
+    contextWindow: inferred.contextWindow,
+    maxOutputTokens: inferred.maxOutputTokens,
+    capabilities: inferred.capabilities,
+    pricing: null,
+    canonicalSlug: null,
+    inputModalities: inferred.inputModalities,
+    outputModalities: inferred.outputModalities,
+    supportedParameters: inferred.supportedParameters,
+    metadata: null,
+    isFree: false,
+    hidden: false,
+  }
+}
+
+/** Map a Gemini `/models` envelope to normalized entries. */
+export function mapGeminiModels(
+  payload: unknown,
+  defaults: OpenAICatalogDefaults = catalogDefaultsForPreset('google'),
+): ModelInfo[] {
+  if (!isRecord(payload) || !Array.isArray(payload.models)) {
+    throw new OpenAICatalogError('Gemini /models response must contain a models array')
+  }
+
+  return payload.models
+    .map((entry) => mapGeminiModel(entry, defaults))
+    .filter((model): model is ModelInfo => model !== null)
+}
