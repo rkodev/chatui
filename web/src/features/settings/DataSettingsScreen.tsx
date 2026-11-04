@@ -1,13 +1,54 @@
 import { Link } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { DataExportPanel } from './DataExportPanel'
+import { createExportService } from './exportServiceFactory'
+import type { ExportServiceLike } from './exportService'
 import './settings.css'
 
+export interface DataSettingsScreenProps {
+  /** Test or story override. When omitted, IndexedDB is opened lazily. */
+  exportService?: ExportServiceLike
+}
+
+function errorMessage(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause)
+}
+
 /**
- * `/settings/data` entry point reserved for M2-04.5.
+ * `/settings/data` entry point for storage and portability.
  *
- * This task deliberately ships navigation and scope copy only. Storage usage,
- * export/import, and clear-data controls are implemented by M2-04.
+ * Export is implemented here. Import and clear-data controls remain for
+ * M2-04.4 and M2-04.5; this screen never deletes or replaces local data.
  */
-export function DataSettingsScreen() {
+export function DataSettingsScreen({ exportService }: DataSettingsScreenProps = {}) {
+  const [service, setService] = useState<ExportServiceLike | null>(exportService ?? null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (exportService !== undefined) {
+      return
+    }
+
+    let cancelled = false
+
+    createExportService().then(
+      (value) => {
+        if (!cancelled) {
+          setService(value)
+        }
+      },
+      (cause: unknown) => {
+        if (!cancelled) {
+          setError(errorMessage(cause))
+        }
+      },
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [exportService])
+
   return (
     <section className="settings-screen" aria-labelledby="data-settings-title">
       <header className="settings-screen__header">
@@ -21,10 +62,22 @@ export function DataSettingsScreen() {
           device in IndexedDB and OPFS.
         </p>
         <p className="settings-screen__muted">
-          Storage usage, export, import, and clear-data controls arrive in M2-04. This screen is
-          the entry point and does not move or delete data yet.
+          Provider API keys are never included in exports. Import and clear-data controls arrive in
+          later M2-04 tasks.
         </p>
       </div>
+
+      {error && (
+        <p className="settings-screen__error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {service === null ? (
+        !error && <p role="status">Preparing export…</p>
+      ) : (
+        <DataExportPanel service={service} />
+      )}
 
       <div className="settings-screen__panel">
         <h3>Related</h3>

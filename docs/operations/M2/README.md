@@ -50,7 +50,7 @@
 | 13 | [M2-03.4 Web settings routes and behavior wiring](M2-03.4-web-settings-routes.md) | Complete | M2-01.3 | web | M2-04.1 |
 | 14 | [M2-04.1 Web conversation search](M2-04.1-web-search.md) | Complete | M2-03.4 | web | M2-04.2 no; sidebar files shared |
 | 15 | [M2-04.2 Web pin, archive, and delete undo](M2-04.2-web-pin-archive-undo.md) | Complete | M2-04.1 | web | M2-07.2 |
-| 16 | [M2-04.3 Web export](M2-04.3-web-export.md) | Not started | M2-03.4 | web | M2-07.3 |
+| 16 | [M2-04.3 Web export](M2-04.3-web-export.md) | Complete | M2-03.4 | web | M2-07.3 |
 | 17 | [M2-04.4 Web import](M2-04.4-web-import.md) | Not started | M2-04.3 | web | M2-07.4 |
 | 18 | [M2-04.5 Web data controls](M2-04.5-web-data-controls.md) | Not started | M2-04.3, M2-04.4 | web | M2-07.5 |
 | 19 | [M2-04.6 Web Playwright suite](M2-04.6-web-playwright.md) | Not started | M2-04.1 through M2-04.5, M2-03.3 | web | M2-08.2 |

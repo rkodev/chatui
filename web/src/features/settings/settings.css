@@ -198,6 +198,21 @@
   color: var(--color-danger);
 }
 
+.settings-screen__warning {
+  margin: 0;
+  padding: var(--density-space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface-raised);
+  color: var(--color-warning);
+}
+
+.settings-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--density-space-2);
+}
+
 .settings-screen__list {
   margin: 0;
   padding-left: var(--space-5);

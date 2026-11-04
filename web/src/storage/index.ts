@@ -47,6 +47,9 @@ export type {
 export { DEFAULT_MESSAGE_LIMIT, MessageRepository } from './MessageRepository'
 export type { AppendMessageResult, MessageListOptions, MessagePage } from './MessageRepository'
 
+export { ExportReader } from './ExportReader'
+export type { ExportReaderOptions, ExportSettingsSource, ExportSnapshot } from './ExportReader'
+
 export { AttachmentRepository } from './AttachmentRepository'
 export type { AttachmentListOptions } from './AttachmentRepository'
 
