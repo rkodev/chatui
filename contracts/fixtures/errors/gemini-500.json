@@ -1,0 +1,11 @@
+{
+  "status": 500,
+  "headers": {},
+  "body": {
+    "error": {
+      "code": 500,
+      "message": "Internal error.",
+      "status": "INTERNAL"
+    }
+  }
+}

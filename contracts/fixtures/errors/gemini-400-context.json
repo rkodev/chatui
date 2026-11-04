@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "headers": {},
+  "body": {
+    "error": {
+      "code": 400,
+      "message": "The input token count exceeds the maximum number of tokens allowed.",
+      "status": "INVALID_ARGUMENT"
+    }
+  }
+}

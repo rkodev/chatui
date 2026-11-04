@@ -35,7 +35,7 @@
 
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [M2-00.1 Expected streams and error fixtures](M2-00.1-expected-streams-errors.md) | Not started | none | contracts | none; unblocks provider work |
+| 1 | [M2-00.1 Expected streams and error fixtures](M2-00.1-expected-streams-errors.md) | Complete | none | contracts | none; unblocks provider work |
 | 2 | [M2-00.2 Catalogs, request vectors, math/export fixtures, and CORS plan](M2-00.2-catalogs-requests-fixtures.md) | Not started | M2-00.1 | contracts | none |
 | 3 | [M2-01.1 Web OpenAI-compatible transport](M2-01.1-web-openai-compatible-transport.md) | Not started | M2-00.2 | web | M2-05.1 |
 | 4 | [M2-01.2 Web preset enablement and Custom providers](M2-01.2-web-preset-enablement-custom.md) | Not started | M2-01.1 | web | M2-05.2 |

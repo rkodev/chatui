@@ -28,13 +28,25 @@ const EXPECTED_STREAM_SOURCES = new Map([
   ['openrouter-reasoning.json', 'openrouter-reasoning.sse'],
   ['openrouter-usage.json', 'openrouter-usage.sse'],
   ['openrouter-error-200.json', 'openrouter-error-200.sse'],
+  ['openai-text.json', 'openai-text.sse'],
+  ['openai-reasoning.json', 'openai-reasoning.sse'],
+  ['anthropic-text.json', 'anthropic-text.sse'],
+  ['gemini-text.json', 'gemini-text.sse'],
+  ['ollama-ndjson.json', 'ollama-ndjson.txt'],
+  ['error-429.json', 'error-429.sse'],
 ]);
 const EXPECTED_KEY_FILE = 'openrouter-key.json';
 const EXPECTED_ERRORS_FILE = 'openrouter-errors.json';
+const EXPECTED_PROVIDER_ERRORS_FILE = 'provider-errors.json';
+const EXPECTED_ANTHROPIC_THINKING_FILE = 'anthropic-thinking.json';
+const EXPECTED_GEMINI_FINISH_REASONS_FILE = 'gemini-finish-reasons.json';
 const EXPECTED_FILES = new Set([
   ...EXPECTED_STREAM_SOURCES.keys(),
   EXPECTED_KEY_FILE,
   EXPECTED_ERRORS_FILE,
+  EXPECTED_PROVIDER_ERRORS_FILE,
+  EXPECTED_ANTHROPIC_THINKING_FILE,
+  EXPECTED_GEMINI_FINISH_REASONS_FILE,
 ]);
 
 const REQUEST_KINDS = ['chat-request', 'protected-fields', 'attribution', 'default-model'];
@@ -101,6 +113,65 @@ const CHAT_ERROR_CODES = [
   'parse',
   'storage',
   'unknown',
+];
+
+const PROVIDER_ERROR_IDS = ['openai', 'anthropic', 'google', 'ollama', 'openrouter'];
+const PROVIDER_ERROR_KINDS = ['http', 'stream', 'synthetic'];
+const REQUIRED_PROVIDER_ERROR_CODES = [
+  'auth',
+  'permission',
+  'rate_limit',
+  'quota',
+  'model_not_found',
+  'context_length',
+  'content_filter',
+  'network',
+  'timeout',
+  'provider',
+];
+const PROVIDER_REQUEST_ID_HEADERS = {
+  openai: ['x-request-id'],
+  anthropic: ['request-id'],
+  google: ['x-goog-request-id'],
+  ollama: [],
+  openrouter: [],
+};
+
+const ANTHROPIC_RAW_EVENT_TYPES = [
+  'message_start',
+  'content_block_start',
+  'content_block_delta',
+  'content_block_stop',
+  'message_delta',
+  'message_stop',
+  'error',
+];
+
+const GEMINI_FINISH_REASONS = [
+  'STOP',
+  'MAX_TOKENS',
+  'SAFETY',
+  'RECITATION',
+  'OTHER',
+  'BLOCKLIST',
+  'PROHIBITED_CONTENT',
+  'SPII',
+  'MALFORMED_FUNCTION_CALL',
+  'UNEXPECTED_TOOL_CALL',
+  'LANGUAGE',
+  'FINISH_REASON_UNSPECIFIED',
+];
+const GEMINI_FINISH_MAPPING = {
+  STOP: 'stop',
+  MAX_TOKENS: 'length',
+  SAFETY: 'content_filter',
+  RECITATION: 'content_filter',
+};
+
+const SECRET_PATTERNS = [
+  /\bsk-[A-Za-z0-9]{16,}\b/,
+  /\bAIza[0-9A-Za-z_-]{20,}\b/,
+  /\bBearer\s+[A-Za-z0-9._-]{16,}\b/,
 ];
 
 const REQUIRED_SCHEMA_FILES = [
@@ -770,6 +841,348 @@ function validateErrorsExpected(filePath, document) {
       addError(filePath, `${field}/error/status`, 'must match the case status');
     }
   });
+}
+
+function providerRequestIdFromHeaders(providerId, headers) {
+  for (const name of PROVIDER_REQUEST_ID_HEADERS[providerId] ?? []) {
+    if (typeof headers[name] === 'string' && headers[name].length > 0) {
+      return headers[name];
+    }
+  }
+  return null;
+}
+
+function validateProviderHttpErrorFixture(fixturePath, caseStatus, providerId) {
+  const document = readJson(fixturePath);
+  if (document === undefined) {
+    return undefined;
+  }
+  if (!checkObjectShape(fixturePath, '', document, ['status', 'headers', 'body'], ['status', 'headers', 'body'])) {
+    return undefined;
+  }
+
+  if (!Number.isInteger(document.status)) {
+    addError(fixturePath, '/status', 'must be an integer');
+  } else if (document.status !== caseStatus) {
+    addError(fixturePath, '/status', `must equal the case status ${caseStatus}`);
+  }
+
+  if (!isPlainObject(document.headers)) {
+    addError(fixturePath, '/headers', 'must be an object');
+    return undefined;
+  }
+  for (const [key, value] of Object.entries(document.headers)) {
+    if (typeof value !== 'string') {
+      addError(fixturePath, `/headers/${key}`, 'must be a string');
+    }
+  }
+
+  if (!isPlainObject(document.body)) {
+    addError(fixturePath, '/body', 'must be an object');
+  } else if (!Object.prototype.hasOwnProperty.call(document.body, 'error')) {
+    addError(fixturePath, '/body/error', 'required property is missing');
+  } else if (!isPlainObject(document.body.error) && typeof document.body.error !== 'string') {
+    addError(fixturePath, '/body/error', 'must be an object or string');
+  }
+
+  return providerRequestIdFromHeaders(providerId, document.headers);
+}
+
+function validateProviderErrorsExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'cases'], ['source', 'cases'])) {
+    return;
+  }
+
+  if (document.source !== 'provider-errors') {
+    addError(filePath, '/source', 'must be "provider-errors"');
+  }
+
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  const seenCodes = new Set();
+  let httpCases = 0;
+  let streamCases = 0;
+
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'providerId', 'kind', 'fixture', 'synthetic', 'httpStatus', 'status', 'error'],
+        ['name', 'providerId', 'kind', 'status', 'error'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (!PROVIDER_ERROR_IDS.includes(item.providerId)) {
+      addError(filePath, `${field}/providerId`, `must be one of ${JSON.stringify(PROVIDER_ERROR_IDS)}`);
+    }
+
+    if (!PROVIDER_ERROR_KINDS.includes(item.kind)) {
+      addError(filePath, `${field}/kind`, `must be one of ${JSON.stringify(PROVIDER_ERROR_KINDS)}`);
+    } else if (item.kind === 'http') {
+      httpCases += 1;
+    } else if (item.kind === 'stream') {
+      streamCases += 1;
+    }
+
+    let fixtureRequestId;
+    if (item.fixture !== undefined) {
+      if (typeof item.fixture !== 'string' || item.fixture.length === 0) {
+        addError(filePath, `${field}/fixture`, 'must be a non-empty string');
+      } else {
+        const fixturePath = path.resolve(fixturesDir, item.fixture);
+        const errorsDir = path.join(fixturesDir, 'errors');
+        if (!fixturePath.startsWith(`${errorsDir}${path.sep}`)) {
+          addError(filePath, `${field}/fixture`, 'must reference a file under fixtures/errors');
+        } else if (!existsSync(fixturePath)) {
+          addError(filePath, `${field}/fixture`, `references missing fixture "${item.fixture}"`);
+        } else if (item.kind === 'http') {
+          fixtureRequestId = validateProviderHttpErrorFixture(fixturePath, item.status, item.providerId);
+        }
+      }
+    } else if (item.synthetic !== true) {
+      addError(filePath, `${field}/fixture`, 'must reference a fixture or set synthetic to true');
+    }
+
+    if (item.synthetic !== undefined && typeof item.synthetic !== 'boolean') {
+      addError(filePath, `${field}/synthetic`, 'must be a boolean');
+    }
+
+    if (item.status !== null && !Number.isInteger(item.status)) {
+      addError(filePath, `${field}/status`, 'must be an integer or null');
+    }
+    if (item.kind === 'http' && item.status === null) {
+      addError(filePath, `${field}/status`, 'must be an integer for an HTTP error');
+    }
+    if (item.kind === 'stream' && item.status === null) {
+      addError(filePath, `${field}/status`, 'must be an integer for an in-stream error');
+    }
+
+    if (item.httpStatus !== undefined) {
+      if (!Number.isInteger(item.httpStatus)) {
+        addError(filePath, `${field}/httpStatus`, 'must be an integer');
+      } else if (item.kind === 'stream' && item.httpStatus !== 200) {
+        addError(filePath, `${field}/httpStatus`, 'must be 200 for an in-stream error');
+      } else if (item.kind === 'http' && item.httpStatus !== item.status) {
+        addError(filePath, `${field}/httpStatus`, 'must equal the case status for an HTTP error');
+      }
+    } else if (item.kind === 'stream') {
+      addError(filePath, `${field}/httpStatus`, 'must be 200 for an in-stream error');
+    }
+
+    validateChatError(filePath, `${field}/error`, item.error);
+    if (isPlainObject(item.error)) {
+      if (item.error.status !== item.status) {
+        addError(filePath, `${field}/error/status`, 'must match the case status');
+      }
+      if (item.error.providerId !== item.providerId) {
+        addError(filePath, `${field}/error/providerId`, 'must match the case providerId');
+      }
+      if (typeof item.error.code === 'string') {
+        seenCodes.add(item.error.code);
+      }
+      if (fixtureRequestId !== undefined && item.error.requestId !== fixtureRequestId) {
+        addError(
+          filePath,
+          `${field}/error/requestId`,
+          `must equal the fixture request ID ${JSON.stringify(fixtureRequestId)}`,
+        );
+      }
+    }
+  });
+
+  if (httpCases === 0) {
+    addError(filePath, '/cases', 'must contain at least one HTTP error case');
+  }
+  if (streamCases === 0) {
+    addError(filePath, '/cases', 'must contain at least one in-stream error case');
+  }
+  for (const code of REQUIRED_PROVIDER_ERROR_CODES) {
+    if (!seenCodes.has(code)) {
+      addError(filePath, '/cases', `missing required error code "${code}"`);
+    }
+  }
+}
+
+function validateAnthropicThinkingExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'cases'], ['source', 'cases'])) {
+    return;
+  }
+
+  if (document.source !== 'anthropic-thinking') {
+    addError(filePath, '/source', 'must be "anthropic-thinking"');
+  }
+
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'rawEvents', 'events', 'text', 'reasoning'],
+        ['name', 'rawEvents', 'events', 'text', 'reasoning'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (!Array.isArray(item.rawEvents) || item.rawEvents.length === 0) {
+      addError(filePath, `${field}/rawEvents`, 'must be a non-empty array');
+    } else {
+      item.rawEvents.forEach((rawEvent, rawIndex) => {
+        const rawField = `${field}/rawEvents/${rawIndex}`;
+        if (!isPlainObject(rawEvent)) {
+          addError(filePath, rawField, 'must be an object');
+          return;
+        }
+        if (!ANTHROPIC_RAW_EVENT_TYPES.includes(rawEvent.type)) {
+          addError(filePath, `${rawField}/type`, `must be one of ${JSON.stringify(ANTHROPIC_RAW_EVENT_TYPES)}`);
+        }
+      });
+    }
+
+    if (!Array.isArray(item.events) || item.events.length === 0) {
+      addError(filePath, `${field}/events`, 'must be a non-empty array');
+    } else {
+      item.events.forEach((event, eventIndex) => validateEvent(filePath, `${field}/events/${eventIndex}`, event));
+
+      const text = item.events
+        .filter((event) => isPlainObject(event) && event.type === 'text-delta' && typeof event.text === 'string')
+        .map((event) => event.text)
+        .join('');
+      const reasoning = item.events
+        .filter(
+          (event) => isPlainObject(event) && event.type === 'reasoning-delta' && typeof event.text === 'string',
+        )
+        .map((event) => event.text)
+        .join('');
+
+      if (typeof item.text === 'string' && item.text !== text) {
+        addError(filePath, `${field}/text`, `must equal the concatenated text-delta events (${JSON.stringify(text)})`);
+      }
+      if (typeof item.reasoning === 'string' && item.reasoning !== reasoning) {
+        addError(
+          filePath,
+          `${field}/reasoning`,
+          `must equal the concatenated reasoning-delta events (${JSON.stringify(reasoning)})`,
+        );
+      }
+      if (!item.events.some((event) => isPlainObject(event) && event.type === 'reasoning-delta')) {
+        addError(filePath, `${field}/events`, 'must contain at least one reasoning-delta event');
+      }
+      if (!item.events.some((event) => isPlainObject(event) && event.type === 'text-delta')) {
+        addError(filePath, `${field}/events`, 'must contain at least one text-delta event');
+      }
+    }
+
+    if (typeof item.text !== 'string') {
+      addError(filePath, `${field}/text`, 'must be a string');
+    }
+    if (typeof item.reasoning !== 'string') {
+      addError(filePath, `${field}/reasoning`, 'must be a string');
+    }
+  });
+}
+
+function validateGeminiFinishReasonsExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'cases'], ['source', 'cases'])) {
+    return;
+  }
+
+  if (document.source !== 'gemini-finish-reasons') {
+    addError(filePath, '/source', 'must be "gemini-finish-reasons"');
+  }
+
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  const seenReasons = new Set();
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'finishReason', 'expected'],
+        ['name', 'finishReason', 'expected'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (!GEMINI_FINISH_REASONS.includes(item.finishReason)) {
+      addError(filePath, `${field}/finishReason`, `must be one of ${JSON.stringify(GEMINI_FINISH_REASONS)}`);
+    } else {
+      seenReasons.add(item.finishReason);
+    }
+
+    if (!FINISH_REASONS.includes(item.expected)) {
+      addError(filePath, `${field}/expected`, `must be one of ${JSON.stringify(FINISH_REASONS)}`);
+    }
+
+    const mapped = GEMINI_FINISH_MAPPING[item.finishReason];
+    if (mapped !== undefined && item.expected !== mapped) {
+      addError(filePath, `${field}/expected`, `must be "${mapped}" for finishReason "${item.finishReason}"`);
+    }
+  });
+
+  for (const reason of ['STOP', 'MAX_TOKENS', 'SAFETY', 'RECITATION']) {
+    if (!seenReasons.has(reason)) {
+      addError(filePath, '/cases', `missing required finishReason "${reason}"`);
+    }
+  }
 }
 
 function validateNormalizedRequest(filePath, field, request) {
@@ -1512,6 +1925,12 @@ function validateExpectedVectors() {
       validateKeyExpected(filePath, document);
     } else if (name === EXPECTED_ERRORS_FILE) {
       validateErrorsExpected(filePath, document);
+    } else if (name === EXPECTED_PROVIDER_ERRORS_FILE) {
+      validateProviderErrorsExpected(filePath, document);
+    } else if (name === EXPECTED_ANTHROPIC_THINKING_FILE) {
+      validateAnthropicThinkingExpected(filePath, document);
+    } else if (name === EXPECTED_GEMINI_FINISH_REASONS_FILE) {
+      validateGeminiFinishReasonsExpected(filePath, document);
     }
   }
 
@@ -1523,10 +1942,10 @@ function validateExpectedVectors() {
 
   const streamDir = path.join(fixturesDir, 'streams');
   const expectedSources = new Set(EXPECTED_STREAM_SOURCES.values());
-  for (const filePath of walkFiles(streamDir).filter((file) => file.endsWith('.sse'))) {
+  for (const filePath of walkFiles(streamDir).filter((file) => file.endsWith('.sse') || file.endsWith('.txt'))) {
     const name = path.basename(filePath);
-    if (name.startsWith('openrouter-') && !expectedSources.has(name)) {
-      addError(filePath, '$', 'OpenRouter stream fixture has no expected vector');
+    if (!expectedSources.has(name)) {
+      addError(filePath, '$', 'stream fixture has no expected vector');
     }
   }
 
@@ -1566,10 +1985,18 @@ function validateFixtureEncoding() {
       continue;
     }
 
+    let text;
     try {
-      new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+      text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
     } catch {
       addError(filePath, '$', 'fixture is not valid UTF-8');
+      continue;
+    }
+
+    for (const pattern of SECRET_PATTERNS) {
+      if (pattern.test(text)) {
+        addError(filePath, '$', `fixture appears to contain a secret matching ${pattern}`);
+      }
     }
   }
 }
@@ -1643,6 +2070,56 @@ function validateParity() {
   }
 }
 
+function runBrokenVectorSelfTest() {
+  const start = errors.length;
+
+  const brokenStreamPath = path.join(expectedDir, '__broken-stream__.json');
+  validateStreamExpected(
+    brokenStreamPath,
+    {
+      source: 'openai-text.sse',
+      events: [
+        { type: 'start', responseId: 'broken' },
+        { type: 'text-delta', text: 'Hello' },
+        { type: 'finish', reason: 'stop' },
+      ],
+      text: 'Goodbye',
+      reasoning: '',
+      retryAllowed: false,
+    },
+    'openai-text.sse',
+  );
+
+  const brokenErrorPath = path.join(expectedDir, '__broken-error__.json');
+  validateChatError(brokenErrorPath, '/cases/0/error', {
+    code: 'not_a_chat_error_code',
+    message: 'Broken vector',
+    providerId: 'openai',
+    status: 401,
+    retryable: false,
+    retryAfterSeconds: null,
+    requestId: null,
+    details: null,
+  });
+
+  const produced = errors.slice(start);
+  errors.length = start;
+
+  const streamOk = produced.some(
+    (message) => message.includes(relative(brokenStreamPath)) && message.includes('/text'),
+  );
+  const errorOk = produced.some(
+    (message) => message.includes(relative(brokenErrorPath)) && message.includes('/cases/0/error/code'),
+  );
+
+  if (!streamOk) {
+    addError(brokenStreamPath, '/text', 'broken-vector self-test did not report the expected text mismatch');
+  }
+  if (!errorOk) {
+    addError(brokenErrorPath, '/cases/0/error/code', 'broken-vector self-test did not report the expected invalid code');
+  }
+}
+
 function main() {
   const schemas = loadSchemas();
   const validators = compileSchemas(schemas);
@@ -1654,6 +2131,7 @@ function main() {
   validateRequestVectors();
   validateFixtureEncoding();
   validateParity();
+  runBrokenVectorSelfTest();
 
   if (errors.length > 0) {
     for (const error of errors) {

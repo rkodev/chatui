@@ -1,0 +1,11 @@
+{
+  "status": 404,
+  "headers": {},
+  "body": {
+    "error": {
+      "code": 404,
+      "message": "Model not found.",
+      "status": "NOT_FOUND"
+    }
+  }
+}

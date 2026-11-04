@@ -1,0 +1,22 @@
+{
+  "source": "openai-reasoning.sse",
+  "events": [
+    { "type": "start", "responseId": "chatcmpl-example-reasoning" },
+    { "type": "reasoning-delta", "text": "I should answer briefly." },
+    { "type": "text-delta", "text": "Here is a brief answer." },
+    { "type": "finish", "reason": "stop" },
+    {
+      "type": "usage",
+      "usage": {
+        "inputTokens": 14,
+        "outputTokens": 9,
+        "totalTokens": 23,
+        "costUsd": null,
+        "estimated": false
+      }
+    }
+  ],
+  "text": "Here is a brief answer.",
+  "reasoning": "I should answer briefly.",
+  "retryAllowed": false
+}

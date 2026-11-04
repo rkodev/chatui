@@ -1,0 +1,9 @@
+{
+  "source": "gemini-finish-reasons",
+  "cases": [
+    { "name": "stop", "finishReason": "STOP", "expected": "stop" },
+    { "name": "max-tokens", "finishReason": "MAX_TOKENS", "expected": "length" },
+    { "name": "safety", "finishReason": "SAFETY", "expected": "content_filter" },
+    { "name": "recitation", "finishReason": "RECITATION", "expected": "content_filter" }
+  ]
+}
