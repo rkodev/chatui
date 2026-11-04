@@ -79,7 +79,7 @@ Deliver:
 
 ### 6. Parity
 
-- Update `contracts/parity.md` for Android share target, desktop/mobile-specific rows, and any behavior changed by platform integration.
+- Update `contracts/parity.md` for Android share target, platform-specific rows, and any behavior changed by platform integration.
 - Critical Android cases covered in M3: 26 (process death preserves partial content) and 27 (backup exclusion prevents key restore), plus regressions from M1 and M2.
 
 ## Out of scope

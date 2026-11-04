@@ -99,23 +99,23 @@ android-assemble:
 	cd $(ANDROID_DIR) && ./gradlew assembleDebug
 
 rust-check:
-	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-multiplatform.md).)
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
 	cargo check --manifest-path $(RUST_DIR)/Cargo.toml --workspace --all-targets
 
 rust-lint:
-	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-multiplatform.md).)
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
 	cargo clippy --manifest-path $(RUST_DIR)/Cargo.toml --workspace --all-targets -- -D warnings
 
 rust-test:
-	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-multiplatform.md).)
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
 	cargo test --manifest-path $(RUST_DIR)/Cargo.toml --workspace
 
 rust-build:
-	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-multiplatform.md).)
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
 	cargo build --manifest-path $(RUST_DIR)/Cargo.toml --workspace --release
 
 rust-run:
-	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-multiplatform.md).)
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
 	cargo run --manifest-path $(RUST_DIR)/Cargo.toml
 
 format:

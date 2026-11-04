@@ -12,7 +12,7 @@ Milestones are intentionally not task lists. Concrete tasks are generated later,
 | M1 | OpenRouter-first core chat | Complete | M0 | web, android |
 | M2 | Providers and content | Planned | M1 | web, android |
 | M3 | Android depth | Planned | M2 | android |
-| M3.5 | Rust multiplatform client | Optional / parallel | M0, M1 | rust desktop, Android, future iOS |
+| M3.5 | Rust desktop client | Optional / parallel | M0, M1 | rust desktop |
 | M4 | Polish and release | Planned | M1, M2, M3, M3.5 if shipping | all enabled clients |
 | M5 | Backup and sync | Future | M4 | all shipping clients |
 | M6 | Managed roksky hosting | Future | M4 (M5 for BYO storage) | web hosting |
@@ -41,7 +41,7 @@ M0 ──> M1 ──> M2 ──> M3 ──┐
 | [M1-openrouter-core.md](M1-openrouter-core.md) | OpenRouter end-to-end chat on web and Android |
 | [M2-providers-and-content.md](M2-providers-and-content.md) | Additional providers, attachments, parameters, search, export/import |
 | [M3-android-depth.md](M3-android-depth.md) | Android platform integration, recovery, tests, release configuration |
-| [M3.5-rust-multiplatform.md](M3.5-rust-multiplatform.md) | Optional Rust workspace, desktop/mobile shell, conformance, packaging |
+| [M3.5-rust-desktop.md](M3.5-rust-desktop.md) | Optional Rust desktop workspace for Windows, macOS, and Linux, conformance, packaging |
 | [M4-polish-and-release.md](M4-polish-and-release.md) | Accessibility, PWA, performance, deployment, parity audit, release |
 | [M5-backup-and-sync.md](M5-backup-and-sync.md) | Encrypted user-owned backup and sync (future) |
 | [M6-managed-hosting.md](M6-managed-hosting.md) | Optional roksky-managed hosting (future) |
@@ -57,7 +57,7 @@ These apply to every milestone and every generated task:
 - IDs are UUIDv7. Timestamps are ISO 8601 / RFC 3339 UTC. Messages carry a monotonic per-conversation `sequence`.
 - Secrets are never committed, logged, placed in URLs, cached by service workers, or included in exports and backup metadata.
 - No analytics, telemetry, hidden network destinations, or server-side prompt proxying in phase 1.
-- The Rust client is optional for the phase 1 web/Android gate. Once published it is first-class and must meet the same contracts, conformance, parity, and security bars.
+- The Rust desktop client is optional for the phase 1 web/Android gate. Once published it is first-class and must meet the same contracts, conformance, parity, and security bars.
 
 ## Ownership map
 

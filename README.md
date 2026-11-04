@@ -17,8 +17,8 @@ tasks are generated per milestone from there.
   browser and supports BYOK provider access subject to provider CORS policy.
 - **Android**: Native Kotlin + Jetpack Compose application with Room, DataStore,
   and platform-backed secret storage.
-- **Rust (optional)**: Multiplatform workspace for desktop, Android, iOS, and
-  WASM targets. Optional for the phase 1 web and Android release gate.
+- **Rust (optional)**: Native desktop workspace for Windows, macOS, and Linux.
+  Optional for the phase 1 web and Android release gate.
 
 Each client is an independent build. There is no root Node workspace or lockfile
 coupling `web/`, `android/`, and `rust/`, and the Rust workspace is not a

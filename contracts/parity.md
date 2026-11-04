@@ -24,17 +24,17 @@
 | Export/import | Required | Required | Required when enabled |
 | Backup/sync | Future | Future | Future |
 | PWA install | Required | N/A | N/A |
-| Native share target | N/A | Required | Required on desktop and mobile |
+| Native share target | N/A | Required | Required on desktop |
 | Desktop packaging (installer/AppImage) | N/A | N/A | Required when enabled |
 | Auto-update | N/A | N/A | Required when enabled |
 
 ## Notes
 
 - OpenRouter is the first release blocker. These rows are release-blocking on every published client: OpenRouter first-run onboarding, key introspection, catalog/pricing/modalities, streaming/reasoning/usage/cost, and provider routing preferences.
-- The Rust column may be `Optional` until the Rust client is enabled for release. Once enabled and published, Rust must meet the same contracts, conformance, parity, and security bar as web and Android.
+- The Rust column may be `Optional` until the Rust desktop client is enabled for release. Once enabled and published, Rust must meet the same contracts, conformance, parity, and security bar as web and Android. The Rust client is desktop-only for Windows, macOS, and Linux; it is not an Android, iOS, or WASM client.
 - No feature is complete at M0. Foundation-level persistence, routing placeholders, or design tokens do not satisfy a feature row.
 - This table records requirement and platform commitment, not current implementation status. Update it in the same change as any user-visible behavior change.
-- Allowed platform values are `Required`, `Required (release blocker)`, `Required when enabled`, `Required on desktop and mobile`, `Future`, `N/A`, and the platform-specific persistence descriptions shown above.
+- Allowed platform values are `Required`, `Required (release blocker)`, `Required when enabled`, `Required on desktop`, `Future`, `N/A`, and the platform-specific persistence descriptions shown above.
 - Release is blocked if a feature is marked complete on one platform and absent on another without an approved exception recorded here.
 
 ## Implementation status (M1, 2026-11-04)
