@@ -351,6 +351,24 @@ describe('OpenRouter streaming fixtures', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('calls fetch without a receiver so browsers do not throw Illegal invocation', async () => {
+    const fetchMock = vi.fn(function (this: unknown) {
+      if (this !== undefined) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation")
+      }
+      return Promise.resolve(sseResponse(loadSseFixture('openrouter-text.sse')))
+    })
+
+    const events = await collect(
+      makeContext(fetchMock as unknown as typeof fetch),
+      baseRequest(),
+      { now: () => FIXED_NOW },
+    )
+
+    expect(events.some((event) => event.type === 'text-delta')).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('emits reasoning once when reasoning and reasoning_details duplicate', async () => {
     const fetchMock = vi.fn(async () => sseResponse(loadSseFixture('openrouter-reasoning.sse')))
 

@@ -9,7 +9,7 @@ Milestones are intentionally not task lists. Concrete tasks are generated later,
 | ID | Milestone | Status | Depends on | Platforms |
 | --- | --- | --- | --- | --- |
 | M0 | Foundations | Complete | none | shared, web, android |
-| M1 | OpenRouter-first core chat | Planned | M0 | web, android |
+| M1 | OpenRouter-first core chat | Complete | M0 | web, android |
 | M2 | Providers and content | Planned | M1 | web, android |
 | M3 | Android depth | Planned | M2 | android |
 | M3.5 | Rust multiplatform client | Optional / parallel | M0, M1 | rust desktop, Android, future iOS |

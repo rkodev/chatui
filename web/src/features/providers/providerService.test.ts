@@ -79,7 +79,7 @@ describe('ProviderService', () => {
       baseUrl: 'https://openrouter.ai/api/v1',
       authType: 'bearer',
       enabled: true,
-      browserCors: 'unknown',
+      browserCors: 'supported',
       metadata: null,
     })
     expect(provider.secretId).toEqual(expect.any(String))

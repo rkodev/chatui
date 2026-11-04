@@ -1,6 +1,6 @@
 # M1 - OpenRouter-first core chat
 
-- Status: Planned
+- Status: Complete
 - Target: 2 weeks
 - Depends on: M0
 - Blocks: M2, M3.5
@@ -146,3 +146,24 @@ Do not combine web and Android adapter work into one task. Do not start M2 adapt
 - In-stream errors inside HTTP 200 must preserve partial text and never auto-retry after output.
 - Streaming persistence frequency is a performance/correctness tradeoff. Follow the 33-50 ms UI flush and roughly 1 s persistence guidance.
 - IndexedDB and Room write patterns must not regress with large conversations; keep the streaming message isolated.
+
+## Completion
+
+M1 is complete as of 2026-11-04. The full exit-gate evidence, including the
+command results, CORS matrix, conformance checklist, fixture results, critical
+cases, and timed web/Android smoke runs, is recorded in
+[M1 Verification Evidence](../operations/M1/M1-verification.md). Implementation
+status is recorded in [`contracts/parity.md`](../../contracts/parity.md).
+
+Gate fixes made during final verification:
+
+- Web detached `fetch` before invoking it so Chrome does not throw
+  `Illegal invocation`.
+- Android onboarding now opens the conversation list after key validation so
+  the user can create the first chat; previously it stopped on the chat
+  placeholder.
+- Android token usage is visible by default, matching web and the spec metadata
+  requirement.
+
+Remaining M1 risk: case 28 reports the `Retry-After` delay and retries
+automatically but does not render a live ticking countdown.

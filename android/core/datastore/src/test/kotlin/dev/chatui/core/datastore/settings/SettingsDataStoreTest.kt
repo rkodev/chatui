@@ -56,6 +56,11 @@ class SettingsDataStoreTest {
     }
 
     @Test
+    fun `token usage is shown by default`() = runTest {
+        assertThat(store.settings.first().showTokenUsage).isTrue()
+    }
+
+    @Test
     fun `save and read typed settings`() = runTest {
         val settings = AndroidSettings(
             theme = Theme.DARK,

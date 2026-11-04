@@ -53,6 +53,9 @@ fun ChatMessageList(
     loadingOlder: Boolean = false,
     onLoadOlder: () -> Unit = {},
     onRetry: ((Message) -> Unit)? = null,
+    onRegenerate: ((Message) -> Unit)? = null,
+    onEditLastUser: ((Message, String) -> Unit)? = null,
+    actionsEnabled: Boolean = true,
     showTokenUsage: Boolean = false,
     chatFontSize: ChatFontSize = ChatFontSize.MD,
     zoneId: ZoneId = ZoneId.systemDefault(),
@@ -70,6 +73,12 @@ fun ChatMessageList(
     }
     val activeStream = streaming?.takeIf { stream ->
         !stream.done || messages.none { it.id == stream.messageId }
+    }
+    val lastAssistantId = remember(visibleMessages) {
+        visibleMessages.lastOrNull { it.role == MessageRole.ASSISTANT }?.id
+    }
+    val lastUserId = remember(visibleMessages) {
+        visibleMessages.lastOrNull { it.role == MessageRole.USER }?.id
     }
 
     val isNearBottom by remember {
@@ -134,6 +143,10 @@ fun ChatMessageList(
                 chatFontSize = chatFontSize,
                 showTokenUsage = showTokenUsage,
                 onRetry = onRetry,
+                onRegenerate = onRegenerate,
+                onEditLastUser = onEditLastUser,
+                canRegenerate = actionsEnabled && message.id == lastAssistantId,
+                canEditLastUser = actionsEnabled && message.id == lastUserId,
                 zoneId = zoneId,
                 onComposed = onMessageComposed,
             )
@@ -146,6 +159,7 @@ fun ChatMessageList(
                     chatFontSize = chatFontSize,
                     showTokenUsage = showTokenUsage,
                     isActiveStream = !stream.done,
+                    showActions = false,
                     onRetry = onRetry?.takeIf { stream.done },
                     zoneId = zoneId,
                     onComposed = onMessageComposed,

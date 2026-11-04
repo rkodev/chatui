@@ -491,6 +491,23 @@ describe('OpenRouter key validation', () => {
     expect(headers.get('X-Title')).toBe('ChatUI')
   })
 
+  it('calls fetch without a receiver so browsers do not throw Illegal invocation', async () => {
+    const fetchMock = vi.fn(function (this: unknown) {
+      if (this !== undefined) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation")
+      }
+      return Promise.resolve(jsonResponse(keyFixture))
+    })
+
+    const info = await validateKey(
+      makeContext(fetchMock as unknown as typeof fetch),
+      new AbortController().signal,
+    )
+
+    expect(info.label).toBe('Example OpenRouter Key')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects a missing key before making a request', async () => {
     const fetchMock = vi.fn()
     const context = makeContext(fetchMock as unknown as typeof fetch, null)

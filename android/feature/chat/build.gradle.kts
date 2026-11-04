@@ -23,6 +23,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.multiplatform.markdown.renderer.m3)
+    implementation(libs.highlights)
     implementation(libs.hilt.android)
 
     ksp(libs.hilt.compiler)

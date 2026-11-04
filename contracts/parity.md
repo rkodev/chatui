@@ -1,7 +1,7 @@
 # ChatUI Feature Parity
 
 - Source: [IMPLEMENTATION.md section 5.4](../docs/IMPLEMENTATION.md#54-parity-checklist)
-- Updated: 2026-10-31
+- Updated: 2026-11-04
 - Purpose: authoritative cross-client requirement and commitment table.
 
 | Feature | Web | Android | Rust |
@@ -36,3 +36,37 @@
 - This table records requirement and platform commitment, not current implementation status. Update it in the same change as any user-visible behavior change.
 - Allowed platform values are `Required`, `Required (release blocker)`, `Required when enabled`, `Required on desktop and mobile`, `Future`, `N/A`, and the platform-specific persistence descriptions shown above.
 - Release is blocked if a feature is marked complete on one platform and absent on another without an approved exception recorded here.
+
+## Implementation status (M1, 2026-11-04)
+
+M1 delivers OpenRouter-only BYOK chat on web and Android. This section records
+what is implemented; the commitment table above is unchanged.
+
+Implemented on both clients:
+
+- OpenRouter first-run onboarding with public catalog preload, `/key`
+  validation, invalid-key rollback, and default model selection.
+- OpenRouter key introspection (`/key`) and provider metadata: label, usage,
+  limit, free tier, rate limit, and CORS status.
+- Public `/models` catalog with paid, free, vision, reasoning, tool, and
+  long-context mapping; per-million pricing; 24-hour cache; manual refresh; and
+  last-known-good snapshot.
+- Streaming `/chat/completions` with keep-alive tolerance, reasoning
+  normalization and deduplication, usage/cost persistence, in-stream error
+  handling, retries with `Retry-After`, and cancellation.
+- Curated routing (`allow_fallbacks`, `sort`, `data_collection`) and protected
+  request-field rejection.
+- Conversation persistence, last-active restore, startup recovery for
+  interrupted streams, and model switching with provider/model snapshots.
+- GFM Markdown, fenced code with language label and copy, raw-HTML inertness,
+  blocked remote images, and copy/regenerate/edit-last-user/retry actions.
+- Browser-direct CORS verified for `/key`, `/models`, and `/chat/completions`;
+  OpenRouter `browserCors` is `supported`.
+
+Not delivered in M1 (M2 or later):
+
+- Additional providers, custom-provider creation, attachments, math rendering,
+  search, pin/archive, export/import, backup/sync, PWA, Rust client, and release
+  packaging.
+- The remote-image loading setting and per-conversation system-prompt/sampling
+  parameter UI remain M2.

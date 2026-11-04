@@ -152,10 +152,11 @@ async function requestJson(
   options: { includeAuth: boolean; signal: AbortSignal },
 ): Promise<unknown> {
   const url = joinUrl(context.provider.baseUrl, path)
+  const fetchImpl = context.fetch
   let response: Response
 
   try {
-    response = await context.fetch(url, {
+    response = await fetchImpl(url, {
       method: 'GET',
       headers: buildHeaders(context, options.includeAuth),
       signal: options.signal,
