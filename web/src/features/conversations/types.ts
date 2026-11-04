@@ -3,6 +3,8 @@ import type {
   AppendMessageResult,
   ConversationListOptions,
   ConversationPage,
+  ConversationSearchOptions,
+  ConversationSearchResult,
   MessageListOptions,
   MessagePage,
   NewConversation,
@@ -20,6 +22,10 @@ export interface ConversationStore {
   create(input: NewConversation): Promise<Conversation>
   get(id: string): Promise<Conversation | null>
   list(options?: ConversationListOptions): Promise<ConversationPage>
+  search(
+    query: string,
+    options?: ConversationSearchOptions,
+  ): Promise<ConversationSearchResult>
   update(id: string, patch: Partial<Omit<Conversation, 'id' | 'createdAt'>>): Promise<Conversation>
   delete(id: string): Promise<void>
 }

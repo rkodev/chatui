@@ -12,6 +12,7 @@ import {
 import type {
   AppendMessageResult,
   ConversationPage,
+  ConversationSearchResult,
   MessagePage,
   NewConversation,
 } from '../../storage'
@@ -86,6 +87,16 @@ class MemoryConversationStore {
 
   async list(): Promise<ConversationPage> {
     return { items: [...this.values.values()], nextCursor: null }
+  }
+
+  async search(query: string): Promise<ConversationSearchResult> {
+    return {
+      query,
+      groups: [],
+      truncated: false,
+      scannedConversations: 0,
+      scannedMessages: 0,
+    }
   }
 
   async update(

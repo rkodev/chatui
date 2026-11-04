@@ -218,6 +218,104 @@ describe('storage repositories', () => {
       expect(page2.nextCursor).toBeNull()
     })
 
+    it('searches titles and message text with grouped context', async () => {
+      const repository = new ConversationRepository(db)
+      const messages = new MessageRepository(db)
+      const titled = await repository.create(
+        conversation({
+          title: 'Alpha planning',
+          updatedAt: '2026-01-03T00:00:00.000Z',
+          lastMessageAt: '2026-01-03T00:00:00.000Z',
+        }),
+      )
+      const messaged = await repository.create(
+        conversation({
+          title: 'Other notes',
+          updatedAt: '2026-01-04T00:00:00.000Z',
+          lastMessageAt: '2026-01-04T00:00:00.000Z',
+        }),
+      )
+
+      await messages.appendMessage(
+        message(messaged.id, 1, {
+          role: 'assistant',
+          createdAt: '2026-01-02T00:00:00.000Z',
+          parts: [
+            {
+              type: 'text',
+              text: 'Some earlier words before the Alpha reference and trailing context.',
+            },
+          ],
+        }),
+      )
+      await messages.appendMessage(
+        message(messaged.id, 2, {
+          role: 'user',
+          createdAt: '2026-01-03T00:00:00.000Z',
+          parts: [{ type: 'text', text: 'Another alpha mention, newer.' }],
+        }),
+      )
+
+      const result = await repository.search('  ALPHA  ')
+
+      expect(result.query).toBe('ALPHA')
+      expect(result.groups.map((group) => group.conversation.id)).toEqual([
+        messaged.id,
+        titled.id,
+      ])
+
+      const titledGroup = result.groups.find((group) => group.conversation.id === titled.id)
+      expect(titledGroup?.titleMatch).toBe(true)
+      expect(titledGroup?.messageMatches).toEqual([])
+
+      const messageGroup = result.groups.find((group) => group.conversation.id === messaged.id)
+      expect(messageGroup?.titleMatch).toBe(false)
+      expect(messageGroup?.messageMatches.map((match) => match.messageId)).toHaveLength(2)
+      expect(messageGroup?.messageMatches[0].sequence).toBe(2)
+      expect(messageGroup?.messageMatches[0].role).toBe('user')
+      expect(messageGroup?.messageMatches[1].snippet).toContain('Alpha reference')
+    })
+
+    it('bounds search work and reports truncation', async () => {
+      const repository = new ConversationRepository(db)
+      const created = await repository.create(
+        conversation({ title: 'Bounded', updatedAt: '2026-01-01T00:00:00.000Z' }),
+      )
+
+      for (let sequence = 1; sequence <= 5; sequence += 1) {
+        await db.put(
+          'messages',
+          message(created.id, sequence, {
+            createdAt: `2026-01-0${sequence}T00:00:00.000Z`,
+            parts: [{ type: 'text', text: `needle number ${sequence}` }],
+          }),
+        )
+      }
+
+      const result = await repository.search('needle', {
+        conversationScanLimit: 1,
+        messageScanLimit: 2,
+        messageMatchLimit: 1,
+      })
+
+      expect(result.scannedConversations).toBe(1)
+      expect(result.scannedMessages).toBe(2)
+      expect(result.truncated).toBe(true)
+      expect(result.groups[0].messageMatches).toHaveLength(1)
+      expect(result.groups[0].messageMatches[0].sequence).toBe(5)
+    })
+
+    it('returns no groups for a blank search query', async () => {
+      const repository = new ConversationRepository(db)
+      await repository.create(conversation({ title: 'Anything' }))
+
+      const result = await repository.search('   ')
+
+      expect(result.groups).toEqual([])
+      expect(result.scannedConversations).toBe(0)
+      expect(result.scannedMessages).toBe(0)
+    })
+
     it('deletes a conversation and its messages together', async () => {
       const conversations = new ConversationRepository(db)
       const messages = new MessageRepository(db)

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { Conversation } from '../../domain'
+import type { ConversationSearchGroup } from '../../storage'
 import {
   Button,
   Dialog,
@@ -16,6 +17,15 @@ import { formatConversationTimestamp } from './formatConversationTimestamp'
 import { groupConversationsByDate } from './historyGroups'
 import './conversations.css'
 
+export interface ConversationSidebarSearchProps {
+  query: string
+  status: 'idle' | 'loading' | 'ready' | 'error'
+  groups: ConversationSearchGroup[]
+  error: string | null
+  truncated: boolean
+  onQueryChange: (query: string) => void
+}
+
 export interface ConversationSidebarProps {
   conversations: Conversation[]
   activeConversationId: string | null
@@ -23,6 +33,7 @@ export interface ConversationSidebarProps {
   error: string | null
   online: boolean
   pendingDelete: Conversation | null
+  search: ConversationSidebarSearchProps
   onNewChat: () => void
   onSelect: (conversation: Conversation) => void
   onRename: (conversation: Conversation, title: string) => Promise<void> | void
@@ -48,6 +59,7 @@ export function ConversationSidebar({
   error,
   online,
   pendingDelete,
+  search,
   onNewChat,
   onSelect,
   onRename,
@@ -62,6 +74,7 @@ export function ConversationSidebar({
   const [renameError, setRenameError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null)
   const groups = groupConversationsByDate(conversations, now)
+  const searching = search.query.trim() !== ''
 
   const openRename = (conversation: Conversation) => {
     setRenameTarget(conversation)
@@ -126,6 +139,26 @@ export function ConversationSidebar({
           New chat
         </Button>
 
+        <div className="conversation-sidebar__search" role="search">
+          <label className="conversation-sidebar__search-label" htmlFor="conversation-search">
+            Search conversations
+          </label>
+          <input
+            id="conversation-search"
+            className="conversation-sidebar__search-input"
+            type="search"
+            placeholder="Search conversations"
+            value={search.query}
+            onChange={(event) => search.onQueryChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && search.query !== '') {
+                event.preventDefault()
+                search.onQueryChange('')
+              }
+            }}
+          />
+        </div>
+
         {!online && (
           <p className="conversation-sidebar__offline" role="status">
             You are offline. History is available; sending is disabled.
@@ -138,75 +171,167 @@ export function ConversationSidebar({
           </p>
         )}
 
-        {status === 'loading' && (
-          <p className="conversation-sidebar__status" role="status">
-            Loading conversations…
-          </p>
-        )}
+        {searching ? (
+          <div className="conversation-sidebar__search-results" aria-label="Search results">
+            {search.status === 'loading' && (
+              <p className="conversation-sidebar__status" role="status" aria-live="polite">
+                Searching conversations…
+              </p>
+            )}
 
-        {status === 'ready' && conversations.length === 0 && (
-          <p className="conversation-sidebar__empty">No conversations yet.</p>
-        )}
+            {search.status === 'error' && (
+              <p className="conversation-sidebar__error" role="alert">
+                Could not search conversations: {search.error ?? 'Unknown error'}
+              </p>
+            )}
 
-        {status === 'ready' &&
-          groups.map((group) => (
-            <section
-              key={group.key}
-              className="conversation-sidebar__group"
-              aria-labelledby={`history-group-${group.key}`}
-            >
-              <h3 id={`history-group-${group.key}`} className="conversation-sidebar__group-title">
-                {group.label}
-              </h3>
-              <ul className="conversation-sidebar__list">
-                {group.conversations.map((conversation) => {
-                  const active = conversation.id === activeConversationId
+            {search.status === 'ready' && search.groups.length === 0 && (
+              <p className="conversation-sidebar__empty" role="status" aria-live="polite">
+                No conversations match “{search.query}”.
+              </p>
+            )}
+
+            {search.status === 'ready' && search.groups.length > 0 && (
+              <>
+                <p className="conversation-sidebar__status" role="status" aria-live="polite">
+                  {search.groups.length} conversation{search.groups.length === 1 ? '' : 's'} match
+                  “{search.query}”.
+                </p>
+
+                {search.groups.map((group) => {
+                  const active = group.conversation.id === activeConversationId
 
                   return (
-                    <li
-                      key={conversation.id}
-                      className="conversation-sidebar__item"
-                      data-active={active ? 'true' : undefined}
+                    <section
+                      key={group.conversation.id}
+                      className="conversation-sidebar__search-group"
+                      aria-labelledby={`search-group-${group.conversation.id}`}
                     >
-                      <button
-                        type="button"
-                        className="conversation-sidebar__item-button"
-                        onClick={() => onSelect(conversation)}
-                        aria-current={active ? 'page' : undefined}
+                      <h3
+                        id={`search-group-${group.conversation.id}`}
+                        className="conversation-sidebar__search-group-title"
                       >
-                        <span className="conversation-sidebar__item-title">
-                          {conversation.title}
-                        </span>
-                        <time
-                          className="conversation-sidebar__item-time"
-                          dateTime={conversation.lastMessageAt}
+                        <button
+                          type="button"
+                          className="conversation-sidebar__search-title"
+                          onClick={() => onSelect(group.conversation)}
+                          aria-current={active ? 'page' : undefined}
                         >
-                          {formatConversationTimestamp(conversation.lastMessageAt, now)}
-                        </time>
-                      </button>
+                          {group.conversation.title}
+                        </button>
+                        {group.titleMatch && (
+                          <span className="conversation-sidebar__search-badge">Title match</span>
+                        )}
+                      </h3>
 
-                      <Menu>
-                        <MenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="conversation-sidebar__item-actions"
-                            aria-label={`Actions for ${conversation.title}`}
-                          >
-                            ⋯
-                          </Button>
-                        </MenuTrigger>
-                        <MenuContent>
-                          <MenuItem onSelect={() => openRename(conversation)}>Rename</MenuItem>
-                          <MenuItem onSelect={() => setDeleteTarget(conversation)}>Delete</MenuItem>
-                        </MenuContent>
-                      </Menu>
-                    </li>
+                      {group.messageMatches.length > 0 && (
+                        <ul className="conversation-sidebar__list">
+                          {group.messageMatches.map((match) => (
+                            <li key={match.messageId} className="conversation-sidebar__search-match">
+                              <button
+                                type="button"
+                                className="conversation-sidebar__search-snippet"
+                                onClick={() => onSelect(group.conversation)}
+                              >
+                                <span className="conversation-sidebar__search-snippet-role">
+                                  {match.role}
+                                </span>
+                                <span>{match.snippet}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
                   )
                 })}
-              </ul>
-            </section>
-          ))}
+
+                {search.truncated && (
+                  <p className="conversation-sidebar__status">
+                    Showing the most recent matches. Narrow your search to see more.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <>
+            {status === 'loading' && (
+              <p className="conversation-sidebar__status" role="status">
+                Loading conversations…
+              </p>
+            )}
+
+            {status === 'ready' && conversations.length === 0 && (
+              <p className="conversation-sidebar__empty">No conversations yet.</p>
+            )}
+
+            {status === 'ready' &&
+              groups.map((group) => (
+                <section
+                  key={group.key}
+                  className="conversation-sidebar__group"
+                  aria-labelledby={`history-group-${group.key}`}
+                >
+                  <h3
+                    id={`history-group-${group.key}`}
+                    className="conversation-sidebar__group-title"
+                  >
+                    {group.label}
+                  </h3>
+                  <ul className="conversation-sidebar__list">
+                    {group.conversations.map((conversation) => {
+                      const active = conversation.id === activeConversationId
+
+                      return (
+                        <li
+                          key={conversation.id}
+                          className="conversation-sidebar__item"
+                          data-active={active ? 'true' : undefined}
+                        >
+                          <button
+                            type="button"
+                            className="conversation-sidebar__item-button"
+                            onClick={() => onSelect(conversation)}
+                            aria-current={active ? 'page' : undefined}
+                          >
+                            <span className="conversation-sidebar__item-title">
+                              {conversation.title}
+                            </span>
+                            <time
+                              className="conversation-sidebar__item-time"
+                              dateTime={conversation.lastMessageAt}
+                            >
+                              {formatConversationTimestamp(conversation.lastMessageAt, now)}
+                            </time>
+                          </button>
+
+                          <Menu>
+                            <MenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="conversation-sidebar__item-actions"
+                                aria-label={`Actions for ${conversation.title}`}
+                              >
+                                ⋯
+                              </Button>
+                            </MenuTrigger>
+                            <MenuContent>
+                              <MenuItem onSelect={() => openRename(conversation)}>Rename</MenuItem>
+                              <MenuItem onSelect={() => setDeleteTarget(conversation)}>
+                                Delete
+                              </MenuItem>
+                            </MenuContent>
+                          </Menu>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+              ))}
+          </>
+        )}
 
         <Dialog
           open={renameTarget !== null}

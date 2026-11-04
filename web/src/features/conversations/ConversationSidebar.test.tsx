@@ -34,6 +34,14 @@ function renderSidebar(overrides: Partial<ConversationSidebarProps> = {}) {
     error: null,
     online: true,
     pendingDelete: null,
+    search: {
+      query: '',
+      status: 'idle',
+      groups: [],
+      error: null,
+      truncated: false,
+      onQueryChange: vi.fn(),
+    },
     onNewChat: vi.fn(),
     onSelect: vi.fn(),
     onRename: vi.fn(async () => undefined),
@@ -135,11 +143,118 @@ describe('ConversationSidebar', () => {
     expect(screen.getByText('Conversation A')).toBeInTheDocument()
   })
 
-  it('does not add search, pin, or archive controls', () => {
+  it('adds a search field but not pin or archive controls', () => {
     renderSidebar()
 
-    expect(screen.queryByText(/search/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('searchbox', { name: 'Search conversations' })).toBeInTheDocument()
     expect(screen.queryByText(/pin/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/archive/i)).not.toBeInTheDocument()
+  })
+
+  it('reports search query changes and clears on Escape', async () => {
+    const user = userEvent.setup()
+    const onQueryChange = vi.fn()
+    renderSidebar({
+      search: {
+        query: 'alpha',
+        status: 'idle',
+        groups: [],
+        error: null,
+        truncated: false,
+        onQueryChange,
+      },
+    })
+
+    const input = screen.getByRole('searchbox', { name: 'Search conversations' })
+    await user.type(input, 'b')
+    expect(onQueryChange).toHaveBeenCalled()
+
+    await user.keyboard('{Escape}')
+    expect(onQueryChange).toHaveBeenLastCalledWith('')
+  })
+
+  it('shows a loading state while searching', () => {
+    renderSidebar({
+      search: {
+        query: 'alpha',
+        status: 'loading',
+        groups: [],
+        error: null,
+        truncated: false,
+        onQueryChange: vi.fn(),
+      },
+    })
+
+    expect(screen.getByRole('status')).toHaveTextContent('Searching conversations…')
+    expect(screen.queryByText('Conversation A')).not.toBeInTheDocument()
+  })
+
+  it('shows an empty search state', () => {
+    renderSidebar({
+      search: {
+        query: 'zzz',
+        status: 'ready',
+        groups: [],
+        error: null,
+        truncated: false,
+        onQueryChange: vi.fn(),
+      },
+    })
+
+    expect(screen.getByRole('status')).toHaveTextContent('No conversations match “zzz”.')
+  })
+
+  it('shows a search error state', () => {
+    renderSidebar({
+      search: {
+        query: 'alpha',
+        status: 'error',
+        groups: [],
+        error: 'Storage is unavailable.',
+        truncated: false,
+        onQueryChange: vi.fn(),
+      },
+    })
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Could not search conversations: Storage is unavailable.',
+    )
+  })
+
+  it('groups title and message matches, shows context, and selects a result', async () => {
+    const user = userEvent.setup()
+    const props = renderSidebar({
+      search: {
+        query: 'alpha',
+        status: 'ready',
+        groups: [
+          {
+            conversation: today,
+            titleMatch: true,
+            messageMatches: [
+              {
+                messageId: 'message-1',
+                sequence: 2,
+                role: 'user',
+                snippet: '…context around alpha in a message…',
+              },
+            ],
+          },
+        ],
+        error: null,
+        truncated: true,
+        onQueryChange: vi.fn(),
+      },
+    })
+
+    expect(screen.getByText('Title match')).toBeInTheDocument()
+    expect(screen.getByText('…context around alpha in a message…')).toBeInTheDocument()
+    expect(screen.getByText(/Showing the most recent matches/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Conversation A' }))
+    expect(props.onSelect).toHaveBeenCalledWith(today)
+
+    await user.click(screen.getByRole('button', { name: /context around alpha/ }))
+    expect(props.onSelect).toHaveBeenCalledTimes(2)
   })
 })

@@ -1,11 +1,12 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Conversation } from '../../domain'
 import { useSidebarStore } from '../../app/stores'
 import { useOnlineStatus } from '../chat/useOnlineStatus'
 import { ConversationSidebar } from './ConversationSidebar'
 import { useConversationHistoryService } from './historyContext'
 import { useConversationHistory } from './useConversationHistory'
+import { useConversationSearch } from './useConversationSearch'
 
 export interface ConversationSidebarContainerProps {
   activeConversationId: string | null
@@ -38,6 +39,8 @@ export function ConversationSidebarContainer({
   })
   const previousPathname = useRef(pathname)
   const refreshHistory = history.refresh
+  const [searchQuery, setSearchQuery] = useState('')
+  const search = useConversationSearch({ service, query: searchQuery })
 
   useEffect(() => {
     if (previousPathname.current === pathname) {
@@ -52,6 +55,7 @@ export function ConversationSidebarContainer({
     const conversation = await history.createNewChat()
 
     if (conversation) {
+      setSearchQuery('')
       close()
       navigate({
         to: '/chat/$conversationId',
@@ -61,6 +65,7 @@ export function ConversationSidebarContainer({
   }
 
   const handleSelect = (conversation: Conversation) => {
+    setSearchQuery('')
     close()
     navigate({
       to: '/chat/$conversationId',
@@ -76,6 +81,7 @@ export function ConversationSidebarContainer({
       error={history.error}
       online={online}
       pendingDelete={history.pendingDelete}
+      search={{ ...search, onQueryChange: setSearchQuery }}
       onNewChat={() => void handleNewChat()}
       onSelect={handleSelect}
       onRename={(conversation, title) => history.rename(conversation.id, title)}

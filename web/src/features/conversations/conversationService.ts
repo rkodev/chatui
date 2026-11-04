@@ -7,7 +7,13 @@ import {
   type Model,
   type Provider,
 } from '../../domain'
-import type { AppendMessageResult, ConversationListOptions, ConversationPage } from '../../storage'
+import type {
+  AppendMessageResult,
+  ConversationListOptions,
+  ConversationPage,
+  ConversationSearchOptions,
+  ConversationSearchResult,
+} from '../../storage'
 import {
   ConversationServiceError,
   type ConversationServiceOptions,
@@ -171,6 +177,14 @@ export class ConversationService {
 
   async listConversations(options: ConversationListOptions = {}): Promise<ConversationPage> {
     return this.conversations.list(options)
+  }
+
+  /** Search titles and message text through the repository's bounded scan. */
+  async searchConversations(
+    query: string,
+    options: ConversationSearchOptions = {},
+  ): Promise<ConversationSearchResult> {
+    return this.conversations.search(query, options)
   }
 
   /** Rename a conversation. Blank titles are rejected. */

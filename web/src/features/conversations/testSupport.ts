@@ -15,6 +15,13 @@ export function createFakeConversationHistoryService(
 
   return {
     listConversations: async () => ({ items: [conversation], nextCursor: null }),
+    searchConversations: async (query: string) => ({
+      query,
+      groups: [],
+      truncated: false,
+      scannedConversations: 0,
+      scannedMessages: 0,
+    }),
     createConversation: async () => ({ ok: true, conversation }),
     renameConversation: async (id: string, title: string): Promise<Conversation> => ({
       ...conversation,
