@@ -4,7 +4,7 @@
 - Target: 3-4 weeks
 - Depends on: M4 and a stable phase 1 release
 - Blocks: M6 BYO storage onboarding
-- Platforms: all shipping clients (web, Android, and Rust if shipped)
+- Platforms: all shipping clients (web, Android, and Rust desktop if shipped)
 - Spec: sections 6.2 (BackupConfig), 12, 13, 17 (M5), 21.5
 
 ## Objective
@@ -91,7 +91,7 @@ Deliver on each shipping client:
 - "Back up now", "Restore from backup", and "Delete remote backup" with typed confirmation.
 - Clear statement that storage credentials and the passphrase stay client-side.
 - Android WorkManager integration with network and battery constraints.
-- Web and Rust scheduling equivalents where applicable; no background scheduling that violates platform constraints.
+- Web and Rust desktop scheduling equivalents where applicable; no background scheduling that violates platform constraints.
 - Restore-on-new-device flow, including attachment restoration and conflict reporting.
 
 ### 6. Tests and evidence
@@ -122,7 +122,7 @@ Deliver:
 - A failed or interrupted sync never destroys local data.
 - Wrong passphrase and tampered ciphertext fail safely.
 - No provider API keys appear in backup metadata.
-- Android backup scheduling respects WorkManager constraints; web and Rust scheduling is documented.
+- Android backup scheduling respects WorkManager constraints; web and Rust desktop scheduling is documented.
 - Backup rows in parity are updated and reviewed.
 - Backup format is versioned and round-trip tested in every client.
 
@@ -144,7 +144,7 @@ Expect 5-7 tasks:
 3. S3-compatible backend with SigV4, conditional writes, and CORS documentation.
 4. Sync protocol, merge, tombstones, and conflict tests.
 5. Backup/restore UI and client-side configuration.
-6. Android WorkManager scheduling plus web/Rust scheduling equivalents.
+6. Android WorkManager scheduling plus web/Rust desktop scheduling equivalents.
 7. Azure Blob, GCS, and WebDAV backends, plus parity and cross-client evidence.
 
 Generate these only after M4 is complete and the user confirms phase 2 scope.

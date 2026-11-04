@@ -32,7 +32,7 @@ Deliver:
   - Streams: `openrouter-text`, `openrouter-reasoning`, `openrouter-usage`, `openrouter-error-200`, `openrouter-keepalive`, `openai-text`, `openai-reasoning`, `anthropic-text`, `gemini-text`, `ollama-ndjson`, and `error-429`.
   - Model catalogs: OpenRouter (paid, free `:free`, vision, reasoning, tool-capable, long-context, unusual price strings, unknown fields, canonical slugs), OpenAI, Anthropic, Gemini, and Ollama tags.
   - Errors: OpenRouter `402`, `429`, and `503` envelopes.
-- `contracts/parity.md` with `Feature | Web | Android | Rust` columns and the initial rows from spec section 5.4, including desktop packaging and auto-update. Rust is `Optional` until the Rust client is enabled, with the required-when-enabled rule documented below the table.
+- `contracts/parity.md` with `Feature | Web | Android | Rust` columns and the initial rows from spec section 5.4, including desktop packaging and auto-update. Rust is `Optional` until the Rust desktop client is enabled, with the required-when-enabled rule documented below the table.
 - `scripts/validate-contracts.mjs` that parses every JSON contract, validates presets and model fixtures against schemas, checks fixture encoding and non-emptiness, enforces unique preset IDs and required fields, validates parity columns and rows, and exits non-zero with file-and-field-specific errors.
 - Keep validator dependencies isolated under `scripts/package.json`; do not create a root workspace.
 

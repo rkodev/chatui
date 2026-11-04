@@ -2,8 +2,8 @@
 
 Status: Draft for implementation
 Last updated: 2026-10-29
-Audience: Web, Android, and Rust implementers, reviewers, and future maintainers
-Scope: Web client (`web/`), native Android client (`android/`), and an optional multiplatform Rust client (`rust/`) for a ChatGPT-like, bring-your-own-key (BYOK) chat application
+Audience: Web, Android, and Rust desktop implementers, reviewers, and future maintainers
+Scope: Web client (`web/`), native Android client (`android/`), and an optional Rust desktop client (`rust/`) for a ChatGPT-like, bring-your-own-key (BYOK) chat application
 
 ---
 
@@ -14,16 +14,16 @@ ChatUI is a self-hostable chat client that talks directly to user-selected AI pr
 The application is deliberately split into independent clients:
 
 - `web/` - React, Vite, TypeScript, installable PWA, with Capacitor available as an optional packaging shell.
-- `android/` - native Kotlin, Jetpack Compose, Room, and Android Keystore-backed secret storage. iOS is a later phase.
-- `rust/` - optional multiplatform Rust client with a headless core and a shared UI shell. One workspace targets desktop (Windows, macOS, Linux), Android, and later iOS; a WASM target may be used for embedded or preview builds, but it is not the production web client.
+- `android/` - native Kotlin, Jetpack Compose, Room, and Android Keystore-backed secret storage. A native iOS client is a separate future consideration and is not a Rust target.
+- `rust/` - optional Rust desktop client with a headless core and a shared UI shell. One workspace targets Windows, macOS, and Linux. The Rust client does not target Android, iOS, or WebAssembly.
 
 There is no application backend in phase 1. Users enter their own provider keys, and requests go from the device directly to the provider. Conversation data remains on-device. Future phases add encrypted backup to user-owned object storage and an optional single-click managed deployment hosted by roksky.
 
-In this document, "both clients" and "both platforms" refer to web and Android unless the Rust client is explicitly included. The Rust client is optional for the phase 1 web/Android release gate, but once it is enabled and published it is governed by the same contracts, OpenRouter conformance, and parity rules as the other clients. It is a first-class implementation target, not a thin WebView wrapper.
+In this document, "both clients" and "both platforms" refer to web and Android unless the Rust desktop client is explicitly included. The Rust client is optional for the phase 1 web/Android release gate, but once it is enabled and published it is governed by the same contracts, OpenRouter conformance, and parity rules as the other clients. It is a first-class desktop implementation target, not a thin WebView wrapper.
 
 OpenRouter is the first-class provider and the reference implementation. Phase 1 is considered usable only after OpenRouter works end-to-end on both clients: key validation, public model catalog with pricing and capability metadata, streaming, reasoning content, usage accounting, provider routing preferences, and OpenRouter-specific errors. The OpenAI-compatible transport built for OpenRouter becomes the base for other presets, and native adapters for Anthropic and Gemini follow in M2.
 
-The clients share behavior through `contracts/`: JSON Schemas, provider presets, stream fixtures, normalized event definitions, and a parity checklist. Web and Android do not share application code with each other. The Rust client shares code internally across its own workspace, but it consumes the same `contracts/` artifacts as the other clients.
+The clients share behavior through `contracts/`: JSON Schemas, provider presets, stream fixtures, normalized event definitions, and a parity checklist. Web and Android do not share application code with each other. The Rust desktop client shares code internally across its own workspace, but it consumes the same `contracts/` artifacts as the other clients.
 
 ---
 
@@ -41,16 +41,16 @@ The clients share behavior through `contracts/`: JSON Schemas, provider presets,
 8. Support image and text-file attachments where the selected model supports them.
 9. Keep user data local by default and never route keys or chats through roksky infrastructure in phase 1.
 10. Be deployable as static files, a container, or a one-click hosted instance without server secrets.
-11. Maintain feature parity across web, Android, and the Rust client when it is enabled, verified by shared fixtures and a parity checklist.
-12. Allow one Rust codebase to target desktop, Android, iOS, and optional WASM builds without forking provider or storage logic.
+11. Maintain feature parity across web, Android, and the Rust desktop client when it is enabled, verified by shared fixtures and a parity checklist.
+12. Allow one Rust codebase to target Windows, macOS, and Linux without forking provider or storage logic.
 
 ### 2.2 Non-goals for phase 1
 
 - User accounts, server-side conversation storage, or cross-device sync.
 - Tool calling, agents, web browsing, image generation, or voice conversation.
 - Team workspaces, sharing links, or collaboration.
-- Production iOS application in phase 1. The Rust workspace may prepare an iOS target, but shipping iOS is not required.
-- A Rust release as a gate for the phase 1 web/Android preview. The Rust client must pass the same contracts and OpenRouter conformance before it is published.
+- Rust builds for Android, iOS, or WebAssembly. The native Kotlin Android app and the web/PWA remain the only mobile and browser clients.
+- A Rust release as a gate for the phase 1 web/Android preview. The Rust desktop client must pass the same contracts and OpenRouter conformance before it is published.
 - Provider resale, billing, or usage metering.
 - Local model inference inside the app.
 - Server-side key custody or prompt proxying.
@@ -61,8 +61,8 @@ The clients share behavior through `contracts/`: JSON Schemas, provider presets,
 - Multi-device sync with deterministic conflict resolution.
 - One-click roksky-managed hosting with BYO storage.
 - Optional self-hosted proxy for providers that block browser CORS.
-- iOS client, potentially reusing the contracts, design tokens, and the Rust shared core and UI.
-- Rust client as a supported first-class distribution across desktop and mobile, including packaging, auto-update, and platform secure-storage backends.
+- iOS client, independent of the Rust desktop client, potentially reusing the contracts and design tokens.
+- Rust desktop client as a supported first-class distribution across Windows, macOS, and Linux, including packaging, auto-update, and platform secure-storage backends.
 
 ---
 
@@ -129,7 +129,7 @@ Every preset must be defined in `contracts/providers.json`; do not hard-code pro
 
 Release policy:
 
-- OpenRouter is a hard release blocker for both web and Android, and for the Rust client whenever it is published.
+- OpenRouter is a hard release blocker for both web and Android, and for the Rust desktop client whenever it is published.
 - OpenAI-compatible, Anthropic, Gemini, and Ollama are launch targets, but they do not block an OpenRouter-first preview release.
 - Do not allow other provider work to delay OpenRouter compatibility. Implement the OpenRouter path first, then generalize the transport for other presets.
 
@@ -178,7 +178,7 @@ Only send parameters the selected model/provider supports. Ignore unsupported va
 - Reduced motion support.
 - WCAG 2.2 AA: keyboard navigation, visible focus, 4.5:1 text contrast, screen-reader labels, live regions for streaming status.
 - Android: Material 3 dynamic color optional, 48 dp touch targets, edge-to-edge, predictive back.
-- Rust desktop: keyboard-first navigation, focus rings, scaling and high-DPI support, and screen-reader bridges provided by the chosen UI framework where available. Rust mobile follows the Android and iOS platform guidance rather than desktop conventions.
+- Rust desktop: keyboard-first navigation, focus rings, scaling and high-DPI support, and screen-reader bridges provided by the chosen UI framework where available.
 
 ---
 
@@ -237,10 +237,7 @@ chatui/
 |   |   |-- chatui-contracts/
 |   |   `-- chatui-ui/
 |   |-- apps/
-|   |   |-- desktop/
-|   |   |-- android/
-|   |   |-- ios/
-|   |   `-- wasm/
+|   |   `-- desktop/
 |   `-- tests/
 |       `-- conformance/
 |-- .github/workflows/
@@ -253,8 +250,8 @@ Notes:
 - `web/`, `android/`, and `rust/` are independent builds. Do not introduce a root Node workspace that couples them, and do not make the Rust workspace a build-time dependency of the web or Kotlin clients.
 - The root `Makefile` provides discoverable commands (`make web-dev`, `make web-test`, `make android-test`, `make rust-test`, `make rust-lint`, `make rust-build`, `make contracts-check`).
 - `contracts/` is the source of truth for provider presets, fixture streams, export formats, and backup formats. All three clients consume it; none may fork provider metadata.
-- Shared design tokens are documented in section 11.12 and implemented per platform. A generated token pipeline is optional; the Rust client may consume generated Rust constants alongside the CSS and Compose values.
-- The Rust workspace is optional but must remain buildable from a clean checkout once it is introduced. It should not require Android or iOS SDKs for a desktop build.
+- Shared design tokens are documented in section 11.12 and implemented per platform. A generated token pipeline is optional; the Rust desktop client may consume generated Rust constants alongside the CSS and Compose values.
+- The Rust workspace is optional but must remain buildable from a clean checkout once it is introduced. A desktop build must not require mobile or browser SDKs.
 
 ---
 
@@ -290,7 +287,7 @@ Notes:
 
 ### 5.4 Parity checklist
 
-`contracts/parity.md` contains a table with columns: Feature, Web, Android, Rust. It is updated in every PR that changes user-visible behavior. Release is blocked if a feature is marked complete on one platform and absent on another without an approved exception. The Rust column may be marked `Optional` until the Rust client is enabled for release; after that, it must meet the same bar as the web and Android clients.
+`contracts/parity.md` contains a table with columns: Feature, Web, Android, Rust. It is updated in every PR that changes user-visible behavior. Release is blocked if a feature is marked complete on one platform and absent on another without an approved exception. The Rust column may be marked `Optional` until the Rust desktop client is enabled for release; after that, it must meet the same bar as the web and Android clients.
 
 Initial feature list:
 
@@ -314,7 +311,7 @@ Initial feature list:
 | Export/import | Required | Required | Required when enabled |
 | Backup/sync | Future | Future | Future |
 | PWA install | Required | N/A | N/A |
-| Native share target | N/A | Required | Required on desktop and mobile |
+| Native share target | N/A | Required | Required on desktop |
 | Desktop packaging (installer/AppImage) | N/A | N/A | Required when enabled |
 | Auto-update | N/A | N/A | Required when enabled |
 
@@ -964,7 +961,7 @@ Local endpoints are `http://localhost:11434` by default. CORS must be enabled wi
 
 ### 7.7 CORS and browser limitations
 
-Direct browser calls are a product requirement, but some providers may block them or require special headers. The Rust desktop and mobile builds are not subject to browser CORS; only its optional WASM target is, and that target is not the production web client.
+Direct browser calls are a product requirement, but some providers may block them or require special headers. The Rust desktop build is not subject to browser CORS.
 
 - Maintain `browserCors` on every preset: `supported`, `unsupported`, or `unknown`.
 - OpenRouter: browser-direct support is required for the web release. Verify `/key`, `/models`, and `/chat/completions` from a browser during M1 and record the result. Send `HTTP-Referer` and `X-Title` attribution headers.
@@ -1427,31 +1424,30 @@ Migrations:
 
 ---
 
-## 10. Rust client (multiplatform)
+## 10. Rust desktop client
 
-The Rust client is an optional but first-class implementation. It uses one Cargo workspace across desktop and mobile, with a headless core that is independent of any UI framework. It is not a WebView wrapper and must not regress the contracts or provider behavior defined for the other clients.
+The Rust client is an optional but first-class desktop implementation. It uses one Cargo workspace across Windows, macOS, and Linux, with a headless core that is independent of any UI framework. It is not a WebView wrapper and must not regress the contracts or provider behavior defined for the other clients.
 
 ### 10.1 Targets and support tiers
 
 | Tier | Target | Status |
 | --- | --- | --- |
-| 1 | Linux (x86_64, aarch64), macOS (Apple Silicon, Intel), Windows (x86_64) | Required when enabled |
-| 2 | Android (arm64-v8a, x86_64) | Required when enabled |
-| 3 | iOS | Future |
-| 3 | WebAssembly (preview/embedding) | Optional; not the production web client |
+| 1 | Windows (x86_64) | Required when enabled |
+| 1 | macOS (Apple Silicon, Intel) | Required when enabled |
+| 1 | Linux (x86_64, aarch64) | Required when enabled |
 
 Rules:
 
-- Feature-gate platform integrations; a desktop build must not require the Android or iOS SDK.
+- Feature-gate OS integrations; a desktop build must not require mobile or browser SDKs.
 - Use the same `contracts/` fixtures and parity checklist as web and Android.
 - Load provider metadata from `contracts/providers.json` or generated types derived from it. Never duplicate provider presets in Rust code.
-- Do not fork provider logic per platform. Platform-specific code is limited to shells, secure storage, file pickers, notifications, and packaging.
+- Do not fork provider logic per OS. Platform-specific code is limited to shells, secure storage, file pickers, notifications, and packaging.
 
 ### 10.2 Stack
 
 - Rust stable, edition 2024, pinned with `rust-toolchain.toml`.
 - Cargo workspace with `resolver = "3"`.
-- UI: Dioxus (recommended) with `dioxus-desktop`, `dioxus-mobile`, and optional `dioxus-web`, or another Rust UI framework that supports desktop and mobile from one codebase. Lock the framework choice in the M3.5 spike before feature work starts. Core crates must not depend on the UI framework.
+- UI: Dioxus (recommended) with `dioxus-desktop`, or another Rust desktop UI framework. Lock the framework choice in the M3.5 spike before feature work starts. Core crates must not depend on the UI framework.
 - Async runtime: `tokio`.
 - HTTP: `reqwest` with `rustls-tls`; no OpenSSL dependency. SSE parsing uses `reqwest-eventsource` or a bounded hand-written parser that matches section 7.6 and the web appendix.
 - JSON: `serde` and `serde_json`.
@@ -1481,10 +1477,7 @@ rust/
 |   |-- chatui-secrets/       # keyring, encrypted fallback, redaction
 |   `-- chatui-ui/            # shared views, tokens, router, view models
 |-- apps/
-|   |-- desktop/              # platform shell, native menus, updater
-|   |-- android/              # android-activity/JNI shell
-|   |-- ios/                  # future
-|   `-- wasm/                 # optional preview
+|   `-- desktop/              # platform shell, native menus, updater
 `-- tests/
     `-- conformance/          # fixture-driven adapter and contract tests
 ```
@@ -1493,7 +1486,7 @@ Rules:
 
 - `chatui-domain`, `chatui-contracts`, and the parser parts of `chatui-providers` should stay `no_std`-friendly where practical and must not depend on the UI framework.
 - `chatui-ui` may depend on `chatui-domain` and view-model abstractions, but repositories are injected as traits so tests can use in-memory implementations.
-- `apps/*` contain only platform wiring. Business logic belongs in crates.
+- `apps/*` contain only desktop OS wiring. Business logic belongs in crates.
 - Compile-time platform dependencies are feature-gated.
 
 ### 10.4 Domain and provider parity
@@ -1523,7 +1516,6 @@ Rules:
   - Linux: Secret Service (libsecret), with a documented fallback when no keyring is available.
   - macOS: Keychain.
   - Windows: Credential Manager.
-  - Android: Android Keystore-backed storage through a small JNI/`android-activity` bridge, or an encrypted file wrapped by a Keystore key.
 - If the credential store is unavailable, support an explicitly chosen encrypted-file fallback using AES-256-GCM or XChaCha20-Poly1305 with an Argon2id-derived key and a random salt. Never store plaintext.
 - Keep a session-only mode that holds keys in memory only and clears them on exit.
 - Exclude secret stores and databases from cloud backup or sync where the platform supports exclusion.
@@ -1536,37 +1528,34 @@ Rules:
 - Timeouts: connect 30 s, no total timeout during streaming, and a 120 s inactivity watchdog that cancels the request with a retryable `timeout` error.
 - Honor `Retry-After` and the retry policy in section 7.9. Do not retry after partial output.
 - Desktop: allow streaming to continue while the window is open. If the window closes, cancel and persist partial content.
-- Android: use a foreground service or a `WorkManager`-backed job only if streaming must survive backgrounding; otherwise pause with clear UX.
 - Do not silently proxy requests through a server.
 - Cleartext is allowed only for `localhost` and private-range hosts with an explicit user warning; HTTPS is the default.
 
 ### 10.8 UI and platform integration
 
-- Reuse the design tokens from section 11.12 and the information architecture from section 11.1. Desktop uses a persistent sidebar; narrow windows and mobile use a drawer or navigation stack.
+- Reuse the design tokens from section 11.12 and the information architecture from section 11.1. Desktop uses a persistent sidebar; narrow windows use a drawer or navigation stack.
 - Support the chat states, composer behavior, model/provider UX, Markdown rules, message actions, and error states defined in section 11.
 - Desktop: native menu bar, keyboard shortcuts, window-state persistence, drag-and-drop, optional multi-window, system theme following, and native file dialogs.
-- Android and iOS: touch targets, safe areas, platform navigation gestures, photo/document pickers, and share targets.
 - Clipboard: copy message and code-block text.
-- Deep links: `chatui://chat/<id>` on desktop and mobile; HTTPS app links are future work.
-- Accessibility: keyboard navigation and focus rings on desktop; platform semantics on mobile. Use the UI framework's accessibility bridge where available, and test at least one screen reader per tier-1 desktop OS and TalkBack on Android.
+- Deep links: `chatui://chat/<id>` on desktop; HTTPS app links are future work.
+- Accessibility: keyboard navigation and focus rings on desktop. Use the UI framework's accessibility bridge where available, and test at least one screen reader per tier-1 desktop OS.
 - No hidden network destinations. Every provider and documentation link is visible in settings.
 
 ### 10.9 Performance and binary size
 
-- Cold start target: under 1.5 s on a mid-tier desktop and under 2 s on a mid-tier Android device.
+- Cold start target: under 1.5 s on a mid-tier desktop.
 - Virtualize or window the message list; isolate the streaming message so token updates do not re-render history.
 - Persist streaming text at most once per second and on pause, completion, cancellation, and error.
 - Delay-load Markdown, syntax highlighting, and math renderers until the first message needs them.
 - Release profile: `lto = "thin"` or `"fat"`, `codegen-units = 1`, `strip = "symbols"`, and `panic = "abort"` where compatible with crash reporting. Keep a debug-symbol artifact for symbolication.
-- Budget: desktop installer under 40 MB, Android APK under 30 MB if feasible, and no bundled browser engine.
+- Budget: desktop installer under 40 MB and no bundled browser engine.
 
 ### 10.10 Packaging and distribution
 
 - Desktop: produce release artifacts for Windows (MSI or portable zip), macOS (signed and notarized DMG or app bundle), and Linux (AppImage and/or `.deb`/`.rpm`). Use `cargo-dist` or an equivalent reproducible pipeline.
-- Android: produce a signed APK/AAB with the same signing-key policy as the Kotlin app. Do not ship a WebView-only build.
 - Auto-update: desktop uses signed update manifests over HTTPS; verify signatures before applying. Provide a `stable`/`beta` channel setting and never auto-update during an active stream without asking.
 - Code signing: desktop installers and macOS bundles must be signed; signing keys live in CI secrets and are never committed.
-- Publish artifacts to GitHub Releases and, when applicable, the same hosting pipeline used by the web client. The Rust client is not distributed through the web PWA.
+- Publish artifacts to GitHub Releases and, when applicable, the same hosting pipeline used by the web client. The Rust desktop client is not distributed through the web PWA.
 
 ### 10.11 Testing
 
@@ -1575,19 +1564,19 @@ Rules:
 - Network tests with `wiremock` or `httpmock` covering SSE chunking, keep-alives, mid-stream errors, cancellation, and `Retry-After`.
 - Storage tests with temporary SQLite databases and in-memory repositories.
 - UI tests for onboarding, send/stream, model switching, settings, and error states. Use the framework's test harness and snapshot tests where available.
-- CI matrix at minimum: Linux x86_64, macOS Apple Silicon, and Windows x86_64. Android builds run on a Linux runner with the Android SDK.
-- Manual smoke test on each tier-1 desktop OS and at least one Android device before release.
+- CI matrix at minimum: Linux x86_64, macOS Apple Silicon, and Windows x86_64.
+- Manual smoke test on each tier-1 desktop OS before release.
 
 ### 10.12 Release gate
 
-The Rust client may ship independently of the web/Android phase 1 preview, but a Rust release is blocked unless:
+The Rust desktop client may ship independently of the web/Android phase 1 preview, but a Rust release is blocked unless:
 
 - All shared contracts validate, and the Rust crates consume `contracts/` rather than duplicating metadata.
 - OpenRouter onboarding, `/key` validation, `/models` catalog mapping, streaming, reasoning, usage/cost, routing preferences, and error handling pass the same conformance suite.
 - Conversations persist across restarts and process death, and partial content is preserved on cancellation or failure.
 - Keys are stored through a documented platform-secure backend or the explicit encrypted fallback, never plaintext.
 - The parity checklist has no unresolved Rust entries that are marked required.
-- Desktop artifacts are signed, update manifests are signed, and the Android artifact uses the project signing policy.
+- Desktop artifacts are signed, and update manifests are signed.
 
 ---
 
@@ -1856,11 +1845,11 @@ Web implements tokens as CSS custom properties in `styles/tokens.css` and theme 
 - Do not proxy or resell provider access in phase 1.
 - If a provider requires a server-side integration, mark it as unsupported for direct browser use.
 
-### 12.6 Rust client threats and mitigations
+### 12.6 Rust desktop client threats and mitigations
 
 | Threat | Mitigation |
 | --- | --- |
-| Key extraction from app data | OS credential store via `keyring`; Android Keystore bridge; encrypted fallback only with an explicit user choice; exclude from cloud backup |
+| Key extraction from app data | OS credential store via `keyring`; encrypted fallback only with an explicit user choice; exclude from cloud backup |
 | Log or panic leakage | `tracing` redaction layer, panic hooks that scrub secrets, no request/response bodies in release logs |
 | Unsafe native bindings | Keep `unsafe` isolated in platform shells, document invariants, and review bindings |
 | Malicious import file | Validate with `jsonschema`, enforce size limits, never execute content, sanitize attachment paths |
@@ -2041,10 +2030,10 @@ EXPOSE 80
 
 ### 14.5 Rust distribution
 
-- Distribute signed desktop artifacts for Windows, macOS, and Linux, plus an Android APK/AAB when the Android target is enabled.
+- Distribute signed desktop artifacts for Windows, macOS, and Linux.
 - Use a reproducible `cargo-dist` (or equivalent) pipeline and publish checksums with every release.
 - Desktop auto-update manifests are signed and served over HTTPS; provide stable and beta channels.
-- Keep the Rust client out of the web PWA and the web container image unless a WASM preview is explicitly built.
+- Keep the Rust desktop client out of the web PWA and the web container image.
 - Versioning and signing-key rules match section 14.4. Never commit signing keys.
 
 ---
@@ -2079,8 +2068,8 @@ Rust:
 - Network tests with `wiremock` or `httpmock`, including chunked SSE, keep-alives, mid-stream errors, cancellation, and `Retry-After`.
 - SQLite tests using temporary databases plus migration tests.
 - UI tests for onboarding, chat, model picker, and settings using the chosen framework's harness.
-- Cross-platform CI matrix for Linux, macOS, and Windows; Android build and smoke test on a Linux runner.
-- Manual smoke test on each tier-1 desktop OS and one Android device.
+- Cross-platform CI matrix for Linux, macOS, and Windows.
+- Manual smoke test on each tier-1 desktop OS.
 
 Shared:
 
@@ -2092,7 +2081,7 @@ Shared:
 
 ### 15.2 Critical test cases
 
-Unless a case is explicitly web- or Android-specific, it applies to every shipped client, including the Rust client when enabled.
+Unless a case is explicitly web- or Android-specific, it applies to every shipped client, including the Rust desktop client when enabled.
 
 1. First run with no provider shows onboarding, preselects OpenRouter, and blocks sending.
 2. Invalid OpenRouter key shows an auth error, preserves the form, and does not accept the key.
@@ -2209,9 +2198,8 @@ Steps:
 3. `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings`.
 4. `cargo nextest run --workspace`.
 5. `cargo build --release --workspace`.
-6. On Linux, build the Android target if the SDK is available; otherwise run a dedicated Android job.
-7. On tags, build signed desktop artifacts with `cargo-dist` or an equivalent pipeline, sign update manifests, and attach them to the GitHub release.
-8. Run `cargo-deny` and `cargo-audit` on a schedule and on dependency changes.
+6. On tags, build signed desktop artifacts with `cargo-dist` or an equivalent pipeline, sign update manifests, and attach them to the GitHub release.
+7. Run `cargo-deny` and `cargo-audit` on a schedule and on dependency changes.
 
 ### 16.4 Contracts workflow
 
@@ -2307,7 +2295,7 @@ Acceptance:
 - Streaming survives configuration changes.
 - UI tests cover onboarding, chat, model picker, and settings.
 
-### M3.5 - Rust multiplatform client (optional, parallel track, 3-4 weeks)
+### M3.5 - Rust desktop client (optional, parallel track, 3-4 weeks)
 
 This track can start after M1 and must not delay the web or Android milestones.
 
@@ -2317,7 +2305,7 @@ Deliverables:
 - Locked UI framework choice and a working desktop shell.
 - Onboarding, chat streaming, model picker, settings, and local persistence.
 - OS credential-store integration with the encrypted-file fallback.
-- Packaging for Linux, macOS, and Windows; Android target if in scope.
+- Packaging for Windows, macOS, and Linux.
 - Signed desktop update manifests and release pipeline.
 
 Acceptance:
@@ -2394,9 +2382,9 @@ Deliverables:
 | Dependency supply-chain attack | Key theft | Minimal dependencies, lockfiles, review, pinned versions, no postinstall scripts where possible |
 | Store policy review | Android release delay | Privacy policy, BYOK explanation, data safety form, no hidden telemetry |
 | Context/token inaccuracies | Confusing limits | Provider usage when available, label estimates, conservative preflight checks |
-| Rust UI framework maturity | Inconsistent desktop/mobile UX or blocked mobile builds | Run an early framework spike; keep core crates UI-agnostic; fall back to a desktop-first shell or Tauri if mobile support is insufficient |
-| Rust multiplatform secret-storage variance | Keys stored insecurely on one OS | Use OS credential stores first, require an explicit encrypted fallback, and test each platform's storage path |
-| Rust binary size and build time | Slow CI and large installers | Release profile tuning, feature gating per platform, cached CI targets, and split Android/iOS jobs |
+| Rust UI framework maturity | Inconsistent desktop UX or blocked desktop builds | Run an early framework spike; keep core crates UI-agnostic; fall back to a desktop-first shell or Tauri if the chosen framework is insufficient |
+| Rust desktop secret-storage variance | Keys stored insecurely on one OS | Use OS credential stores first, require an explicit encrypted fallback, and test each desktop OS storage path |
+| Rust binary size and build time | Slow CI and large installers | Release profile tuning, feature gating per OS, cached CI targets, and split OS jobs |
 | Rust track delays core clients | Rust work distracts from OpenRouter web/Android preview | Treat Rust as an optional parallel track with its own milestone and no release-gate dependency |
 
 ---
@@ -2404,7 +2392,7 @@ Deliverables:
 ## 19. Decisions
 
 1. **OpenRouter is the reference provider.** It is the default preset, the first end-to-end implementation, and a release blocker on every enabled client. Other providers are built by generalizing the OpenRouter transport.
-2. **Independent clients, shared contracts.** React/Vite for web, native Kotlin for Android, and an optional Rust workspace for multiplatform desktop and mobile. Reason: best platform fit; shared behavior through contracts, with code sharing allowed inside the Rust workspace only.
+2. **Independent clients, shared contracts.** React/Vite for web, native Kotlin for Android, and an optional Rust desktop workspace for Windows, macOS, and Linux. Reason: best platform fit; shared behavior through contracts, with code sharing allowed inside the Rust workspace only.
 3. **No backend in phase 1.** Direct provider calls with user keys. Reason: self-deployment, privacy, and the "paste a key and go" requirement.
 4. **Capacitor is optional.** It may be used for internal shells, but the native Kotlin app is the production Android target.
 5. **Static-first web deployment.** No server secrets, easy one-click hosting, container optional.
@@ -2416,8 +2404,8 @@ Deliverables:
 11. **Markdown without raw HTML.** Security over flexibility; sanitize everything.
 12. **No analytics or telemetry.** Privacy default; local debug tooling only.
 13. **English-only UI initially.** Structure strings for localization, but do not block phase 1 on translations.
-14. **The Rust client is optional but first-class.** One Cargo workspace with a headless core, a shared UI shell, and thin platform apps. It may ship independently, but it must consume `contracts/`, pass the OpenRouter conformance suite, and meet the same parity bar before release. It is not a WebView wrapper and does not replace the web or Kotlin clients.
-15. **Rust UI framework is chosen by spike, not by default.** Prefer a framework that supports desktop and mobile from one codebase. Core crates must remain UI-agnostic so the shell can be replaced without rewriting providers or storage.
+14. **The Rust desktop client is optional but first-class.** One Cargo workspace with a headless core, a shared UI shell, and a thin desktop shell. It may ship independently, but it must consume `contracts/`, pass the OpenRouter conformance suite, and meet the same parity bar before release. It is not a WebView wrapper and does not replace the web or Kotlin clients.
+15. **Rust UI framework is chosen by spike, not by default.** Prefer a framework that supports Windows, macOS, and Linux from one codebase. Core crates must remain UI-agnostic so the shell can be replaced without rewriting providers or storage.
 
 ---
 
@@ -2437,9 +2425,9 @@ Deliverables:
 12. Localization timeline and initial languages.
 13. Should OpenRouter provider routing default to `data_collection: "deny"`, or should that remain an explicit user choice? Recommendation: explicit choice with a visible summary.
 14. Is OpenRouter OAuth/PKCE key provisioning desirable later, or is manual API-key entry sufficient?
-15. Which Rust UI framework do we lock: Dioxus, Slint, Iced, or a Tauri shell reusing the web UI? Recommendation: run a one-week spike in M3.5 and prefer the option that best supports desktop plus Android without a WebView.
-16. Should the Rust client eventually replace the native Kotlin Android app, or coexist as a power-user/desktop distribution? Recommendation: coexist through phase 1 and revisit after parity is proven.
-17. Is a WASM build of the Rust client required for embedding, or should the PWA remain the only browser deliverable? Recommendation: optional and explicitly not the production web client.
+15. Which Rust desktop UI framework do we lock: Dioxus, Slint, Iced, or a Tauri shell reusing the web UI? Recommendation: run a one-week spike in M3.5 and prefer the option that best supports native desktop apps on Windows, macOS, and Linux without a WebView.
+16. Should the Rust desktop client be distributed through OS package managers in addition to signed GitHub Release artifacts? Recommendation: start with signed installers and revisit package-manager distribution after the desktop client is stable.
+17. Should the Rust desktop client eventually share a UI shell with the web client, or remain a native desktop implementation? Recommendation: remain native and share only contracts and behavior.
 
 ---
 
@@ -2610,9 +2598,9 @@ Header fields: `v`, `alg`, `kdf`, `iterations`, `salt`, `objectType`, `objectKey
 ### 21.7 Definition of done for phase 1
 
 - A new user can install/launch the app, add an OpenRouter key, pick a model, and chat in under two minutes.
-- OpenRouter works end-to-end on web and Android, and on Rust when it is published: `/key` validation, rich catalog, streaming, reasoning, usage/cost, routing preferences, and error handling.
+- OpenRouter works end-to-end on web and Android, and on the Rust desktop client when it is published: `/key` validation, rich catalog, streaming, reasoning, usage/cost, routing preferences, and error handling.
 - Streaming, stop, regenerate, edit, and error recovery work on every enabled client.
-- At least OpenRouter, OpenAI-compatible, Anthropic, Gemini, and Ollama providers work on web and Android where CORS permits, and on Rust when enabled.
+- At least OpenRouter, OpenAI-compatible, Anthropic, Gemini, and Ollama providers work on web and Android where CORS permits, and on the Rust desktop client when enabled.
 - Conversations persist, search, export, and import correctly.
 - Markdown, code, and math render safely.
 - Attachments work with capable models and are blocked or warned otherwise.
@@ -2620,4 +2608,4 @@ Header fields: `v`, `alg`, `kdf`, `iterations`, `salt`, `objectType`, `objectKey
 - No keys or chat content leave the device except to the chosen provider.
 - Static deployment and container deployment are documented and tested.
 - The parity checklist is complete and reviewed.
-- If the Rust client is published as part of phase 1, it meets the same OpenRouter conformance, persistence, secret-storage, packaging, and parity requirements as web and Android; otherwise it is explicitly marked as a post-preview or parallel deliverable.
+- If the Rust desktop client is published as part of phase 1, it meets the same OpenRouter conformance, persistence, secret-storage, packaging, and parity requirements as web and Android; otherwise it is explicitly marked as a post-preview or parallel deliverable.

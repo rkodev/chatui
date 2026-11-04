@@ -89,7 +89,7 @@ Deliver:
 - Provider resale, billing, usage metering, or prompt proxying.
 - Server-side key custody, server-side conversation storage, or cross-device sync.
 - A managed storage offering sold by roksky beyond BYO storage; any future partner storage must remain client-side encrypted and unreadable by roksky.
-- Native Android or Rust distribution.
+- Native Android or Rust desktop distribution.
 
 ## Exit gate
 
