@@ -57,7 +57,7 @@
 | 23 | [M1-07.3 Android provider, model, defaults, and routing UI](M1-07.3-android-provider-model-management.md) | Complete | M1-07.1, M1-07.2 | android | M1-03.3 |
 | 24 | [M1-08.2 Android conversations and navigation](M1-08.2-android-conversations-recovery.md) | Complete | M1-08.1, M1-07.3 | android | M1-05.2 |
 | 25 | [M1-08.3 Android recovery and conversation tests](M1-08.3-android-recovery-tests.md) | Complete | M1-08.2, M1-07.3 | android | M1-05.2 |
-| 26 | [M1-09.1 Android chat runner and ViewModel](M1-09.1-android-chat-runner.md) | Not started | M1-06.4, M1-08.1, M1-08.2 | android | M1-04.1 |
+| 26 | [M1-09.1 Android chat runner and ViewModel](M1-09.1-android-chat-runner.md) | In progress | M1-06.4, M1-08.1, M1-08.2 | android | M1-04.1 |
 | 27 | [M1-09.2 Android chat screen and composer](M1-09.2-android-chat-screen.md) | Not started | M1-09.1 | android | M1-04.2, M1-04.3 |
 | 28 | [M1-09.3 Android Markdown, code, and actions](M1-09.3-android-markdown-actions.md) | Not started | M1-09.2 | android | M1-04.4 |
 | 29 | [M1-10.1 Browser CORS verification and browserCors update](M1-10.1-cors-verification.md) | Not started | M1-02.4, M1-06.4, M1-03.2, M1-07.2 | verification | none |
