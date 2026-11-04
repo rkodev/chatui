@@ -34,6 +34,7 @@ describe('useChatSession', () => {
       getAvailability: async () => ({ ok: true, model, provider }),
       getShowTokenUsage: async () => false,
       getSendKey: async () => 'mod-enter',
+      getLoadRemoteImages: async () => true,
     })
 
     const { result } = renderHook(() => useChatSession(conversation.id), {
@@ -47,6 +48,7 @@ describe('useChatSession', () => {
     expect(result.current.availability).toEqual({ ok: true, model, provider })
     expect(result.current.showTokenUsage).toBe(false)
     expect(result.current.sendKey).toBe('mod-enter')
+    expect(result.current.loadRemoteImages).toBe(true)
   })
 
   it('announces start, complete, and error but not token updates', async () => {

@@ -54,6 +54,28 @@ describe('SettingsService', () => {
     expect(await settings.getRememberKeysOnWeb()).toBe(false)
   })
 
+  it('persists appearance and remote-image settings', async () => {
+    const settings = service()
+
+    await settings.setAppearance({ theme: 'dark', density: 'compact', chatFontSize: 'lg' })
+    await settings.setLoadRemoteImages(true)
+
+    expect(await settings.getAppearance()).toEqual({
+      theme: 'dark',
+      density: 'compact',
+      chatFontSize: 'lg',
+    })
+    expect(await settings.getLoadRemoteImages()).toBe(true)
+
+    const reloaded = new SettingsService(new SettingsRepository(db))
+    expect(await reloaded.getAppearance()).toEqual({
+      theme: 'dark',
+      density: 'compact',
+      chatFontSize: 'lg',
+    })
+    expect(await reloaded.getLoadRemoteImages()).toBe(true)
+  })
+
   it('updates defaults without clobbering unrelated settings', async () => {
     const settings = service()
     await settings.setSendKey('mod-enter')

@@ -134,6 +134,7 @@ export function ChatScreen({ session, composer }: ChatScreenProps) {
             loadingOlder={session.loadingOlder}
             onLoadOlder={session.loadOlder}
             showTokenUsage={session.showTokenUsage}
+            loadRemoteImages={session.loadRemoteImages}
             onRetry={session.retry}
             onRegenerate={session.regenerate}
             onEditLastUser={session.editLastUser}

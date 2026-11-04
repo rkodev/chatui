@@ -28,6 +28,8 @@ export interface MessageListProps {
   loadingOlder: boolean
   onLoadOlder: () => void
   showTokenUsage: boolean
+  /** Global remote-image policy from settings; defaults to blocked. */
+  loadRemoteImages?: boolean
   onRetry?: (message: Message) => void
   onRegenerate?: (message: Message) => void
   onEditLastUser?: (message: Message, text: string) => void
@@ -85,6 +87,7 @@ export function MessageList({
   loadingOlder,
   onLoadOlder,
   showTokenUsage,
+  loadRemoteImages = false,
   onRetry,
   onRegenerate,
   onEditLastUser,
@@ -233,6 +236,7 @@ export function MessageList({
             <MessageItem
               message={message}
               showTokenUsage={showTokenUsage}
+              loadRemoteImages={loadRemoteImages}
               onRetry={onRetry}
               onRegenerate={onRegenerate}
               onEditLastUser={onEditLastUser}
@@ -248,6 +252,7 @@ export function MessageList({
           <StreamingMessage
             conversation={conversation}
             showTokenUsage={showTokenUsage}
+            loadRemoteImages={loadRemoteImages}
             onRetry={onRetry}
             persisted={persistedStreaming}
           />

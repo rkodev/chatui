@@ -7,6 +7,11 @@ import { createFakeChatService } from '../features/chat/testSupport'
 import { OnboardingServiceProvider, type OnboardingServiceLike } from '../features/onboarding'
 import { ProviderManagementProvider } from '../features/providers'
 import { createFakeProviderManagementService } from '../features/providers/testSupport'
+import {
+  DEFAULT_SETTINGS,
+  SettingsProvider,
+  type SettingsClient,
+} from '../features/settings'
 import { createAppRouter } from './router'
 
 const testConfig: AppConfig = {
@@ -29,17 +34,31 @@ const onboardingService: OnboardingServiceLike = {
   isOnboardingComplete: async () => false,
 }
 
+function createTestSettingsClient(): SettingsClient {
+  let settings = structuredClone(DEFAULT_SETTINGS)
+
+  return {
+    get: async () => settings,
+    update: async (patch) => {
+      settings = { ...settings, ...patch }
+      return settings
+    },
+  }
+}
+
 function renderRoute(path: string) {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }))
   render(
     <ConfigContext.Provider value={testConfig}>
-      <ChatServiceProvider service={createFakeChatService()}>
-        <ProviderManagementProvider service={createFakeProviderManagementService()}>
-          <OnboardingServiceProvider service={onboardingService}>
-            <RouterProvider router={router} />
-          </OnboardingServiceProvider>
-        </ProviderManagementProvider>
-      </ChatServiceProvider>
+      <SettingsProvider service={createTestSettingsClient()}>
+        <ChatServiceProvider service={createFakeChatService()}>
+          <ProviderManagementProvider service={createFakeProviderManagementService()}>
+            <OnboardingServiceProvider service={onboardingService}>
+              <RouterProvider router={router} />
+            </OnboardingServiceProvider>
+          </ProviderManagementProvider>
+        </ChatServiceProvider>
+      </SettingsProvider>
     </ConfigContext.Provider>,
   )
   return router
@@ -49,14 +68,15 @@ describe('app router', () => {
   it.each([
     ['/', 'Welcome to ChatUI'],
     ['/chat/conversation-1', 'New chat'],
-    ['/settings/appearance', 'Appearance settings placeholder'],
+    ['/settings/appearance', 'Appearance'],
+    ['/settings/chat', 'Chat defaults'],
     ['/settings/providers', 'Providers'],
     ['/settings/providers/new', 'Welcome to ChatUI'],
     ['/settings/providers/provider-1', 'OpenRouter'],
     ['/settings/models', 'Models'],
-    ['/settings/data', 'Data settings placeholder'],
-    ['/settings/backup', 'Backup settings placeholder'],
-    ['/settings/about', 'About settings placeholder'],
+    ['/settings/data', 'Data'],
+    ['/settings/backup', 'Backup'],
+    ['/settings/about', 'About'],
   ])('resolves %s', async (path, heading) => {
     renderRoute(path)
 
@@ -67,7 +87,7 @@ describe('app router', () => {
     const router = renderRoute('/settings')
 
     expect(
-      await screen.findByRole('heading', { name: 'Appearance settings placeholder' }),
+      await screen.findByRole('heading', { name: 'Appearance' }),
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/settings/appearance')
   })

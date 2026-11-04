@@ -53,6 +53,23 @@ describe('MessageList', () => {
     expect(articles[1]).toHaveAttribute('data-role', 'assistant')
   })
 
+  it('passes the remote-image setting through to message rendering', () => {
+    const message = createTestMessage({
+      role: 'assistant',
+      parts: [{ type: 'text', text: '![Chart](https://example.com/chart.png)' }],
+    })
+
+    const { unmount } = renderList({ messages: [message] })
+    expect(screen.getByText('Remote images are blocked.')).toBeInTheDocument()
+    unmount()
+
+    renderList({ messages: [message], loadRemoteImages: true })
+    expect(screen.getByRole('img', { name: 'Chart' })).toHaveAttribute(
+      'src',
+      'https://example.com/chart.png',
+    )
+  })
+
   it('loads older messages from the top control', async () => {
     const user = userEvent.setup()
     const onLoadOlder = vi.fn()

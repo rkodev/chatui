@@ -103,6 +103,7 @@ function createHarness(
     settings: {
       getShowTokenUsage: async () => true,
       getSendKey: async () => 'enter',
+      getLoadRemoteImages: async () => false,
     },
     runner,
     runtime: { fetch: globalThis.fetch },

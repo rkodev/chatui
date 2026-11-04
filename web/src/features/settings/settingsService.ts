@@ -1,4 +1,11 @@
-import type { ChatParams, SendKey, Settings } from '../../domain'
+import type {
+  ChatFontSize,
+  ChatParams,
+  Density,
+  SendKey,
+  Settings,
+  Theme,
+} from '../../domain'
 
 /**
  * Minimal settings persistence surface.
@@ -51,6 +58,23 @@ export interface SettingsDefaults {
   params: ChatParams
 }
 
+export interface AppearanceSettings {
+  theme: Theme
+  density: Density
+  chatFontSize: ChatFontSize
+}
+
+/**
+ * Read/write settings surface used by the settings provider and screens.
+ *
+ * `SettingsService` satisfies this interface, and tests can supply an
+ * in-memory fake without opening IndexedDB.
+ */
+export interface SettingsClient {
+  get(): Promise<Settings>
+  update(patch: Partial<Settings>): Promise<Settings>
+}
+
 /**
  * Typed facade over the key/value `SettingsRepository`.
  *
@@ -98,6 +122,40 @@ export class SettingsService {
 
   async setOnboardingCompleted(value: boolean): Promise<void> {
     await this.repository.set('onboardingCompleted', value)
+  }
+
+  async getAppearance(): Promise<AppearanceSettings> {
+    const settings = await this.get()
+
+    return {
+      theme: settings.theme,
+      density: settings.density,
+      chatFontSize: settings.chatFontSize,
+    }
+  }
+
+  async setAppearance(patch: Partial<AppearanceSettings>): Promise<Settings> {
+    const update: Partial<Settings> = {}
+
+    if (patch.theme !== undefined) {
+      update.theme = patch.theme
+    }
+    if (patch.density !== undefined) {
+      update.density = patch.density
+    }
+    if (patch.chatFontSize !== undefined) {
+      update.chatFontSize = patch.chatFontSize
+    }
+
+    return this.update(update)
+  }
+
+  async getLoadRemoteImages(): Promise<boolean> {
+    return (await this.get()).loadRemoteImages
+  }
+
+  async setLoadRemoteImages(value: boolean): Promise<void> {
+    await this.repository.set('loadRemoteImages', value)
   }
 
   async getSendKey(): Promise<SendKey> {

@@ -47,7 +47,7 @@
 | 10 | [M2-03.1 Web content and reasoning rendering](M2-03.1-web-content-rendering.md) | Complete | M2-01.3 | web | M2-02.1, M2-02.2, M2-02.3 |
 | 11 | [M2-03.2 Web parameters and conversation settings](M2-03.2-web-parameters-conversation-settings.md) | Complete | M2-01.3 | web | M2-03.1 |
 | 12 | [M2-03.3 Web attachments end-to-end](M2-03.3-web-attachments.md) | Complete | M2-03.1, M2-03.2 | web | M2-06.6 |
-| 13 | [M2-03.4 Web settings routes and behavior wiring](M2-03.4-web-settings-routes.md) | Not started | M2-01.3 | web | M2-04.1 |
+| 13 | [M2-03.4 Web settings routes and behavior wiring](M2-03.4-web-settings-routes.md) | Complete | M2-01.3 | web | M2-04.1 |
 | 14 | [M2-04.1 Web conversation search](M2-04.1-web-search.md) | Not started | M2-03.4 | web | M2-04.2 no; sidebar files shared |
 | 15 | [M2-04.2 Web pin, archive, and delete undo](M2-04.2-web-pin-archive-undo.md) | Not started | M2-04.1 | web | M2-07.2 |
 | 16 | [M2-04.3 Web export](M2-04.3-web-export.md) | Not started | M2-03.4 | web | M2-07.3 |

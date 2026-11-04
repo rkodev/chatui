@@ -1,4 +1,4 @@
-import { Outlet, useRouterState } from '@tanstack/react-router'
+import { Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { useSidebarStore } from '../stores'
 import { Button } from '../../ui/primitives'
 import {
@@ -6,6 +6,7 @@ import {
   ConversationSidebarContainer,
   conversationIdFromPathname,
 } from '../../features/conversations'
+import { SettingsProvider } from '../../features/settings'
 
 function RootLayoutContent() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
@@ -17,15 +18,20 @@ function RootLayoutContent() {
       <header className="app-shell__header">
         <div className="app-shell__header-content">
           <h1 className="app-shell__title">ChatUI</h1>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="app-shell__menu"
-            onClick={toggleSidebar}
-            aria-label="Open history"
-          >
-            History
-          </Button>
+          <div className="app-shell__header-actions">
+            <Link to="/settings" className="app-shell__settings-link">
+              Settings
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="app-shell__menu"
+              onClick={toggleSidebar}
+              aria-label="Open history"
+            >
+              History
+            </Button>
+          </div>
         </div>
       </header>
       <div className="app-shell__body">
@@ -47,8 +53,10 @@ function RootLayoutContent() {
  */
 export function RootLayout() {
   return (
-    <ConversationHistoryProvider>
-      <RootLayoutContent />
-    </ConversationHistoryProvider>
+    <SettingsProvider>
+      <ConversationHistoryProvider>
+        <RootLayoutContent />
+      </ConversationHistoryProvider>
+    </SettingsProvider>
   )
 }

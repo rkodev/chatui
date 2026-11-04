@@ -64,6 +64,7 @@ export interface ChatServiceLike {
   getAvailability(conversation: Conversation): Promise<ChatAvailability>
   getShowTokenUsage(): Promise<boolean>
   getSendKey(): Promise<SendKey>
+  getLoadRemoteImages(): Promise<boolean>
   send(conversation: Conversation, userMessage?: Message): Promise<ChatSendResult>
   retry(conversation: Conversation, target: Message): Promise<ChatSendResult>
   editLastUser(conversation: Conversation, target: Message, text: string): Promise<ChatSendResult>
@@ -104,6 +105,7 @@ export interface ChatServiceOptions {
   settings: {
     getShowTokenUsage(): Promise<boolean>
     getSendKey(): Promise<SendKey>
+    getLoadRemoteImages(): Promise<boolean>
   }
   runner: ChatRunnerLike
   runtime: ProviderRuntime
@@ -197,6 +199,10 @@ export class ChatService implements ChatServiceLike {
 
   async getSendKey(): Promise<SendKey> {
     return this.settings.getSendKey()
+  }
+
+  async getLoadRemoteImages(): Promise<boolean> {
+    return this.settings.getLoadRemoteImages()
   }
 
   isStreaming(conversationId: string): boolean {

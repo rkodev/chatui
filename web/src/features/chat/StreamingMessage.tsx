@@ -5,6 +5,7 @@ import { useStreamingStream, type StreamingState } from './streamingStore'
 export interface StreamingMessageProps {
   conversation: Conversation
   showTokenUsage: boolean
+  loadRemoteImages?: boolean
   onRetry?: (message: Message) => void
   /** True when the persisted message with the same id is already in history. */
   persisted: boolean
@@ -51,6 +52,7 @@ function toMessage(conversation: Conversation, stream: StreamingState): Message 
 export function StreamingMessage({
   conversation,
   showTokenUsage,
+  loadRemoteImages = false,
   onRetry,
   persisted,
 }: StreamingMessageProps) {
@@ -68,6 +70,7 @@ export function StreamingMessage({
     <MessageItem
       message={toMessage(conversation, stream)}
       showTokenUsage={showTokenUsage}
+      loadRemoteImages={loadRemoteImages}
       onRetry={onRetry}
       isActiveStream={!stream.done}
     />

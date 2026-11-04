@@ -27,6 +27,7 @@ export interface ChatSession {
   availability: ChatAvailability | null
   showTokenUsage: boolean
   sendKey: SendKey
+  loadRemoteImages: boolean
   streamingMessageId: string | null
   isStreaming: boolean
   announcement: string
@@ -73,6 +74,7 @@ export function useChatSession(conversationId: string): ChatSession {
   const [availability, setAvailability] = useState<ChatAvailability | null>(null)
   const [showTokenUsage, setShowTokenUsage] = useState(true)
   const [sendKey, setSendKey] = useState<SendKey>('enter')
+  const [loadRemoteImages, setLoadRemoteImages] = useState(false)
   const [announcement, setAnnouncement] = useState('')
   const [attachmentState, setAttachmentState] = useState<{
     conversationId: string
@@ -99,20 +101,24 @@ export function useChatSession(conversationId: string): ChatSession {
         availability: null,
         showTokenUsage: true,
         sendKey: 'enter' as SendKey,
+        loadRemoteImages: false,
       }
     }
 
-    const [nextAvailability, nextShowTokenUsage, nextSendKey] = await Promise.all([
-      service.getAvailability(value),
-      service.getShowTokenUsage(),
-      service.getSendKey(),
-    ])
+    const [nextAvailability, nextShowTokenUsage, nextSendKey, nextLoadRemoteImages] =
+      await Promise.all([
+        service.getAvailability(value),
+        service.getShowTokenUsage(),
+        service.getSendKey(),
+        service.getLoadRemoteImages(),
+      ])
 
     return {
       conversation: value,
       availability: nextAvailability,
       showTokenUsage: nextShowTokenUsage,
       sendKey: nextSendKey,
+      loadRemoteImages: nextLoadRemoteImages,
     }
   }, [conversationId, service])
 
@@ -129,6 +135,7 @@ export function useChatSession(conversationId: string): ChatSession {
       setAvailability(result.availability)
       setShowTokenUsage(result.showTokenUsage)
       setSendKey(result.sendKey)
+      setLoadRemoteImages(result.loadRemoteImages)
 
       if (!service.isStreaming(conversationId)) {
         useStreamingStore.getState().clearStream(conversationId)
@@ -429,6 +436,7 @@ export function useChatSession(conversationId: string): ChatSession {
     availability: isCurrent ? availability : null,
     showTokenUsage,
     sendKey,
+    loadRemoteImages,
     streamingMessageId,
     isStreaming,
     announcement,
