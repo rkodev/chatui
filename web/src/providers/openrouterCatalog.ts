@@ -20,6 +20,8 @@ export interface ModelInfo {
   supportedParameters: string[]
   metadata: Record<string, unknown> | null
   isFree: boolean
+  /** True for non-chat models such as embeddings. */
+  hidden?: boolean
 }
 
 /** Normalized key introspection result from spec section 7.1. */

@@ -29,3 +29,35 @@ export type {
   PresetAvailabilityStatus,
   ProviderPreset,
 } from './registry'
+export {
+  DEFAULT_SUPPORTED_PARAMETERS,
+  ProviderRequestError,
+  buildChatRequestBody,
+  buildStreamHeaders,
+  catalogCacheKey,
+  createOpenAICompatibleAdapter,
+  estimateUsage,
+  listModels,
+  loadCatalog,
+  refreshCatalog,
+  streamChat,
+  toChatError,
+  validateKey,
+} from './openaiCompatible'
+export type {
+  Attribution,
+  ListModelsOptions,
+  ModelDiscoveryFormat,
+  NormalizedChatMessage,
+  NormalizedChatRequest,
+  OpenAICompatiblePreset,
+  ProviderAuthConfig,
+  ProviderAuthType,
+  ProviderContext,
+  ProviderKeyValidation,
+  ProviderMessages,
+  ProviderModelDiscovery,
+  StreamChatOptions,
+  StreamEvent,
+} from './openaiCompatible'
+export { getOpenAICompatiblePreset, toOpenAICompatiblePreset } from './presets'
