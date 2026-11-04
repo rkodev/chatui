@@ -79,6 +79,34 @@ describe('MessageItem', () => {
     expect(screen.getByText(/interrupted/i)).toBeInTheDocument()
   })
 
+  it('renders attachment chips without a "No content" placeholder', () => {
+    const message = createTestMessage({
+      parts: [
+        { type: 'text', text: 'See attached' },
+        { type: 'image', attachmentId: 'image-1', mimeType: 'image/png', alt: 'pixel.png' },
+        { type: 'file', attachmentId: 'file-1', mimeType: 'text/plain', name: 'notes.txt' },
+      ],
+    })
+
+    render(<MessageItem message={message} showTokenUsage={false} />)
+
+    expect(screen.getByText('See attached')).toBeInTheDocument()
+    expect(screen.getByText('pixel.png')).toBeInTheDocument()
+    expect(screen.getByText('notes.txt')).toBeInTheDocument()
+    expect(screen.queryByText('No content.')).not.toBeInTheDocument()
+  })
+
+  it('renders an image-only message without the empty placeholder', () => {
+    const message = createTestMessage({
+      parts: [{ type: 'image', attachmentId: 'image-1', mimeType: 'image/png', alt: 'pixel.png' }],
+    })
+
+    render(<MessageItem message={message} showTokenUsage={false} />)
+
+    expect(screen.getByText('pixel.png')).toBeInTheDocument()
+    expect(screen.queryByText('No content.')).not.toBeInTheDocument()
+  })
+
   it('shows a typing indicator only for the active stream', () => {
     const streaming = createTestMessage({ status: 'streaming', parts: [] })
     const { rerender } = render(

@@ -60,6 +60,7 @@ interface RequestVector {
   kind: string
   providerId: string
   request: NormalizedChatRequest
+  attachments?: Record<string, { mimeType: string; name?: string; dataBase64: string }>
   supportedParameters: string[]
   expected: {
     body?: Record<string, unknown>
@@ -110,11 +111,7 @@ function makeContext(
   }
 }
 
-function sseResponse(
-  sse: string,
-  status = 200,
-  headers: Record<string, string> = {},
-): Response {
+function sseResponse(sse: string, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(sse, {
     status,
     headers: { 'Content-Type': 'text/event-stream', ...headers },
@@ -181,16 +178,28 @@ describe('OpenAI-compatible request serialization', () => {
   it('serializes the OpenAI basic request vector exactly', () => {
     const vector = loadRequest('openai-basic')
 
-    expect(
-      buildChatRequestBody(vector.request, OPENAI_PRESET, vector.supportedParameters),
-    ).toEqual(vector.expected.body)
+    expect(buildChatRequestBody(vector.request, OPENAI_PRESET, vector.supportedParameters)).toEqual(
+      vector.expected.body,
+    )
   })
 
   it('serializes the OpenAI extras vector exactly', () => {
     const vector = loadRequest('openai-extras')
 
+    expect(buildChatRequestBody(vector.request, OPENAI_PRESET, vector.supportedParameters)).toEqual(
+      vector.expected.body,
+    )
+  })
+
+  it('serializes images as data URLs and text files as text parts', () => {
+    const vector = loadRequest('openai-attachments')
+
     expect(
-      buildChatRequestBody(vector.request, OPENAI_PRESET, vector.supportedParameters),
+      buildChatRequestBody(
+        { ...vector.request, attachments: vector.attachments },
+        OPENAI_PRESET,
+        vector.supportedParameters,
+      ),
     ).toEqual(vector.expected.body)
   })
 
@@ -253,11 +262,9 @@ describe('OpenAI-compatible streaming fixtures', () => {
     const expected = loadExpected(expectedName)
     const fetchMock = vi.fn(async () => sseResponse(loadSseFixture(fixtureName)))
 
-    const events = await collect(
-      makeContext(fetchMock as unknown as typeof fetch),
-      baseRequest(),
-      { now: () => FIXED_NOW },
-    )
+    const events = await collect(makeContext(fetchMock as unknown as typeof fetch), baseRequest(), {
+      now: () => FIXED_NOW,
+    })
 
     expect(withoutAt(events)).toEqual(expected.events)
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -283,11 +290,9 @@ describe('OpenAI-compatible streaming fixtures', () => {
     ].join('')
     const fetchMock = vi.fn(async () => sseResponse(sse))
 
-    const events = await collect(
-      makeContext(fetchMock as unknown as typeof fetch),
-      baseRequest(),
-      { now: () => FIXED_NOW },
-    )
+    const events = await collect(makeContext(fetchMock as unknown as typeof fetch), baseRequest(), {
+      now: () => FIXED_NOW,
+    })
 
     expect(events.filter((event) => event.type === 'reasoning-delta')).toEqual([
       { type: 'reasoning-delta', text: 'I' },
@@ -308,11 +313,9 @@ describe('OpenAI-compatible streaming fixtures', () => {
       sseResponse(loadText('../contracts/fixtures/errors/openai-stream-error.sse')),
     )
 
-    const events = await collect(
-      makeContext(fetchMock as unknown as typeof fetch),
-      baseRequest(),
-      { now: () => FIXED_NOW },
-    )
+    const events = await collect(makeContext(fetchMock as unknown as typeof fetch), baseRequest(), {
+      now: () => FIXED_NOW,
+    })
 
     expect(withoutAt(events)).toEqual([{ type: 'error', error: expected?.error }])
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -330,15 +333,12 @@ describe('OpenAI-compatible HTTP error mapping', () => {
       headers: Record<string, string>
       body: unknown
     }>(`../contracts/fixtures/${entry.fixture}`)
-    const fetchMock = vi.fn(async () =>
-      jsonResponse(fixture.body, fixture.status, fixture.headers),
-    )
+    const fetchMock = vi.fn(async () => jsonResponse(fixture.body, fixture.status, fixture.headers))
 
-    const events = await collect(
-      makeContext(fetchMock as unknown as typeof fetch),
-      baseRequest(),
-      { retry: { maxAttempts: 1 }, now: () => FIXED_NOW },
-    )
+    const events = await collect(makeContext(fetchMock as unknown as typeof fetch), baseRequest(), {
+      retry: { maxAttempts: 1 },
+      now: () => FIXED_NOW,
+    })
 
     expect(withoutAt(events)).toEqual([{ type: 'error', error: entry.error }])
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -348,11 +348,10 @@ describe('OpenAI-compatible HTTP error mapping', () => {
     const expected = loadExpectedErrors().cases.find((entry) => entry.name === 'provider-quota')
     const fetchMock = vi.fn(async () => jsonResponse({}, 402))
 
-    const events = await collect(
-      makeContext(fetchMock as unknown as typeof fetch),
-      baseRequest(),
-      { retry: { maxAttempts: 1 }, now: () => FIXED_NOW },
-    )
+    const events = await collect(makeContext(fetchMock as unknown as typeof fetch), baseRequest(), {
+      retry: { maxAttempts: 1 },
+      now: () => FIXED_NOW,
+    })
 
     expect(withoutAt(events)).toEqual([{ type: 'error', error: expected?.error }])
   })
@@ -362,11 +361,10 @@ describe('OpenAI-compatible HTTP error mapping', () => {
       jsonResponse({ error: { message: `Invalid key ${API_KEY}` } }, 401),
     )
 
-    const events = await collect(
-      makeContext(fetchMock as unknown as typeof fetch),
-      baseRequest(),
-      { retry: { maxAttempts: 1 }, now: () => FIXED_NOW },
-    )
+    const events = await collect(makeContext(fetchMock as unknown as typeof fetch), baseRequest(), {
+      retry: { maxAttempts: 1 },
+      now: () => FIXED_NOW,
+    })
 
     expect(JSON.stringify(events)).not.toContain(API_KEY)
     expect(events[0]).toMatchObject({
@@ -388,11 +386,10 @@ describe('OpenAI-compatible retry policy', () => {
       )
       .mockResolvedValueOnce(sseResponse(loadSseFixture('openai-text.sse')))
 
-    const promise = collect(
-      makeContext(fetchMock as unknown as typeof fetch),
-      baseRequest(),
-      { retry: { random: () => 0 }, now: () => FIXED_NOW },
-    )
+    const promise = collect(makeContext(fetchMock as unknown as typeof fetch), baseRequest(), {
+      retry: { random: () => 0 },
+      now: () => FIXED_NOW,
+    })
 
     await vi.advanceTimersByTimeAsync(0)
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -415,11 +412,10 @@ describe('OpenAI-compatible retry policy', () => {
       .mockRejectedValueOnce(new TypeError('network down'))
       .mockResolvedValueOnce(sseResponse(loadSseFixture('openai-text.sse')))
 
-    const promise = collect(
-      makeContext(fetchMock as unknown as typeof fetch),
-      baseRequest(),
-      { retry: { random: () => 0 }, now: () => FIXED_NOW },
-    )
+    const promise = collect(makeContext(fetchMock as unknown as typeof fetch), baseRequest(), {
+      retry: { random: () => 0 },
+      now: () => FIXED_NOW,
+    })
 
     await vi.advanceTimersByTimeAsync(0)
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -454,11 +450,9 @@ describe('OpenAI-compatible retry policy', () => {
     })
     const fetchMock = vi.fn(async () => new Response(stream, { status: 200 }))
 
-    const events = await collect(
-      makeContext(fetchMock as unknown as typeof fetch),
-      baseRequest(),
-      { now: () => FIXED_NOW },
-    )
+    const events = await collect(makeContext(fetchMock as unknown as typeof fetch), baseRequest(), {
+      now: () => FIXED_NOW,
+    })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(events.filter((event) => event.type === 'text-delta')).toEqual([
@@ -546,7 +540,9 @@ describe('OpenAI-compatible headers and auth', () => {
       auth: { type: 'x-api-key', headerName: 'x-api-key' },
       defaultHeaders: { 'X-Custom': 'value' },
     }
-    const headers = buildStreamHeaders(makeContext(vi.fn() as unknown as typeof fetch, API_KEY, preset))
+    const headers = buildStreamHeaders(
+      makeContext(vi.fn() as unknown as typeof fetch, API_KEY, preset),
+    )
 
     expect(headers.get('x-api-key')).toBe(API_KEY)
     expect(headers.get('X-Custom')).toBe('value')

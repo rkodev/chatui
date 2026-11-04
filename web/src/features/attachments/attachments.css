@@ -1,0 +1,113 @@
+.attachment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--density-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--density-space-2);
+  max-width: min(100%, 22rem);
+  padding: var(--density-space-1) var(--density-space-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-raised);
+  color: var(--color-fg-secondary);
+  font-size: 0.8125rem;
+}
+
+.attachment-chip__thumbnail {
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.attachment-chip__icon {
+  display: inline-grid;
+  min-width: 2rem;
+  height: 2rem;
+  place-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-fg-muted);
+  font-size: 0.75rem;
+}
+
+.attachment-chip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-chip__size {
+  flex: 0 0 auto;
+  color: var(--color-fg-muted);
+  font-size: 0.75rem;
+}
+
+.attachment-chip__remove {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+}
+
+.attachment-chip__remove:hover {
+  text-decoration: underline;
+}
+
+.attachment-chip__remove:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.composer__dropzone {
+  display: grid;
+  gap: var(--density-space-2);
+}
+
+.composer__dropzone--active {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: 2px;
+}
+
+.composer__attachment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--density-space-2);
+}
+
+.composer__attachment-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.8125rem;
+}
+
+.composer__hint {
+  color: var(--color-fg-muted);
+  font-size: 0.75rem;
+}
+
+.composer__dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--density-space-2);
+  margin-top: var(--density-space-3);
+}
+
+.message__attachments {
+  display: grid;
+  gap: var(--density-space-1);
+}

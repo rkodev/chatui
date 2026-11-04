@@ -15,6 +15,7 @@ export {
   type ChatAvailability,
   type ChatSendFailureReason,
   type ChatSendResult,
+  type ChatAttachmentServiceLike,
   type ChatRunnerLike,
   type ChatServiceLike,
   type ChatServiceOptions,
@@ -33,11 +34,7 @@ export {
   sanitizeMarkdownUrl,
   MARKDOWN_SANITIZE_SCHEMA,
 } from './markdownSanitize'
-export {
-  SUPPORTED_LANGUAGES,
-  normalizeLanguage,
-  type SupportedLanguage,
-} from './highlighter'
+export { SUPPORTED_LANGUAGES, normalizeLanguage, type SupportedLanguage } from './highlighter'
 export { MessageList, type MessageListProps } from './MessageList'
 export { StreamingMessage, type StreamingMessageProps } from './StreamingMessage'
 export { useChatSession, type ChatSession, type ChatSessionStatus } from './useChatSession'

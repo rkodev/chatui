@@ -1,11 +1,15 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDraftStore } from '../../app/stores'
-import { createTestConversation } from '../providers/testSupport'
+import {
+  createTestConversation,
+  createTestModel,
+  createTestProvider,
+} from '../providers/testSupport'
 import { Composer } from './Composer'
 import { MAX_COMPOSER_LINES } from './composerTextarea'
-import { createTestChatSession } from './testSupport'
+import { createTestAttachment, createTestChatSession } from './testSupport'
 import type { ChatSession } from './useChatSession'
 
 function renderComposer(session: ChatSession) {
@@ -224,9 +228,123 @@ describe('Composer', () => {
     await waitFor(() => expect(textarea).toHaveValue(''))
   })
 
-  it('does not add attachment controls', () => {
-    renderComposer(createTestChatSession())
+  it('adds supported files through the picker', async () => {
+    const user = userEvent.setup()
+    const addAttachments = vi.fn(async () => ({
+      attachments: [createTestAttachment()],
+      errors: [],
+    }))
+    renderComposer(createTestChatSession({ addAttachments }))
+    const input = screen.getByLabelText('Attachment files') as HTMLInputElement
+    const file = new File(['hello'], 'notes.txt', { type: 'text/plain' })
 
-    expect(screen.queryByRole('button', { name: /attach/i })).not.toBeInTheDocument()
+    await user.upload(input, file)
+
+    await waitFor(() => expect(addAttachments).toHaveBeenCalledWith([file]))
+  })
+
+  it('adds dropped files and pasted clipboard images', async () => {
+    const addAttachments = vi.fn(async () => ({ attachments: [], errors: [] }))
+    renderComposer(createTestChatSession({ addAttachments }))
+    const dropzone = screen.getByTestId('composer-dropzone')
+    const textarea = screen.getByLabelText('Message')
+    const dropped = new File(['hello'], 'notes.md', { type: 'text/markdown' })
+    const pasted = new File(['image'], 'clip.png', { type: 'image/png' })
+
+    fireEvent.drop(dropzone, { dataTransfer: { files: [dropped] } })
+    await waitFor(() => expect(addAttachments).toHaveBeenCalledWith([dropped]))
+
+    const item = {
+      kind: 'file',
+      type: 'image/png',
+      getAsFile: () => pasted,
+    }
+    fireEvent.paste(textarea, {
+      clipboardData: { items: [item], files: [pasted] },
+    })
+
+    await waitFor(() => expect(addAttachments).toHaveBeenCalledWith([pasted]))
+  })
+
+  it('shows attachment chips with size and removes them before send', async () => {
+    const user = userEvent.setup()
+    const attachment = createTestAttachment({ name: 'notes.txt', kind: 'file', size: 2048 })
+    const removeAttachment = vi.fn(async () => undefined)
+    renderComposer(createTestChatSession({ attachments: [attachment], removeAttachment }))
+
+    expect(screen.getByText('notes.txt')).toBeInTheDocument()
+    expect(screen.getByText('2.0 KB')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove attachment notes.txt' }))
+
+    expect(removeAttachment).toHaveBeenCalledWith(attachment.id)
+  })
+
+  it('sends text and attachments together', async () => {
+    const user = userEvent.setup()
+    const attachment = createTestAttachment({ kind: 'file', name: 'notes.txt' })
+    const send = vi.fn(async () => true)
+    renderComposer(createTestChatSession({ attachments: [attachment], send }))
+
+    await user.type(screen.getByLabelText('Message'), 'Hello')
+    await user.click(screen.getByRole('button', { name: 'Send message' }))
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith('Hello', [attachment]))
+  })
+
+  it('warns and confirms before sending unsupported image attachments', async () => {
+    const user = userEvent.setup()
+    const attachment = createTestAttachment({ kind: 'image', name: 'photo.png' })
+    const removeAttachment = vi.fn(async () => undefined)
+    const send = vi.fn(async () => true)
+    renderComposer(
+      createTestChatSession({
+        attachments: [attachment],
+        availability: {
+          ok: true,
+          model: createTestModel({ inputModalities: ['text'] }),
+          provider: createTestProvider(),
+        },
+        removeAttachment,
+        send,
+      }),
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(/cannot receive images/i)
+
+    await user.type(screen.getByLabelText('Message'), 'What is this?')
+    await user.click(screen.getByRole('button', { name: 'Send message' }))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(send).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Remove and send' }))
+
+    await waitFor(() => expect(removeAttachment).toHaveBeenCalledWith(attachment.id))
+    await waitFor(() => expect(send).toHaveBeenCalledWith('What is this?'))
+  })
+
+  it('rejects an invalid file without corrupting the composer state', async () => {
+    const user = userEvent.setup()
+    const addAttachments = vi.fn(async () => ({
+      attachments: [],
+      errors: [
+        {
+          fileName: 'bad.exe',
+          code: 'unsupported_type' as const,
+          message: 'bad.exe is not supported.',
+        },
+      ],
+    }))
+    renderComposer(createTestChatSession({ addAttachments }))
+
+    const input = screen.getByLabelText('Attachment files') as HTMLInputElement
+    fireEvent.change(input, {
+      target: { files: [new File(['x'], 'bad.exe', { type: 'application/x-msdownload' })] },
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('bad.exe is not supported.')
+    await user.type(screen.getByLabelText('Message'), 'Still here')
+    expect(screen.getByLabelText('Message')).toHaveValue('Still here')
   })
 })

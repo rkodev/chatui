@@ -25,29 +25,14 @@ import {
   type ModelInfo,
   type ProviderKeyInfo,
 } from './openrouterCatalog'
-import {
-  RETRY_MAX_ATTEMPTS,
-  retryDelayFor,
-  sleep,
-  type RetryPolicy,
-} from './retry'
-import {
-  SseAbortError,
-  SseBufferOverflowError,
-  SseTransportError,
-  readSse,
-} from './sse'
+import { RETRY_MAX_ATTEMPTS, retryDelayFor, sleep, type RetryPolicy } from './retry'
+import { SseAbortError, SseBufferOverflowError, SseTransportError, readSse } from './sse'
 
 /** Authentication styles supported by the shared provider contracts. */
 export type ProviderAuthType = 'bearer' | 'x-api-key' | 'query-key' | 'none'
 
 /** Model discovery formats understood by the OpenAI-compatible transport. */
-export type ModelDiscoveryFormat =
-  | 'openrouter'
-  | 'openai'
-  | 'anthropic'
-  | 'gemini'
-  | 'ollama-tags'
+export type ModelDiscoveryFormat = 'openrouter' | 'openai' | 'anthropic' | 'gemini' | 'ollama-tags'
 
 export interface ProviderAuthConfig {
   type: ProviderAuthType
@@ -176,12 +161,24 @@ export interface NormalizedChatMessage {
   parts: ContentPart[]
 }
 
+/** Attachment bytes resolved by the caller before request serialization. */
+export interface ResolvedAttachment {
+  mimeType: string
+  name?: string
+  dataBase64: string
+}
+
 /** Normalized chat request from spec section 7.3. */
 export interface NormalizedChatRequest {
   model: string
   system: string | null
   messages: NormalizedChatMessage[]
   params: ChatParams
+  /**
+   * Bytes for image and file parts, keyed by attachment id. The shared
+   * normalized request never carries bytes inside message parts.
+   */
+  attachments?: Record<string, ResolvedAttachment>
 }
 
 export interface StreamChatOptions {
@@ -379,12 +376,7 @@ function normalizeUsage(raw: Record<string, unknown>): Usage | null {
     (inputTokens !== null && outputTokens !== null ? inputTokens + outputTokens : null)
   const costUsd = numberOrNull(raw.cost)
 
-  if (
-    inputTokens === null &&
-    outputTokens === null &&
-    totalTokens === null &&
-    costUsd === null
-  ) {
+  if (inputTokens === null && outputTokens === null && totalTokens === null && costUsd === null) {
     return null
   }
 
@@ -417,10 +409,116 @@ export function estimateUsage(text: string, reasoning = ''): Usage {
   }
 }
 
-function messageContent(parts: ContentPart[]): string {
-  return parts
-    .map((part) => (part.type === 'text' ? part.text : ''))
-    .join('')
+function decodeBase64Utf8(dataBase64: string): string {
+  const binary = atob(dataBase64)
+  const bytes = new Uint8Array(binary.length)
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+
+  return new TextDecoder().decode(bytes)
+}
+
+function imageDataUrl(
+  attachment: ResolvedAttachment,
+  part: Extract<ContentPart, { type: 'image' }>,
+): string {
+  return `data:${attachment.mimeType || part.mimeType};base64,${attachment.dataBase64}`
+}
+
+function fileText(
+  attachment: ResolvedAttachment,
+  part: Extract<ContentPart, { type: 'file' }>,
+): string {
+  const name = attachment.name ?? part.name
+  const body = /^text\//i.test(attachment.mimeType || part.mimeType)
+    ? decodeBase64Utf8(attachment.dataBase64)
+    : ''
+
+  return `\n\n[File: ${name}]\n${body}`
+}
+
+/**
+ * Build a message `content` value.
+ *
+ * Text-only messages keep the plain-string form used by the M1 vectors. As
+ * soon as an image is present, content becomes the ordered OpenAI multimodal
+ * array: text, `image_url` data URLs, and text-file headers.
+ */
+function messageContent(
+  parts: ContentPart[],
+  attachments: Record<string, ResolvedAttachment>,
+): string | Array<Record<string, unknown>> {
+  if (!parts.some((part) => part.type === 'image')) {
+    return parts
+      .map((part) => {
+        if (part.type === 'text') {
+          return part.text
+        }
+
+        if (part.type === 'file') {
+          const attachment = attachments[part.attachmentId]
+
+          if (!attachment) {
+            throw new ProviderRequestError(
+              'invalid_request',
+              `Missing attachment ${part.attachmentId} for the OpenAI-compatible request.`,
+            )
+          }
+
+          return fileText(attachment, part)
+        }
+
+        return ''
+      })
+      .join('')
+  }
+
+  const content: Array<Record<string, unknown>> = []
+
+  for (const part of parts) {
+    switch (part.type) {
+      case 'text':
+        if (part.text !== '') {
+          content.push({ type: 'text', text: part.text })
+        }
+        break
+      case 'image': {
+        const attachment = attachments[part.attachmentId]
+
+        if (!attachment) {
+          throw new ProviderRequestError(
+            'invalid_request',
+            `Missing attachment ${part.attachmentId} for the OpenAI-compatible request.`,
+          )
+        }
+
+        content.push({
+          type: 'image_url',
+          image_url: { url: imageDataUrl(attachment, part) },
+        })
+        break
+      }
+      case 'file': {
+        const attachment = attachments[part.attachmentId]
+
+        if (!attachment) {
+          throw new ProviderRequestError(
+            'invalid_request',
+            `Missing attachment ${part.attachmentId} for the OpenAI-compatible request.`,
+          )
+        }
+
+        content.push({ type: 'text', text: fileText(attachment, part) })
+        break
+      }
+      default:
+        break
+    }
+  }
+
+  return content
 }
 
 function protectedAdvancedFields(extra: unknown): string[] {
@@ -444,10 +542,7 @@ function resolvePreset(
   return resolved
 }
 
-function resolveAuth(
-  context: ProviderContext,
-  preset: OpenAICompatiblePreset,
-): ProviderAuthConfig {
+function resolveAuth(context: ProviderContext, preset: OpenAICompatiblePreset): ProviderAuthConfig {
   return context.auth ?? preset.auth
 }
 
@@ -556,14 +651,15 @@ export function buildChatRequestBody(
     )
   }
 
-  const messages: Array<{ role: string; content: string }> = []
+  const messages: Array<{ role: string; content: unknown }> = []
+  const attachments = request.attachments ?? {}
 
   if (request.system !== null) {
     messages.push({ role: 'system', content: request.system })
   }
 
   for (const message of request.messages) {
-    messages.push({ role: message.role, content: messageContent(message.parts) })
+    messages.push({ role: message.role, content: messageContent(message.parts, attachments) })
   }
 
   const body: Record<string, unknown> = {
@@ -1069,8 +1165,7 @@ function streamError(
 ): ProviderRequestError {
   const messages = messagesFor(preset)
   const status = streamStatus(envelope)
-  const rawMessage =
-    typeof envelope.message === 'string' ? envelope.message : messages.streamError
+  const rawMessage = typeof envelope.message === 'string' ? envelope.message : messages.streamError
   const message = redactSecret(rawMessage, context.apiKey)
   const code = status !== null ? statusToCode(status, message) : 'provider'
   const metadata = isRecord(envelope.metadata) ? envelope.metadata : null
@@ -1443,10 +1538,7 @@ export async function streamChat(
       }
 
       const canRetry =
-        normalized.retryable &&
-        !receivedText &&
-        !receivedReasoning &&
-        attempt < maxAttempts
+        normalized.retryable && !receivedText && !receivedReasoning && attempt < maxAttempts
 
       if (!canRetry) {
         emitError(normalized)
@@ -1474,11 +1566,8 @@ export function createOpenAICompatibleAdapter(preset: OpenAICompatiblePreset) {
     kind: 'openai-compatible' as const,
     validateKey: (context: ProviderContext, signal: AbortSignal) =>
       validateKey({ ...context, preset }, signal),
-    listModels: (
-      context: ProviderContext,
-      signal: AbortSignal,
-      options: ListModelsOptions = {},
-    ) => listModels({ ...context, preset }, signal, { ...options, preset }),
+    listModels: (context: ProviderContext, signal: AbortSignal, options: ListModelsOptions = {}) =>
+      listModels({ ...context, preset }, signal, { ...options, preset }),
     streamChat: (
       context: ProviderContext,
       request: NormalizedChatRequest,

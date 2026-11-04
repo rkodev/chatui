@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { ContentPart, Message, MessageRole, Usage } from '../../domain'
 import { formatUsd } from '../providers/format'
+import { MessageAttachments } from '../attachments'
 import { Button } from '../../ui/primitives'
 import { describeChatError } from './chatErrorCopy'
 import { MarkdownRenderer } from './MarkdownRenderer'
@@ -75,6 +76,7 @@ function MessageItemComponent({
   const text = textParts(message)
   const reasoning = reasoningParts(message)
   const hasText = text.some((part) => part.trim() !== '')
+  const hasAttachments = message.parts.some((part) => part.type === 'image' || part.type === 'file')
   const errorCopy = message.error === null ? null : describeChatError(message.error)
   const usage = message.usage === null ? '' : formatUsage(message.usage)
   const isInterrupted = message.status === 'streaming' && !isActiveStream
@@ -114,13 +116,17 @@ function MessageItemComponent({
           />
         ))}
 
-        {!hasText && message.status === 'streaming' && isActiveStream && (
+        <MessageAttachments parts={message.parts} />
+
+        {!hasText && !hasAttachments && message.status === 'streaming' && isActiveStream && (
           <p className="message__typing" aria-label="Assistant is typing">
             <span aria-hidden="true">…</span>
           </p>
         )}
 
-        {!hasText && message.status === 'complete' && <p className="message__empty">No content.</p>}
+        {!hasText && !hasAttachments && message.status === 'complete' && (
+          <p className="message__empty">No content.</p>
+        )}
 
         {message.status === 'cancelled' && (
           <p className="message__status">Response cancelled. Partial content is preserved.</p>
