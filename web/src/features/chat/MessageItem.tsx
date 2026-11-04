@@ -53,7 +53,9 @@ function textParts(message: Message): string[] {
 
 function reasoningParts(message: Message): string[] {
   return message.parts
-    .filter((part): part is Extract<ContentPart, { type: 'reasoning' }> => part.type === 'reasoning')
+    .filter(
+      (part): part is Extract<ContentPart, { type: 'reasoning' }> => part.type === 'reasoning',
+    )
     .map((part) => part.text)
     .filter((text) => text !== '')
 }
@@ -61,6 +63,7 @@ function reasoningParts(message: Message): string[] {
 function MessageItemComponent({
   message,
   showTokenUsage,
+  loadRemoteImages = false,
   onRetry,
   onRegenerate,
   onEditLastUser,
@@ -103,7 +106,12 @@ function MessageItemComponent({
         )}
 
         {text.map((part, index) => (
-          <MarkdownRenderer key={index} markdown={part} className="message__markdown" />
+          <MarkdownRenderer
+            key={index}
+            markdown={part}
+            className="message__markdown"
+            loadRemoteImages={loadRemoteImages}
+          />
         ))}
 
         {!hasText && message.status === 'streaming' && isActiveStream && (
@@ -112,9 +120,7 @@ function MessageItemComponent({
           </p>
         )}
 
-        {!hasText && message.status === 'complete' && (
-          <p className="message__empty">No content.</p>
-        )}
+        {!hasText && message.status === 'complete' && <p className="message__empty">No content.</p>}
 
         {message.status === 'cancelled' && (
           <p className="message__status">Response cancelled. Partial content is preserved.</p>

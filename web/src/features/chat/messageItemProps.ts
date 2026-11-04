@@ -3,6 +3,8 @@ import type { Message } from '../../domain'
 export interface MessageItemProps {
   message: Message
   showTokenUsage: boolean
+  /** Global remote-image policy from settings; defaults to blocked. */
+  loadRemoteImages?: boolean
   onRetry?: (message: Message) => void
   onRegenerate?: (message: Message) => void
   onEditLastUser?: (message: Message, text: string) => void
@@ -16,10 +18,7 @@ export interface MessageItemProps {
  * Memoization comparator keyed by message id plus the content revision fields
  * that can change after persistence.
  */
-export function messageItemPropsEqual(
-  previous: MessageItemProps,
-  next: MessageItemProps,
-): boolean {
+export function messageItemPropsEqual(previous: MessageItemProps, next: MessageItemProps): boolean {
   return (
     previous.message.id === next.message.id &&
     previous.message.updatedAt === next.message.updatedAt &&
@@ -28,6 +27,7 @@ export function messageItemPropsEqual(
     previous.message.usage === next.message.usage &&
     previous.message.parts === next.message.parts &&
     previous.showTokenUsage === next.showTokenUsage &&
+    previous.loadRemoteImages === next.loadRemoteImages &&
     previous.onRetry === next.onRetry &&
     previous.onRegenerate === next.onRegenerate &&
     previous.onEditLastUser === next.onEditLastUser &&

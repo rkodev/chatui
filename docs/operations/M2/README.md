@@ -44,7 +44,7 @@
 | 7 | [M2-02.2 Web Gemini adapter](M2-02.2-web-gemini-adapter.md) | Complete | M2-01.3 | web | M2-02.1, M2-02.3, M2-06.2 |
 | 8 | [M2-02.3 Web Ollama adapter](M2-02.3-web-ollama-adapter.md) | Complete | M2-01.3 | web | M2-02.1, M2-02.2, M2-06.3 |
 | 9 | [M2-02.4 Web CORS classification and matrix](M2-02.4-web-cors-matrix.md) | Blocked | M2-02.1, M2-02.2, M2-02.3 | web | M2-03.1 |
-| 10 | [M2-03.1 Web content and reasoning rendering](M2-03.1-web-content-rendering.md) | Not started | M2-01.3 | web | M2-02.1, M2-02.2, M2-02.3 |
+| 10 | [M2-03.1 Web content and reasoning rendering](M2-03.1-web-content-rendering.md) | Complete | M2-01.3 | web | M2-02.1, M2-02.2, M2-02.3 |
 | 11 | [M2-03.2 Web parameters and conversation settings](M2-03.2-web-parameters-conversation-settings.md) | Not started | M2-01.3 | web | M2-03.1 |
 | 12 | [M2-03.3 Web attachments end-to-end](M2-03.3-web-attachments.md) | Not started | M2-03.1, M2-03.2 | web | M2-06.6 |
 | 13 | [M2-03.4 Web settings routes and behavior wiring](M2-03.4-web-settings-routes.md) | Not started | M2-01.3 | web | M2-04.1 |

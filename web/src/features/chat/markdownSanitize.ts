@@ -46,7 +46,11 @@ export function sanitizeMarkdownUrl(url: string | null | undefined): string | nu
   try {
     const parsed = new URL(trimmed)
 
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
+    if (
+      parsed.protocol === 'http:' ||
+      parsed.protocol === 'https:' ||
+      parsed.protocol === 'mailto:'
+    ) {
       return trimmed
     }
   } catch {
@@ -54,6 +58,28 @@ export function sanitizeMarkdownUrl(url: string | null | undefined): string | nu
   }
 
   return null
+}
+
+/**
+ * Return a safe remote-image URL, or null when the URL is not allowed.
+ *
+ * Images may only point at absolute `http` or `https` URLs. `mailto`, anchors,
+ * relative paths, data URLs, and every other scheme are rejected.
+ */
+export function sanitizeImageUrl(url: string | null | undefined): string | null {
+  const safe = sanitizeMarkdownUrl(url)
+
+  if (safe === null) {
+    return null
+  }
+
+  try {
+    const parsed = new URL(safe)
+
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? safe : null
+  } catch {
+    return null
+  }
 }
 
 /**
