@@ -24,7 +24,7 @@ data class AndroidSettings(
     val defaultModelId: String? = null,
     val defaultSystemPrompt: String = "",
     val defaultParams: ChatParams = DEFAULT_CHAT_PARAMS,
-    val showTokenUsage: Boolean = false,
+    val showTokenUsage: Boolean = true,
     val loadRemoteImages: Boolean = true,
     val lastActiveConversationId: String? = null,
     val onboardingCompleted: Boolean = false,

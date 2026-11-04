@@ -78,7 +78,7 @@ class ChatMessageListTest {
 
         assertThat(historyCompositions.get()).isEqualTo(historyBefore)
         assertThat(streamingCompositions.get()).isGreaterThan(streamingBefore)
-        composeRule.onNodeWithText("First and second").assertExists()
+        composeRule.onNodeWithText("First and second", useUnmergedTree = true).assertExists()
     }
 
     @Test

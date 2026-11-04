@@ -48,7 +48,7 @@ fun NavGraphBuilder.shellDestinations(
         OnboardingRoute(
             service = service,
             onConnected = {
-                navController.navigate(ShellDestination.Chat.route) {
+                navController.navigate(ShellDestination.Conversations.route) {
                     popUpTo(ShellDestination.Onboarding.route) { inclusive = true }
                     launchSingleTop = true
                 }

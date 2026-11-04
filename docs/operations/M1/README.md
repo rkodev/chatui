@@ -3,8 +3,8 @@
 - Source plan: [M1 OpenRouter Core Implementation Plan](../M1-openrouter-core-implementation-plan.md)
 - Milestone: [M1 OpenRouter-first core chat](../../milestones/M1-openrouter-core.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: Not started
-- Last updated: 2026-11-03
+- Status: Complete
+- Last updated: 2026-11-04
 - Ordering: work through the `Order` column unless a task's dependency column says otherwise.
 - Scope: OpenRouter-only chat on web and Android. Rust, attachments, math, search, export/import, and additional providers are out of scope.
 
@@ -61,7 +61,7 @@
 | 27 | [M1-09.2 Android chat screen and composer](M1-09.2-android-chat-screen.md) | Complete | M1-09.1 | android | M1-04.2, M1-04.3 |
 | 28 | [M1-09.3 Android Markdown, code, and actions](M1-09.3-android-markdown-actions.md) | Complete | M1-09.2 | android | M1-04.4 |
 | 29 | [M1-10.1 Browser CORS verification and browserCors update](M1-10.1-cors-verification.md) | Complete | M1-02.4, M1-06.4, M1-03.2, M1-07.2 | verification | none |
-| 30 | [M1-10.2 Conformance, parity, verification, and exit gate](M1-10.2-conformance-exit-gate.md) | Not started | all prior tasks | verification | none |
+| 30 | [M1-10.2 Conformance, parity, verification, and exit gate](M1-10.2-conformance-exit-gate.md) | Complete | all prior tasks | verification | none |
 
 ## Parallel execution groups
 

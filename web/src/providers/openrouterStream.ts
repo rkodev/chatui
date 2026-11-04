@@ -634,10 +634,11 @@ async function attemptStream(
   emit: (event: StreamEvent) => void,
 ): Promise<OpenRouterRequestError | null> {
   const url = joinUrl(context.provider.baseUrl, '/chat/completions')
+  const fetchImpl = context.fetch
   let response: Response
 
   try {
-    response = await context.fetch(url, {
+    response = await fetchImpl(url, {
       method: 'POST',
       headers: buildStreamHeaders(context),
       body: JSON.stringify(body),
