@@ -2,13 +2,17 @@ package dev.chatui.feature.chat
 
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.Conversation
+import dev.chatui.core.model.InputModality
 import dev.chatui.core.network.ProviderContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 /** Everything the runner needs to start one provider request. */
 data class ChatContext(
     val providerContext: ProviderContext,
     val modelRemoteId: String,
     val supportedParameters: List<String>,
+    val inputModalities: List<InputModality> = listOf(InputModality.TEXT),
 )
 
 /** Why a conversation cannot currently send. */
@@ -37,4 +41,9 @@ interface ChatContextResolver {
 /** Minimal conversation lookup used by the chat ViewModel. */
 interface ChatConversationSource {
     suspend fun getConversation(id: String): Conversation?
+
+    /** Observe conversation changes so model switches update capability warnings. */
+    fun observeConversation(id: String): Flow<Conversation?> = flow {
+        emit(getConversation(id))
+    }
 }

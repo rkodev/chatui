@@ -21,11 +21,13 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.model.Attachment
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.Conversation
 import dev.chatui.core.model.Message
 import dev.chatui.core.model.MessageRole
+import java.io.File
 import java.time.ZoneId
 
 /** Test tags exposed by the chat message list. */
@@ -62,6 +64,8 @@ fun ChatMessageList(
     zoneId: ZoneId = ZoneId.systemDefault(),
     listState: LazyListState = rememberLazyListState(),
     onMessageComposed: ((String) -> Unit)? = null,
+    attachments: Map<String, Attachment> = emptyMap(),
+    attachmentFile: (String) -> File? = { null },
 ) {
     val dimens = LocalDimens.current
     val isStreaming = streaming?.done == false
@@ -151,6 +155,8 @@ fun ChatMessageList(
                 canEditLastUser = actionsEnabled && message.id == lastUserId,
                 zoneId = zoneId,
                 onComposed = onMessageComposed,
+                attachments = attachments,
+                attachmentFile = attachmentFile,
             )
         }
 

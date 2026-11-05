@@ -2,9 +2,12 @@ package dev.chatui.feature.chat
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import dev.chatui.core.database.attachment.AttachmentInput
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.ChatErrorCode
+import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.FinishReason
+import dev.chatui.core.model.InputModality
 import dev.chatui.core.model.MessageRole
 import dev.chatui.core.model.MessageStatus
 import dev.chatui.core.model.StreamEvent
@@ -288,4 +291,122 @@ class ChatViewModelTest {
             assertThat(viewModel.state.value.draft).isEmpty()
             assertThat(drafts.draftFor("conversation-1")).isEmpty()
         }
+
+    @Test
+    fun `adding and removing attachments updates pending state`() = runTest(dispatcher) {
+        val store = FakeChatAttachmentStore()
+        val viewModel = ChatViewModel(
+            conversationId = "conversation-1",
+            conversations = FakeChatConversationSource(),
+            messages = FakeChatMessageStore(),
+            contextResolver = FakeChatContextResolver(),
+            adapter = FakeProviderAdapter(),
+            clock = clock,
+            attachments = store,
+        )
+        runCurrent()
+
+        viewModel.onAddAttachments(
+            listOf(AttachmentInput("notes.txt", "text/plain", 5, "hello".toByteArray())),
+        )
+        runCurrent()
+
+        val added = viewModel.state.value.pendingAttachments.single()
+        assertThat(added.name).isEqualTo("notes.txt")
+
+        viewModel.onRemoveAttachment(added.id)
+        runCurrent()
+
+        assertThat(viewModel.state.value.pendingAttachments).isEmpty()
+        assertThat(store.attachments).isEmpty()
+    }
+
+    @Test
+    fun `sending an image includes parts and resolved bytes`() = runTest(dispatcher) {
+        val adapter = FakeProviderAdapter()
+        val store = FakeChatAttachmentStore()
+        val viewModel = ChatViewModel(
+            conversationId = "conversation-1",
+            conversations = FakeChatConversationSource(),
+            messages = FakeChatMessageStore(),
+            contextResolver = FakeChatContextResolver(
+                result = ChatContextResult.Ready(
+                    testChatContext(
+                        inputModalities = listOf(InputModality.TEXT, InputModality.IMAGE),
+                    ),
+                ),
+            ),
+            adapter = adapter,
+            clock = clock,
+            attachments = store,
+        )
+        runCurrent()
+
+        viewModel.onAddAttachments(
+            listOf(AttachmentInput("photo.png", "image/png", 3, byteArrayOf(1, 2, 3))),
+        )
+        runCurrent()
+        val attachment = viewModel.state.value.pendingAttachments.single()
+
+        viewModel.onDraftChange("Look")
+        viewModel.onSend()
+        runCurrent()
+        adapter.started.await()
+
+        val request = adapter.lastRequest!!
+        assertThat(request.messages.last().parts).contains(
+            ContentPart.Image(attachment.id, "image/png", "photo.png"),
+        )
+        assertThat(request.attachments).containsKey(attachment.id)
+
+        adapter.events.send(StreamEvent.TextDelta("Hi"))
+        adapter.events.send(StreamEvent.Finish(FinishReason.STOP))
+        adapter.events.close()
+        runCurrent()
+
+        assertThat(viewModel.state.value.pendingAttachments).isEmpty()
+        assertThat(store.attachments[attachment.id]?.messageId).isNotNull()
+    }
+
+    @Test
+    fun `unsupported attachments require confirmation before sending`() = runTest(dispatcher) {
+        val adapter = FakeProviderAdapter()
+        val store = FakeChatAttachmentStore()
+        val viewModel = ChatViewModel(
+            conversationId = "conversation-1",
+            conversations = FakeChatConversationSource(),
+            messages = FakeChatMessageStore(),
+            contextResolver = FakeChatContextResolver(
+                result = ChatContextResult.Ready(
+                    testChatContext(inputModalities = listOf(InputModality.TEXT)),
+                ),
+            ),
+            adapter = adapter,
+            clock = clock,
+            attachments = store,
+        )
+        runCurrent()
+
+        viewModel.onAddAttachments(
+            listOf(AttachmentInput("photo.png", "image/png", 3, byteArrayOf(1, 2, 3))),
+        )
+        runCurrent()
+        viewModel.onDraftChange("Look")
+        viewModel.onSend()
+        runCurrent()
+
+        assertThat(viewModel.state.value.confirmSendWithUnsupportedAttachments).isTrue()
+        assertThat(adapter.lastRequest).isNull()
+
+        viewModel.onConfirmSend()
+        runCurrent()
+        adapter.started.await()
+
+        assertThat(adapter.lastRequest).isNotNull()
+        assertThat(viewModel.state.value.confirmSendWithUnsupportedAttachments).isFalse()
+
+        adapter.events.send(StreamEvent.Finish(FinishReason.STOP))
+        adapter.events.close()
+        runCurrent()
+    }
 }

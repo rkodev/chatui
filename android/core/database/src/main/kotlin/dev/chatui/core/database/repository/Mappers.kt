@@ -1,10 +1,13 @@
 package dev.chatui.core.database.repository
 
 import dev.chatui.core.database.entity.ConversationEntity
+import dev.chatui.core.database.entity.AttachmentEntity
 import dev.chatui.core.database.entity.MessageEntity
 import dev.chatui.core.database.entity.ModelEntity
 import dev.chatui.core.database.entity.ProviderEntity
 import dev.chatui.core.model.BrowserCors
+import dev.chatui.core.model.Attachment
+import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.ChatParams
 import dev.chatui.core.model.ChatUiJson
@@ -92,8 +95,35 @@ internal fun Conversation.toEntity(): ConversationEntity = ConversationEntity(
     syncState = sync?.let { serialName(SyncState.serializer(), it.state) },
 )
 
-internal fun MessageEntity.toDomain(): Message = Message(
+internal fun AttachmentEntity.toDomain(): Attachment = Attachment(
     id = id,
+    messageId = messageId,
+    kind = parseSerialName(AttachmentKind.serializer(), kind),
+    mimeType = mimeType,
+    name = name,
+    size = size,
+    sha256 = sha256,
+    storageKey = storageKey,
+    width = width,
+    height = height,
+    createdAt = Instant.parse(createdAt),
+)
+
+internal fun Attachment.toEntity(): AttachmentEntity = AttachmentEntity(
+    id = id,
+    messageId = messageId,
+    kind = serialName(AttachmentKind.serializer(), kind),
+    mimeType = mimeType,
+    name = name,
+    size = size,
+    sha256 = sha256,
+    storageKey = storageKey,
+    width = width,
+    height = height,
+    createdAt = createdAt.toString(),
+)
+
+internal fun MessageEntity.toDomain(): Message = Message(    id = id,
     conversationId = conversationId,
     sequence = sequence,
     role = parseSerialName(MessageRole.serializer(), role),

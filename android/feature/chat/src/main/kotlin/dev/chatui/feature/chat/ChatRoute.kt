@@ -7,6 +7,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.model.newId
+import java.io.File
 
 /**
  * Stateful chat entry point.
@@ -36,6 +37,7 @@ fun ChatRoute(
             clock = dependencies.clock,
             newId = ::newId,
             drafts = dependencies.drafts,
+            attachments = dependencies.attachmentStore,
             persistIntervalMs = persistIntervalMs,
         ),
     )
@@ -44,6 +46,17 @@ fun ChatRoute(
         initialValue = AndroidSettings(),
     )
     val online = rememberIsOnline()
+
+    val attachmentFile: (String) -> File? = { id ->
+        val attachment = state.attachmentsByMessage[id]
+            ?: state.pendingAttachments.firstOrNull { it.id == id }
+        val root = dependencies.attachmentRoot
+        if (attachment != null && root != null) {
+            File(root, attachment.storageKey)
+        } else {
+            null
+        }
+    }
 
     ChatScreen(
         state = state,
@@ -58,6 +71,12 @@ fun ChatRoute(
         onBack = onBack,
         onOpenProviders = onOpenProviders,
         onOpenConversationSettings = onOpenConversationSettings,
+        onAddAttachments = viewModel::onAddAttachments,
+        onRemoveAttachment = viewModel::onRemoveAttachment,
+        onConfirmSend = viewModel::onConfirmSend,
+        onCancelSendConfirmation = viewModel::onCancelSendConfirmation,
+        onDismissAttachmentError = viewModel::onDismissAttachmentError,
+        attachmentFile = attachmentFile,
         sendKey = settings.sendKey,
         showTokenUsage = settings.showTokenUsage,
         loadRemoteImages = settings.loadRemoteImages,

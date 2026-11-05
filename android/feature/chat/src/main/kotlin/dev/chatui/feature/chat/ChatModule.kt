@@ -1,10 +1,17 @@
 package dev.chatui.feature.chat
 
+import android.content.Context
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dev.chatui.core.database.ChatUiDatabase
+import dev.chatui.core.database.attachment.AndroidImageProcessor
+import dev.chatui.core.database.attachment.AttachmentService
+import dev.chatui.core.database.attachment.AttachmentStorage
+import dev.chatui.core.database.repository.AttachmentRepository
 import dev.chatui.core.database.repository.ConversationRepository
 import dev.chatui.core.database.repository.MessageRepository
 import dev.chatui.core.database.repository.ModelRepository
@@ -12,6 +19,7 @@ import dev.chatui.core.database.repository.ProviderRepository
 import dev.chatui.core.datastore.secret.SecretStore
 import dev.chatui.core.datastore.settings.SettingsDataStore
 import dev.chatui.core.network.ProviderAdapter
+import java.io.File
 import java.time.Clock
 import javax.inject.Singleton
 
@@ -24,12 +32,39 @@ data class ChatDependencies(
     val settings: SettingsDataStore,
     val drafts: ChatDrafts,
     val clock: Clock,
+    val attachmentStore: ChatAttachmentStore? = null,
+    val attachmentRoot: File? = null,
 )
 
 /** Builds the chat dependency bundle from the singleton graph. */
 @Module
 @InstallIn(SingletonComponent::class)
 object ChatModule {
+    @Provides
+    @Singleton
+    fun provideAttachmentRepository(database: ChatUiDatabase): AttachmentRepository =
+        AttachmentRepository(database.attachmentDao())
+
+    @Provides
+    @Singleton
+    fun provideAttachmentService(
+        @ApplicationContext context: Context,
+        attachments: AttachmentRepository,
+        messages: MessageRepository,
+        clock: Clock,
+    ): AttachmentService = AttachmentService(
+        repository = attachments,
+        messages = messages,
+        storage = AttachmentStorage(context.filesDir),
+        imageProcessor = AndroidImageProcessor(),
+        clock = clock,
+    )
+
+    @Provides
+    @Singleton
+    fun provideChatAttachmentStore(service: AttachmentService): ChatAttachmentStore =
+        RepositoryChatAttachmentStore(service)
+
     @Provides
     @Singleton
     fun provideChatDependencies(
@@ -41,6 +76,8 @@ object ChatModule {
         settings: SettingsDataStore,
         adapter: ProviderAdapter,
         clock: Clock,
+        attachmentStore: ChatAttachmentStore,
+        @ApplicationContext context: Context,
     ): ChatDependencies = ChatDependencies(
         conversationSource = RepositoryChatConversationSource(conversations),
         messageStore = RepositoryChatMessageStore(messages),
@@ -54,6 +91,8 @@ object ChatModule {
         settings = settings,
         drafts = InMemoryChatDrafts(),
         clock = clock,
+        attachmentStore = attachmentStore,
+        attachmentRoot = context.filesDir,
     )
 }
 

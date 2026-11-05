@@ -17,7 +17,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.test.performTextInput
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
+import dev.chatui.core.model.Attachment
+import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.SendKey
+import java.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -179,4 +182,72 @@ class ChatComposerTest {
         composeRule.onNodeWithTag(ChatComposerTestTags.Input).assertIsNotEnabled()
         composeRule.onNodeWithTag(ChatComposerTestTags.Send).assertIsNotEnabled()
     }
+
+    @Test
+    fun `attachments enable send and expose a remove action`() {
+        var removed: String? = null
+        val attachment = attachment()
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    draft = "",
+                    onDraftChange = {},
+                    onSend = {},
+                    onStop = {},
+                    sendKey = SendKey.ENTER,
+                    enabled = true,
+                    streaming = false,
+                    sending = false,
+                    attachments = listOf(attachment),
+                    onRemoveAttachment = { removed = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.attachmentChip(attachment.id))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.Send).assertIsEnabled()
+        composeRule.onNodeWithTag(ChatComposerTestTags.removeAttachment(attachment.id))
+            .performClick()
+
+        assertThat(removed).isEqualTo(attachment.id)
+    }
+
+    @Test
+    fun `attachment warning and error are rendered`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    draft = "Hello",
+                    onDraftChange = {},
+                    onSend = {},
+                    onStop = {},
+                    sendKey = SendKey.ENTER,
+                    enabled = true,
+                    streaming = false,
+                    sending = false,
+                    attachmentWarning = "This model cannot receive images.",
+                    attachmentError = "photo.png is too large.",
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentWarning).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentError).assertIsDisplayed()
+    }
+
+    private fun attachment(): Attachment = Attachment(
+        id = "attachment-1",
+        messageId = null,
+        kind = AttachmentKind.FILE,
+        mimeType = "text/plain",
+        name = "notes.txt",
+        size = 12,
+        sha256 = "sha",
+        storageKey = "attachments/sha",
+        width = null,
+        height = null,
+        createdAt = Instant.parse("2026-11-05T12:00:00Z"),
+    )
 }

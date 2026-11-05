@@ -71,6 +71,7 @@ class DefaultChatContextResolver(
                 providerContext = ProviderContext(provider, apiKey),
                 modelRemoteId = model.remoteId,
                 supportedParameters = model.supportedParameters,
+                inputModalities = model.inputModalities,
             ),
         )
     }

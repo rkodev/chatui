@@ -28,6 +28,9 @@ class MessageRepository(
 ) {
     suspend fun get(id: String): Message? = dao.getById(id)?.toDomain()
 
+    /** Every message id, including deleted rows, for attachment cleanup. */
+    suspend fun allIds(): List<String> = dao.allIds()
+
     /** Newest page, oldest message first. */
     suspend fun latest(
         conversationId: String,

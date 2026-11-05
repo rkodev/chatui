@@ -1,5 +1,13 @@
 package dev.chatui.feature.chat
 
+import android.content.ClipboardManager
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -18,18 +27,28 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draganddrop.DragAndDropEvent
+import androidx.compose.ui.draganddrop.DragAndDropTarget
+import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.chatui.core.database.attachment.AttachmentInput
+import dev.chatui.core.database.attachment.MAX_IMAGE_BYTES
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.Message
 import dev.chatui.core.model.SendKey
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.InputStream
 import java.time.ZoneId
 
 /** Test tags exposed by the chat screen. */
@@ -48,6 +67,10 @@ object ChatScreenTestTags {
     const val Back = "chat-screen-back"
     const val OpenProviders = "chat-screen-open-providers"
     const val ConversationSettings = "chat-screen-conversation-settings"
+    const val AttachmentWarning = "chat-screen-attachment-warning"
+    const val SendConfirmation = "chat-screen-send-confirmation"
+    const val SendAnyway = "chat-screen-send-anyway"
+    const val CancelSend = "chat-screen-cancel-send"
 }
 
 /**
@@ -72,6 +95,12 @@ fun ChatScreen(
     onBack: () -> Unit = {},
     onOpenProviders: () -> Unit = {},
     onOpenConversationSettings: () -> Unit = {},
+    onAddAttachments: (List<AttachmentInput>) -> Unit = {},
+    onRemoveAttachment: (String) -> Unit = {},
+    onConfirmSend: () -> Unit = {},
+    onCancelSendConfirmation: () -> Unit = {},
+    onDismissAttachmentError: () -> Unit = {},
+    attachmentFile: (String) -> File? = { null },
     sendKey: SendKey = SendKey.ENTER,
     showTokenUsage: Boolean = false,
     loadRemoteImages: Boolean = false,
@@ -102,6 +131,12 @@ fun ChatScreen(
                 onEditLastUser = onEditLastUser,
                 onOpenProviders = onOpenProviders,
                 onOpenConversationSettings = onOpenConversationSettings,
+                onAddAttachments = onAddAttachments,
+                onRemoveAttachment = onRemoveAttachment,
+                onConfirmSend = onConfirmSend,
+                onCancelSendConfirmation = onCancelSendConfirmation,
+                onDismissAttachmentError = onDismissAttachmentError,
+                attachmentFile = attachmentFile,
                 sendKey = sendKey,
                 showTokenUsage = showTokenUsage,
                 loadRemoteImages = loadRemoteImages,
@@ -172,6 +207,12 @@ private fun ChatContent(
     onEditLastUser: (Message, String) -> Unit,
     onOpenProviders: () -> Unit,
     onOpenConversationSettings: () -> Unit,
+    onAddAttachments: (List<AttachmentInput>) -> Unit,
+    onRemoveAttachment: (String) -> Unit,
+    onConfirmSend: () -> Unit,
+    onCancelSendConfirmation: () -> Unit,
+    onDismissAttachmentError: () -> Unit,
+    attachmentFile: (String) -> File?,
     sendKey: SendKey,
     showTokenUsage: Boolean,
     loadRemoteImages: Boolean,
@@ -181,12 +222,57 @@ private fun ChatContent(
     dimensPadding: androidx.compose.ui.unit.Dp,
 ) {
     val dimens = LocalDimens.current
+    val context = LocalContext.current
     val modelLabel = state.conversation?.modelLabel
         ?: state.conversation?.modelId
         ?: "No model selected"
     val availability = state.availability
     val unavailable = availability?.takeIf { !it.available }
     val isEmpty = state.messages.isEmpty() && state.streaming == null
+
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        uri?.let { selected ->
+            readAttachmentInput(context, selected)?.let { input ->
+                onAddAttachments(listOf(input))
+            }
+        }
+    }
+
+    val documentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        val inputs = uris.mapNotNull { uri -> readAttachmentInput(context, uri) }
+        if (inputs.isNotEmpty()) onAddAttachments(inputs)
+    }
+
+    val pasteImage = {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val clip = clipboard?.primaryClip
+        val inputs = if (clip == null) {
+            emptyList()
+        } else {
+            (0 until clip.itemCount).mapNotNull { index ->
+                clip.getItemAt(index).uri?.let { uri -> readAttachmentInput(context, uri) }
+            }
+        }
+        if (inputs.isNotEmpty()) onAddAttachments(inputs)
+    }
+
+    val dropTarget = remember(context, onAddAttachments) {
+        object : DragAndDropTarget {
+            override fun onDrop(event: DragAndDropEvent): Boolean {
+                val clip = event.toAndroidDragEvent().clipData ?: return false
+                val inputs = (0 until clip.itemCount).mapNotNull { index ->
+                    clip.getItemAt(index).uri?.let { uri -> readAttachmentInput(context, uri) }
+                }
+                if (inputs.isEmpty()) return false
+                onAddAttachments(inputs)
+                return true
+            }
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -257,6 +343,18 @@ private fun ChatContent(
             }
         }
 
+        state.attachmentWarning?.let { warning ->
+            Text(
+                text = warning,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = dimensPadding, vertical = dimens.space1)
+                    .testTag(ChatScreenTestTags.AttachmentWarning),
+            )
+        }
+
         Box(modifier = Modifier.weight(1f)) {
             if (isEmpty) {
                 EmptyState(
@@ -279,23 +377,86 @@ private fun ChatContent(
                     loadRemoteImages = loadRemoteImages,
                     chatFontSize = chatFontSize,
                     zoneId = zoneId,
+                    attachments = state.attachmentsByMessage,
+                    attachmentFile = attachmentFile,
                 )
             }
         }
 
-        ChatComposer(
-            draft = state.draft,
-            onDraftChange = onDraftChange,
-            onSend = onSend,
-            onStop = onStop,
-            sendKey = sendKey,
-            enabled = availability?.available != false,
-            streaming = state.isStreaming,
-            sending = state.sending,
-            offline = offline,
-        )
+        Box(
+            modifier = Modifier.dragAndDropTarget(
+                shouldStartDragAndDrop = { event ->
+                    event.toAndroidDragEvent().clipData != null
+                },
+                target = dropTarget,
+            ),
+        ) {
+            ChatComposer(
+                draft = state.draft,
+                onDraftChange = onDraftChange,
+                onSend = onSend,
+                onStop = onStop,
+                sendKey = sendKey,
+                enabled = availability?.available != false,
+                streaming = state.isStreaming,
+                sending = state.sending,
+                offline = offline,
+                attachments = state.pendingAttachments,
+                attachmentWarning = state.attachmentWarning,
+                attachmentError = state.attachmentError,
+                attachmentFile = attachmentFile,
+                onAddPhoto = {
+                    photoPicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                onAddFile = {
+                    documentPicker.launch(
+                        arrayOf(
+                            "text/*",
+                            "application/json",
+                            "application/xml",
+                            "application/javascript",
+                        ),
+                    )
+                },
+                onPasteImage = pasteImage,
+                onRemoveAttachment = onRemoveAttachment,
+                onDismissAttachmentError = onDismissAttachmentError,
+            )
+        }
 
         ChatAnnouncement(state.announcement)
+    }
+
+    if (state.confirmSendWithUnsupportedAttachments) {
+        AlertDialog(
+            onDismissRequest = onCancelSendConfirmation,
+            modifier = Modifier.testTag(ChatScreenTestTags.SendConfirmation),
+            title = { Text("Send unsupported attachments?") },
+            text = {
+                Text(
+                    state.attachmentWarning
+                        ?: "The selected model cannot receive every attachment.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = onConfirmSend,
+                    modifier = Modifier.testTag(ChatScreenTestTags.SendAnyway),
+                ) {
+                    Text("Send anyway")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = onCancelSendConfirmation,
+                    modifier = Modifier.testTag(ChatScreenTestTags.CancelSend),
+                ) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
@@ -384,4 +545,68 @@ private fun ChatAnnouncement(message: String) {
                 liveRegion = LiveRegionMode.Polite
             },
     )
+}
+
+/**
+ * Read a content URI into an attachment input.
+ *
+ * The read is capped just above the image limit so a hostile provider cannot
+ * exhaust memory before validation rejects the file.
+ */
+private fun readAttachmentInput(context: Context, uri: Uri): AttachmentInput? {
+    val resolver = context.contentResolver
+    val mimeType = resolver.getType(uri).orEmpty()
+    var name = uri.lastPathSegment ?: "attachment"
+    var declaredSize = -1L
+
+    try {
+        resolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (nameIndex >= 0) {
+                    name = cursor.getString(nameIndex) ?: name
+                }
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) {
+                    declaredSize = cursor.getLong(sizeIndex)
+                }
+            }
+        }
+    } catch (_: Exception) {
+        // Fall back to the URI segment and the actual byte count.
+    }
+
+    val bytes = try {
+        resolver.openInputStream(uri)?.use { readAtMost(it, MAX_IMAGE_BYTES + 1) }
+    } catch (_: Exception) {
+        null
+    } ?: return null
+
+    return AttachmentInput(
+        name = name,
+        mimeType = mimeType,
+        size = if (declaredSize > 0) declaredSize else bytes.size.toLong(),
+        bytes = bytes,
+    )
+}
+
+private fun readAtMost(input: InputStream, limit: Long): ByteArray {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var total = 0L
+
+    while (total < limit) {
+        val read = input.read(buffer, 0, minOf(buffer.size.toLong(), limit - total).toInt())
+        if (read < 0) break
+        output.write(buffer, 0, read)
+        total += read
+    }
+
+    return output.toByteArray()
 }

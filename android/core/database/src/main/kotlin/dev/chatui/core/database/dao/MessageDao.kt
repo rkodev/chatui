@@ -61,6 +61,9 @@ abstract class MessageDao {
     @Query("SELECT * FROM messages WHERE id = :id")
     abstract suspend fun getById(id: String): MessageEntity?
 
+    @Query("SELECT id FROM messages")
+    abstract suspend fun allIds(): List<String>
+
     @Query(
         "SELECT COUNT(*) FROM messages " +
             "WHERE conversationId = :conversationId AND deletedAt IS NULL",

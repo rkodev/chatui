@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.chatui.core.database.attachment.AttachmentInput
+import dev.chatui.core.model.Attachment
+import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.ChatErrorCode
 import dev.chatui.core.model.ContentPart
@@ -14,6 +17,7 @@ import dev.chatui.core.model.MessageRole
 import dev.chatui.core.model.MessageStatus
 import dev.chatui.core.model.newId
 import dev.chatui.core.network.ProviderAdapter
+import dev.chatui.core.network.ResolvedAttachment
 import java.time.Clock
 import java.time.Instant
 import kotlinx.coroutines.CancellationException
@@ -44,6 +48,7 @@ class ChatViewModel(
     private val clock: Clock = Clock.systemUTC(),
     private val newId: () -> String = ::newId,
     private val drafts: ChatDrafts = InMemoryChatDrafts(),
+    private val attachments: ChatAttachmentStore? = null,
     persistIntervalMs: Long = DEFAULT_PERSIST_INTERVAL_MS,
 ) : ViewModel() {
     private val runner = ChatRunner(
@@ -69,10 +74,79 @@ class ChatViewModel(
         observeConversation()
         observeMessages()
         observeStreaming()
+        cleanupAttachments()
     }
 
     fun onDraftChange(text: String) {
         setDraft(text)
+    }
+
+    /** Add files from a picker, clipboard, or drag-and-drop. */
+    fun onAddAttachments(inputs: List<AttachmentInput>) {
+        val store = attachments ?: return
+        if (inputs.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                val result = store.addFiles(inputs)
+                _state.update { state ->
+                    state.copy(
+                        pendingAttachments = state.pendingAttachments + result.attachments,
+                        attachmentError = result.errors.firstOrNull()?.message,
+                        confirmSendWithUnsupportedAttachments = false,
+                    )
+                }
+                updateAttachmentWarning()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        attachmentError = error.message ?: "Could not add the attachment.",
+                    )
+                }
+            }
+        }
+    }
+
+    /** Remove a pending attachment and its local bytes. */
+    fun onRemoveAttachment(id: String) {
+        val store = attachments ?: return
+
+        viewModelScope.launch {
+            try {
+                store.remove(id)
+                _state.update { state ->
+                    state.copy(
+                        pendingAttachments = state.pendingAttachments.filterNot { it.id == id },
+                        confirmSendWithUnsupportedAttachments = false,
+                    )
+                }
+                updateAttachmentWarning()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        attachmentError = error.message ?: "Could not remove the attachment.",
+                    )
+                }
+            }
+        }
+    }
+
+    fun onDismissAttachmentError() {
+        _state.update { it.copy(attachmentError = null) }
+    }
+
+    /** Confirm sending even though the model cannot receive every attachment. */
+    fun onConfirmSend() {
+        _state.update { it.copy(confirmSendWithUnsupportedAttachments = false) }
+        sendNow()
+    }
+
+    fun onCancelSendConfirmation() {
+        _state.update { it.copy(confirmSendWithUnsupportedAttachments = false) }
     }
 
     fun onLoadOlder() {
@@ -120,7 +194,24 @@ class ChatViewModel(
         if (current.availability?.available == false) return
 
         val text = current.draft.trim()
-        if (text.isEmpty()) return
+        if (text.isEmpty() && current.pendingAttachments.isEmpty()) return
+
+        if (!current.attachmentSupport.supported) {
+            _state.update { it.copy(confirmSendWithUnsupportedAttachments = true) }
+            return
+        }
+
+        sendNow()
+    }
+
+    private fun sendNow() {
+        val current = _state.value
+        if (current.sending || current.isStreaming) return
+        if (current.availability?.available == false) return
+
+        val text = current.draft.trim()
+        val pending = current.pendingAttachments
+        if (text.isEmpty() && pending.isEmpty()) return
 
         _state.update { it.copy(sending = true, error = null, notice = null) }
 
@@ -133,14 +224,18 @@ class ChatViewModel(
                 val userMessage = newUserMessage(
                     conversation = conversation,
                     text = text,
+                    attachments = pending,
                     sequence = nextSequence,
                     now = clock.instant(),
                     id = newId(),
                 )
+                val requestMessages = history + userMessage
+                val resolved = resolveAttachments(requestMessages)
                 val request = buildChatRequest(
                     conversation = conversation,
                     modelRemoteId = context.modelRemoteId,
-                    messages = history + userMessage,
+                    messages = requestMessages,
+                    attachments = resolved,
                 )
                 val result = runner.send(
                     ChatRunInput(
@@ -151,7 +246,12 @@ class ChatViewModel(
                         assistantSequence = nextSequence + 1,
                     ),
                 )
-                applyResult(result, draftOnFailure = text)
+                applyResult(
+                    result = result,
+                    draftOnFailure = text,
+                    userMessage = userMessage,
+                    pending = pending,
+                )
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -185,6 +285,7 @@ class ChatViewModel(
                     conversation = conversation,
                     modelRemoteId = context.modelRemoteId,
                     messages = beforeTarget,
+                    attachments = resolveAttachments(beforeTarget),
                 )
                 val result = runner.regenerate(
                     RegenerateInput(
@@ -224,6 +325,7 @@ class ChatViewModel(
                     conversation = conversation,
                     modelRemoteId = context.modelRemoteId,
                     messages = beforeTarget,
+                    attachments = resolveAttachments(beforeTarget),
                 )
                 val result = runner.retry(
                     RegenerateInput(
@@ -282,10 +384,14 @@ class ChatViewModel(
                     updatedAt = clock.instant(),
                 )
                 val beforeTarget = history.filter { it.sequence < target.sequence }
+                val truncated = history
+                    .filter { it.sequence > target.sequence }
+                    .map { it.id } + target.id
                 val request = buildChatRequest(
                     conversation = conversation,
                     modelRemoteId = context.modelRemoteId,
                     messages = beforeTarget + updatedTarget,
+                    attachments = resolveAttachments(beforeTarget + updatedTarget),
                 )
                 val result = runner.editAndResend(
                     EditAndResendInput(
@@ -296,6 +402,11 @@ class ChatViewModel(
                     ),
                 )
                 applyResult(result, draftOnFailure = null)
+                if (result is ChatRunResult.Success ||
+                    (result is ChatRunResult.Failure && result.userMessagePersisted)
+                ) {
+                    attachments?.deleteForMessages(truncated)
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -328,21 +439,22 @@ class ChatViewModel(
     private fun observeConversation() {
         viewModelScope.launch {
             try {
-                val conversation = conversations.getConversation(conversationId)
-                _state.update {
-                    it.copy(
-                        conversation = conversation,
-                        loading = false,
-                        error = if (conversation == null) {
-                            invalidTargetError("Conversation $conversationId was not found.")
-                        } else {
-                            it.error
-                        },
-                    )
-                }
+                conversations.observeConversation(conversationId).collect { conversation ->
+                    _state.update {
+                        it.copy(
+                            conversation = conversation,
+                            loading = false,
+                            error = if (conversation == null) {
+                                invalidTargetError("Conversation $conversationId was not found.")
+                            } else {
+                                it.error
+                            },
+                        )
+                    }
 
-                if (conversation != null) {
-                    refreshAvailability(conversation)
+                    if (conversation != null) {
+                        refreshAvailability(conversation)
+                    }
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -387,6 +499,7 @@ class ChatViewModel(
                                 all.any { message -> message.sequence < cursor },
                         )
                     }
+                    refreshAttachments(window)
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -438,7 +551,13 @@ class ChatViewModel(
     private suspend fun refreshAvailability(conversation: Conversation) {
         when (val result = contextResolver.resolve(conversation)) {
             is ChatContextResult.Ready -> {
-                _state.update { it.copy(availability = ChatAvailability(available = true)) }
+                _state.update {
+                    it.copy(
+                        availability = ChatAvailability(available = true),
+                        modelInputModalities = result.context.inputModalities,
+                    )
+                }
+                updateAttachmentWarning()
             }
 
             is ChatContextResult.Unavailable -> {
@@ -452,7 +571,13 @@ class ChatViewModel(
     private suspend fun resolveContext(conversation: Conversation): ChatContext? =
         when (val result = contextResolver.resolve(conversation)) {
             is ChatContextResult.Ready -> {
-                _state.update { it.copy(availability = ChatAvailability(available = true)) }
+                _state.update {
+                    it.copy(
+                        availability = ChatAvailability(available = true),
+                        modelInputModalities = result.context.inputModalities,
+                    )
+                }
+                updateAttachmentWarning()
                 result.context
             }
 
@@ -476,7 +601,12 @@ class ChatViewModel(
             message = message,
         )
 
-    private fun applyResult(result: ChatRunResult, draftOnFailure: String?) {
+    private fun applyResult(
+        result: ChatRunResult,
+        draftOnFailure: String?,
+        userMessage: Message? = null,
+        pending: List<Attachment> = emptyList(),
+    ) {
         when (result) {
             is ChatRunResult.Success -> {
                 _state.update {
@@ -487,6 +617,7 @@ class ChatViewModel(
                     )
                 }
                 setDraft("")
+                bindAttachments(userMessage, pending)
             }
 
             is ChatRunResult.Failure -> {
@@ -503,6 +634,83 @@ class ChatViewModel(
                     )
                 }
                 setDraft(nextDraft)
+                if (result.userMessagePersisted) {
+                    bindAttachments(userMessage, pending)
+                }
+            }
+        }
+    }
+
+    private fun bindAttachments(userMessage: Message?, pending: List<Attachment>) {
+        if (userMessage == null || pending.isEmpty()) return
+        val store = attachments ?: return
+        val ids = pending.map { it.id }
+
+        _state.update { it.copy(pendingAttachments = emptyList()) }
+        updateAttachmentWarning()
+
+        viewModelScope.launch {
+            try {
+                store.attachToMessage(ids, userMessage.id)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                // The rows stay unbound and are removed by the next orphan cleanup.
+            }
+        }
+    }
+
+    private suspend fun resolveAttachments(
+        messages: List<Message>,
+    ): Map<String, ResolvedAttachment> {
+        val store = attachments ?: return emptyMap()
+        return store.resolveForMessages(messages).mapValues { (_, value) ->
+            ResolvedAttachment(
+                mimeType = value.mimeType,
+                name = value.name,
+                dataBase64 = value.dataBase64,
+            )
+        }
+    }
+
+    private suspend fun refreshAttachments(messages: List<Message>) {
+        val store = attachments ?: return
+        val ids = messages
+            .flatMap { it.parts }
+            .mapNotNull { part ->
+                when (part) {
+                    is ContentPart.Image -> part.attachmentId
+                    is ContentPart.File -> part.attachmentId
+                    else -> null
+                }
+            }
+            .toSet()
+
+        val loaded = ids.mapNotNull { id -> store.get(id)?.let { id to it } }.toMap()
+        _state.update { it.copy(attachmentsByMessage = loaded) }
+    }
+
+    private fun updateAttachmentWarning() {
+        _state.update { state ->
+            state.copy(
+                attachmentWarning = attachmentSupport(
+                    state.pendingAttachments,
+                    state.modelInputModalities,
+                ).message,
+            )
+        }
+    }
+
+    private fun cleanupAttachments() {
+        val store = attachments ?: return
+        val startedAt = clock.instant()
+        viewModelScope.launch {
+            try {
+                store.cleanupOrphans(startedAt)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                // Cleanup is best-effort; a later startup retries it.
             }
         }
     }
@@ -537,28 +745,54 @@ class ChatViewModel(
     private fun newUserMessage(
         conversation: Conversation,
         text: String,
+        attachments: List<Attachment>,
         sequence: Long,
         now: Instant,
         id: String,
-    ): Message = Message(
-        id = id,
-        conversationId = conversation.id,
-        sequence = sequence,
-        role = MessageRole.USER,
-        parts = listOf(ContentPart.Text(text)),
-        status = MessageStatus.COMPLETE,
-        providerId = conversation.providerId,
-        modelId = conversation.modelId,
-        modelLabel = conversation.modelLabel,
-        usage = null,
-        finishReason = null,
-        error = null,
-        latencyMs = null,
-        firstTokenMs = null,
-        createdAt = now,
-        updatedAt = now,
-        deletedAt = null,
-    )
+    ): Message {
+        val parts = buildList {
+            if (text.isNotEmpty()) add(ContentPart.Text(text))
+            attachments.forEach { attachment ->
+                when (attachment.kind) {
+                    AttachmentKind.IMAGE -> add(
+                        ContentPart.Image(
+                            attachmentId = attachment.id,
+                            mimeType = attachment.mimeType,
+                            alt = attachment.name,
+                        ),
+                    )
+
+                    AttachmentKind.FILE -> add(
+                        ContentPart.File(
+                            attachmentId = attachment.id,
+                            mimeType = attachment.mimeType,
+                            name = attachment.name,
+                        ),
+                    )
+                }
+            }
+        }
+
+        return Message(
+            id = id,
+            conversationId = conversation.id,
+            sequence = sequence,
+            role = MessageRole.USER,
+            parts = parts,
+            status = MessageStatus.COMPLETE,
+            providerId = conversation.providerId,
+            modelId = conversation.modelId,
+            modelLabel = conversation.modelLabel,
+            usage = null,
+            finishReason = null,
+            error = null,
+            latencyMs = null,
+            firstTokenMs = null,
+            createdAt = now,
+            updatedAt = now,
+            deletedAt = null,
+        )
+    }
 
     private fun storageError(message: String): ChatError = ChatError(
         code = ChatErrorCode.STORAGE,
@@ -594,6 +828,7 @@ class ChatViewModel(
             clock: Clock = Clock.systemUTC(),
             newId: () -> String = ::newId,
             drafts: ChatDrafts = InMemoryChatDrafts(),
+            attachments: ChatAttachmentStore? = null,
             persistIntervalMs: Long = DEFAULT_PERSIST_INTERVAL_MS,
         ): ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -606,6 +841,7 @@ class ChatViewModel(
                     clock = clock,
                     newId = newId,
                     drafts = drafts,
+                    attachments = attachments,
                     persistIntervalMs = persistIntervalMs,
                 )
             }
