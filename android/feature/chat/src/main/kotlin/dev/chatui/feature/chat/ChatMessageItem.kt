@@ -38,6 +38,7 @@ import java.time.format.DateTimeFormatter
 /** Test tags exposed by one message row. */
 object ChatMessageTestTags {
     const val Reasoning = "chat-message-reasoning"
+    const val ReasoningText = "chat-message-reasoning-text"
     const val Typing = "chat-message-typing"
     const val Cancelled = "chat-message-cancelled"
     const val Error = "chat-message-error"
@@ -93,6 +94,7 @@ fun ChatMessageItem(
     modifier: Modifier = Modifier,
     chatFontSize: ChatFontSize = ChatFontSize.MD,
     showTokenUsage: Boolean = false,
+    loadRemoteImages: Boolean = false,
     isActiveStream: Boolean = false,
     showActions: Boolean = true,
     canRegenerate: Boolean = false,
@@ -171,6 +173,7 @@ fun ChatMessageItem(
                         text = reasoning.joinToString("\n"),
                         style = bodyStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag(ChatMessageTestTags.ReasoningText),
                     )
                 }
             }
@@ -180,6 +183,7 @@ fun ChatMessageItem(
                     content = part,
                     modifier = Modifier.testTag(ChatMessageTestTags.text(message.id)),
                     chatFontSize = chatFontSize,
+                    loadRemoteImages = loadRemoteImages,
                 )
             }
 
