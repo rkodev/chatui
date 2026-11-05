@@ -61,6 +61,7 @@ class ChatScreenTest {
         onRegenerateMessage: (dev.chatui.core.model.Message) -> Unit = {},
         onEditLastUser: (dev.chatui.core.model.Message, String) -> Unit = { _, _ -> },
         onOpenProviders: () -> Unit = {},
+        onOpenConversationSettings: () -> Unit = {},
     ) {
         composeRule.setContent {
             ChatUiTheme {
@@ -75,6 +76,7 @@ class ChatScreenTest {
                     onRegenerateMessage = onRegenerateMessage,
                     onEditLastUser = onEditLastUser,
                     onOpenProviders = onOpenProviders,
+                    onOpenConversationSettings = onOpenConversationSettings,
                     zoneId = java.time.ZoneOffset.UTC,
                 )
             }
@@ -294,5 +296,15 @@ class ChatScreenTest {
 
         composeRule.onNodeWithTag(ChatScreenTestTags.Announcement)
             .assertContentDescriptionEquals("Response complete")
+    }
+
+    @Test
+    fun `conversation settings entry point is available from the header`() {
+        var opened = 0
+        screen(state(), onOpenConversationSettings = { opened += 1 })
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.ConversationSettings).performClick()
+
+        assertThat(opened).isEqualTo(1)
     }
 }

@@ -62,7 +62,7 @@
 | 25 | [M2-06.2 Android Gemini adapter](M2-06.2-android-gemini-adapter.md) | Complete | M2-05.4 | android | M2-06.1, M2-06.3, M2-02.2 |
 | 26 | [M2-06.3 Android Ollama adapter](M2-06.3-android-ollama-adapter.md) | Complete | M2-05.4 | android | M2-06.1, M2-06.2, M2-02.3 |
 | 27 | [M2-06.4 Android content and reasoning rendering](M2-06.4-android-content-rendering.md) | Complete | M2-05.4 | android | M2-06.5 |
-| 28 | [M2-06.5 Android parameters, conversation settings, and settings screens](M2-06.5-android-parameters-settings.md) | Not started | M2-05.4 | android | M2-06.4 |
+| 28 | [M2-06.5 Android parameters, conversation settings, and settings screens](M2-06.5-android-parameters-settings.md) | Complete | M2-05.4 | android | M2-06.4 |
 | 29 | [M2-06.6 Android attachments end-to-end](M2-06.6-android-attachments.md) | Not started | M2-06.4, M2-06.5 | android | M2-03.3 |
 | 30 | [M2-07.1 Android conversation search](M2-07.1-android-search.md) | Not started | M2-06.5 | android | M2-07.2 no; conversation files shared |
 | 31 | [M2-07.2 Android pin, archive, and delete undo](M2-07.2-android-pin-archive-undo.md) | Not started | M2-07.1 | android | M2-04.2 |

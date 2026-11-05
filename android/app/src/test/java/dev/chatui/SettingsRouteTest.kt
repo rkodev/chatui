@@ -5,8 +5,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
-import dev.chatui.shell.SettingsRoute
-import dev.chatui.shell.SettingsTestTags
+import dev.chatui.feature.settings.SettingsRootScreen
+import dev.chatui.feature.settings.SettingsTestTags
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,17 +20,27 @@ class SettingsRouteTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `settings exposes the provider management entry point`() {
-        var opened = 0
+    fun `settings root exposes every section and the provider entry point`() {
+        var openedProviders = 0
+        var openedAppearance = 0
 
         composeRule.setContent {
             ChatUiTheme {
-                SettingsRoute(onOpenProviders = { opened += 1 })
+                SettingsRootScreen(
+                    onOpenAppearance = { openedAppearance += 1 },
+                    onOpenChatDefaults = {},
+                    onOpenProviders = { openedProviders += 1 },
+                    onOpenData = {},
+                    onOpenBackup = {},
+                    onOpenAbout = {},
+                )
             }
         }
 
-        composeRule.onNodeWithTag(SettingsTestTags.ManageProviders).performClick()
+        composeRule.onNodeWithTag(SettingsTestTags.Providers).performClick()
+        composeRule.onNodeWithTag(SettingsTestTags.Appearance).performClick()
 
-        assertThat(opened).isEqualTo(1)
+        assertThat(openedProviders).isEqualTo(1)
+        assertThat(openedAppearance).isEqualTo(1)
     }
 }

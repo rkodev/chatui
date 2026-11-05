@@ -338,13 +338,46 @@ class FakeProviderManagementService : ProviderManagementService {
                 "Model $modelId was not found.",
             )
         lastSelectedModelId = modelId
+        val provider = providersFlow.value.firstOrNull { it.id == model.providerId }
+        val params = if (provider != null && conversation.providerId != provider.id) {
+            conversation.params.copy(
+                extra = pruneExtrasForPreset(conversation.params.extra, provider.presetId),
+            )
+        } else {
+            conversation.params
+        }
         val updated = conversation.copy(
             providerId = model.providerId,
             modelId = model.id,
             modelLabel = model.label,
+            params = params,
         )
         conversations[conversationId] = updated
         return updated
+    }
+
+    override suspend fun setConversationSettings(
+        conversationId: String,
+        systemPrompt: String?,
+        params: dev.chatui.core.model.ChatParams?,
+    ): Conversation {
+        error?.let { throw it }
+        val conversation = conversations[conversationId]
+            ?: throw ProviderManagementException(
+                ProviderManagementErrorCode.NOT_FOUND,
+                "Conversation $conversationId was not found.",
+            )
+        val updated = conversation.copy(
+            systemPrompt = systemPrompt ?: conversation.systemPrompt,
+            params = params ?: conversation.params,
+        )
+        conversations[conversationId] = updated
+        return updated
+    }
+
+    override suspend fun deleteConversation(conversationId: String) {
+        error?.let { throw it }
+        conversations.remove(conversationId)
     }
 
     override suspend fun getConversationRouting(conversationId: String): RoutingPreferences =

@@ -9,6 +9,7 @@ import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.shell.ChatDestination
 import dev.chatui.shell.ProviderDestination
+import dev.chatui.shell.SettingsDestination
 import dev.chatui.shell.ShellDestination
 import dev.chatui.shell.shellDestinations
 import dev.chatui.shell.shellStartDestination
@@ -29,8 +30,21 @@ class ShellNavigationTest {
         }
         assertThat(navController.graph.findNode(ChatDestination.ROUTE)).isNotNull()
         assertThat(navController.graph.findNode(ProviderDestination.ROUTE)).isNotNull()
+        assertThat(navController.graph.findNode(SettingsDestination.APPEARANCE)).isNotNull()
+        assertThat(navController.graph.findNode(SettingsDestination.CHAT_DEFAULTS)).isNotNull()
+        assertThat(navController.graph.findNode(SettingsDestination.DATA)).isNotNull()
+        assertThat(navController.graph.findNode(SettingsDestination.BACKUP)).isNotNull()
+        assertThat(navController.graph.findNode(SettingsDestination.ABOUT)).isNotNull()
         assertThat(navController.graph.startDestinationRoute)
             .isEqualTo(ShellDestination.Conversations.route)
+    }
+
+    @Test
+    fun `settings section routes keep the settings destination selected`() {
+        assertThat(ShellDestination.Settings.matches("settings")).isTrue()
+        assertThat(ShellDestination.Settings.matches("settings/appearance")).isTrue()
+        assertThat(ShellDestination.Settings.matches("settings/chat")).isTrue()
+        assertThat(ShellDestination.Settings.matches("providers")).isFalse()
     }
 
     @Test

@@ -9,6 +9,7 @@ import dev.chatui.core.database.repository.ConversationRepository
 import dev.chatui.core.database.repository.ModelRepository
 import dev.chatui.core.database.repository.ProviderRepository
 import dev.chatui.core.datastore.settings.SettingsDataStore
+import dev.chatui.core.model.ChatParams
 import dev.chatui.core.model.Conversation
 import dev.chatui.core.model.InputModality
 import dev.chatui.core.model.Model
@@ -130,6 +131,21 @@ interface ProviderManagementService {
     suspend fun getConversation(conversationId: String): Conversation?
 
     suspend fun setConversationModel(conversationId: String, modelId: String): Conversation
+
+    /**
+     * Persist the per-conversation system prompt and/or generation parameters.
+     *
+     * A null argument leaves that field unchanged. Values are written
+     * immediately so the next send uses them.
+     */
+    suspend fun setConversationSettings(
+        conversationId: String,
+        systemPrompt: String? = null,
+        params: ChatParams? = null,
+    ): Conversation
+
+    /** Hard-delete a conversation and clear a matching last-active pointer. */
+    suspend fun deleteConversation(conversationId: String)
 
     suspend fun getConversationRouting(conversationId: String): RoutingPreferences
 
@@ -337,14 +353,48 @@ class DefaultProviderManagementService @Inject constructor(
             )
         }
 
+        val params = if (conversation.providerId != provider.id) {
+            conversation.params.copy(
+                extra = pruneExtrasForPreset(conversation.params.extra, provider.presetId),
+            )
+        } else {
+            conversation.params
+        }
+
         return conversations.update(
             conversation.copy(
                 providerId = provider.id,
                 modelId = model.id,
                 modelLabel = model.label,
+                params = params,
                 updatedAt = clock.instant(),
             ),
         )
+    }
+
+    override suspend fun setConversationSettings(
+        conversationId: String,
+        systemPrompt: String?,
+        params: ChatParams?,
+    ): Conversation {
+        val conversation = requireConversation(conversationId)
+
+        return conversations.update(
+            conversation.copy(
+                systemPrompt = systemPrompt ?: conversation.systemPrompt,
+                params = params ?: conversation.params,
+                updatedAt = clock.instant(),
+            ),
+        )
+    }
+
+    override suspend fun deleteConversation(conversationId: String) {
+        requireConversation(conversationId)
+        conversations.delete(conversationId)
+
+        if (settings.current().lastActiveConversationId == conversationId) {
+            settings.setLastActiveConversation(null)
+        }
     }
 
     override suspend fun getConversationRouting(conversationId: String): RoutingPreferences {

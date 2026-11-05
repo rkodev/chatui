@@ -21,6 +21,7 @@ fun ChatRoute(
     dependencies: ChatDependencies,
     onBack: () -> Unit,
     onOpenProviders: () -> Unit,
+    onOpenConversationSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
     persistIntervalMs: Long = DEFAULT_PERSIST_INTERVAL_MS,
 ) {
@@ -56,8 +57,10 @@ fun ChatRoute(
         onEditLastUser = viewModel::onEditAndResend,
         onBack = onBack,
         onOpenProviders = onOpenProviders,
+        onOpenConversationSettings = onOpenConversationSettings,
         sendKey = settings.sendKey,
         showTokenUsage = settings.showTokenUsage,
+        loadRemoteImages = settings.loadRemoteImages,
         chatFontSize = settings.chatFontSize,
         offline = !online,
         modifier = modifier,

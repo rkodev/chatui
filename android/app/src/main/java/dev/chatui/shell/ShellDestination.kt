@@ -59,5 +59,6 @@ enum class ShellDestination(
     fun matches(route: String?): Boolean =
         route == this.route ||
             (this == Chat && route?.startsWith("chat/") == true) ||
-            (this == Providers && route?.startsWith("providers/") == true)
+            (this == Providers && route?.startsWith("providers/") == true) ||
+            (this == Settings && route?.startsWith("settings/") == true)
 }

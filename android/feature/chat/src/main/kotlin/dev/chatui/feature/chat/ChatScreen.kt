@@ -47,6 +47,7 @@ object ChatScreenTestTags {
     const val Announcement = "chat-screen-announcement"
     const val Back = "chat-screen-back"
     const val OpenProviders = "chat-screen-open-providers"
+    const val ConversationSettings = "chat-screen-conversation-settings"
 }
 
 /**
@@ -70,8 +71,10 @@ fun ChatScreen(
     modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
     onOpenProviders: () -> Unit = {},
+    onOpenConversationSettings: () -> Unit = {},
     sendKey: SendKey = SendKey.ENTER,
     showTokenUsage: Boolean = false,
+    loadRemoteImages: Boolean = false,
     chatFontSize: ChatFontSize = ChatFontSize.MD,
     offline: Boolean = false,
     zoneId: ZoneId = ZoneId.systemDefault(),
@@ -98,8 +101,10 @@ fun ChatScreen(
                 onRegenerateMessage = onRegenerateMessage,
                 onEditLastUser = onEditLastUser,
                 onOpenProviders = onOpenProviders,
+                onOpenConversationSettings = onOpenConversationSettings,
                 sendKey = sendKey,
                 showTokenUsage = showTokenUsage,
+                loadRemoteImages = loadRemoteImages,
                 chatFontSize = chatFontSize,
                 offline = offline,
                 zoneId = zoneId,
@@ -166,8 +171,10 @@ private fun ChatContent(
     onRegenerateMessage: (Message) -> Unit,
     onEditLastUser: (Message, String) -> Unit,
     onOpenProviders: () -> Unit,
+    onOpenConversationSettings: () -> Unit,
     sendKey: SendKey,
     showTokenUsage: Boolean,
+    loadRemoteImages: Boolean,
     chatFontSize: ChatFontSize,
     offline: Boolean,
     zoneId: ZoneId,
@@ -202,6 +209,14 @@ private fun ChatContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+            TextButton(
+                onClick = onOpenConversationSettings,
+                modifier = Modifier
+                    .heightIn(min = dimens.touchTargetMin)
+                    .testTag(ChatScreenTestTags.ConversationSettings),
+            ) {
+                Text("Settings")
             }
             AssistChip(
                 onClick = onOpenProviders,
@@ -261,6 +276,7 @@ private fun ChatContent(
                     onEditLastUser = onEditLastUser,
                     actionsEnabled = !state.isStreaming && !state.sending,
                     showTokenUsage = showTokenUsage,
+                    loadRemoteImages = loadRemoteImages,
                     chatFontSize = chatFontSize,
                     zoneId = zoneId,
                 )
