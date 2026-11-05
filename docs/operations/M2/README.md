@@ -55,7 +55,7 @@
 | 18 | [M2-04.5 Web data controls](M2-04.5-web-data-controls.md) | Complete | M2-04.3, M2-04.4 | web | M2-07.5 |
 | 19 | [M2-04.6 Web Playwright suite](M2-04.6-web-playwright.md) | Complete | M2-04.1 through M2-04.5, M2-03.3 | web | M2-08.2 |
 | 20 | [M2-05.1 Android OpenAI-compatible transport](M2-05.1-android-openai-compatible-transport.md) | Complete | M2-00.2 | android | M2-01.1 |
-| 21 | [M2-05.2 Android preset enablement and Custom providers](M2-05.2-android-preset-enablement-custom.md) | Not started | M2-05.1 | android | M2-01.2 |
+| 21 | [M2-05.2 Android preset enablement and Custom providers](M2-05.2-android-preset-enablement-custom.md) | Complete | M2-05.1 | android | M2-01.2 |
 | 22 | [M2-05.3 Android discovery, fallback, capabilities, and reasoning](M2-05.3-android-discovery-capability-reasoning.md) | Not started | M2-05.2 | android | M2-01.3 |
 | 23 | [M2-05.4 Android provider UI and shell wiring](M2-05.4-android-provider-ui-shell.md) | Not started | M2-05.3 | android | none; blocks Android adapter tasks |
 | 24 | [M2-06.1 Android Anthropic adapter](M2-06.1-android-anthropic-adapter.md) | Not started | M2-05.4 | android | M2-06.2, M2-06.3, M2-02.1 |

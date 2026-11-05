@@ -38,16 +38,40 @@ class ProviderRegistryTest {
     }
 
     @Test
-    fun `M1 gating exposes only openrouter`() {
-        assertThat(registry.getEnabledPresets().map { it.id }).containsExactly("openrouter")
-        assertThat(isPresetEnabledInM1("openrouter")).isTrue()
-        assertThat(isPresetEnabledInM1("openai")).isFalse()
+    fun `M2 gating exposes OpenAI-compatible presets and custom`() {
+        val enabled = registry.getEnabledPresets().map { it.id }
+
+        assertThat(enabled).containsExactly(
+            "openrouter",
+            "openai",
+            "groq",
+            "mistral",
+            "deepseek",
+            "xai",
+            "together",
+            "fireworks",
+            "lmstudio",
+            "llamacpp",
+            "custom",
+        )
+        assertThat(registry.getEnabledPresets().all { it.kind == ProviderKind.OPENAI_COMPATIBLE })
+            .isTrue()
+
+        assertThat(isPresetEnabledInM2("openrouter")).isTrue()
+        assertThat(isPresetEnabledInM2("openai")).isTrue()
+        assertThat(isPresetEnabledInM2("custom")).isTrue()
+        assertThat(isPresetEnabledInM2("anthropic")).isFalse()
+        assertThat(isPresetEnabledInM2("google")).isFalse()
+        assertThat(isPresetEnabledInM2("ollama")).isFalse()
 
         val availability = registry.getPresetAvailability()
         assertThat(availability.filter { it.enabled }.map { it.preset.id })
-            .containsExactly("openrouter")
-        assertThat(availability.filter { !it.enabled }).hasSize(registry.presets.size - 1)
+            .containsExactlyElementsIn(enabled)
         assertThat(availability.first { it.preset.id == "openai" }.status)
+            .isEqualTo(PresetAvailabilityStatus.AVAILABLE)
+        assertThat(availability.first { it.preset.id == "anthropic" }.status)
+            .isEqualTo(PresetAvailabilityStatus.COMING_LATER)
+        assertThat(availability.first { it.preset.id == "ollama" }.status)
             .isEqualTo(PresetAvailabilityStatus.COMING_LATER)
     }
 

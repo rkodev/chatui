@@ -87,11 +87,14 @@ class AppModuleTest {
     }
 
     @Test
-    fun `provides the provider registry with OpenRouter enabled`() {
+    fun `provides the provider registry with M2 presets enabled`() {
         val registry = AppModule.provideProviderRegistry()
+        val enabled = registry.getEnabledPresets().map { it.id }
 
         assertThat(registry.getPreset("openrouter")).isNotNull()
-        assertThat(registry.getEnabledPresets().map { it.id }).containsExactly("openrouter")
+        assertThat(enabled).contains("openai")
+        assertThat(enabled).contains("custom")
+        assertThat(enabled).doesNotContain("anthropic")
     }
 
     @Test

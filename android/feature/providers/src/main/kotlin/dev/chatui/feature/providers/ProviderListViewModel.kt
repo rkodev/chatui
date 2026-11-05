@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.chatui.core.model.Provider
+import dev.chatui.core.model.ProviderAuthType
+import dev.chatui.core.providers.CreateCustomProviderInput
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,19 +15,38 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** One editable non-secret header row in the Custom provider form. */
+data class CustomHeaderField(
+    val name: String = "",
+    val value: String = "",
+)
+
+/** Editable state for the Custom provider creation form. */
+data class CustomProviderFormState(
+    val label: String = "",
+    val baseUrl: String = "",
+    val authType: ProviderAuthType = ProviderAuthType.BEARER,
+    val apiKey: String = "",
+    val headers: List<CustomHeaderField> = emptyList(),
+    val error: String? = null,
+)
+
 /** One immutable state for the provider list. */
 data class ProviderListUiState(
     val providers: List<Provider> = emptyList(),
     val options: List<ProviderAvailability> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
+    val customForm: CustomProviderFormState = CustomProviderFormState(),
+    val creatingCustom: Boolean = false,
+    val notice: String? = null,
 )
 
 /**
  * Provider list state holder.
  *
- * Only OpenRouter is enabled in M1. Other presets are shown as "Coming later"
- * and there is no custom-provider creation path.
+ * M2 enables every OpenAI-compatible preset and Custom provider creation.
+ * Native-adapter presets remain visible as "Coming later".
  */
 class ProviderListViewModel(
     private val service: ProviderManagementService,
@@ -41,6 +62,116 @@ class ProviderListViewModel(
 
     fun onRetry() {
         observeProviders()
+    }
+
+    fun onCustomLabelChanged(value: String) {
+        updateCustomForm { it.copy(label = value, error = null) }
+    }
+
+    fun onCustomBaseUrlChanged(value: String) {
+        updateCustomForm { it.copy(baseUrl = value, error = null) }
+    }
+
+    fun onCustomAuthTypeChanged(value: ProviderAuthType) {
+        updateCustomForm { it.copy(authType = value, error = null) }
+    }
+
+    fun onCustomApiKeyChanged(value: String) {
+        updateCustomForm { it.copy(apiKey = value, error = null) }
+    }
+
+    fun onAddCustomHeader() {
+        updateCustomForm { it.copy(headers = it.headers + CustomHeaderField()) }
+    }
+
+    fun onCustomHeaderNameChanged(index: Int, value: String) {
+        updateCustomHeader(index) { it.copy(name = value) }
+    }
+
+    fun onCustomHeaderValueChanged(index: Int, value: String) {
+        updateCustomHeader(index) { it.copy(value = value) }
+    }
+
+    fun onRemoveCustomHeader(index: Int) {
+        updateCustomForm { form ->
+            if (index !in form.headers.indices) {
+                form
+            } else {
+                form.copy(headers = form.headers.filterIndexed { i, _ -> i != index })
+            }
+        }
+    }
+
+    fun onCreateCustomProvider() {
+        val current = _state.value
+        if (current.creatingCustom) {
+            return
+        }
+
+        val form = current.customForm
+        _state.update {
+            it.copy(
+                creatingCustom = true,
+                notice = null,
+                customForm = form.copy(error = null),
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                service.createCustomProvider(
+                    CreateCustomProviderInput(
+                        baseUrl = form.baseUrl,
+                        authType = form.authType,
+                        apiKey = form.apiKey.takeIf { it.isNotBlank() },
+                        label = form.label.takeIf { it.isNotBlank() },
+                        headers = form.headers
+                            .filter { it.name.isNotBlank() || it.value.isNotBlank() }
+                            .associate { it.name.trim() to it.value.trim() },
+                    ),
+                )
+                _state.update {
+                    it.copy(
+                        creatingCustom = false,
+                        customForm = CustomProviderFormState(),
+                        notice = "Custom provider added.",
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        creatingCustom = false,
+                        customForm = it.customForm.copy(
+                            error = providerErrorMessage(error),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun updateCustomForm(transform: (CustomProviderFormState) -> CustomProviderFormState) {
+        _state.update { it.copy(customForm = transform(it.customForm)) }
+    }
+
+    private fun updateCustomHeader(
+        index: Int,
+        transform: (CustomHeaderField) -> CustomHeaderField,
+    ) {
+        updateCustomForm { form ->
+            if (index !in form.headers.indices) {
+                form
+            } else {
+                form.copy(
+                    headers = form.headers.mapIndexed { i, header ->
+                        if (i == index) transform(header) else header
+                    },
+                    error = null,
+                )
+            }
+        }
     }
 
     private fun observeProviders() {

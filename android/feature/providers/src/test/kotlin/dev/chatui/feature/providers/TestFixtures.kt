@@ -16,6 +16,8 @@ import dev.chatui.core.model.OutputModality
 import dev.chatui.core.model.Provider
 import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.model.ProviderKind
+import dev.chatui.core.providers.CreateCustomProviderInput
+import dev.chatui.core.providers.CreatePresetProviderInput
 import dev.chatui.core.providers.RefreshModelsResult
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
@@ -163,7 +165,9 @@ class FakeProviderManagementService : ProviderManagementService {
     var routing: MutableMap<String, RoutingPreferences> = mutableMapOf()
     var options: List<ProviderAvailability> = listOf(
         ProviderAvailability("openrouter", "OpenRouter", true, true, null),
-        ProviderAvailability("openai", "OpenAI", false, false, "Coming later"),
+        ProviderAvailability("openai", "OpenAI", true, false, null),
+        ProviderAvailability("custom", "Custom", true, false, null),
+        ProviderAvailability("anthropic", "Anthropic", false, false, "Coming later"),
     )
     var docsUrl: String? = "https://openrouter.ai/docs"
     var error: Throwable? = null
@@ -171,6 +175,9 @@ class FakeProviderManagementService : ProviderManagementService {
     var lastRotatedKey: String? = null
     var lastSelectedModelId: String? = null
     var lastRouting: RoutingPreferences? = null
+    var lastCustomInput: CreateCustomProviderInput? = null
+    var lastPresetInput: CreatePresetProviderInput? = null
+    var createError: Throwable? = null
     var refreshCalls: Int = 0
 
     override fun observeProviders(): Flow<List<Provider>> =
@@ -182,6 +189,36 @@ class FakeProviderManagementService : ProviderManagementService {
     override suspend fun getProvider(providerId: String): Provider? {
         error?.let { throw it }
         return providersFlow.value.firstOrNull { it.id == providerId }
+    }
+
+    override suspend fun createPresetProvider(input: CreatePresetProviderInput): Provider {
+        createError?.let { throw it }
+        lastPresetInput = input
+        val provider = testProvider(
+            id = "provider-${providersFlow.value.size + 1}",
+            label = input.label ?: input.presetId,
+            presetId = input.presetId,
+            secretId = if (input.apiKey == null) null else "secret-new",
+        )
+        providersFlow.value = providersFlow.value + provider
+        return provider
+    }
+
+    override suspend fun createCustomProvider(input: CreateCustomProviderInput): Provider {
+        createError?.let { throw it }
+        lastCustomInput = input
+        val provider = testProvider(
+            id = "provider-${providersFlow.value.size + 1}",
+            label = input.label ?: "Custom",
+            presetId = "custom",
+            secretId = if (input.apiKey == null) null else "secret-new",
+        ).copy(
+            baseUrl = input.baseUrl,
+            authType = input.authType,
+            headers = input.headers,
+        )
+        providersFlow.value = providersFlow.value + provider
+        return provider
     }
 
     override suspend fun validateProviderKey(providerId: String): Provider {

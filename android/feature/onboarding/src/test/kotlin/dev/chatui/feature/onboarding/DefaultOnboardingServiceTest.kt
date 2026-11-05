@@ -122,12 +122,13 @@ class DefaultOnboardingServiceTest {
     }
 
     @Test
-    fun `provider options enable only OpenRouter`() {
+    fun `provider options reflect M2 availability`() {
         val options = service.providerOptions()
 
         assertThat(options.first { it.id == "openrouter" }.enabled).isTrue()
         assertThat(options.first { it.id == "openrouter" }.recommended).isTrue()
-        assertThat(options.filter { it.id != "openrouter" }.all { !it.enabled }).isTrue()
+        assertThat(options.first { it.id == "openai" }.enabled).isTrue()
+        assertThat(options.first { it.id == "anthropic" }.enabled).isFalse()
     }
 
     @Test

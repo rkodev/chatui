@@ -6,8 +6,10 @@ import dev.chatui.core.model.Provider
 import dev.chatui.core.model.newId
 import dev.chatui.core.network.ProviderContext
 import dev.chatui.core.network.ProviderRegistry
+import dev.chatui.core.network.isPresetEnabledInM2
 import java.time.Clock
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 /**
  * Provider lifecycle service.
@@ -32,48 +34,104 @@ class ProviderService(
     /**
      * Create an OpenRouter provider and store its key.
      *
-     * The provider record is written with `metadata: null` and a `secretId`;
-     * the plaintext key is written only to the secret store. If the provider
-     * write fails, the newly written secret is removed.
+     * Kept as a named entry point for onboarding. It delegates to the generic
+     * preset path so OpenRouter and the other OpenAI-compatible presets share
+     * validation and rollback behavior.
      */
     suspend fun createOpenRouterProvider(
         apiKey: String,
         label: String? = null,
-    ): Provider {
-        val key = requireNonEmpty(apiKey, "apiKey")
-        val preset = registry.getPreset(OPENROUTER_PRESET_ID)
-            ?: throw ProviderServiceException(
-                ProviderServiceErrorCode.INVALID_INPUT,
-                "OpenRouter preset is missing.",
-            )
+    ): Provider = createPresetProvider(
+        CreatePresetProviderInput(
+            presetId = OPENROUTER_PRESET_ID,
+            apiKey = apiKey,
+            label = label,
+        ),
+    )
 
-        val id = generateId()
-        val secretId = generateId()
-        val now = clock.instant()
-        val provider = Provider(
-            id = id,
-            presetId = preset.id,
-            label = label?.trim()?.takeIf { it.isNotEmpty() } ?: preset.label,
-            kind = preset.kind,
-            baseUrl = preset.baseUrl,
-            authType = preset.auth.type,
-            secretId = secretId,
-            headers = emptyMap(),
-            enabled = true,
-            browserCors = preset.browserCors,
-            metadata = null,
-            createdAt = now,
-            updatedAt = now,
-        )
+    /**
+     * Create a provider from an enabled OpenAI-compatible contract preset.
+     *
+     * The provider record is written with a `secretId`; the plaintext key is
+     * written only to the secret store. If the provider write fails, the newly
+     * written secret is removed. Presets that do not use a key get no secret.
+     */
+    suspend fun createPresetProvider(input: CreatePresetProviderInput): Provider {
+        val preset = registry.getPreset(input.presetId)
+            ?: throw invalidInput("Unknown provider preset \"${input.presetId}\".")
 
-        secrets.put(secretId, key)
-
-        return try {
-            providers.upsert(provider)
-        } catch (error: Throwable) {
-            runCatching { secrets.delete(secretId) }
-            throw error
+        if (preset.id == CUSTOM_PRESET_ID) {
+            throw invalidInput("Use createCustomProvider to add a Custom provider.")
         }
+
+        if (!isPresetEnabledInM2(preset.id)) {
+            throw invalidInput("${preset.label} is not available in M2.")
+        }
+
+        val apiKey = validateApiKey(preset.auth.type, input.apiKey)
+        val label = resolveLabel(input.label, preset.label)
+        val headers = validateHeaders(input.headers, preset.auth.type)
+
+        return persistProvider(
+            provider = Provider(
+                id = generateId(),
+                presetId = preset.id,
+                label = label,
+                kind = preset.kind,
+                baseUrl = preset.baseUrl,
+                authType = preset.auth.type,
+                secretId = null,
+                headers = headers,
+                enabled = true,
+                browserCors = preset.browserCors,
+                metadata = null,
+                createdAt = clock.instant(),
+                updatedAt = clock.instant(),
+            ),
+            apiKey = apiKey,
+        )
+    }
+
+    /**
+     * Create a Custom OpenAI-compatible provider.
+     *
+     * The base URL and auth style are required. Non-secret headers are stored
+     * on the provider record; the key is stored only in the secret store.
+     * Invalid input is rejected before any write, and a failed provider write
+     * removes the newly written secret.
+     */
+    suspend fun createCustomProvider(input: CreateCustomProviderInput): Provider {
+        val preset = registry.getPreset(CUSTOM_PRESET_ID)
+            ?: throw invalidInput("Custom provider preset is missing.")
+
+        if (!isPresetEnabledInM2(CUSTOM_PRESET_ID)) {
+            throw invalidInput("Custom providers are not enabled in this build.")
+        }
+
+        val baseUrl = validateBaseUrl(input.baseUrl)
+        val authType = validateCustomAuthType(input.authType)
+        val apiKey = validateApiKey(authType, input.apiKey)
+        val label = resolveLabel(input.label, preset.label)
+        val headers = validateHeaders(input.headers, authType)
+
+        return persistProvider(
+            provider = Provider(
+                id = generateId(),
+                presetId = preset.id,
+                label = label,
+                kind = preset.kind,
+                baseUrl = baseUrl,
+                authType = authType,
+                secretId = null,
+                headers = headers,
+                enabled = true,
+                browserCors = preset.browserCors,
+                metadata = null,
+                createdAt = clock.instant(),
+                updatedAt = clock.instant(),
+            ),
+            apiKey = apiKey,
+        )
     }
 
     /**
@@ -190,6 +248,58 @@ class ProviderService(
         }
     }
 
+    /**
+     * Write the secret first, then the provider record.
+     *
+     * A failed secret write leaves no provider record. A failed provider write
+     * deletes the newly written secret so no orphan ciphertext remains.
+     */
+    private suspend fun persistProvider(provider: Provider, apiKey: String?): Provider {
+        val secretId = if (apiKey == null) null else generateId()
+        val record = provider.copy(secretId = secretId)
+
+        if (secretId != null && apiKey != null) {
+            try {
+                secrets.put(secretId, apiKey)
+            } catch (error: Throwable) {
+                throw ProviderServiceException(
+                    ProviderServiceErrorCode.STORAGE,
+                    "Could not save the API key on this device. Try again.",
+                    cause = error,
+                )
+            }
+        }
+
+        return try {
+            providers.upsert(record)
+        } catch (error: Throwable) {
+            if (secretId != null) {
+                runCatching { secrets.delete(secretId) }
+            }
+            throw ProviderServiceException(
+                ProviderServiceErrorCode.STORAGE,
+                "Could not save the provider. Try again.",
+                cause = error,
+            )
+        }
+    }
+
+    private suspend fun resolveLabel(label: String?, fallback: String): String {
+        val resolved = label?.trim()?.takeIf { it.isNotEmpty() } ?: fallback
+        val existing = providers.observeAll().first()
+
+        if (existing.any { it.label.equals(resolved, ignoreCase = true) }) {
+            throw invalidInput(
+                "A provider named \"$resolved\" already exists. Choose a different label.",
+            )
+        }
+
+        return resolved
+    }
+
+    private fun invalidInput(message: String): ProviderServiceException =
+        ProviderServiceException(ProviderServiceErrorCode.INVALID_INPUT, message)
+
     private suspend fun requireProvider(providerId: String): Provider =
         providers.get(providerId)
             ?: throw ProviderServiceException(
@@ -210,7 +320,10 @@ class ProviderService(
     }
 
     companion object {
-        /** The only provider preset enabled in M1. */
+        /** The default, reference, and required provider preset. */
         const val OPENROUTER_PRESET_ID: String = "openrouter"
+
+        /** The contract preset used for user-supplied OpenAI-compatible servers. */
+        const val CUSTOM_PRESET_ID: String = "custom"
     }
 }

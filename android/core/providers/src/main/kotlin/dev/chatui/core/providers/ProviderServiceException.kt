@@ -19,4 +19,5 @@ enum class ProviderServiceErrorCode {
     NOT_FOUND,
     MISSING_KEY,
     INVALID_INPUT,
+    STORAGE,
 }

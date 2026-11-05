@@ -143,6 +143,12 @@ private fun copyForProviderService(
             message = "The provider record was not found. Try connecting again.",
             details = details,
         )
+
+        ProviderServiceErrorCode.STORAGE -> OnboardingErrorCopy(
+            title = "Could not save the key",
+            message = "ChatUI could not save the key on this device. Try again.",
+            details = details,
+        )
     }
 }
 

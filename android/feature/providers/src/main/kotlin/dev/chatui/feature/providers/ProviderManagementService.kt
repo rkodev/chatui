@@ -19,6 +19,8 @@ import dev.chatui.core.model.OutputModality
 import dev.chatui.core.model.Provider
 import dev.chatui.core.model.newId
 import dev.chatui.core.network.ProviderRegistry
+import dev.chatui.core.providers.CreateCustomProviderInput
+import dev.chatui.core.providers.CreatePresetProviderInput
 import dev.chatui.core.providers.ModelService
 import dev.chatui.core.providers.ProviderService
 import dev.chatui.core.providers.RefreshModelsResult
@@ -95,6 +97,10 @@ interface ProviderManagementService {
 
     suspend fun getProvider(providerId: String): Provider?
 
+    suspend fun createPresetProvider(input: CreatePresetProviderInput): Provider
+
+    suspend fun createCustomProvider(input: CreateCustomProviderInput): Provider
+
     suspend fun validateProviderKey(providerId: String): Provider
 
     suspend fun rotateKey(providerId: String, apiKey: String): Provider
@@ -161,6 +167,12 @@ class DefaultProviderManagementService @Inject constructor(
     override suspend fun listProviders(): List<Provider> = providers.observeAll().first()
 
     override suspend fun getProvider(providerId: String): Provider? = providers.get(providerId)
+
+    override suspend fun createPresetProvider(input: CreatePresetProviderInput): Provider =
+        providerService.createPresetProvider(input)
+
+    override suspend fun createCustomProvider(input: CreateCustomProviderInput): Provider =
+        providerService.createCustomProvider(input)
 
     override suspend fun validateProviderKey(providerId: String): Provider =
         providerService.validateProviderKey(providerId)
