@@ -1,10 +1,15 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { openDatabase } from '../../storage'
+import { DataClearPanel } from './DataClearPanel'
 import { DataExportPanel } from './DataExportPanel'
 import { DataImportPanel } from './DataImportPanel'
+import { DataKeysPanel } from './DataKeysPanel'
+import { DataUsagePanel } from './DataUsagePanel'
+import { createDataControlsService } from './dataControlsServiceFactory'
 import { createExportService } from './exportServiceFactory'
 import { createImportService } from './importServiceFactory'
+import type { DataControlsServiceLike } from './dataControlsService'
 import type { ExportServiceLike } from './exportService'
 import type { ImportServiceLike } from './importService'
 import './settings.css'
@@ -14,6 +19,8 @@ export interface DataSettingsScreenProps {
   exportService?: ExportServiceLike
   /** Test or story override. When omitted, IndexedDB is opened lazily. */
   importService?: ImportServiceLike
+  /** Test or story override. When omitted, IndexedDB is opened lazily. */
+  dataControlsService?: DataControlsServiceLike
 }
 
 function errorMessage(cause: unknown): string {
@@ -23,13 +30,14 @@ function errorMessage(cause: unknown): string {
 /**
  * `/settings/data` entry point for storage and portability.
  *
- * Export and import share one IndexedDB connection when both are created here.
- * Import is merge-by-default; replace mode is confirmed in `DataImportPanel`.
- * Clear-data controls remain for M2-04.5.
+ * Export, import, usage, clear-all, and per-key deletion share one IndexedDB
+ * connection when created here. Import is merge-by-default; replace mode and
+ * clear-all are confirmed in their panels. Backup remains a placeholder.
  */
 export function DataSettingsScreen({
   exportService,
   importService,
+  dataControlsService,
 }: DataSettingsScreenProps = {}) {
   const [exportServiceState, setExportServiceState] = useState<ExportServiceLike | null>(
     exportService ?? null,
@@ -37,10 +45,17 @@ export function DataSettingsScreen({
   const [importServiceState, setImportServiceState] = useState<ImportServiceLike | null>(
     importService ?? null,
   )
+  const [dataControlsServiceState, setDataControlsServiceState] =
+    useState<DataControlsServiceLike | null>(dataControlsService ?? null)
+  const [dataVersion, setDataVersion] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (exportService !== undefined && importService !== undefined) {
+    if (
+      exportService !== undefined &&
+      importService !== undefined &&
+      dataControlsService !== undefined
+    ) {
       return
     }
 
@@ -48,14 +63,16 @@ export function DataSettingsScreen({
 
     async function load() {
       const db = await openDatabase()
-      const [nextExport, nextImport] = await Promise.all([
+      const [nextExport, nextImport, nextDataControls] = await Promise.all([
         exportService ?? createExportService({ db }),
         importService ?? createImportService({ db }),
+        dataControlsService ?? createDataControlsService({ db }),
       ])
 
       if (!cancelled) {
         setExportServiceState(nextExport)
         setImportServiceState(nextImport)
+        setDataControlsServiceState(nextDataControls)
       }
     }
 
@@ -68,7 +85,11 @@ export function DataSettingsScreen({
     return () => {
       cancelled = true
     }
-  }, [exportService, importService])
+  }, [exportService, importService, dataControlsService])
+
+  function refreshData() {
+    setDataVersion((current) => current + 1)
+  }
 
   return (
     <section className="settings-screen" aria-labelledby="data-settings-title">
@@ -84,7 +105,7 @@ export function DataSettingsScreen({
         </p>
         <p className="settings-screen__muted">
           Provider API keys are never included in exports. Import validates the archive before
-          writing; clear-data controls arrive in M2-04.5.
+          writing. Clear-all and per-key deletion are available below.
         </p>
       </div>
 
@@ -94,12 +115,21 @@ export function DataSettingsScreen({
         </p>
       )}
 
-      {exportServiceState === null || importServiceState === null ? (
+      {exportServiceState === null ||
+      importServiceState === null ||
+      dataControlsServiceState === null ? (
         !error && <p role="status">Preparing data services…</p>
       ) : (
         <>
+          <DataUsagePanel service={dataControlsServiceState} refreshKey={dataVersion} />
+          <DataKeysPanel
+            service={dataControlsServiceState}
+            refreshKey={dataVersion}
+            onChanged={refreshData}
+          />
+          <DataClearPanel service={dataControlsServiceState} onCleared={refreshData} />
           <DataExportPanel service={exportServiceState} />
-          <DataImportPanel service={importServiceState} />
+          <DataImportPanel service={importServiceState} onImported={refreshData} />
         </>
       )}
 

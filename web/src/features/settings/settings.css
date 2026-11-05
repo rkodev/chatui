@@ -220,6 +220,59 @@
   gap: var(--space-1);
 }
 
+.settings-screen__usage {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.settings-screen__usage th,
+.settings-screen__usage td {
+  padding: var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--color-border-subtle);
+  text-align: left;
+}
+
+.settings-screen__usage thead th {
+  color: var(--color-fg-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.settings-screen__usage th:last-child,
+.settings-screen__usage td:last-child {
+  text-align: right;
+}
+
+.settings-screen__usage tfoot th,
+.settings-screen__usage tfoot td {
+  border-bottom: none;
+  font-weight: 600;
+}
+
+.settings-screen__key-list {
+  display: grid;
+  gap: var(--density-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-screen__key-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--density-space-2);
+  padding: var(--density-space-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface-raised);
+}
+
+.settings-screen__key-item p {
+  margin: var(--space-1) 0 0;
+}
+
 @media (max-width: 48rem) {
   .settings-layout {
     grid-template-columns: minmax(0, 1fr);

@@ -12,6 +12,25 @@ export { SettingsLayout } from './SettingsLayout'
 export { AppearanceSettingsScreen } from './AppearanceSettingsScreen'
 export { ChatSettingsRoute, ChatSettingsScreen } from './ChatSettingsScreen'
 export { DataSettingsScreen } from './DataSettingsScreen'
+export { DataClearPanel, CLEAR_ALL_CONFIRMATION, type DataClearPanelProps } from './DataClearPanel'
+export { DataKeysPanel, type DataKeysPanelProps } from './DataKeysPanel'
+export { DataUsagePanel, type DataUsagePanelProps } from './DataUsagePanel'
+export { formatBytes } from './formatBytes'
+export {
+  DataControlsService,
+  type AttachmentCleanupLike,
+  type ClearAllResult,
+  type DataControlsServiceLike,
+  type DataControlsServiceOptions,
+  type ProviderKeyServiceLike,
+  type ProviderKeySummary,
+  type StorageUsage,
+  type StorageUsageEntry,
+} from './dataControlsService'
+export {
+  createDataControlsService,
+  type CreateDataControlsServiceOptions,
+} from './dataControlsServiceFactory'
 export { DataExportPanel, type DataExportPanelProps } from './DataExportPanel'
 export {
   DataImportPanel,

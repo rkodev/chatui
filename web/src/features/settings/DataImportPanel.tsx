@@ -9,6 +9,8 @@ export interface DataImportPanelProps {
   service: ImportServiceLike
   /** Test override. Defaults to the browser confirmation dialog. */
   confirmReplace?: (message: string) => boolean
+  /** Called after a successful import so usage can reload. */
+  onImported?: () => void
 }
 
 function errorMessage(cause: unknown): string {
@@ -25,6 +27,7 @@ function errorMessage(cause: unknown): string {
 export function DataImportPanel({
   service,
   confirmReplace = (message) => window.confirm(message),
+  onImported,
 }: DataImportPanelProps) {
   const [mode, setMode] = useState<ImportMode>('merge')
   const [busy, setBusy] = useState(false)
@@ -54,6 +57,7 @@ export function DataImportPanel({
       setStatus(
         `Imported ${result.conversations} conversation(s), ${result.messages} message(s), and ${result.attachments} attachment(s).`,
       )
+      onImported?.()
     } catch (cause) {
       setError(errorMessage(cause))
     } finally {

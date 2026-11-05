@@ -52,7 +52,7 @@
 | 15 | [M2-04.2 Web pin, archive, and delete undo](M2-04.2-web-pin-archive-undo.md) | Complete | M2-04.1 | web | M2-07.2 |
 | 16 | [M2-04.3 Web export](M2-04.3-web-export.md) | Complete | M2-03.4 | web | M2-07.3 |
 | 17 | [M2-04.4 Web import](M2-04.4-web-import.md) | Complete | M2-04.3 | web | M2-07.4 |
-| 18 | [M2-04.5 Web data controls](M2-04.5-web-data-controls.md) | Not started | M2-04.3, M2-04.4 | web | M2-07.5 |
+| 18 | [M2-04.5 Web data controls](M2-04.5-web-data-controls.md) | Complete | M2-04.3, M2-04.4 | web | M2-07.5 |
 | 19 | [M2-04.6 Web Playwright suite](M2-04.6-web-playwright.md) | Not started | M2-04.1 through M2-04.5, M2-03.3 | web | M2-08.2 |
 | 20 | [M2-05.1 Android OpenAI-compatible transport](M2-05.1-android-openai-compatible-transport.md) | Not started | M2-00.2 | android | M2-01.1 |
 | 21 | [M2-05.2 Android preset enablement and Custom providers](M2-05.2-android-preset-enablement-custom.md) | Not started | M2-05.1 | android | M2-01.2 |
