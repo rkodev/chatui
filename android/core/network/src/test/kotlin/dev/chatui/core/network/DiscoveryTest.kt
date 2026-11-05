@@ -26,6 +26,8 @@ class DiscoveryTest {
         readResource("/contracts/fixtures/models/openrouter-models.json")
     private val anthropicModels: String =
         readResource("/contracts/fixtures/models/anthropic-models.json")
+    private val geminiModels: String =
+        readResource("/contracts/fixtures/models/gemini-models.json")
 
     @Before
     fun setUp() {
@@ -52,6 +54,7 @@ class DiscoveryTest {
             val payload = when (preset.modelDiscovery.format) {
                 ModelDiscoveryFormat.OPENROUTER -> openRouterModels
                 ModelDiscoveryFormat.ANTHROPIC -> anthropicModels
+                ModelDiscoveryFormat.GEMINI -> geminiModels
                 else -> openAIModels
             }
             server.enqueue(jsonResponse(payload))
@@ -69,8 +72,10 @@ class DiscoveryTest {
                 preset.auth.type != ProviderAuthType.NONE
             if (sendsKey) {
                 when (preset.auth.type) {
-                    ProviderAuthType.X_API_KEY ->
-                        assertThat(request.headers["x-api-key"]).isEqualTo("sk-test-key")
+                    ProviderAuthType.X_API_KEY -> {
+                        val header = preset.auth.headerName ?: "x-api-key"
+                        assertThat(request.headers[header]).isEqualTo("sk-test-key")
+                    }
                     else ->
                         assertThat(request.headers["Authorization"]).isEqualTo("Bearer sk-test-key")
                 }
@@ -143,6 +148,12 @@ class DiscoveryTest {
         now: () -> Long = { 1000L },
     ): CatalogAdapter = when (preset.kind) {
         ProviderKind.ANTHROPIC -> AnthropicAdapter(
+            client = client,
+            preset = preset,
+            cache = cache,
+            now = now,
+        )
+        ProviderKind.GOOGLE_GEMINI -> GeminiAdapter(
             client = client,
             preset = preset,
             cache = cache,

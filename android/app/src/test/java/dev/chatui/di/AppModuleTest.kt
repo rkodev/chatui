@@ -104,6 +104,7 @@ class AppModuleTest {
         val registry = AppModule.provideProviderAdapterRegistry(client)
 
         assertThat(registry.adapterFor(ProviderKind.ANTHROPIC)).isNotNull()
+        assertThat(registry.adapterFor(ProviderKind.GOOGLE_GEMINI)).isNotNull()
         assertThat(AppModule.provideProviderAdapter(registry)).isNotNull()
         assertThat(AppModule.provideProviderGateway(registry)).isNotNull()
     }

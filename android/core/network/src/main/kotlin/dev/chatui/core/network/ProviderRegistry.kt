@@ -14,14 +14,15 @@ class ProviderRegistryException(
 /**
  * Presets enabled in M2.
  *
- * Anthropic has a native adapter. Gemini and Ollama stay in contracts but are
- * not selectable until their M2-06 adapter tasks land. `custom` is enabled
+ * Anthropic and Gemini have native adapters. Ollama stays in contracts but is
+ * not selectable until its M2-06 adapter task lands. `custom` is enabled
  * because Custom providers use the OpenAI-compatible transport.
  */
 val M2_ENABLED_PRESET_IDS: Set<String> = setOf(
     "openrouter",
     "openai",
     "anthropic",
+    "google",
     "groq",
     "mistral",
     "deepseek",

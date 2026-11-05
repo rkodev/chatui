@@ -75,6 +75,15 @@ class ProviderAdapterRegistry(
                     random = random,
                     sleep = sleep,
                 ),
+                ProviderKind.GOOGLE_GEMINI to GeminiAdapter(
+                    client = client,
+                    cache = cache,
+                    now = now,
+                    retryPolicy = retryPolicy,
+                    inactivityTimeoutMillis = inactivityTimeoutMillis,
+                    random = random,
+                    sleep = sleep,
+                ),
             ),
         )
     }
