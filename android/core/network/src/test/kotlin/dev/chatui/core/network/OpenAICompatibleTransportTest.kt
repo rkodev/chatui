@@ -99,6 +99,59 @@ class OpenAICompatibleTransportTest {
     }
 
     @Test
+    fun `normalizes reasoning and reasoning_details fields separately from text`(): Unit = runBlocking {
+        server.enqueue(
+            sseResponse(
+                """
+                data: {"id":"chatcmpl-reasoning","choices":[{"index":0,"delta":{"reasoning":"first thought"},"finish_reason":null}]}
+
+                data: {"id":"chatcmpl-reasoning","choices":[{"index":0,"delta":{"reasoning_details":[{"type":"reasoning.text","text":"second thought"}]},"finish_reason":null}]}
+
+                data: {"id":"chatcmpl-reasoning","choices":[{"index":0,"delta":{"content":"answer"},"finish_reason":"stop"}]}
+
+                data: [DONE]
+
+                """.trimIndent(),
+            ),
+        )
+
+        val events = adapter().streamChat(context(), baseRequest()).toList()
+
+        assertThat(events.filterIsInstance<StreamEvent.ReasoningDelta>().map { it.text })
+            .containsExactly("first thought", "second thought")
+            .inOrder()
+        assertThat(events.filterIsInstance<StreamEvent.TextDelta>().map { it.text })
+            .containsExactly("answer")
+    }
+
+    @Test
+    fun `reasoning parts are not replayed in the request body`() {
+        val request = baseRequest(
+            messages = listOf(
+                NormalizedMessage(
+                    NormalizedRole.ASSISTANT,
+                    listOf(
+                        ContentPart.Reasoning("private chain of thought"),
+                        ContentPart.Text("visible answer"),
+                    ),
+                ),
+            ),
+        )
+
+        val body = buildOpenAICompatibleChatRequestBody(
+            request,
+            openAIPreset,
+            listOf("temperature", "top_p", "max_tokens", "stop", "stream"),
+        )
+
+        val messages = body["messages"]!!.jsonArray
+        assertThat(messages).hasSize(1)
+        val content = messages[0].jsonObject["content"]!!.jsonPrimitive.content
+        assertThat(content).isEqualTo("visible answer")
+        assertThat(body.toString()).doesNotContain("private chain of thought")
+    }
+
+    @Test
     fun `openai HTTP error fixtures match the shared expected errors`(): Unit = runBlocking {
         for (case in openAIErrorCases()) {
             val obj = case.jsonObject

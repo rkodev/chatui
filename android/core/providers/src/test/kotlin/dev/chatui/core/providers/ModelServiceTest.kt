@@ -274,6 +274,88 @@ class ModelServiceTest {
     }
 
     @Test
+    fun `refreshModels returns cached models with a degraded notice when discovery fails`() = runTest {
+        val provider = createProvider()
+        modelRepository.insert(
+            model(
+                id = "cached",
+                providerId = provider.id,
+                remoteId = "openrouter/auto",
+            ),
+        )
+        gateway.listError = IllegalStateException("catalog unavailable")
+
+        val result = service.refreshModels(provider.id)
+
+        assertThat(result.degraded).isTrue()
+        assertThat(result.models.map { it.remoteId }).containsExactly("openrouter/auto")
+        assertThat(result.notice).isEqualTo("Discovery unavailable; using 1 cached model.")
+        assertThat(result.refreshError).isInstanceOf(IllegalStateException::class.java)
+    }
+
+    @Test
+    fun `refreshModels persists fallback models when discovery fails and no cache exists`() = runTest {
+        val provider = createPresetProvider("openai")
+        gateway.listError = IllegalStateException("catalog unavailable")
+
+        val result = service.refreshModels(provider.id)
+
+        assertThat(result.degraded).isTrue()
+        assertThat(result.models.map { it.remoteId })
+            .containsExactly("gpt-4o-mini", "gpt-4o")
+            .inOrder()
+        assertThat(result.notice).isEqualTo("Discovery unavailable; using 2 fallback models.")
+        assertThat(result.refreshError).isInstanceOf(IllegalStateException::class.java)
+
+        val stored = modelRepository.forProvider(provider.id)
+        assertThat(stored).hasSize(2)
+        assertThat(stored.map { it.metadata?.get("fallback") })
+            .containsExactly(JsonPrimitive(true), JsonPrimitive(true))
+    }
+
+    @Test
+    fun `selectDefaultModel creates fallback rows when the catalog is empty`() = runTest {
+        val provider = createPresetProvider("openai")
+
+        val selection = service.selectDefaultModel(provider.id)
+
+        assertThat(selection.remoteId).isEqualTo("gpt-4o-mini")
+        assertThat(selection.notice)
+            .isEqualTo("Discovery unavailable; using fallback model gpt-4o-mini.")
+        assertThat(modelRepository.forProvider(provider.id)).hasSize(2)
+    }
+
+    @Test
+    fun `selectDefaultModel uses a fallback id present in the catalog`() = runTest {
+        val provider = createPresetProvider("openai")
+        modelRepository.insert(
+            model(
+                id = "gpt-4o",
+                providerId = provider.id,
+                remoteId = "gpt-4o",
+            ),
+        )
+
+        val selection = service.selectDefaultModel(provider.id)
+
+        assertThat(selection.remoteId).isEqualTo("gpt-4o")
+        assertThat(selection.notice)
+            .isEqualTo("Default model gpt-4o-mini is unavailable; using gpt-4o.")
+    }
+
+    @Test
+    fun `selectDefaultModel reports no fallback for openrouter with an empty catalog`() = runTest {
+        val provider = createProvider()
+
+        val selection = service.selectDefaultModel(provider.id)
+
+        assertThat(selection.modelId).isNull()
+        assertThat(selection.remoteId).isNull()
+        assertThat(selection.notice)
+            .isEqualTo("Discovery unavailable; no fallback model is available.")
+    }
+
+    @Test
     fun `refreshModels reports an unknown provider`() = runTest {
         val error = runCatching { service.refreshModels("missing") }.exceptionOrNull()
 
@@ -284,4 +366,12 @@ class ModelServiceTest {
 
     private suspend fun createProvider() =
         providerService.createOpenRouterProvider("sk-test-secret-key")
+
+    private suspend fun createPresetProvider(presetId: String) =
+        providerService.createPresetProvider(
+            CreatePresetProviderInput(
+                presetId = presetId,
+                apiKey = "sk-test-secret-key",
+            ),
+        )
 }
