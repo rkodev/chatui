@@ -13,6 +13,11 @@ export { AppearanceSettingsScreen } from './AppearanceSettingsScreen'
 export { ChatSettingsRoute, ChatSettingsScreen } from './ChatSettingsScreen'
 export { DataSettingsScreen } from './DataSettingsScreen'
 export { DataExportPanel, type DataExportPanelProps } from './DataExportPanel'
+export {
+  DataImportPanel,
+  IMPORT_REPLACE_CONFIRMATION,
+  type DataImportPanelProps,
+} from './DataImportPanel'
 export { downloadTextFile } from './download'
 export {
   EXPORT_APP_VERSION,
@@ -39,6 +44,25 @@ export type {
   ExportServiceOptions,
 } from './exportService'
 export { createExportService } from './exportServiceFactory'
+export {
+  IMPORT_MODES,
+  ImportService,
+  ImportValidationError,
+  MAX_IMPORT_ATTACHMENT_BYTES,
+  MAX_IMPORT_ATTACHMENT_NAME_LENGTH,
+  MAX_IMPORT_BYTES,
+  validateImportArchive,
+} from './importService'
+export type {
+  ImportAttachmentStore,
+  ImportErrorCode,
+  ImportMode,
+  ImportOptions,
+  ImportResult,
+  ImportServiceLike,
+  ImportServiceOptions,
+} from './importService'
+export { createImportService } from './importServiceFactory'
 export { BackupSettingsScreen } from './BackupSettingsScreen'
 export { AboutSettingsScreen } from './AboutSettingsScreen'
 export { ModelsSettingsRoute, ModelsSettingsScreen } from './ModelsSettingsScreen'

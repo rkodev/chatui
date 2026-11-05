@@ -1,13 +1,19 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import { openDatabase } from '../../storage'
 import { DataExportPanel } from './DataExportPanel'
+import { DataImportPanel } from './DataImportPanel'
 import { createExportService } from './exportServiceFactory'
+import { createImportService } from './importServiceFactory'
 import type { ExportServiceLike } from './exportService'
+import type { ImportServiceLike } from './importService'
 import './settings.css'
 
 export interface DataSettingsScreenProps {
   /** Test or story override. When omitted, IndexedDB is opened lazily. */
   exportService?: ExportServiceLike
+  /** Test or story override. When omitted, IndexedDB is opened lazily. */
+  importService?: ImportServiceLike
 }
 
 function errorMessage(cause: unknown): string {
@@ -17,37 +23,52 @@ function errorMessage(cause: unknown): string {
 /**
  * `/settings/data` entry point for storage and portability.
  *
- * Export is implemented here. Import and clear-data controls remain for
- * M2-04.4 and M2-04.5; this screen never deletes or replaces local data.
+ * Export and import share one IndexedDB connection when both are created here.
+ * Import is merge-by-default; replace mode is confirmed in `DataImportPanel`.
+ * Clear-data controls remain for M2-04.5.
  */
-export function DataSettingsScreen({ exportService }: DataSettingsScreenProps = {}) {
-  const [service, setService] = useState<ExportServiceLike | null>(exportService ?? null)
+export function DataSettingsScreen({
+  exportService,
+  importService,
+}: DataSettingsScreenProps = {}) {
+  const [exportServiceState, setExportServiceState] = useState<ExportServiceLike | null>(
+    exportService ?? null,
+  )
+  const [importServiceState, setImportServiceState] = useState<ImportServiceLike | null>(
+    importService ?? null,
+  )
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (exportService !== undefined) {
+    if (exportService !== undefined && importService !== undefined) {
       return
     }
 
     let cancelled = false
 
-    createExportService().then(
-      (value) => {
-        if (!cancelled) {
-          setService(value)
-        }
-      },
-      (cause: unknown) => {
-        if (!cancelled) {
-          setError(errorMessage(cause))
-        }
-      },
-    )
+    async function load() {
+      const db = await openDatabase()
+      const [nextExport, nextImport] = await Promise.all([
+        exportService ?? createExportService({ db }),
+        importService ?? createImportService({ db }),
+      ])
+
+      if (!cancelled) {
+        setExportServiceState(nextExport)
+        setImportServiceState(nextImport)
+      }
+    }
+
+    load().catch((cause: unknown) => {
+      if (!cancelled) {
+        setError(errorMessage(cause))
+      }
+    })
 
     return () => {
       cancelled = true
     }
-  }, [exportService])
+  }, [exportService, importService])
 
   return (
     <section className="settings-screen" aria-labelledby="data-settings-title">
@@ -62,8 +83,8 @@ export function DataSettingsScreen({ exportService }: DataSettingsScreenProps = 
           device in IndexedDB and OPFS.
         </p>
         <p className="settings-screen__muted">
-          Provider API keys are never included in exports. Import and clear-data controls arrive in
-          later M2-04 tasks.
+          Provider API keys are never included in exports. Import validates the archive before
+          writing; clear-data controls arrive in M2-04.5.
         </p>
       </div>
 
@@ -73,10 +94,13 @@ export function DataSettingsScreen({ exportService }: DataSettingsScreenProps = 
         </p>
       )}
 
-      {service === null ? (
-        !error && <p role="status">Preparing export…</p>
+      {exportServiceState === null || importServiceState === null ? (
+        !error && <p role="status">Preparing data services…</p>
       ) : (
-        <DataExportPanel service={service} />
+        <>
+          <DataExportPanel service={exportServiceState} />
+          <DataImportPanel service={importServiceState} />
+        </>
       )}
 
       <div className="settings-screen__panel">
