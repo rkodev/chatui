@@ -19,11 +19,13 @@ import dev.chatui.core.datastore.secret.TinkSecretCipher
 import dev.chatui.core.datastore.settings.SettingsDataStore
 import dev.chatui.core.network.OpenRouterAdapter
 import dev.chatui.core.network.ProviderAdapter
+import dev.chatui.core.network.ProviderAdapterRegistry
 import dev.chatui.core.network.ProviderRegistry
+import dev.chatui.core.network.RoutingProviderAdapter
 import dev.chatui.core.providers.ModelService
-import dev.chatui.core.providers.OpenRouterGateway
 import dev.chatui.core.providers.ProviderGateway
 import dev.chatui.core.providers.ProviderService
+import dev.chatui.core.providers.RoutingProviderGateway
 import java.time.Clock
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
@@ -96,12 +98,18 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideProviderAdapter(adapter: OpenRouterAdapter): ProviderAdapter = adapter
+    fun provideProviderAdapterRegistry(client: OkHttpClient): ProviderAdapterRegistry =
+        ProviderAdapterRegistry.create(client)
 
     @Provides
     @Singleton
-    fun provideProviderGateway(adapter: OpenRouterAdapter): ProviderGateway =
-        OpenRouterGateway(adapter)
+    fun provideProviderAdapter(registry: ProviderAdapterRegistry): ProviderAdapter =
+        RoutingProviderAdapter(registry)
+
+    @Provides
+    @Singleton
+    fun provideProviderGateway(registry: ProviderAdapterRegistry): ProviderGateway =
+        RoutingProviderGateway(registry)
 
     @Provides
     @Singleton

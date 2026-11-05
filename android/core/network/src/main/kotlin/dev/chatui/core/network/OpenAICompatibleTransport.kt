@@ -441,7 +441,7 @@ class OpenAICompatibleAdapter(
     private val random: Random = Random.Default,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
     private val supportedParameters: List<String> = DEFAULT_SUPPORTED_PARAMETERS,
-) : ProviderAdapter {
+) : CatalogAdapter {
     override val kind: ProviderKind = ProviderKind.OPENAI_COMPATIBLE
 
     /**
@@ -513,9 +513,9 @@ class OpenAICompatibleAdapter(
      * successful snapshot is returned with `stale: true` and `refreshError`
      * set. If no snapshot exists, the refresh error is thrown.
      */
-    suspend fun loadCatalog(
+    override suspend fun loadCatalog(
         context: ProviderContext,
-        forceRefresh: Boolean = false,
+        forceRefresh: Boolean,
     ): CatalogResult {
         val cacheKey = catalogCacheKey(context.provider.id)
 
@@ -585,7 +585,7 @@ class OpenAICompatibleAdapter(
         loadCatalog(context).models
 
     /** Force a catalog refresh while preserving last-known-good behavior. */
-    suspend fun refreshCatalog(context: ProviderContext): CatalogResult =
+    override suspend fun refreshCatalog(context: ProviderContext): CatalogResult =
         loadCatalog(context, forceRefresh = true)
 
     /**

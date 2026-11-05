@@ -24,6 +24,8 @@ class DiscoveryTest {
     private val openAIModels: String = readResource("/contracts/fixtures/models/openai-models.json")
     private val openRouterModels: String =
         readResource("/contracts/fixtures/models/openrouter-models.json")
+    private val anthropicModels: String =
+        readResource("/contracts/fixtures/models/anthropic-models.json")
 
     @Before
     fun setUp() {
@@ -47,14 +49,14 @@ class DiscoveryTest {
         for (presetId in M2_ENABLED_PRESET_IDS) {
             val preset = registry.getPreset(presetId)
                 ?: error("Missing preset $presetId")
-            val payload = if (preset.modelDiscovery.format == ModelDiscoveryFormat.OPENROUTER) {
-                openRouterModels
-            } else {
-                openAIModels
+            val payload = when (preset.modelDiscovery.format) {
+                ModelDiscoveryFormat.OPENROUTER -> openRouterModels
+                ModelDiscoveryFormat.ANTHROPIC -> anthropicModels
+                else -> openAIModels
             }
             server.enqueue(jsonResponse(payload))
 
-            val result = adapter(preset).loadCatalog(context(preset))
+            val result = catalogAdapter(preset).loadCatalog(context(preset))
 
             assertThat(result.models).isNotEmpty()
             assertThat(result.fromCache).isFalse()
@@ -66,7 +68,12 @@ class DiscoveryTest {
             val sendsKey = !preset.modelDiscovery.public &&
                 preset.auth.type != ProviderAuthType.NONE
             if (sendsKey) {
-                assertThat(request.headers["Authorization"]).isEqualTo("Bearer sk-test-key")
+                when (preset.auth.type) {
+                    ProviderAuthType.X_API_KEY ->
+                        assertThat(request.headers["x-api-key"]).isEqualTo("sk-test-key")
+                    else ->
+                        assertThat(request.headers["Authorization"]).isEqualTo("Bearer sk-test-key")
+                }
             } else {
                 assertThat(request.headers["Authorization"]).isNull()
             }
@@ -130,6 +137,20 @@ class DiscoveryTest {
         assertThat(error).isInstanceOf(ProviderRequestException::class.java)
     }
 
+    private fun catalogAdapter(
+        preset: ProviderPreset,
+        cache: CatalogCache = MemoryCatalogCache(),
+        now: () -> Long = { 1000L },
+    ): CatalogAdapter = when (preset.kind) {
+        ProviderKind.ANTHROPIC -> AnthropicAdapter(
+            client = client,
+            preset = preset,
+            cache = cache,
+            now = now,
+        )
+        else -> adapter(preset, cache, now)
+    }
+
     private fun adapter(
         preset: ProviderPreset,
         cache: CatalogCache = MemoryCatalogCache(),
@@ -154,7 +175,7 @@ class DiscoveryTest {
             id = preset.id,
             presetId = preset.id,
             label = preset.label,
-            kind = ProviderKind.OPENAI_COMPATIBLE,
+            kind = preset.kind,
             baseUrl = server.url("/v1").toString(),
             authType = preset.auth.type,
             secretId = null,

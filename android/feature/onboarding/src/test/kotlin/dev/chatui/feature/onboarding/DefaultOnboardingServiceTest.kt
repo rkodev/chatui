@@ -128,7 +128,8 @@ class DefaultOnboardingServiceTest {
         assertThat(options.first { it.id == "openrouter" }.enabled).isTrue()
         assertThat(options.first { it.id == "openrouter" }.recommended).isTrue()
         assertThat(options.first { it.id == "openai" }.enabled).isTrue()
-        assertThat(options.first { it.id == "anthropic" }.enabled).isFalse()
+        assertThat(options.first { it.id == "anthropic" }.enabled).isTrue()
+        assertThat(options.first { it.id == "google" }.enabled).isFalse()
     }
 
     @Test

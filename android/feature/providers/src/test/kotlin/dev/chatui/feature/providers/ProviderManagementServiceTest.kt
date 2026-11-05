@@ -130,8 +130,9 @@ class ProviderManagementServiceTest {
         assertThat(options.first { it.id == "openrouter" }.recommended).isTrue()
         assertThat(options.first { it.id == "openai" }.enabled).isTrue()
         assertThat(options.first { it.id == "custom" }.enabled).isTrue()
-        assertThat(options.first { it.id == "anthropic" }.enabled).isFalse()
-        assertThat(options.first { it.id == "anthropic" }.statusLabel)
+        assertThat(options.first { it.id == "anthropic" }.enabled).isTrue()
+        assertThat(options.first { it.id == "google" }.enabled).isFalse()
+        assertThat(options.first { it.id == "google" }.statusLabel)
             .isEqualTo("Coming later")
         assertThat(service.docsUrl("openrouter")).isNotNull()
     }

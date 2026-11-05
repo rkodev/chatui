@@ -13,6 +13,7 @@ import dev.chatui.core.database.repository.ProviderRepository
 import dev.chatui.core.database.recovery.StreamingRecoveryService
 import dev.chatui.core.datastore.secret.SecretCipher
 import dev.chatui.core.datastore.secret.SecretStore
+import dev.chatui.core.model.ProviderKind
 import dev.chatui.core.network.ProviderRegistry
 import dev.chatui.core.providers.ModelService
 import dev.chatui.core.providers.ProviderGateway
@@ -94,15 +95,17 @@ class AppModuleTest {
         assertThat(registry.getPreset("openrouter")).isNotNull()
         assertThat(enabled).contains("openai")
         assertThat(enabled).contains("custom")
-        assertThat(enabled).doesNotContain("anthropic")
+        assertThat(enabled).contains("anthropic")
     }
 
     @Test
-    fun `provides the adapter and gateway`() {
-        val adapter = AppModule.provideOpenRouterAdapter(AppModule.provideOkHttpClient())
+    fun `provides the adapter registry, routing adapter, and gateway`() {
+        val client = AppModule.provideOkHttpClient()
+        val registry = AppModule.provideProviderAdapterRegistry(client)
 
-        assertThat(AppModule.provideProviderAdapter(adapter)).isSameInstanceAs(adapter)
-        assertThat(AppModule.provideProviderGateway(adapter)).isNotNull()
+        assertThat(registry.adapterFor(ProviderKind.ANTHROPIC)).isNotNull()
+        assertThat(AppModule.provideProviderAdapter(registry)).isNotNull()
+        assertThat(AppModule.provideProviderGateway(registry)).isNotNull()
     }
 
     @Test

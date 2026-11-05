@@ -167,7 +167,8 @@ class FakeProviderManagementService : ProviderManagementService {
         ProviderAvailability("openrouter", "OpenRouter", true, true, null),
         ProviderAvailability("openai", "OpenAI", true, false, null),
         ProviderAvailability("custom", "Custom", true, false, null),
-        ProviderAvailability("anthropic", "Anthropic", false, false, "Coming later"),
+        ProviderAvailability("anthropic", "Anthropic", true, false, null),
+        ProviderAvailability("google", "Google Gemini", false, false, "Coming later"),
     )
     var docsUrl: String? = "https://openrouter.ai/docs"
     var error: Throwable? = null

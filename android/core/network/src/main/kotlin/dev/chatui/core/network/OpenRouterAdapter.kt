@@ -25,7 +25,7 @@ class OpenRouterAdapter(
     private val random: Random = Random.Default,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
     private val supportedParameters: List<String> = DEFAULT_SUPPORTED_PARAMETERS,
-) : ProviderAdapter {
+) : CatalogAdapter {
     override val kind: ProviderKind = ProviderKind.OPENAI_COMPATIBLE
 
     private val delegate = OpenAICompatibleAdapter(
@@ -55,9 +55,9 @@ class OpenRouterAdapter(
      * Load the OpenRouter catalog with a 24-hour cache and last-known-good
      * fallback.
      */
-    suspend fun loadCatalog(
+    override suspend fun loadCatalog(
         context: ProviderContext,
-        forceRefresh: Boolean = false,
+        forceRefresh: Boolean,
     ): CatalogResult = delegate.loadCatalog(context, forceRefresh)
 
     /**
@@ -70,7 +70,7 @@ class OpenRouterAdapter(
         delegate.listModels(context)
 
     /** Force a catalog refresh while preserving last-known-good behavior. */
-    suspend fun refreshCatalog(context: ProviderContext): CatalogResult =
+    override suspend fun refreshCatalog(context: ProviderContext): CatalogResult =
         delegate.refreshCatalog(context)
 
     /**

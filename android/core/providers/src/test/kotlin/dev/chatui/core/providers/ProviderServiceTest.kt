@@ -11,6 +11,7 @@ import dev.chatui.core.database.repository.ProviderRepository
 import dev.chatui.core.datastore.secret.SecretCipher
 import dev.chatui.core.datastore.secret.SecretStore
 import dev.chatui.core.model.ProviderAuthType
+import dev.chatui.core.model.ProviderKind
 import dev.chatui.core.network.ProviderRegistry
 import java.time.Clock
 import java.time.Instant
@@ -252,15 +253,13 @@ class ProviderServiceTest {
     }
 
     @Test
-    fun `createPresetProvider rejects native and unknown presets`() = runTest {
-        val native = runCatching {
-            service.createPresetProvider(
-                CreatePresetProviderInput(presetId = "anthropic", apiKey = "sk-ant"),
-            )
-        }.exceptionOrNull()
-        assertThat(native).isInstanceOf(ProviderServiceException::class.java)
-        assertThat((native as ProviderServiceException).code)
-            .isEqualTo(ProviderServiceErrorCode.INVALID_INPUT)
+    fun `createPresetProvider accepts Anthropic and rejects unknown presets`() = runTest {
+        val anthropic = service.createPresetProvider(
+            CreatePresetProviderInput(presetId = "anthropic", apiKey = "sk-ant"),
+        )
+        assertThat(anthropic.presetId).isEqualTo("anthropic")
+        assertThat(anthropic.kind).isEqualTo(ProviderKind.ANTHROPIC)
+        assertThat(anthropic.authType).isEqualTo(ProviderAuthType.X_API_KEY)
 
         val unknown = runCatching {
             service.createPresetProvider(

@@ -1,8 +1,10 @@
 package dev.chatui.feature.providers
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -42,7 +44,8 @@ class ProviderListScreenTest {
         options = listOf(
             ProviderAvailability("openrouter", "OpenRouter", true, true, null),
             ProviderAvailability("openai", "OpenAI", true, false, null),
-            ProviderAvailability("anthropic", "Anthropic", false, false, "Coming later"),
+            ProviderAvailability("anthropic", "Anthropic", true, false, null),
+            ProviderAvailability("google", "Google Gemini", false, false, "Coming later"),
         ),
         loading = false,
     )
@@ -82,11 +85,11 @@ class ProviderListScreenTest {
             .performScrollToNode(hasTestTag(ProviderListTestTags.providerOption("openai")))
         composeRule.onNodeWithTag(ProviderListTestTags.providerOption("openai"))
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Available").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Available").assertCountEquals(2)
 
         composeRule.onNodeWithTag(ProviderListTestTags.Screen)
-            .performScrollToNode(hasTestTag(ProviderListTestTags.providerOption("anthropic")))
-        composeRule.onNodeWithTag(ProviderListTestTags.providerOption("anthropic"))
+            .performScrollToNode(hasTestTag(ProviderListTestTags.providerOption("google")))
+        composeRule.onNodeWithTag(ProviderListTestTags.providerOption("google"))
             .assertIsDisplayed()
         composeRule.onNodeWithText("Coming later").assertIsDisplayed()
     }
@@ -109,6 +112,8 @@ class ProviderListScreenTest {
         composeRule.onNodeWithTag(ProviderListTestTags.presetOption("openai"))
             .assertIsDisplayed()
         composeRule.onNodeWithTag(ProviderListTestTags.presetOption("anthropic"))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.presetOption("google"))
             .assertDoesNotExist()
     }
 
