@@ -4,7 +4,7 @@
 - Milestone: [M2 Providers and content](../../milestones/M2-providers-and-content.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
 - Status: Not started
-- Last updated: 2026-11-04
+- Last updated: 2026-11-05
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
 - Scope: web and Android only. Rust, M3 Android depth, M4 release work, backup/sync, and deployment are out of scope.
 
@@ -53,7 +53,7 @@
 | 16 | [M2-04.3 Web export](M2-04.3-web-export.md) | Complete | M2-03.4 | web | M2-07.3 |
 | 17 | [M2-04.4 Web import](M2-04.4-web-import.md) | Complete | M2-04.3 | web | M2-07.4 |
 | 18 | [M2-04.5 Web data controls](M2-04.5-web-data-controls.md) | Complete | M2-04.3, M2-04.4 | web | M2-07.5 |
-| 19 | [M2-04.6 Web Playwright suite](M2-04.6-web-playwright.md) | Not started | M2-04.1 through M2-04.5, M2-03.3 | web | M2-08.2 |
+| 19 | [M2-04.6 Web Playwright suite](M2-04.6-web-playwright.md) | Complete | M2-04.1 through M2-04.5, M2-03.3 | web | M2-08.2 |
 | 20 | [M2-05.1 Android OpenAI-compatible transport](M2-05.1-android-openai-compatible-transport.md) | Not started | M2-00.2 | android | M2-01.1 |
 | 21 | [M2-05.2 Android preset enablement and Custom providers](M2-05.2-android-preset-enablement-custom.md) | Not started | M2-05.1 | android | M2-01.2 |
 | 22 | [M2-05.3 Android discovery, fallback, capabilities, and reasoning](M2-05.3-android-discovery-capability-reasoning.md) | Not started | M2-05.2 | android | M2-01.3 |
