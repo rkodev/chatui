@@ -71,13 +71,13 @@ class RoutingProviderGateway(
     private val adapters: ProviderAdapterRegistry,
 ) : ProviderGateway {
     override suspend fun validateKey(context: ProviderContext): ProviderKeyInfo =
-        adapters.requireAdapter(context.provider.kind).validateKey(context)
+        adapters.requireAdapter(context).validateKey(context)
 
     override suspend fun listModels(
         context: ProviderContext,
         forceRefresh: Boolean,
     ): List<ModelInfo> {
-        val adapter = adapters.requireCatalogAdapter(context.provider.kind)
+        val adapter = adapters.requireCatalogAdapter(context)
 
         if (!forceRefresh) {
             return adapter.listModels(context)

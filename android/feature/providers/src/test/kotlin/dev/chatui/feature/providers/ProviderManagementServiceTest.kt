@@ -132,9 +132,8 @@ class ProviderManagementServiceTest {
         assertThat(options.first { it.id == "custom" }.enabled).isTrue()
         assertThat(options.first { it.id == "anthropic" }.enabled).isTrue()
         assertThat(options.first { it.id == "google" }.enabled).isTrue()
-        assertThat(options.first { it.id == "ollama" }.enabled).isFalse()
-        assertThat(options.first { it.id == "ollama" }.statusLabel)
-            .isEqualTo("Coming later")
+        assertThat(options.first { it.id == "ollama" }.enabled).isTrue()
+        assertThat(options.first { it.id == "ollama" }.statusLabel).isNull()
         assertThat(service.docsUrl("openrouter")).isNotNull()
     }
 

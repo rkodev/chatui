@@ -46,6 +46,7 @@ class ProviderRegistryTest {
             "openai",
             "anthropic",
             "google",
+            "ollama",
             "groq",
             "mistral",
             "deepseek",
@@ -64,7 +65,7 @@ class ProviderRegistryTest {
         assertThat(isPresetEnabledInM2("custom")).isTrue()
         assertThat(isPresetEnabledInM2("anthropic")).isTrue()
         assertThat(isPresetEnabledInM2("google")).isTrue()
-        assertThat(isPresetEnabledInM2("ollama")).isFalse()
+        assertThat(isPresetEnabledInM2("ollama")).isTrue()
 
         val availability = registry.getPresetAvailability()
         assertThat(availability.filter { it.enabled }.map { it.preset.id })
@@ -76,7 +77,7 @@ class ProviderRegistryTest {
         assertThat(availability.first { it.preset.id == "google" }.status)
             .isEqualTo(PresetAvailabilityStatus.AVAILABLE)
         assertThat(availability.first { it.preset.id == "ollama" }.status)
-            .isEqualTo(PresetAvailabilityStatus.COMING_LATER)
+            .isEqualTo(PresetAvailabilityStatus.AVAILABLE)
     }
 
     @Test

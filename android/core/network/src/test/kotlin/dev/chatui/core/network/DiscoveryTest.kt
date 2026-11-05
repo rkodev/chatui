@@ -28,6 +28,8 @@ class DiscoveryTest {
         readResource("/contracts/fixtures/models/anthropic-models.json")
     private val geminiModels: String =
         readResource("/contracts/fixtures/models/gemini-models.json")
+    private val ollamaTags: String =
+        readResource("/contracts/fixtures/models/ollama-tags.json")
 
     @Before
     fun setUp() {
@@ -55,6 +57,7 @@ class DiscoveryTest {
                 ModelDiscoveryFormat.OPENROUTER -> openRouterModels
                 ModelDiscoveryFormat.ANTHROPIC -> anthropicModels
                 ModelDiscoveryFormat.GEMINI -> geminiModels
+                ModelDiscoveryFormat.OLLAMA_TAGS -> ollamaTags
                 else -> openAIModels
             }
             server.enqueue(jsonResponse(payload))
@@ -66,7 +69,8 @@ class DiscoveryTest {
             assertThat(result.stale).isFalse()
 
             val request = server.takeRequest()
-            assertThat(request.url.encodedPath).isEqualTo("/v1/models")
+            val expectedPath = if (preset.id == "ollama") "/api/tags" else "/v1/models"
+            assertThat(request.url.encodedPath).isEqualTo(expectedPath)
 
             val sendsKey = !preset.modelDiscovery.public &&
                 preset.auth.type != ProviderAuthType.NONE
@@ -146,14 +150,20 @@ class DiscoveryTest {
         preset: ProviderPreset,
         cache: CatalogCache = MemoryCatalogCache(),
         now: () -> Long = { 1000L },
-    ): CatalogAdapter = when (preset.kind) {
-        ProviderKind.ANTHROPIC -> AnthropicAdapter(
+    ): CatalogAdapter = when {
+        preset.id == "ollama" -> OllamaAdapter(
             client = client,
             preset = preset,
             cache = cache,
             now = now,
         )
-        ProviderKind.GOOGLE_GEMINI -> GeminiAdapter(
+        preset.kind == ProviderKind.ANTHROPIC -> AnthropicAdapter(
+            client = client,
+            preset = preset,
+            cache = cache,
+            now = now,
+        )
+        preset.kind == ProviderKind.GOOGLE_GEMINI -> GeminiAdapter(
             client = client,
             preset = preset,
             cache = cache,
