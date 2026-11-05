@@ -26,4 +26,6 @@ data class ModelInfo(
     val supportedParameters: List<String> = emptyList(),
     val metadata: JsonObject? = null,
     val isFree: Boolean = false,
+    /** True for non-chat models such as embeddings; never a default chat model. */
+    val hidden: Boolean = false,
 )
