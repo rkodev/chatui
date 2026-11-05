@@ -41,6 +41,47 @@ class ProviderListViewModelTest {
     }
 
     @Test
+    fun `preset form creates an enabled preset provider`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ProviderListViewModel(service)
+        advanceUntilIdle()
+
+        viewModel.onPresetSelected("openai")
+        viewModel.onPresetLabelChanged("Work OpenAI")
+        viewModel.onPresetApiKeyChanged("sk-openai")
+        viewModel.onCreatePresetProvider()
+        advanceUntilIdle()
+
+        val input = service.lastPresetInput
+        assertThat(input).isNotNull()
+        assertThat(input!!.presetId).isEqualTo("openai")
+        assertThat(input.apiKey).isEqualTo("sk-openai")
+        assertThat(input.label).isEqualTo("Work OpenAI")
+
+        val state = viewModel.state.value
+        assertThat(state.creatingPreset).isFalse()
+        assertThat(state.presetForm.presetId).isNull()
+        assertThat(state.notice).isEqualTo("OpenAI added.")
+    }
+
+    @Test
+    fun `preset form requires a preset and a key`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ProviderListViewModel(service)
+        advanceUntilIdle()
+
+        viewModel.onCreatePresetProvider()
+        assertThat(viewModel.state.value.presetForm.error)
+            .isEqualTo("Choose a provider preset.")
+
+        viewModel.onPresetSelected("openai")
+        viewModel.onCreatePresetProvider()
+        assertThat(viewModel.state.value.presetForm.error)
+            .isEqualTo("Enter an API key for the selected provider.")
+        assertThat(service.lastPresetInput).isNull()
+    }
+
+    @Test
     fun `custom form creates a provider and resets`() = runTest(dispatcher) {
         val service = FakeProviderManagementService()
         val viewModel = ProviderListViewModel(service)

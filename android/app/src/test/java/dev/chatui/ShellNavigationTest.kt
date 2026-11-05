@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.shell.ChatDestination
+import dev.chatui.shell.ProviderDestination
 import dev.chatui.shell.ShellDestination
 import dev.chatui.shell.shellDestinations
 import dev.chatui.shell.shellStartDestination
@@ -27,8 +28,31 @@ class ShellNavigationTest {
             assertThat(navController.graph.findNode(destination.route)).isNotNull()
         }
         assertThat(navController.graph.findNode(ChatDestination.ROUTE)).isNotNull()
+        assertThat(navController.graph.findNode(ProviderDestination.ROUTE)).isNotNull()
         assertThat(navController.graph.startDestinationRoute)
             .isEqualTo(ShellDestination.Conversations.route)
+    }
+
+    @Test
+    fun `provider detail route keeps the providers destination selected`() {
+        assertThat(ShellDestination.Providers.matches("providers")).isTrue()
+        assertThat(ShellDestination.Providers.matches("providers/provider-1")).isTrue()
+        assertThat(ShellDestination.Providers.matches("settings")).isFalse()
+    }
+
+    @Test
+    fun `provider detail route accepts a provider id`() {
+        val navController = navController()
+
+        navController.navigate(ProviderDestination.createRoute("provider-1"))
+
+        assertThat(navController.currentDestination?.route)
+            .isEqualTo(ProviderDestination.ROUTE)
+        assertThat(
+            navController.currentBackStackEntry
+                ?.arguments
+                ?.getString(ProviderDestination.ARG_PROVIDER_ID),
+        ).isEqualTo("provider-1")
     }
 
     @Test

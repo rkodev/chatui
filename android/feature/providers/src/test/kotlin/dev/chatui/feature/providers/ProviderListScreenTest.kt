@@ -92,6 +92,59 @@ class ProviderListScreenTest {
     }
 
     @Test
+    fun `shows enabled preset options and the preset form`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state(),
+                    onOpenProvider = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.PresetForm))
+        composeRule.onNodeWithTag(ProviderListTestTags.PresetForm).assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.presetOption("openai"))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.presetOption("anthropic"))
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun `preset form forwards selection and creation`() {
+        var selected: String? = null
+        var created = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state().copy(
+                        presetForm = PresetProviderFormState(presetId = "openai"),
+                    ),
+                    onOpenProvider = {},
+                    onRetry = {},
+                    onPresetSelected = { selected = it },
+                    onCreatePresetProvider = { created = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.PresetForm))
+        composeRule.onNodeWithTag(ProviderListTestTags.presetOption("openai"))
+            .performClick()
+        composeRule.onNodeWithTag(ProviderListTestTags.PresetApiKey).assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.PresetCreate))
+        composeRule.onNodeWithTag(ProviderListTestTags.PresetCreate).performClick()
+
+        assertThat(selected).isEqualTo("openai")
+        assertThat(created).isTrue()
+    }
+
+    @Test
     fun `shows the custom provider form`() {
         composeRule.setContent {
             ChatUiTheme {

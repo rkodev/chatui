@@ -81,11 +81,47 @@ class ProviderDetailScreenTest {
             .assertTextContains("Rate limit: 20 requests per 1m")
         composeRule.onNodeWithTag(ProviderDetailTestTags.Cors)
             .assertTextContains("CORS: Supported")
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.DocsLink))
         composeRule.onNodeWithTag(ProviderDetailTestTags.DocsLink).assertIsDisplayed()
         composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
             .performScrollToNode(hasTestTag(ProviderDetailTestTags.ModelCount))
         composeRule.onNodeWithTag(ProviderDetailTestTags.ModelCount)
             .assertTextContains("3 models are cached for this provider.")
+    }
+
+    @Test
+    fun `shows preset, base URL, and auth for a custom provider`() {
+        val custom = testProvider(
+            label = "My server",
+            presetId = "custom",
+        ).copy(baseUrl = "https://api.example.com/v1")
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderDetailScreen(
+                    state = ProviderDetailUiState(
+                        provider = custom,
+                        loading = false,
+                    ),
+                    onNewKeyChanged = {},
+                    onRotateKey = {},
+                    onRemoveKey = {},
+                    onCancelRemove = {},
+                    onToggleEnabled = {},
+                    onValidate = {},
+                    onRefreshModels = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Preset)
+            .assertTextContains("Preset: custom")
+        composeRule.onNodeWithTag(ProviderDetailTestTags.BaseUrl)
+            .assertTextContains("Base URL: https://api.example.com/v1")
+        composeRule.onNodeWithTag(ProviderDetailTestTags.AuthType)
+            .assertTextContains("Auth: bearer")
     }
 
     @Test

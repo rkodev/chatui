@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.chatui.core.model.Provider
 import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.providers.CreateCustomProviderInput
+import dev.chatui.core.providers.CreatePresetProviderInput
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,12 +32,22 @@ data class CustomProviderFormState(
     val error: String? = null,
 )
 
+/** Editable state for creating a provider from an enabled preset. */
+data class PresetProviderFormState(
+    val presetId: String? = null,
+    val label: String = "",
+    val apiKey: String = "",
+    val error: String? = null,
+)
+
 /** One immutable state for the provider list. */
 data class ProviderListUiState(
     val providers: List<Provider> = emptyList(),
     val options: List<ProviderAvailability> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
+    val presetForm: PresetProviderFormState = PresetProviderFormState(),
+    val creatingPreset: Boolean = false,
     val customForm: CustomProviderFormState = CustomProviderFormState(),
     val creatingCustom: Boolean = false,
     val notice: String? = null,
@@ -62,6 +73,104 @@ class ProviderListViewModel(
 
     fun onRetry() {
         observeProviders()
+    }
+
+    fun onPresetSelected(presetId: String) {
+        _state.update {
+            it.copy(
+                presetForm = it.presetForm.copy(presetId = presetId, error = null),
+            )
+        }
+    }
+
+    fun onPresetLabelChanged(value: String) {
+        _state.update {
+            it.copy(presetForm = it.presetForm.copy(label = value, error = null))
+        }
+    }
+
+    fun onPresetApiKeyChanged(value: String) {
+        _state.update {
+            it.copy(presetForm = it.presetForm.copy(apiKey = value, error = null))
+        }
+    }
+
+    fun onCreatePresetProvider() {
+        val current = _state.value
+        if (current.creatingPreset) {
+            return
+        }
+
+        val form = current.presetForm
+        val presetId = form.presetId
+        if (presetId == null) {
+            _state.update {
+                it.copy(presetForm = form.copy(error = "Choose a provider preset."))
+            }
+            return
+        }
+
+        val option = current.options.firstOrNull { it.id == presetId }
+        if (option == null || !option.enabled) {
+            _state.update {
+                it.copy(
+                    presetForm = form.copy(
+                        error = "This provider preset is not available yet.",
+                    ),
+                )
+            }
+            return
+        }
+
+        val apiKey = form.apiKey.trim()
+        if (option.requiresKey && apiKey.isEmpty()) {
+            _state.update {
+                it.copy(
+                    presetForm = form.copy(
+                        error = "Enter an API key for the selected provider.",
+                    ),
+                )
+            }
+            return
+        }
+
+        _state.update {
+            it.copy(
+                creatingPreset = true,
+                notice = null,
+                presetForm = form.copy(error = null),
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                service.createPresetProvider(
+                    CreatePresetProviderInput(
+                        presetId = presetId,
+                        apiKey = apiKey.takeIf { option.requiresKey },
+                        label = form.label.takeIf { it.isNotBlank() },
+                    ),
+                )
+                _state.update {
+                    it.copy(
+                        creatingPreset = false,
+                        presetForm = PresetProviderFormState(),
+                        notice = "${option.label} added.",
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        creatingPreset = false,
+                        presetForm = it.presetForm.copy(
+                            error = providerErrorMessage(error),
+                        ),
+                    )
+                }
+            }
+        }
     }
 
     fun onCustomLabelChanged(value: String) {

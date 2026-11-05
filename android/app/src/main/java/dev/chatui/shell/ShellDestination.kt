@@ -57,5 +57,7 @@ enum class ShellDestination(
      * an exact match is not enough for the bottom-navigation selection.
      */
     fun matches(route: String?): Boolean =
-        route == this.route || (this == Chat && route?.startsWith("chat/") == true)
+        route == this.route ||
+            (this == Chat && route?.startsWith("chat/") == true) ||
+            (this == Providers && route?.startsWith("providers/") == true)
 }

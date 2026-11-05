@@ -2,6 +2,8 @@ package dev.chatui.feature.providers
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +37,11 @@ object ProviderListTestTags {
     const val Empty = "provider-list-empty"
     const val Error = "provider-list-error"
     const val AddProvider = "provider-list-add"
+    const val PresetForm = "provider-list-preset-form"
+    const val PresetLabel = "provider-list-preset-label"
+    const val PresetApiKey = "provider-list-preset-api-key"
+    const val PresetCreate = "provider-list-preset-create"
+    const val PresetError = "provider-list-preset-error"
     const val CustomForm = "provider-list-custom-form"
     const val CustomLabel = "provider-list-custom-label"
     const val CustomBaseUrl = "provider-list-custom-base-url"
@@ -48,6 +55,8 @@ object ProviderListTestTags {
     fun provider(id: String): String = "provider-list-item-$id"
 
     fun providerOption(id: String): String = "provider-list-option-$id"
+
+    fun presetOption(id: String): String = "provider-list-preset-option-$id"
 
     fun customHeaderName(index: Int): String = "provider-list-custom-header-name-$index"
 
@@ -68,6 +77,10 @@ fun ProviderListScreen(
     state: ProviderListUiState,
     onOpenProvider: (String) -> Unit,
     onRetry: () -> Unit,
+    onPresetSelected: (String) -> Unit = {},
+    onPresetLabelChanged: (String) -> Unit = {},
+    onPresetApiKeyChanged: (String) -> Unit = {},
+    onCreatePresetProvider: () -> Unit = {},
     onCustomLabelChanged: (String) -> Unit = {},
     onCustomBaseUrlChanged: (String) -> Unit = {},
     onCustomAuthTypeChanged: (ProviderAuthType) -> Unit = {},
@@ -126,6 +139,18 @@ fun ProviderListScreen(
         }
 
         item { AddProviderSection(state.options) }
+
+        item {
+            PresetProviderForm(
+                options = state.options,
+                form = state.presetForm,
+                creating = state.creatingPreset,
+                onPresetSelected = onPresetSelected,
+                onLabelChanged = onPresetLabelChanged,
+                onApiKeyChanged = onPresetApiKeyChanged,
+                onCreate = onCreatePresetProvider,
+            )
+        }
 
         item {
             CustomProviderForm(
@@ -249,6 +274,95 @@ private fun AddProviderSection(options: List<ProviderAvailability>) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PresetProviderForm(
+    options: List<ProviderAvailability>,
+    form: PresetProviderFormState,
+    creating: Boolean,
+    onPresetSelected: (String) -> Unit,
+    onLabelChanged: (String) -> Unit,
+    onApiKeyChanged: (String) -> Unit,
+    onCreate: () -> Unit,
+) {
+    val dimens = LocalDimens.current
+    val selectable = options.filter { it.enabled && it.id != "custom" }
+    val selected = selectable.firstOrNull { it.id == form.presetId }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ProviderListTestTags.PresetForm),
+        verticalArrangement = Arrangement.spacedBy(dimens.space2),
+    ) {
+        Text(
+            text = "Add a preset provider",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = "Choose an enabled OpenAI-compatible preset. The key is stored " +
+                "separately from the provider record.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(dimens.space1),
+        ) {
+            selectable.forEach { option ->
+                FilterChip(
+                    selected = option.id == form.presetId,
+                    onClick = { onPresetSelected(option.id) },
+                    label = { Text(option.label) },
+                    modifier = Modifier.testTag(
+                        ProviderListTestTags.presetOption(option.id),
+                    ),
+                )
+            }
+        }
+
+        OutlinedTextField(
+            value = form.label,
+            onValueChange = onLabelChanged,
+            label = { Text("Label (optional)") },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(ProviderListTestTags.PresetLabel),
+        )
+
+        if (selected?.requiresKey == true) {
+            OutlinedTextField(
+                value = form.apiKey,
+                onValueChange = onApiKeyChanged,
+                label = { Text("API key") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(ProviderListTestTags.PresetApiKey),
+            )
+        }
+
+        form.error?.let { message ->
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag(ProviderListTestTags.PresetError),
+            )
+        }
+
+        Button(
+            onClick = onCreate,
+            enabled = !creating,
+            modifier = Modifier.testTag(ProviderListTestTags.PresetCreate),
+        ) {
+            Text(if (creating) "Adding…" else "Add preset provider")
         }
     }
 }

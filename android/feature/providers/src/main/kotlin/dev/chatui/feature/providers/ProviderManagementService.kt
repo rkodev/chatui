@@ -17,6 +17,7 @@ import dev.chatui.core.model.ModelPricing
 import dev.chatui.core.model.ModelSource
 import dev.chatui.core.model.OutputModality
 import dev.chatui.core.model.Provider
+import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.model.newId
 import dev.chatui.core.network.ProviderRegistry
 import dev.chatui.core.providers.CreateCustomProviderInput
@@ -44,6 +45,7 @@ data class ProviderAvailability(
     val enabled: Boolean,
     val recommended: Boolean,
     val statusLabel: String?,
+    val requiresKey: Boolean = true,
 )
 
 /** User-supplied model that is not present in the catalog. */
@@ -448,6 +450,7 @@ class DefaultProviderManagementService @Inject constructor(
                 enabled = availability.enabled,
                 recommended = availability.preset.id == ProviderService.OPENROUTER_PRESET_ID,
                 statusLabel = if (availability.enabled) null else "Coming later",
+                requiresKey = availability.preset.auth.type != ProviderAuthType.NONE,
             )
         }
 
