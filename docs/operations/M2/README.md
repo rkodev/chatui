@@ -69,7 +69,7 @@
 | 32 | [M2-07.3 Android export](M2-07.3-android-export.md) | Complete | M2-06.5 | android | M2-04.3 |
 | 33 | [M2-07.4 Android import](M2-07.4-android-import.md) | Complete | M2-07.3 | android | M2-04.4 |
 | 34 | [M2-07.5 Android data controls and shell integration](M2-07.5-android-data-controls-shell.md) | Complete | M2-07.3, M2-07.4 | android | M2-04.5 |
-| 35 | [M2-08.1 Android provider adapter tests](M2-08.1-android-provider-tests.md) | Not started | M2-06.1, M2-06.2, M2-06.3 | android | none; M2-08.2 follows |
+| 35 | [M2-08.1 Android provider adapter tests](M2-08.1-android-provider-tests.md) | Complete | M2-06.1, M2-06.2, M2-06.3 | android | none; M2-08.2 follows |
 | 36 | [M2-08.2 Android persistence, data, and critical-case tests](M2-08.2-android-persistence-data-tests.md) | Not started | M2-06.6, M2-07.3, M2-07.4, M2-07.5, M2-08.1 | android | M2-04.6 |
 | 37 | [M2-09.1 CORS matrix and conformance evidence](M2-09.1-cors-conformance-evidence.md) | Not started | M2-02.4, M2-04.6, M2-08.1, M2-08.2 | verification | none |
 | 38 | [M2-09.2 Parity and exit gate](M2-09.2-parity-exit-gate.md) | Not started | all prior tasks | verification | none |
