@@ -13,6 +13,7 @@ import dev.chatui.shell.SettingsDestination
 import dev.chatui.shell.ShellDestination
 import dev.chatui.shell.shellDestinations
 import dev.chatui.shell.shellStartDestination
+import dev.chatui.feature.settings.SettingsSection
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -45,6 +46,16 @@ class ShellNavigationTest {
         assertThat(ShellDestination.Settings.matches("settings/appearance")).isTrue()
         assertThat(ShellDestination.Settings.matches("settings/chat")).isTrue()
         assertThat(ShellDestination.Settings.matches("providers")).isFalse()
+    }
+
+    @Test
+    fun `data and backup settings routes are wired`() {
+        assertThat(SettingsDestination.routeFor(SettingsSection.DATA))
+            .isEqualTo(SettingsDestination.DATA)
+        assertThat(SettingsDestination.routeFor(SettingsSection.BACKUP))
+            .isEqualTo(SettingsDestination.BACKUP)
+        assertThat(ShellDestination.Settings.matches(SettingsDestination.DATA)).isTrue()
+        assertThat(ShellDestination.Settings.matches(SettingsDestination.BACKUP)).isTrue()
     }
 
     @Test

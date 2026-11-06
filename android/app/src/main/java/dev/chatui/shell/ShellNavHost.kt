@@ -32,6 +32,7 @@ import dev.chatui.feature.providers.ProviderDetailRoute
 import dev.chatui.feature.providers.ProviderListRoute
 import dev.chatui.feature.providers.ProviderManagementEntryPoint
 import dev.chatui.feature.providers.ProviderManagementService
+import dev.chatui.feature.settings.DataControlsService
 import dev.chatui.feature.settings.SettingsEntryPoint
 import dev.chatui.feature.settings.SettingsRoute
 import dev.chatui.feature.settings.SettingsSection
@@ -190,6 +191,7 @@ fun NavGraphBuilder.shellDestinations(
             section = SettingsSection.ROOT,
             settingsStore = rememberSettingsDataStore(),
             service = rememberProviderManagementService(),
+            dataControlsService = rememberDataControlsService(),
             onOpenSection = { section ->
                 navController.navigate(SettingsDestination.routeFor(section)) {
                     launchSingleTop = true
@@ -210,21 +212,31 @@ fun NavGraphBuilder.shellDestinations(
         SettingsSection.ABOUT to SettingsDestination.ABOUT,
     ).forEach { (section, route) ->
         composable(route) {
-            SettingsRoute(
-                section = section,
-                settingsStore = rememberSettingsDataStore(),
-                service = rememberProviderManagementService(),
-                onOpenSection = { target ->
-                    navController.navigate(SettingsDestination.routeFor(target)) {
-                        launchSingleTop = true
-                    }
-                },
-                onOpenProviders = {
-                    navController.navigate(ShellDestination.Providers.route) {
-                        launchSingleTop = true
-                    }
-                },
-            )
+            if (section == SettingsSection.DATA) {
+                DataSettingsDestination(
+                    navController = navController,
+                    settingsStore = rememberSettingsDataStore(),
+                    providerService = rememberProviderManagementService(),
+                    dataControlsService = rememberDataControlsService(),
+                )
+            } else {
+                SettingsRoute(
+                    section = section,
+                    settingsStore = rememberSettingsDataStore(),
+                    service = rememberProviderManagementService(),
+                    dataControlsService = rememberDataControlsService(),
+                    onOpenSection = { target ->
+                        navController.navigate(SettingsDestination.routeFor(target)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onOpenProviders = {
+                        navController.navigate(ShellDestination.Providers.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
         }
     }
     composable(ShellDestination.Backup.route) { BackupPlaceholder() }
@@ -249,6 +261,17 @@ private fun rememberProviderManagementService(): ProviderManagementService {
             context.applicationContext,
             ProviderManagementEntryPoint::class.java,
         ).providerManagementService()
+    }
+}
+
+@Composable
+private fun rememberDataControlsService(): DataControlsService {
+    val context = LocalContext.current
+    return remember(context.applicationContext) {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SettingsEntryPoint::class.java,
+        ).dataControlsService()
     }
 }
 

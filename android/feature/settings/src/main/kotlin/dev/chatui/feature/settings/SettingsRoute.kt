@@ -33,8 +33,13 @@ fun SettingsRoute(
     section: SettingsSection,
     settingsStore: SettingsDataStore,
     service: ProviderManagementService,
+    dataControlsService: DataControls,
     onOpenSection: (SettingsSection) -> Unit,
     onOpenProviders: () -> Unit,
+    onExportAll: () -> Unit = {},
+    onImportMerge: () -> Unit = {},
+    onImportReplace: () -> Unit = {},
+    onOpenBackup: () -> Unit = { onOpenSection(SettingsSection.BACKUP) },
     modifier: Modifier = Modifier,
 ) {
     if (section == SettingsSection.ROOT) {
@@ -82,7 +87,15 @@ fun SettingsRoute(
             modifier = modifier,
         )
 
-        SettingsSection.DATA -> DataSettingsScreen(modifier = modifier)
+        SettingsSection.DATA -> DataSettingsRoute(
+            service = dataControlsService,
+            onOpenProviders = onOpenProviders,
+            onOpenBackup = onOpenBackup,
+            onExportAll = onExportAll,
+            onImportMerge = onImportMerge,
+            onImportReplace = onImportReplace,
+            modifier = modifier,
+        )
 
         SettingsSection.BACKUP -> BackupSettingsScreen(modifier = modifier)
 
@@ -97,4 +110,6 @@ fun SettingsRoute(
 @InstallIn(SingletonComponent::class)
 interface SettingsEntryPoint {
     fun settingsDataStore(): SettingsDataStore
+
+    fun dataControlsService(): DataControlsService
 }

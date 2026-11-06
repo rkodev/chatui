@@ -482,29 +482,6 @@ fun ChatDefaultsSettingsScreen(
     }
 }
 
-/** Data settings entry point reserved for M2-07. */
-@Composable
-fun DataSettingsScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .testTag(SettingsTestTags.Data),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text("Data", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            text = "Storage usage, export, import, and clear-data controls arrive in M2-07.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Text(
-            text = "Conversations and settings stay on this device.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
 /** Backup placeholder for the post-M2 backup feature. */
 @Composable
 fun BackupSettingsScreen(modifier: Modifier = Modifier) {

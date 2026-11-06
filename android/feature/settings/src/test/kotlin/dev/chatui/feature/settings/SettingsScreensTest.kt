@@ -97,15 +97,6 @@ class SettingsScreensTest {
     }
 
     @Test
-    fun `data screen renders`() {
-        composeRule.setContent {
-            ChatUiTheme { DataSettingsScreen() }
-        }
-
-        composeRule.onNodeWithTag(SettingsTestTags.Data).assertIsDisplayed()
-    }
-
-    @Test
     fun `backup screen renders`() {
         composeRule.setContent {
             ChatUiTheme { BackupSettingsScreen() }
