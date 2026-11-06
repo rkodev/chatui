@@ -6,6 +6,7 @@ import com.google.common.truth.Truth.assertThat
 import dagger.Module
 import dagger.Provides
 import dev.chatui.core.database.ChatUiDatabase
+import dev.chatui.core.database.attachment.AttachmentService
 import dev.chatui.core.database.repository.ConversationRepository
 import dev.chatui.core.database.repository.MessageRepository
 import dev.chatui.core.database.repository.ModelRepository
@@ -19,11 +20,15 @@ import dev.chatui.core.network.ProviderRegistry
 import dev.chatui.core.providers.ModelService
 import dev.chatui.core.providers.ProviderGateway
 import dev.chatui.core.providers.ProviderService
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import java.io.File
+import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Base64
 import javax.inject.Singleton
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -164,6 +169,18 @@ class AppModuleTest {
         )
 
         assertThat(recovery).isInstanceOf(StreamingRecoveryService::class.java)
+    }
+
+    @Test
+    fun `provides attachment cleanup backed by the attachment service`() = runTest {
+        val service = mockk<AttachmentService>()
+        val before = Instant.parse("2026-11-06T12:00:00Z")
+        coEvery { service.cleanupOrphans(before) } returns listOf("attachments/orphan")
+
+        val cleanup = AppModule.provideAttachmentCleanup(service)
+
+        assertThat(cleanup.cleanupOrphans(before)).containsExactly("attachments/orphan")
+        coVerify { service.cleanupOrphans(before) }
     }
 
     @Test

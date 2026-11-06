@@ -7,6 +7,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.chatui.core.database.ChatUiDatabase
+import dev.chatui.core.database.attachment.AttachmentService
 import dev.chatui.core.database.repository.ConversationRepository
 import dev.chatui.core.database.repository.MessageRepository
 import dev.chatui.core.database.repository.ModelRepository
@@ -27,7 +28,9 @@ import dev.chatui.core.providers.ModelService
 import dev.chatui.core.providers.ProviderGateway
 import dev.chatui.core.providers.ProviderService
 import dev.chatui.core.providers.RoutingProviderGateway
+import dev.chatui.startup.AttachmentCleanup
 import java.time.Clock
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 import okhttp3.OkHttpClient
@@ -133,6 +136,20 @@ object AppModule {
         messages: MessageRepository,
         clock: Clock,
     ): InterruptedMessageRecovery = StreamingRecoveryService(messages, clock)
+
+    /**
+     * Startup cleanup binding.
+     *
+     * Delegates to the shared [AttachmentService] so startup and chat use the
+     * same orphan rules and file-deletion logic.
+     */
+    @Provides
+    @Singleton
+    fun provideAttachmentCleanup(service: AttachmentService): AttachmentCleanup =
+        object : AttachmentCleanup {
+            override suspend fun cleanupOrphans(before: Instant): List<String> =
+                service.cleanupOrphans(before)
+        }
 
     @Provides
     @Singleton

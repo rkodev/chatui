@@ -56,7 +56,7 @@
 | 19 | [M3-04.2 Persistent drafts](M3-04.2-persistent-drafts.md) | Complete | M3-04.1 | lifecycle | M3-02.3 |
 | 20 | [M3-04.3 Navigation and last-active restore](M3-04.3-navigation-restore.md) | Complete | M3-04.2, M3-02.2 | lifecycle | none; startup/navigation files shared |
 | 21 | [M3-04.4 Process-death streaming recovery and case 26](M3-04.4-process-death-case-26.md) | Complete | M3-04.3 | lifecycle | none; startup files shared |
-| 22 | [M3-04.5 Startup orphan-attachment cleanup](M3-04.5-startup-attachment-cleanup.md) | Not started | M3-04.4 | lifecycle | none; startup files shared |
+| 22 | [M3-04.5 Startup orphan-attachment cleanup](M3-04.5-startup-attachment-cleanup.md) | Complete | M3-04.4 | lifecycle | none; startup files shared |
 | 23 | [M3-04.6 Background behavior documentation](M3-04.6-background-behavior.md) | Not started | M3-04.5 | lifecycle | M3-02.3, M3-05.1 |
 | 24 | [M3-05.2 Core Compose UI flows](M3-05.2-core-compose-flows.md) | Not started | M3-04.6, M3-03.4 | tests | M3-06.2, M3-06.3 |
 | 25 | [M3-05.3 Roborazzi screenshot suite](M3-05.3-roborazzi-screenshots.md) | Not started | M3-05.2 | tests | M3-05.4, M3-05.5 |

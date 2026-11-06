@@ -739,3 +739,51 @@ No real API key, prompt, conversation content, personal data, or signing
 material is recorded in this section. The provider key was a synthetic
 placeholder, the prompt was synthetic, and the streamed text was the fixture's
 `synthetic-NN` sequence.
+
+## 17. M3-04.5 Startup orphan-attachment cleanup
+
+Recorded 2026-11-06. Only synthetic attachment names and bytes were used.
+
+### 17.1 Behavior
+
+- `AppStartup` now depends on an `AttachmentCleanup` interface. The production
+  binding in `AppModule.provideAttachmentCleanup` delegates to the shared
+  `AttachmentService.cleanupOrphans`, so startup and chat use the same orphan
+  rules and file-deletion logic.
+- `AppStartup.run()` captures one startup instant before recovery, runs
+  `recovery.recoverInterruptedMessages()`, then calls
+  `attachmentCleanup.cleanupOrphans(startedAt)`.
+- Cleanup runs inside the existing mutex/`completed` guard, so it runs exactly
+  once per process even with concurrent callers.
+- A cleanup failure is non-fatal. Only the exception class name is recorded in
+  `AppStartup.lastCleanupFailure`; no message, path, or attachment content is
+  stored. The shell still renders.
+- A recovery failure keeps its existing behavior and still attempts cleanup
+  before the exception propagates to `MainActivity`.
+- Attachments created at or after the captured startup instant are never
+  treated as orphans. Attachments bound to an existing message survive.
+
+### 17.2 Automated tests
+
+| Test | Result | What it proves |
+| --- | --- | --- |
+| `AppStartupTest.runs cleanup after recovery with the startup timestamp` | Pass | Cleanup runs after recovery and receives the captured startup instant. |
+| `AppStartupTest.cleanup runs once per process` | Pass | Repeated calls do not repeat cleanup. |
+| `AppStartupTest.a failed cleanup does not block the shell and is recorded` | Pass | A cleanup failure is swallowed, recorded as a class name, and not retried. |
+| `AppStartupTest.cleanup is still attempted when recovery fails` | Pass | Recovery failure does not skip cleanup. |
+| `AttachmentServiceTest.startup cleanup removes orphan metadata and bytes but keeps referenced and new attachments` | Pass | Orphan metadata and orphan bytes are deleted; a message-bound attachment and an attachment created after the cutoff survive. |
+| `AppModuleTest.provides attachment cleanup backed by the attachment service` | Pass | The DI binding delegates to `AttachmentService.cleanupOrphans`. |
+
+### 17.3 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-lint` | `BUILD SUCCESSFUL`; 439 actionable tasks. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 953 aggregated tests, 0 failures, 0 errors, 0 skipped. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-assemble` | `BUILD SUCCESSFUL`; debug APK produced. |
+
+### 17.4 Redaction
+
+No API key, prompt, conversation content, personal data, or signing material is
+recorded in this section. Attachment fixtures use synthetic names and bytes.
+
