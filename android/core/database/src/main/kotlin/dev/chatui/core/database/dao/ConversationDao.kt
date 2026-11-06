@@ -33,6 +33,10 @@ abstract class ConversationDao {
     @Query("SELECT * FROM conversations WHERE id = :id")
     abstract suspend fun getById(id: String): ConversationEntity?
 
+    /** Every conversation, including archived rows, for export. */
+    @Query("SELECT * FROM conversations")
+    abstract suspend fun all(): List<ConversationEntity>
+
     /**
      * Case-insensitive title search over active conversations.
      *

@@ -28,6 +28,9 @@ class ConversationRepository(
 
     suspend fun get(id: String): Conversation? = dao.getById(id)?.toDomain()
 
+    /** Every conversation, including archived rows, for export. */
+    suspend fun all(): List<Conversation> = dao.all().map { it.toDomain() }
+
     /**
      * Search active conversation titles.
      *

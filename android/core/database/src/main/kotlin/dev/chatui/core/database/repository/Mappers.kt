@@ -2,9 +2,14 @@ package dev.chatui.core.database.repository
 
 import dev.chatui.core.database.entity.ConversationEntity
 import dev.chatui.core.database.entity.AttachmentEntity
+import dev.chatui.core.database.entity.BackupConfigEntity
 import dev.chatui.core.database.entity.MessageEntity
 import dev.chatui.core.database.entity.ModelEntity
 import dev.chatui.core.database.entity.ProviderEntity
+import dev.chatui.core.model.BackupBackend
+import dev.chatui.core.model.BackupConfig
+import dev.chatui.core.model.BackupEncryption
+import dev.chatui.core.model.BackupKdf
 import dev.chatui.core.model.BrowserCors
 import dev.chatui.core.model.Attachment
 import dev.chatui.core.model.AttachmentKind
@@ -121,6 +126,22 @@ internal fun Attachment.toEntity(): AttachmentEntity = AttachmentEntity(
     width = width,
     height = height,
     createdAt = createdAt.toString(),
+)
+
+internal fun BackupConfigEntity.toDomain(): BackupConfig = BackupConfig(
+    enabled = enabled,
+    backend = parseSerialName(BackupBackend.serializer(), backend),
+    endpoint = endpoint,
+    region = region,
+    bucket = bucket,
+    prefix = prefix,
+    credentialSecretId = credentialSecretId,
+    encryption = parseSerialName(BackupEncryption.serializer(), encryption),
+    kdf = parseSerialName(BackupKdf.serializer(), kdf),
+    kdfSalt = kdfSalt,
+    lastSyncAt = lastSyncAt?.let(Instant::parse),
+    lastManifestEtag = lastManifestEtag,
+    deviceId = deviceId,
 )
 
 internal fun MessageEntity.toDomain(): Message = Message(    id = id,

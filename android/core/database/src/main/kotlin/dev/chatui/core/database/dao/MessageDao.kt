@@ -74,6 +74,17 @@ abstract class MessageDao {
     @Query("SELECT * FROM messages WHERE id = :id")
     abstract suspend fun getById(id: String): MessageEntity?
 
+    /** Every message, including deleted rows, for export. */
+    @Query("SELECT * FROM messages")
+    abstract suspend fun all(): List<MessageEntity>
+
+    /** Every message in one conversation, including deleted rows, for export. */
+    @Query(
+        "SELECT * FROM messages WHERE conversationId = :conversationId " +
+            "ORDER BY sequence ASC",
+    )
+    abstract suspend fun allForConversation(conversationId: String): List<MessageEntity>
+
     @Query("SELECT id FROM messages")
     abstract suspend fun allIds(): List<String>
 

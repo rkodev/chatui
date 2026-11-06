@@ -34,6 +34,13 @@ class MessageRepository(
 ) {
     suspend fun get(id: String): Message? = dao.getById(id)?.toDomain()
 
+    /** Every message, including deleted rows, for export. */
+    suspend fun all(): List<Message> = dao.all().map { it.toDomain() }
+
+    /** Every message in one conversation, including deleted rows, for export. */
+    suspend fun allForConversation(conversationId: String): List<Message> =
+        dao.allForConversation(conversationId).map { it.toDomain() }
+
     /** Every message id, including deleted rows, for attachment cleanup. */
     suspend fun allIds(): List<String> = dao.allIds()
 

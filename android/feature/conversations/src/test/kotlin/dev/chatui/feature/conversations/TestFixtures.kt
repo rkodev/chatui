@@ -1,9 +1,13 @@
 package dev.chatui.feature.conversations
 
+import dev.chatui.core.model.Attachment
+import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.BrowserCors
+import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.ChatParams
 import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.Conversation
+import dev.chatui.core.model.Density
 import dev.chatui.core.model.InputModality
 import dev.chatui.core.model.Message
 import dev.chatui.core.model.MessageRole
@@ -15,6 +19,9 @@ import dev.chatui.core.model.OutputModality
 import dev.chatui.core.model.Provider
 import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.model.ProviderKind
+import dev.chatui.core.model.SendKey
+import dev.chatui.core.model.Settings
+import dev.chatui.core.model.Theme
 import java.time.Instant
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -263,3 +270,48 @@ class FakeConversationService : ConversationService {
         return searchResults
     }
 }
+
+fun testAttachment(
+    id: String = "attachment-1",
+    messageId: String? = "message-1",
+    kind: AttachmentKind = AttachmentKind.FILE,
+    mimeType: String = "text/plain",
+    name: String = "notes.txt",
+    size: Long = 5,
+    sha256: String = "abc123",
+    storageKey: String = "attachments/abc123",
+    createdAt: Instant = TEST_NOW,
+): Attachment = Attachment(
+    id = id,
+    messageId = messageId,
+    kind = kind,
+    mimeType = mimeType,
+    name = name,
+    size = size,
+    sha256 = sha256,
+    storageKey = storageKey,
+    width = null,
+    height = null,
+    createdAt = createdAt,
+)
+
+fun testSettings(
+    defaultProviderId: String? = "provider-1",
+    defaultModelId: String? = "model-1",
+    lastActiveConversationId: String? = "conversation-1",
+): Settings = Settings(
+    theme = Theme.SYSTEM,
+    density = Density.COMFORTABLE,
+    chatFontSize = ChatFontSize.MD,
+    sendKey = SendKey.ENTER,
+    defaultProviderId = defaultProviderId,
+    defaultModelId = defaultModelId,
+    defaultSystemPrompt = "",
+    defaultParams = testChatParams(),
+    rememberKeysOnWeb = false,
+    showTokenUsage = true,
+    loadRemoteImages = false,
+    lastActiveConversationId = lastActiveConversationId,
+    backup = null,
+    onboardingCompleted = true,
+)
