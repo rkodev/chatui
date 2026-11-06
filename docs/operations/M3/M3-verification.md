@@ -787,3 +787,39 @@ Recorded 2026-11-06. Only synthetic attachment names and bytes were used.
 No API key, prompt, conversation content, personal data, or signing material is
 recorded in this section. Attachment fixtures use synthetic names and bytes.
 
+## 18. M3-04.6 Background behavior documentation
+
+Recorded 2026-11-06. Documentation-only task; no production code changed.
+
+### 18.1 Document
+
+[android-background-behavior.md](android-background-behavior.md) records:
+
+- streaming while foregrounded, including configuration-change survival;
+- the best-effort short grace period when backgrounded, subject to OS limits;
+- process-death behavior: partial content preserved, message marked
+  interrupted, regenerate available;
+- no foreground service in M3;
+- no WorkManager or background sync before backup exists;
+- user-facing expectations and known limitations.
+
+The document states explicitly that long background responses are not
+guaranteed and that a foreground service is a future enhancement.
+
+### 18.2 Audit: no background service or sync
+
+Command:
+
+```bash
+rg -n "WorkManager|ForegroundService|startForeground" android/app android/feature android/core || true
+```
+
+Result: no matches in production sources. `AndroidManifest.xml` declares only
+`MainActivity` and no service, receiver, or WorkManager initializer. No
+foreground service, notification, wake lock, or background sync job was added.
+
+### 18.3 Redaction
+
+No API key, prompt, conversation content, personal data, or signing material is
+recorded in this section or in the background-behavior document.
+
