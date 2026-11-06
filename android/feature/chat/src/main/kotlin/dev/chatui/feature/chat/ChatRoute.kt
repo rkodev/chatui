@@ -3,6 +3,7 @@ package dev.chatui.feature.chat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.chatui.core.datastore.settings.AndroidSettings
@@ -46,6 +47,7 @@ fun ChatRoute(
         initialValue = AndroidSettings(),
     )
     val online = rememberIsOnline()
+    val context = LocalContext.current
 
     val attachmentFile: (String) -> File? = { id ->
         val attachment = state.attachmentsByMessage[id]
@@ -71,6 +73,14 @@ fun ChatRoute(
         onBack = onBack,
         onOpenProviders = onOpenProviders,
         onOpenConversationSettings = onOpenConversationSettings,
+        onShareConversation = { format ->
+            val text = ConversationShareFormatter.format(
+                title = state.conversation?.title ?: "Conversation",
+                messages = state.messages,
+                format = format,
+            )
+            context.startActivity(ConversationShareIntent.createChooserIntent(text))
+        },
         onAddAttachments = viewModel::onAddAttachments,
         onRemoveAttachment = viewModel::onRemoveAttachment,
         onConfirmSend = viewModel::onConfirmSend,

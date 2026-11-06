@@ -69,6 +69,7 @@ class ChatScreenTest {
         onEditLastUser: (dev.chatui.core.model.Message, String) -> Unit = { _, _ -> },
         onOpenProviders: () -> Unit = {},
         onOpenConversationSettings: () -> Unit = {},
+        onShareConversation: ((ConversationShareFormat) -> Unit)? = null,
         onConfirmSend: () -> Unit = {},
         onCancelSendConfirmation: () -> Unit = {},
         imeInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
@@ -87,6 +88,7 @@ class ChatScreenTest {
                     onEditLastUser = onEditLastUser,
                     onOpenProviders = onOpenProviders,
                     onOpenConversationSettings = onOpenConversationSettings,
+                    onShareConversation = onShareConversation,
                     onConfirmSend = onConfirmSend,
                     onCancelSendConfirmation = onCancelSendConfirmation,
                     zoneId = java.time.ZoneOffset.UTC,
@@ -350,6 +352,44 @@ class ChatScreenTest {
         composeRule.onNodeWithTag(ChatScreenTestTags.ConversationSettings).performClick()
 
         assertThat(opened).isEqualTo(1)
+    }
+
+    @Test
+    fun `share action offers text and markdown formats`() {
+        var selected: ConversationShareFormat? = null
+        screen(
+            state(messages = listOf(testMessage(text = "Hello"))),
+            onShareConversation = { selected = it },
+        )
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.Share).performClick()
+        composeRule.onNodeWithTag(ChatScreenTestTags.ShareText).performClick()
+
+        assertThat(selected).isEqualTo(ConversationShareFormat.TEXT)
+    }
+
+    @Test
+    fun `share action can select markdown`() {
+        var selected: ConversationShareFormat? = null
+        screen(
+            state(messages = listOf(testMessage(text = "Hello"))),
+            onShareConversation = { selected = it },
+        )
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.Share).performClick()
+        composeRule.onNodeWithTag(ChatScreenTestTags.ShareMarkdown).performClick()
+
+        assertThat(selected).isEqualTo(ConversationShareFormat.MARKDOWN)
+    }
+
+    @Test
+    fun `share action is hidden without a conversation`() {
+        screen(
+            ChatUiState(conversationId = null, conversation = null, loading = false),
+            onShareConversation = {},
+        )
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.Share).assertDoesNotExist()
     }
 
     @Test

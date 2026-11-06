@@ -25,6 +25,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -33,7 +35,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
@@ -76,6 +81,10 @@ object ChatScreenTestTags {
     const val Back = "chat-screen-back"
     const val OpenProviders = "chat-screen-open-providers"
     const val ConversationSettings = "chat-screen-conversation-settings"
+    const val Share = "chat-screen-share"
+    const val ShareMenu = "chat-screen-share-menu"
+    const val ShareText = "chat-screen-share-text"
+    const val ShareMarkdown = "chat-screen-share-markdown"
     const val AttachmentWarning = "chat-screen-attachment-warning"
     const val SendConfirmation = "chat-screen-send-confirmation"
     const val SendAnyway = "chat-screen-send-anyway"
@@ -104,6 +113,7 @@ fun ChatScreen(
     onBack: () -> Unit = {},
     onOpenProviders: () -> Unit = {},
     onOpenConversationSettings: () -> Unit = {},
+    onShareConversation: ((ConversationShareFormat) -> Unit)? = null,
     onAddAttachments: (List<AttachmentInput>) -> Unit = {},
     onRemoveAttachment: (String) -> Unit = {},
     onConfirmSend: () -> Unit = {},
@@ -175,6 +185,7 @@ fun ChatScreen(
                 onEditLastUser = onEditLastUser,
                 onOpenProviders = onOpenProviders,
                 onOpenConversationSettings = onOpenConversationSettings,
+                onShareConversation = onShareConversation,
                 onAddAttachments = onAddAttachments,
                 onRemoveAttachment = onRemoveAttachment,
                 onConfirmSend = onConfirmSend,
@@ -251,6 +262,7 @@ private fun ChatContent(
     onEditLastUser: (Message, String) -> Unit,
     onOpenProviders: () -> Unit,
     onOpenConversationSettings: () -> Unit,
+    onShareConversation: ((ConversationShareFormat) -> Unit)?,
     onAddAttachments: (List<AttachmentInput>) -> Unit,
     onRemoveAttachment: (String) -> Unit,
     onConfirmSend: () -> Unit,
@@ -267,6 +279,7 @@ private fun ChatContent(
 ) {
     val dimens = LocalDimens.current
     val context = LocalContext.current
+    var shareMenuExpanded by remember { mutableStateOf(false) }
     val modelLabel = state.conversation?.modelLabel
         ?: state.conversation?.modelId
         ?: "No model selected"
@@ -338,6 +351,41 @@ private fun ChatContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+            if (state.conversation != null && onShareConversation != null) {
+                Box {
+                    TextButton(
+                        onClick = { shareMenuExpanded = true },
+                        modifier = Modifier
+                            .heightIn(min = dimens.touchTargetMin)
+                            .testTag(ChatScreenTestTags.Share)
+                            .semantics { contentDescription = "Share conversation" },
+                    ) {
+                        Text("Share")
+                    }
+                    DropdownMenu(
+                        expanded = shareMenuExpanded,
+                        onDismissRequest = { shareMenuExpanded = false },
+                        modifier = Modifier.testTag(ChatScreenTestTags.ShareMenu),
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Share as text") },
+                            onClick = {
+                                shareMenuExpanded = false
+                                onShareConversation(ConversationShareFormat.TEXT)
+                            },
+                            modifier = Modifier.testTag(ChatScreenTestTags.ShareText),
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Share as Markdown") },
+                            onClick = {
+                                shareMenuExpanded = false
+                                onShareConversation(ConversationShareFormat.MARKDOWN)
+                            },
+                            modifier = Modifier.testTag(ChatScreenTestTags.ShareMarkdown),
+                        )
+                    }
                 }
             }
             TextButton(
