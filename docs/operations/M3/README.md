@@ -40,7 +40,7 @@
 | 3 | [M3-05.1 Android test infrastructure and fake provider harness](M3-05.1-test-infrastructure.md) | Complete | M3-00.2 | tests | no; shares app build file with M3-06.1 |
 | 4 | [M3-06.1 Release minification, shrinking, mapping, and keep rules](M3-06.1-release-minification.md) | Complete | M3-00.1 | release | M3-01.*, M3-03.* |
 | 5 | [M3-01.1 Real Android Keystore and ciphertext-only proof](M3-01.1-keystore-proof.md) | Complete | M3-00.2, M3-05.1 | secrets | M3-01.4, M3-02.3 |
-| 6 | [M3-01.2 Backup exclusion and case 27 evidence](M3-01.2-backup-exclusion.md) | Not started | M3-01.1 | secrets | M3-01.3, M3-01.4 |
+| 6 | [M3-01.2 Backup exclusion and case 27 evidence](M3-01.2-backup-exclusion.md) | Complete | M3-01.1 | secrets | M3-01.3, M3-01.4 |
 | 7 | [M3-01.3 FLAG_SECURE, key lifecycle, and logging audit](M3-01.3-flag-secure-key-lifecycle.md) | Not started | M3-01.1 | secrets | M3-01.2, M3-01.4 |
 | 8 | [M3-01.4 Network security config and local cleartext policy](M3-01.4-network-security.md) | Not started | M3-00.2 | secrets | M3-01.1, M3-01.2, M3-01.3 |
 | 9 | [M3-01.5 Cleartext warning and certificate-validation guard](M3-01.5-cleartext-warning.md) | Not started | M3-01.4 | secrets | M3-01.2, M3-01.3 |

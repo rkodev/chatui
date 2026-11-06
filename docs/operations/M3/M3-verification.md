@@ -209,3 +209,124 @@ Searched `android/**/*.kt` for `Log.`, `println`, `printStackTrace`,
 No real key, request header, prompt, or personal data is recorded in this
 section. The sentinel is synthetic and exists only in test sources and test
 output.
+
+## 10. M3-01.2 Backup exclusion and case 27 evidence
+
+Recorded 2026-11-06. Only the synthetic sentinel
+`m3-backup-sentinel-not-a-real-key` was used. No real provider key, prompt,
+conversation content, or personal data was created or recorded.
+
+### 10.1 Targets and method
+
+| Target | AVD | API | Role |
+| --- | --- | --- | --- |
+| `emulator-5554` | `Medium_Phone_API_36.1` | 36 | Source with seeded sentinel data |
+| `emulator-5556` | `Small_Phone` | 31 | Second target / fresh install |
+
+Method: Android Backup Manager (`bmgr`) with the platform backup transport.
+The source target had Backup Manager enabled (`bmgr enable true`) so the test
+exercised the real backup path rather than a globally disabled service. The
+second target was installed fresh and checked before and after a restore
+attempt.
+
+No API 26-30 system image is installed in this environment. The
+`fullBackupContent` path is therefore covered by the static `BackupRulesTest`
+assertions, not by a runtime backup on API 26-30. The API 31+ path was exercised
+on both API 31 and API 36.
+
+### 10.2 Source target: seeded data and backup attempt
+
+The manual `BackupSeedTest` phase seeded the production `chatui.db`, the
+`files/datastore/settings.preferences_pb` DataStore, and the Keystore-backed
+secret store with a synthetic provider, conversation, and sentinel secret.
+
+```bash
+adb -s emulator-5554 shell am instrument -w \
+  -e class dev.chatui.security.BackupSeedTest#backupPhase \
+  -e phase seed dev.chatui.test/androidx.test.runner.AndroidJUnitRunner
+adb -s emulator-5554 shell bmgr enable true
+adb -s emulator-5554 shell bmgr backupnow dev.chatui
+adb -s emulator-5554 shell bmgr fullbackup dev.chatui
+adb -s emulator-5554 shell bmgr list sets
+```
+
+Results:
+
+- Seed phase: `OK (1 test)`.
+- `bmgr backupnow dev.chatui`: `Package dev.chatui with result: Backup is not allowed`; `Backup finished with result: Success`.
+- `bmgr fullbackup dev.chatui`: `Performing full transport backup`; no restore set was created.
+- `bmgr list sets`: `No restore sets`.
+- Plaintext scan of `databases/chatui.db`, `files/datastore/settings.preferences_pb`, and `shared_prefs/chatui_secret_keyset_prefs.xml`: 0 hits for the sentinel.
+- `BackupSeedTest` `verify` phase after the backup attempts: `OK (1 test)`, proving the source data was still present and readable.
+
+### 10.3 Second target: restore attempt and fresh-install check
+
+The second target was installed fresh, then checked for restore sets and app
+data before any seeding.
+
+```bash
+adb -s emulator-5556 install -r app-debug.apk
+adb -s emulator-5556 install -r app-debug-androidTest.apk
+adb -s emulator-5556 shell bmgr list sets
+adb -s emulator-5556 shell bmgr backupnow dev.chatui
+adb -s emulator-5556 shell run-as dev.chatui ls -la databases files shared_prefs
+adb -s emulator-5556 shell am instrument -w \
+  -e class dev.chatui.security.BackupSeedTest#backupPhase \
+  -e phase verifyAbsent dev.chatui.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Results:
+
+- `bmgr list sets`: `No restore sets`. There was no source backup set to restore because the source backup was refused.
+- `bmgr backupnow dev.chatui` on the fresh target: `Backup is not allowed`.
+- `run-as dev.chatui ls`: `databases`, `files`, and `shared_prefs` did not exist.
+- `verifyAbsent`: `OK (1 test)`. The test asserts no sentinel secret, no seeded provider, no seeded conversation, `onboardingCompleted == false`, and no default provider or last-active conversation.
+
+The API 31 target was also used to exercise the `dataExtractionRules` path with
+seeded data:
+
+```bash
+adb -s emulator-5556 shell am instrument -w \
+  -e class dev.chatui.security.BackupSeedTest#backupPhase \
+  -e phase seed dev.chatui.test/androidx.test.runner.AndroidJUnitRunner
+adb -s emulator-5556 shell bmgr enable true
+adb -s emulator-5556 shell bmgr backupnow dev.chatui
+```
+
+Result: `Package dev.chatui with result: Backup is not allowed`; `Backup
+finished with result: Success`. The target was then cleared with
+`adb -s emulator-5556 shell pm clear dev.chatui` and `verifyAbsent` passed
+again.
+
+### 10.4 Static rule and regression checks
+
+- `AndroidManifest.xml` still has `android:allowBackup="false"`,
+  `android:dataExtractionRules="@xml/data_extraction_rules"`, and
+  `android:fullBackupContent="@xml/backup_rules"`.
+- `backup_rules.xml` still excludes `chatui.db` (plus `-shm`, `-wal`,
+  `-journal`), `datastore/`, and `chatui_secret_keyset_prefs.xml`.
+- `data_extraction_rules.xml` still excludes the same paths under both
+  `<cloud-backup>` and `<device-transfer>`.
+- `BackupRulesTest`: pass (3 tests).
+- `make android-test`: `BUILD SUCCESSFUL`.
+- `:app:connectedDebugAndroidTest`: `BUILD SUCCESSFUL`; 7 tests, 0 failures,
+  0 errors, 2 skipped. The skipped tests are the manual `BackupSeedTest` and
+  `KeystoreRestartProofTest` phases.
+
+### 10.5 Limitations and decisions
+
+- `adb backup` was attempted on the source target, but the emulator's System UI
+  became unresponsive at the confirmation dialog. The platform `bmgr` path was
+  used instead and produced the definitive `Backup is not allowed` result.
+- No API 26-30 image is available, so the `fullBackupContent` runtime path
+  could not be exercised. The static rule test remains the guard for that path.
+- Device-to-device transfer was not exercised because the available emulators
+  are not signed into a common account and the D2D transport requires a
+  setup-wizard transfer flow. The `device-transfer` exclusions are present in
+  `data_extraction_rules.xml` and are covered by `BackupRulesTest`.
+- Onboarding was simulated by writing the same persisted state the real flow
+  writes (`onboardingCompleted`, default provider/model, provider row, secret,
+  conversation). The real onboarding path validates the key with `GET /key`, so
+  a synthetic sentinel cannot complete it. The seeded state is exactly the data
+  that must not restore, so the backup-exclusion result is unaffected.
+- No manifest or XML rule was weakened to make a test pass.
