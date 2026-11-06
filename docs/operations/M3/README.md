@@ -49,7 +49,7 @@
 | 12 | [M3-03.3 Predictive back ordering](M3-03.3-predictive-back.md) | Complete | M3-03.1, M3-03.2 | navigation | none; shell files shared |
 | 13 | [M3-03.4 Hardware keyboard shortcuts](M3-03.4-keyboard-shortcuts.md) | Complete | M3-03.3 | navigation | none; shell files shared |
 | 14 | [M3-02.1 Share target and draft-preserving intent intake](M3-02.1-share-target.md) | Complete | M3-03.4 | platform | M3-02.3 |
-| 15 | [M3-02.2 Deep link routing](M3-02.2-deep-links.md) | Not started | M3-02.1 | platform | M3-02.3 |
+| 15 | [M3-02.2 Deep link routing](M3-02.2-deep-links.md) | Complete | M3-02.1 | platform | M3-02.3 |
 | 16 | [M3-02.3 Provider documentation in Custom Tabs](M3-02.3-custom-tabs.md) | Not started | M3-00.2 | platform | M3-02.1, M3-02.2, M3-04.* |
 | 17 | [M3-02.4 Outbound conversation share](M3-02.4-outbound-share.md) | Not started | M3-00.2, M3-02.1 | platform | M3-02.2, M3-02.3 |
 | 18 | [M3-04.1 Configuration-change stream survival](M3-04.1-config-change.md) | Not started | M3-03.4, M3-05.1 | lifecycle | M3-02.* |

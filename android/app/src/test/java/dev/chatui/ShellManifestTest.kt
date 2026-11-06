@@ -31,6 +31,15 @@ class ShellManifestTest {
     }
 
     @Test
+    fun `manifest registers the chatui deep link filter`() {
+        assertThat(manifest).contains("android.intent.action.VIEW")
+        assertThat(manifest).contains("android.intent.category.BROWSABLE")
+        assertThat(manifest).contains("android:scheme=\"chatui\"")
+        assertThat(manifest).contains("android:host=\"chat\"")
+        assertThat(manifest).contains("android:pathPrefix=\"/\"")
+    }
+
+    @Test
     fun `manifest references the network security config`() {
         assertThat(manifest)
             .contains("android:networkSecurityConfig=\"@xml/network_security_config\"")

@@ -15,6 +15,11 @@ sealed interface ExternalIntentAction {
     data class ShareText(val text: String) : ExternalIntentAction {
         override val key: String = "share:${text.hashCode()}"
     }
+
+    /** A validated `chatui://chat/<id>` deep link. */
+    data class OpenChat(val conversationId: String) : ExternalIntentAction {
+        override val key: String = "chat:$conversationId"
+    }
 }
 
 /**

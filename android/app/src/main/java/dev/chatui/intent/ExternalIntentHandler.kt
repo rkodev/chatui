@@ -35,6 +35,27 @@ class ExternalIntentHandler(
         onboardingCompleted: Boolean,
     ): ExternalIntentOutcome = when (action) {
         is ExternalIntentAction.ShareText -> handleShare(action, onboardingCompleted)
+        is ExternalIntentAction.OpenChat -> handleOpenChat(action, onboardingCompleted)
+    }
+
+    /**
+     * Routes a validated deep link without creating or looking up a
+     * conversation. The chat destination owns the missing-conversation state,
+     * so an unknown id renders the existing not-found screen.
+     */
+    private fun handleOpenChat(
+        action: ExternalIntentAction.OpenChat,
+        onboardingCompleted: Boolean,
+    ): ExternalIntentOutcome {
+        if (!onboardingCompleted) {
+            // Keep the link pending so it is handled after onboarding finishes.
+            return ExternalIntentOutcome.OpenOnboarding
+        }
+
+        router.consume(action)
+        return ExternalIntentOutcome.NavigateToChat(
+            ChatDestination.createRoute(action.conversationId),
+        )
     }
 
     private suspend fun handleShare(

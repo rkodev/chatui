@@ -103,4 +103,61 @@ class ExternalIntentHandlerTest {
         assertThat(outcome).isEqualTo(ExternalIntentOutcome.OpenOnboarding)
         assertThat(router.pending.value).isEqualTo(action)
     }
+
+    @Test
+    fun `deep link after onboarding navigates to the chat route`() = runTest {
+        val router = ExternalIntentRouter()
+        val drafts = InMemoryChatDrafts()
+        val service = FakeConversationService()
+        val action = ExternalIntentAction.OpenChat(DEEP_LINK_ID)
+        router.submit(action)
+
+        val outcome = ExternalIntentHandler(router, service, drafts)
+            .handle(action, onboardingCompleted = true)
+
+        assertThat(outcome).isEqualTo(
+            ExternalIntentOutcome.NavigateToChat(
+                ChatDestination.createRoute(DEEP_LINK_ID),
+            ),
+        )
+        assertThat(router.pending.value).isNull()
+        assertThat(drafts.draftFor(DEEP_LINK_ID)).isEmpty()
+    }
+
+    @Test
+    fun `deep link during onboarding opens onboarding and keeps the link pending`() = runTest {
+        val router = ExternalIntentRouter()
+        val drafts = InMemoryChatDrafts()
+        val service = FakeConversationService()
+        val action = ExternalIntentAction.OpenChat(DEEP_LINK_ID)
+        router.submit(action)
+
+        val outcome = ExternalIntentHandler(router, service, drafts)
+            .handle(action, onboardingCompleted = false)
+
+        assertThat(outcome).isEqualTo(ExternalIntentOutcome.OpenOnboarding)
+        assertThat(router.pending.value).isEqualTo(action)
+    }
+
+    @Test
+    fun `deep link to a missing conversation still routes to the chat destination`() = runTest {
+        val router = ExternalIntentRouter()
+        val drafts = InMemoryChatDrafts()
+        val service = FakeConversationService(conversations = emptyList())
+        val action = ExternalIntentAction.OpenChat(DEEP_LINK_ID)
+        router.submit(action)
+
+        val outcome = ExternalIntentHandler(router, service, drafts)
+            .handle(action, onboardingCompleted = true)
+
+        assertThat(outcome).isEqualTo(
+            ExternalIntentOutcome.NavigateToChat(
+                ChatDestination.createRoute(DEEP_LINK_ID),
+            ),
+        )
+    }
+
+    private companion object {
+        const val DEEP_LINK_ID = "0190a5c4-1d2e-7abc-8def-0123456789ab"
+    }
 }

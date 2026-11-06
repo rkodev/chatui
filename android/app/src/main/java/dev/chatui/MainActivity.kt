@@ -15,9 +15,8 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import dev.chatui.core.datastore.settings.SettingsDataStore
-import dev.chatui.intent.ExternalIntentAction
+import dev.chatui.intent.ExternalIntentIntake
 import dev.chatui.intent.ExternalIntentRouter
-import dev.chatui.intent.ShareTextParser
 import dev.chatui.shell.ChatUiApp
 import dev.chatui.startup.AppStartup
 import javax.inject.Inject
@@ -81,8 +80,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleExternalIntent(intent: Intent?) {
-        val text = ShareTextParser.parse(intent) ?: return
-        externalIntentRouter.submit(ExternalIntentAction.ShareText(text))
+        val action = ExternalIntentIntake.actionFor(intent) ?: return
+        externalIntentRouter.submit(action)
     }
 
     private companion object {

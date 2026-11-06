@@ -72,4 +72,31 @@ class ExternalIntentRouterTest {
 
         assertThat(router.pending.value).isEqualTo(pending)
     }
+
+    @Test
+    fun `repeated deep link delivery keeps one pending action`() {
+        val router = ExternalIntentRouter()
+        val action = ExternalIntentAction.OpenChat(
+            "0190a5c4-1d2e-7abc-8def-0123456789ab",
+        )
+
+        router.submit(action)
+        router.submit(action)
+
+        assertThat(router.pending.value).isEqualTo(action)
+    }
+
+    @Test
+    fun `a consumed deep link is not delivered again`() {
+        val router = ExternalIntentRouter()
+        val action = ExternalIntentAction.OpenChat(
+            "0190a5c4-1d2e-7abc-8def-0123456789ab",
+        )
+
+        router.submit(action)
+        router.consume(action)
+        router.submit(action)
+
+        assertThat(router.pending.value).isNull()
+    }
 }
