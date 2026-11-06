@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.roborazzi)
+    alias(libs.plugins.baselineprofile)
 }
 
 // --- Release signing -------------------------------------------------------
@@ -157,6 +158,13 @@ android {
     }
 }
 
+// Keep the generated profile in source control so release builds always ship
+// the same startup profile. Regenerate with
+// `:app:generateBaselineProfile` on a connected device.
+baselineProfile {
+    saveInSrc = true
+}
+
 // Remove a decoded base64 keystore as soon as the release package tasks finish.
 val tempKeystore = temporaryKeystore
 if (tempKeystore != null) {
@@ -211,6 +219,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
     implementation(libs.androidx.paging.compose)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.coil.compose)

@@ -823,3 +823,82 @@ foreground service, notification, wake lock, or background sync job was added.
 No API key, prompt, conversation content, personal data, or signing material is
 recorded in this section or in the background-behavior document.
 
+## 19. M3-06.3 Baseline profile and startup benchmark
+
+Recorded 2026-11-06 on `Medium_Phone_API_36.1(AVD) - 16` (API 36, x86_64,
+1080x2400). The emulator was the available device; physical mid-tier validation
+remains in M3-07.3.
+
+### 19.1 Configuration
+
+- `androidx.baselineprofile` plugin `1.5.0` applied to `:app` and the new
+  `:baselineprofile` module.
+- `androidx.profileinstaller:profileinstaller:1.4.1` added to `:app`.
+- `androidx.benchmark:benchmark-macro-junit4:1.5.0` and
+  `androidx.test.uiautomator:uiautomator:2.4.1` added to `:baselineprofile`.
+- `:app` declares `baselineProfile(project(":baselineprofile"))` and
+  `baselineProfile { saveInSrc = true }`.
+- The rule exercises cold start, the compact-layout drawer, and the
+  keyboard-shortcuts dialog, and sets `includeInStartupProfile = true`.
+
+### 19.2 Generated profile
+
+| Item | Value |
+| --- | --- |
+| Baseline profile | `android/app/src/release/generated/baselineProfiles/baseline-prof.txt` |
+| Baseline profile size | 26,995 lines; 1,954 `dev/chatui` entries |
+| Startup profile | `android/app/src/release/generated/baselineProfiles/startup-prof.txt` |
+| Startup profile size | 26,995 lines; 1,954 `dev/chatui` entries |
+| APK profile assets | `assets/dexopt/baseline.prof`, `assets/dexopt/baseline.profm` |
+| Generation command | `ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:generateBaselineProfile` |
+| Plugin tasks run | `:baselineprofile:connectedNonMinifiedReleaseAndroidTest`, `:baselineprofile:collectNonMinifiedReleaseBaselineProfile` |
+
+The task name produced by this plugin version is
+`:baselineprofile:connectedBenchmarkReleaseAndroidTest`, not
+`:baselineprofile:connectedBenchmarkAndroidTest`. It completes successfully;
+the baseline-profile test is skipped in the `benchmarkRelease` variant because
+generation uses `nonMinifiedRelease`.
+
+### 19.3 Startup measurement
+
+Build type: `release` (R8 minified, resource shrunk), signed with a temporary
+local measurement keystore outside the repository. The keystore and passwords
+were not committed; release signing policy remains M3-06.2.
+
+Procedure:
+
+1. Install the release APK.
+2. Trigger profile installation with
+   `adb shell am broadcast -a androidx.profileinstaller.action.INSTALL_PROFILE -n dev.chatui/androidx.profileinstaller.ProfileInstallReceiver`
+   (result=1).
+3. Apply the profile with `adb shell cmd package compile -m speed-profile dev.chatui`
+   (`Success`; `dumpsys package` then reports `[status=speed-profile]`).
+4. For each run: `adb shell am force-stop dev.chatui`, then
+   `adb shell am start -W -n dev.chatui/.MainActivity`.
+
+| Run | TotalTime (ms) | LaunchState |
+| --- | --- | --- |
+| 1 | 713 | COLD |
+| 2 | 743 | COLD |
+| 3 | 730 | COLD |
+| 4 | 888 | COLD |
+| 5 | 831 | COLD |
+
+Median: **743 ms**. Budget: 1,500 ms. Result: met on the recorded emulator.
+The first launch after install, before the profile was applied, was 794 ms and
+is not part of the five-run set.
+
+### 19.4 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:assembleRelease` | `BUILD SUCCESSFUL` |
+| `ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:generateBaselineProfile` | `BUILD SUCCESSFUL`; profile and startup profile generated |
+| `ANDROID_HOME=$HOME/Android/Sdk ./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest` | `BUILD SUCCESSFUL`; test skipped in `benchmarkRelease` (expected) |
+
+### 19.5 Redaction
+
+No API key, prompt, conversation content, personal data, or signing material is
+recorded in this section. The measurement keystore path and passwords are not
+recorded.
+

@@ -63,7 +63,7 @@
 | 26 | [M3-05.4 Platform edge-case regression tests](M3-05.4-edge-case-regressions.md) | Complete | M3-05.2, M3-02.2, M3-03.3 | tests | M3-05.3, M3-05.5 |
 | 27 | [M3-05.5 Large-conversation bounded composition](M3-05.5-large-conversation.md) | Complete | M3-05.2 | tests | M3-05.3, M3-05.4 |
 | 28 | [M3-06.2 Signing and version policy](M3-06.2-signing-versioning.md) | Complete | M3-06.1, M3-00.2 | release | M3-05.* |
-| 29 | [M3-06.3 Baseline profile and startup benchmark](M3-06.3-baseline-profile.md) | Not started | M3-06.1, M3-03.4, M3-04.5 | release | no; shares app build file with M3-06.2 |
+| 29 | [M3-06.3 Baseline profile and startup benchmark](M3-06.3-baseline-profile.md) | Complete | M3-06.1, M3-03.4, M3-04.5 | release | no; shares app build file with M3-06.2 |
 | 30 | [M3-06.4 Release CI, artifacts, and developer targets](M3-06.4-release-ci-artifacts.md) | Not started | M3-06.1, M3-06.2, M3-06.3 | release | M3-05.* |
 | 31 | [M3-06.5 Image decode, Coil sizing, and release size measurement](M3-06.5-image-decode-size.md) | Not started | M3-06.1 | release | M3-05.* |
 | 32 | [M3-07.1 Performance and size evidence](M3-07.1-performance-size-evidence.md) | Not started | M3-06.4, M3-06.5, M3-05.5 | evidence | M3-07.2, M3-07.3, M3-07.4 |
