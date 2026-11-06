@@ -2,8 +2,12 @@ package dev.chatui.feature.conversations
 
 import dev.chatui.core.model.BrowserCors
 import dev.chatui.core.model.ChatParams
+import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.Conversation
 import dev.chatui.core.model.InputModality
+import dev.chatui.core.model.Message
+import dev.chatui.core.model.MessageRole
+import dev.chatui.core.model.MessageStatus
 import dev.chatui.core.model.Model
 import dev.chatui.core.model.ModelCapability
 import dev.chatui.core.model.ModelSource
@@ -12,6 +16,7 @@ import dev.chatui.core.model.Provider
 import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.model.ProviderKind
 import java.time.Instant
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.JsonObject
@@ -99,6 +104,57 @@ fun testConversation(
     sync = null,
 )
 
+fun testMessage(
+    id: String = "message-1",
+    conversationId: String = "conversation-1",
+    sequence: Long = 1,
+    role: MessageRole = MessageRole.USER,
+    text: String = "hello",
+    createdAt: Instant = TEST_NOW,
+): Message = Message(
+    id = id,
+    conversationId = conversationId,
+    sequence = sequence,
+    role = role,
+    parts = listOf(ContentPart.Text(text)),
+    status = MessageStatus.COMPLETE,
+    providerId = null,
+    modelId = null,
+    modelLabel = null,
+    usage = null,
+    finishReason = null,
+    error = null,
+    latencyMs = null,
+    firstTokenMs = null,
+    createdAt = createdAt,
+    updatedAt = createdAt,
+    deletedAt = null,
+)
+
+fun testSearchResult(
+    conversation: Conversation = testConversation(),
+    titleMatched: Boolean = false,
+    messageMatches: List<ConversationSearchMessageMatch> = emptyList(),
+): ConversationSearchResult = ConversationSearchResult(
+    conversation = conversation,
+    titleMatched = titleMatched,
+    messageMatches = messageMatches,
+)
+
+fun testSearchMessageMatch(
+    messageId: String = "message-1",
+    sequence: Long = 1,
+    role: MessageRole = MessageRole.USER,
+    snippet: String = "hello",
+    createdAt: Instant = TEST_NOW,
+): ConversationSearchMessageMatch = ConversationSearchMessageMatch(
+    messageId = messageId,
+    sequence = sequence,
+    role = role,
+    snippet = snippet,
+    createdAt = createdAt,
+)
+
 /**
  * In-memory conversation facade for ViewModel and composable tests.
  *
@@ -116,6 +172,10 @@ class FakeConversationService : ConversationService {
     var lastRenamed: Pair<String, String>? = null
     var lastDeleted: String? = null
     var lastActiveSet: String? = null
+    var searchResults: List<ConversationSearchResult> = emptyList()
+    var searchError: Throwable? = null
+    var searchDelayMs: Long = 0
+    val searchCalls = mutableListOf<String>()
 
     override fun observeConversations(): Flow<List<Conversation>> = conversationsFlow
 
@@ -160,4 +220,14 @@ class FakeConversationService : ConversationService {
 
     override suspend fun getConversation(id: String): Conversation? =
         conversationsFlow.value.firstOrNull { it.id == id }
+
+    override suspend fun searchConversations(
+        query: String,
+        limit: Int,
+    ): List<ConversationSearchResult> {
+        searchCalls += query
+        if (searchDelayMs > 0) delay(searchDelayMs)
+        searchError?.let { throw it }
+        return searchResults
+    }
 }

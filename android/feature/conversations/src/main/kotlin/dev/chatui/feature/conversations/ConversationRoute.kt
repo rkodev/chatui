@@ -47,6 +47,8 @@ fun ConversationRoute(
         onDeleteDismissed = viewModel::onDeleteDismissed,
         onDeleteConfirmed = viewModel::onDeleteConfirmed,
         onRetry = viewModel::onRetry,
+        onSearchQueryChanged = viewModel::onSearchQueryChanged,
+        onSearchRetry = viewModel::onSearchRetry,
         modifier = modifier,
         now = clock.instant(),
         zoneId = zoneId,

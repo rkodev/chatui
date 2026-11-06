@@ -293,7 +293,7 @@ internal fun Model.toEntity(): ModelEntity = ModelEntity(
  * results, image alt text, and file names are included so search can find
  * messages whose visible content is not a text part.
  */
-internal fun searchableText(parts: List<ContentPart>): String = parts.mapNotNull { part ->
+fun searchableText(parts: List<ContentPart>): String = parts.mapNotNull { part ->
     when (part) {
         is ContentPart.Text -> part.text
         is ContentPart.Reasoning -> part.text

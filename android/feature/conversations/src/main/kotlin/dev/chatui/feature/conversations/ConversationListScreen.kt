@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.model.Conversation
+import dev.chatui.core.model.MessageRole
 import java.time.Instant
 import java.time.ZoneId
 
@@ -52,6 +53,11 @@ object ConversationListTestTags {
     const val RenameSave = "conversation-rename-save"
     const val DeleteDialog = "conversation-delete-dialog"
     const val DeleteConfirm = "conversation-delete-confirm"
+    const val SearchField = "conversation-search-field"
+    const val SearchLoading = "conversation-search-loading"
+    const val SearchEmpty = "conversation-search-empty"
+    const val SearchError = "conversation-search-error"
+    const val SearchRetry = "conversation-search-retry"
 
     fun group(key: ConversationGroupKey): String =
         "conversation-group-${key.name.lowercase()}"
@@ -63,6 +69,11 @@ object ConversationListTestTags {
     fun rename(id: String): String = "conversation-rename-$id"
 
     fun delete(id: String): String = "conversation-delete-$id"
+
+    fun searchResult(id: String): String = "conversation-search-result-$id"
+
+    fun searchResultMessage(id: String, messageId: String): String =
+        "conversation-search-message-$id-$messageId"
 }
 
 /**
@@ -83,6 +94,8 @@ fun ConversationListScreen(
     onDeleteDismissed: () -> Unit,
     onDeleteConfirmed: () -> Unit,
     onRetry: () -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onSearchRetry: () -> Unit,
     modifier: Modifier = Modifier,
     now: Instant = Instant.now(),
     zoneId: ZoneId = ZoneId.systemDefault(),
@@ -119,6 +132,18 @@ fun ConversationListScreen(
             }
         }
 
+        item {
+            OutlinedTextField(
+                value = state.searchQuery,
+                onValueChange = onSearchQueryChanged,
+                label = { Text("Search conversations") },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(ConversationListTestTags.SearchField),
+            )
+        }
+
         state.error?.let { message ->
             item {
                 Column(
@@ -134,45 +159,97 @@ fun ConversationListScreen(
             }
         }
 
-        when {
-            state.loading && state.groups.isEmpty() -> item {
-                Text(
-                    text = "Loading conversations…",
-                    modifier = Modifier.testTag(ConversationListTestTags.Loading),
-                )
-            }
+        if (state.searchQuery.isNotBlank()) {
+            val searchError = state.searchError
 
-            state.groups.isEmpty() -> item {
-                Text(
-                    text = "No conversations yet.",
-                    modifier = Modifier.testTag(ConversationListTestTags.Empty),
-                )
-            }
+            when {
+                searchError != null -> item {
+                    Column(
+                        modifier = Modifier.testTag(ConversationListTestTags.SearchError),
+                        verticalArrangement = Arrangement.spacedBy(dimens.space1),
+                    ) {
+                        Text(
+                            text = searchError,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        TextButton(
+                            onClick = onSearchRetry,
+                            modifier = Modifier.testTag(
+                                ConversationListTestTags.SearchRetry,
+                            ),
+                        ) {
+                            Text("Retry")
+                        }
+                    }
+                }
 
-            else -> state.groups.forEach { group ->
-                item(key = "group-${group.key.name}") {
+                state.searchLoading -> item {
                     Text(
-                        text = group.label,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.testTag(ConversationListTestTags.group(group.key)),
+                        text = "Searching…",
+                        modifier = Modifier.testTag(ConversationListTestTags.SearchLoading),
                     )
                 }
 
-                items(group.conversations, key = { it.id }) { conversation ->
-                    ConversationRow(
-                        conversation = conversation,
-                        active = conversation.id == state.activeConversationId,
-                        now = now,
-                        zoneId = zoneId,
-                        onSelect = { onSelect(conversation) },
-                        onRename = {
-                            renameTarget = conversation
-                            renameValue = conversation.title
-                            renameError = null
-                        },
-                        onDelete = { onDeleteRequested(conversation) },
+                state.searchResults.isEmpty() -> item {
+                    Text(
+                        text = "No matches.",
+                        modifier = Modifier.testTag(ConversationListTestTags.SearchEmpty),
                     )
+                }
+
+                else -> items(
+                    state.searchResults,
+                    key = { "search-${it.conversation.id}" },
+                ) { result ->
+                    SearchResultRow(
+                        result = result,
+                        onSelect = { onSelect(result.conversation) },
+                    )
+                }
+            }
+        } else {
+            when {
+                state.loading && state.groups.isEmpty() -> item {
+                    Text(
+                        text = "Loading conversations…",
+                        modifier = Modifier.testTag(ConversationListTestTags.Loading),
+                    )
+                }
+
+                state.groups.isEmpty() -> item {
+                    Text(
+                        text = "No conversations yet.",
+                        modifier = Modifier.testTag(ConversationListTestTags.Empty),
+                    )
+                }
+
+                else -> state.groups.forEach { group ->
+                    item(key = "group-${group.key.name}") {
+                        Text(
+                            text = group.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag(
+                                ConversationListTestTags.group(group.key),
+                            ),
+                        )
+                    }
+
+                    items(group.conversations, key = { it.id }) { conversation ->
+                        ConversationRow(
+                            conversation = conversation,
+                            active = conversation.id == state.activeConversationId,
+                            now = now,
+                            zoneId = zoneId,
+                            onSelect = { onSelect(conversation) },
+                            onRename = {
+                                renameTarget = conversation
+                                renameValue = conversation.title
+                                renameError = null
+                            },
+                            onDelete = { onDeleteRequested(conversation) },
+                        )
+                    }
                 }
             }
         }
@@ -225,6 +302,8 @@ fun ConversationDrawer(
     onDeleteDismissed: () -> Unit,
     onDeleteConfirmed: () -> Unit,
     onRetry: () -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onSearchRetry: () -> Unit,
     modifier: Modifier = Modifier,
     now: Instant = Instant.now(),
     zoneId: ZoneId = ZoneId.systemDefault(),
@@ -246,6 +325,8 @@ fun ConversationDrawer(
                     onDeleteDismissed = onDeleteDismissed,
                     onDeleteConfirmed = onDeleteConfirmed,
                     onRetry = onRetry,
+                    onSearchQueryChanged = onSearchQueryChanged,
+                    onSearchRetry = onSearchRetry,
                     now = now,
                     zoneId = zoneId,
                 )
@@ -344,6 +425,64 @@ private fun ConversationRow(
             }
         }
     }
+}
+
+@Composable
+private fun SearchResultRow(
+    result: ConversationSearchResult,
+    onSelect: () -> Unit,
+) {
+    val dimens = LocalDimens.current
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ConversationListTestTags.searchResult(result.conversation.id)),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onSelect)
+                .padding(dimens.space3),
+            verticalArrangement = Arrangement.spacedBy(dimens.space1),
+        ) {
+            Text(
+                text = result.conversation.title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+            )
+
+            if (result.titleMatched) {
+                Text(
+                    text = "Title match",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            result.messageMatches.take(3).forEach { match ->
+                Text(
+                    text = "${roleLabel(match.role)}: ${match.snippet}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    modifier = Modifier.testTag(
+                        ConversationListTestTags.searchResultMessage(
+                            result.conversation.id,
+                            match.messageId,
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+}
+
+private fun roleLabel(role: MessageRole): String = when (role) {
+    MessageRole.USER -> "You"
+    MessageRole.ASSISTANT -> "Assistant"
+    MessageRole.SYSTEM -> "System"
+    MessageRole.TOOL -> "Tool"
 }
 
 @Composable

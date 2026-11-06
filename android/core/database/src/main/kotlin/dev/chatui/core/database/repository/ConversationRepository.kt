@@ -25,6 +25,27 @@ class ConversationRepository(
 
     suspend fun get(id: String): Conversation? = dao.getById(id)?.toDomain()
 
+    /**
+     * Search active conversation titles.
+     *
+     * The query is trimmed and `LIKE` wildcards are escaped so a user typing
+     * `%` or `_` cannot turn the search into a full-table match.
+     */
+    suspend fun searchByTitle(
+        query: String,
+        limit: Int = 50,
+    ): List<Conversation> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
+
+        val escaped = trimmed
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+
+        return dao.searchByTitle("%$escaped%", limit).map { it.toDomain() }
+    }
+
     suspend fun create(conversation: Conversation): Conversation {
         dao.upsert(conversation.toEntity())
         return conversation

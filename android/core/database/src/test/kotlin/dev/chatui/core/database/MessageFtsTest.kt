@@ -83,4 +83,15 @@ class MessageFtsTest : DatabaseTestBase() {
 
         assertThat(dao.searchPage("common", 2)).hasSize(2)
     }
+
+    @Test
+    fun `search supports multiple prefix tokens`() = runTest {
+        dao.insert(TestData.message(id = "message-1", sequence = 1), "hello world")
+
+        assertThat(dao.search("hello").map { it.id }).containsExactly("message-1")
+        assertThat(dao.search("hello*").map { it.id }).containsExactly("message-1")
+        assertThat(dao.search("world*").map { it.id }).containsExactly("message-1")
+        assertThat(dao.search("hello world").map { it.id }).containsExactly("message-1")
+        assertThat(dao.search("hello* world*").map { it.id }).containsExactly("message-1")
+    }
 }

@@ -11,6 +11,7 @@ import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,10 @@ data class ConversationListUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val pendingDelete: Conversation? = null,
+    val searchQuery: String = "",
+    val searchResults: List<ConversationSearchResult> = emptyList(),
+    val searchLoading: Boolean = false,
+    val searchError: String? = null,
 )
 
 /** One-shot navigation or feedback event from the conversation list. */
@@ -52,6 +57,8 @@ class ConversationListViewModel(
 
     private var conversationsJob: Job? = null
     private var activeJob: Job? = null
+    private var searchJob: Job? = null
+    private var searchGeneration: Int = 0
 
     init {
         observeConversations()
@@ -60,6 +67,73 @@ class ConversationListViewModel(
 
     fun onRetry() {
         observeConversations()
+    }
+
+    /**
+     * Update the search query and schedule a debounced search.
+     *
+     * Every keystroke cancels the previous job and increments a generation
+     * counter. A result is applied only when its generation is still current,
+     * so a slow query can never overwrite a newer one.
+     */
+    fun onSearchQueryChanged(query: String) {
+        _state.update {
+            it.copy(
+                searchQuery = query,
+                searchError = null,
+            )
+        }
+
+        searchJob?.cancel()
+        val trimmed = query.trim()
+
+        if (trimmed.isEmpty()) {
+            searchGeneration += 1
+            _state.update {
+                it.copy(
+                    searchResults = emptyList(),
+                    searchLoading = false,
+                    searchError = null,
+                )
+            }
+            return
+        }
+
+        val generation = ++searchGeneration
+        _state.update { it.copy(searchLoading = true) }
+
+        searchJob = viewModelScope.launch {
+            try {
+                delay(SEARCH_DEBOUNCE_MS)
+                val results = service.searchConversations(trimmed)
+                if (generation == searchGeneration) {
+                    _state.update {
+                        it.copy(
+                            searchResults = results,
+                            searchLoading = false,
+                            searchError = null,
+                        )
+                    }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                if (generation == searchGeneration) {
+                    _state.update {
+                        it.copy(
+                            searchLoading = false,
+                            searchError = error.message
+                                ?: "Could not search conversations.",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** Retry the current search query after a failure. */
+    fun onSearchRetry() {
+        onSearchQueryChanged(_state.value.searchQuery)
     }
 
     fun onNewChat() {
@@ -194,6 +268,9 @@ class ConversationListViewModel(
     }
 
     companion object {
+        /** Debounce window before a search query reaches the service. */
+        const val SEARCH_DEBOUNCE_MS: Long = 300L
+
         fun factory(
             service: ConversationService,
             clock: Clock = Clock.systemUTC(),

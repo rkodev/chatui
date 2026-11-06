@@ -1,6 +1,7 @@
 package dev.chatui.core.database.dao
 
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -10,6 +11,18 @@ import dev.chatui.core.database.entity.ConversationEntity
 import dev.chatui.core.database.entity.MessageEntity
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
+
+/**
+ * One FTS message hit joined to its owning conversation.
+ *
+ * The conversation columns are aliased with a `conversation_` prefix so Room
+ * can embed both entities without colliding on `id`, `createdAt`, or
+ * `updatedAt`.
+ */
+data class MessageSearchRow(
+    @Embedded val message: MessageEntity,
+    @Embedded(prefix = "conversation_") val conversation: ConversationEntity,
+)
 
 /**
  * Message reads and writes from spec 9.5.
@@ -203,6 +216,43 @@ abstract class MessageDao {
     /** Full-text search, defaulting to 50 results. */
     suspend fun search(query: String): List<MessageEntity> =
         searchPage(query, DEFAULT_PAGE_SIZE)
+
+    /**
+     * Full-text search joined to the owning conversation.
+     *
+     * Archived conversations are excluded so search matches the active history
+     * list. The join is performed by SQLite; callers never scan messages in the
+     * UI layer.
+     */
+    @Query(
+        "SELECT messages.*, " +
+            "conversations.id AS conversation_id, " +
+            "conversations.title AS conversation_title, " +
+            "conversations.systemPrompt AS conversation_systemPrompt, " +
+            "conversations.providerId AS conversation_providerId, " +
+            "conversations.modelId AS conversation_modelId, " +
+            "conversations.modelLabel AS conversation_modelLabel, " +
+            "conversations.paramsJson AS conversation_paramsJson, " +
+            "conversations.pinned AS conversation_pinned, " +
+            "conversations.archived AS conversation_archived, " +
+            "conversations.temporary AS conversation_temporary, " +
+            "conversations.createdAt AS conversation_createdAt, " +
+            "conversations.updatedAt AS conversation_updatedAt, " +
+            "conversations.lastMessageAt AS conversation_lastMessageAt, " +
+            "conversations.messageCount AS conversation_messageCount, " +
+            "conversations.lastErrorJson AS conversation_lastErrorJson, " +
+            "conversations.syncState AS conversation_syncState " +
+            "FROM messages " +
+            "INNER JOIN messages_fts ON messages.id = messages_fts.messageId " +
+            "INNER JOIN conversations ON conversations.id = messages.conversationId " +
+            "WHERE messages_fts MATCH :query AND messages.deletedAt IS NULL " +
+            "AND conversations.archived = 0 " +
+            "ORDER BY messages.sequence DESC LIMIT :limit",
+    )
+    abstract suspend fun searchWithConversations(
+        query: String,
+        limit: Int,
+    ): List<MessageSearchRow>
 
     companion object {
         const val DEFAULT_PAGE_SIZE: Int = 50

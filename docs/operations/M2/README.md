@@ -64,7 +64,7 @@
 | 27 | [M2-06.4 Android content and reasoning rendering](M2-06.4-android-content-rendering.md) | Complete | M2-05.4 | android | M2-06.5 |
 | 28 | [M2-06.5 Android parameters, conversation settings, and settings screens](M2-06.5-android-parameters-settings.md) | Complete | M2-05.4 | android | M2-06.4 |
 | 29 | [M2-06.6 Android attachments end-to-end](M2-06.6-android-attachments.md) | Complete | M2-06.4, M2-06.5 | android | M2-03.3 |
-| 30 | [M2-07.1 Android conversation search](M2-07.1-android-search.md) | Not started | M2-06.5 | android | M2-07.2 no; conversation files shared |
+| 30 | [M2-07.1 Android conversation search](M2-07.1-android-search.md) | Complete | M2-06.5 | android | M2-07.2 no; conversation files shared |
 | 31 | [M2-07.2 Android pin, archive, and delete undo](M2-07.2-android-pin-archive-undo.md) | Not started | M2-07.1 | android | M2-04.2 |
 | 32 | [M2-07.3 Android export](M2-07.3-android-export.md) | Not started | M2-06.5 | android | M2-04.3 |
 | 33 | [M2-07.4 Android import](M2-07.4-android-import.md) | Not started | M2-07.3 | android | M2-04.4 |

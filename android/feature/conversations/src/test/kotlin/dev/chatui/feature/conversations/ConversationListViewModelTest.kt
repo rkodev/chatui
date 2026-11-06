@@ -9,8 +9,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -189,5 +191,99 @@ class ConversationListViewModelTest {
         advanceUntilIdle()
 
         assertThat(viewModel.state.value.activeConversationId).isEqualTo("conversation-1")
+    }
+
+    @Test
+    fun `search debounces and cancels stale queries`() = runTest(dispatcher) {
+        val service = FakeConversationService()
+        val result = testSearchResult(
+            conversation = testConversation(id = "conversation-1", title = "Kotlin"),
+            titleMatched = true,
+        )
+        service.searchResults = listOf(result)
+        val viewModel = ConversationListViewModel(service, clock, ZoneOffset.UTC)
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("k")
+        advanceTimeBy(100)
+        viewModel.onSearchQueryChanged("ko")
+        advanceTimeBy(100)
+        viewModel.onSearchQueryChanged("kotlin")
+        advanceTimeBy(299)
+
+        assertThat(service.searchCalls).isEmpty()
+        assertThat(viewModel.state.value.searchLoading).isTrue()
+
+        advanceTimeBy(1)
+        runCurrent()
+
+        assertThat(service.searchCalls).containsExactly("kotlin")
+        assertThat(viewModel.state.value.searchResults).containsExactly(result)
+        assertThat(viewModel.state.value.searchLoading).isFalse()
+    }
+
+    @Test
+    fun `search exposes an empty result state`() = runTest(dispatcher) {
+        val service = FakeConversationService()
+        val viewModel = ConversationListViewModel(service, clock, ZoneOffset.UTC)
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("missing")
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.searchResults).isEmpty()
+        assertThat(viewModel.state.value.searchLoading).isFalse()
+        assertThat(viewModel.state.value.searchError).isNull()
+    }
+
+    @Test
+    fun `search exposes an error state and retries`() = runTest(dispatcher) {
+        val service = FakeConversationService()
+        service.searchError = IllegalStateException("search failed")
+        val viewModel = ConversationListViewModel(service, clock, ZoneOffset.UTC)
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("kotlin")
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.searchError).isEqualTo("search failed")
+        assertThat(viewModel.state.value.searchLoading).isFalse()
+
+        val result = testSearchResult(
+            conversation = testConversation(id = "conversation-1", title = "Kotlin"),
+            titleMatched = true,
+        )
+        service.searchError = null
+        service.searchResults = listOf(result)
+
+        viewModel.onSearchRetry()
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.searchError).isNull()
+        assertThat(viewModel.state.value.searchResults).containsExactly(result)
+    }
+
+    @Test
+    fun `clearing the query resets search state`() = runTest(dispatcher) {
+        val service = FakeConversationService()
+        service.searchResults = listOf(
+            testSearchResult(
+                conversation = testConversation(id = "conversation-1", title = "Kotlin"),
+                titleMatched = true,
+            ),
+        )
+        val viewModel = ConversationListViewModel(service, clock, ZoneOffset.UTC)
+        advanceUntilIdle()
+
+        viewModel.onSearchQueryChanged("kotlin")
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.searchResults).isNotEmpty()
+
+        viewModel.onSearchQueryChanged("")
+
+        assertThat(viewModel.state.value.searchQuery).isEmpty()
+        assertThat(viewModel.state.value.searchResults).isEmpty()
+        assertThat(viewModel.state.value.searchLoading).isFalse()
+        assertThat(viewModel.state.value.searchError).isNull()
     }
 }

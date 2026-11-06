@@ -15,6 +15,12 @@ data class AppendMessageResult(
     val conversation: Conversation,
 )
 
+/** One FTS message hit joined to its owning conversation. */
+data class MessageSearchHit(
+    val message: Message,
+    val conversation: Conversation,
+)
+
 /**
  * Domain repository for messages.
  *
@@ -88,6 +94,22 @@ class MessageRepository(
         query: String,
         limit: Int = MessageDao.DEFAULT_PAGE_SIZE,
     ): List<Message> = dao.searchPage(query, limit).map { it.toDomain() }
+
+    /**
+     * Full-text search joined to the owning conversation.
+     *
+     * Archived conversations are excluded. The join happens in SQLite so the
+     * caller receives ready-to-group hits without loading every message.
+     */
+    suspend fun searchWithConversations(
+        query: String,
+        limit: Int = MessageDao.DEFAULT_PAGE_SIZE,
+    ): List<MessageSearchHit> = dao.searchWithConversations(query, limit).map { row ->
+        MessageSearchHit(
+            message = row.message.toDomain(),
+            conversation = row.conversation.toDomain(),
+        )
+    }
 
     /** Messages left in the `streaming` state, oldest first. */
     suspend fun streamingMessages(): List<Message> = dao.streaming().map { it.toDomain() }

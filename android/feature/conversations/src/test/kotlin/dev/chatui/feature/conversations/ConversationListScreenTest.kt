@@ -74,6 +74,8 @@ class ConversationListScreenTest {
                     onDeleteDismissed = {},
                     onDeleteConfirmed = {},
                     onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
                     now = now,
                     zoneId = zone,
                 )
@@ -107,6 +109,8 @@ class ConversationListScreenTest {
                     onDeleteDismissed = {},
                     onDeleteConfirmed = {},
                     onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
                     now = now,
                     zoneId = zone,
                 )
@@ -131,6 +135,8 @@ class ConversationListScreenTest {
                     onDeleteDismissed = {},
                     onDeleteConfirmed = {},
                     onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
                     now = now,
                     zoneId = zone,
                 )
@@ -165,6 +171,8 @@ class ConversationListScreenTest {
                     onDeleteDismissed = {},
                     onDeleteConfirmed = {},
                     onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
                     now = now,
                     zoneId = zone,
                 )
@@ -215,6 +223,8 @@ class ConversationListScreenTest {
                         state = state.copy(pendingDelete = null)
                     },
                     onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
                     now = now,
                     zoneId = zone,
                 )
@@ -248,6 +258,8 @@ class ConversationListScreenTest {
                     onDeleteDismissed = {},
                     onDeleteConfirmed = {},
                     onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
                     now = now,
                     zoneId = zone,
                 ) {
@@ -258,5 +270,208 @@ class ConversationListScreenTest {
 
         composeRule.onNodeWithTag(ConversationListTestTags.Drawer).assertIsDisplayed()
         composeRule.onNodeWithTag(ConversationListTestTags.NewChat).assertIsDisplayed()
+    }
+
+    @Test
+    fun `search field forwards query changes`() {
+        var query = ""
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(loading = false),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = { query = it },
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.SearchField)
+            .performTextInput("kotlin")
+
+        assertThat(query).isEqualTo("kotlin")
+    }
+
+    @Test
+    fun `search loading state is shown`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        loading = false,
+                        searchQuery = "kotlin",
+                        searchLoading = true,
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.SearchLoading).assertIsDisplayed()
+    }
+
+    @Test
+    fun `search empty state is shown`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        loading = false,
+                        searchQuery = "kotlin",
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.SearchEmpty).assertIsDisplayed()
+    }
+
+    @Test
+    fun `search error state is shown and retry invokes the intent`() {
+        var retried = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        loading = false,
+                        searchQuery = "kotlin",
+                        searchError = "search failed",
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = { retried = true },
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.SearchError).assertIsDisplayed()
+        composeRule.onNodeWithText("search failed").assertIsDisplayed()
+        composeRule.onNodeWithTag(ConversationListTestTags.SearchRetry).performClick()
+
+        assertThat(retried).isTrue()
+    }
+
+    @Test
+    fun `search results are grouped and show title and message context`() {
+        val conversation = testConversation(id = "conversation-1", title = "Kotlin notes")
+        val result = testSearchResult(
+            conversation = conversation,
+            titleMatched = true,
+            messageMatches = listOf(
+                testSearchMessageMatch(
+                    messageId = "message-1",
+                    snippet = "I love Kotlin",
+                ),
+            ),
+        )
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        loading = false,
+                        searchQuery = "kotlin",
+                        searchResults = listOf(result),
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(
+            ConversationListTestTags.searchResult("conversation-1"),
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText("Kotlin notes").assertIsDisplayed()
+        composeRule.onNodeWithText("Title match").assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            ConversationListTestTags.searchResultMessage("conversation-1", "message-1"),
+            useUnmergedTree = true,
+        ).assertExists()
+        composeRule.onNodeWithText("You: I love Kotlin", useUnmergedTree = true)
+            .assertExists()
+    }
+
+    @Test
+    fun `selecting a search result opens the conversation`() {
+        val conversation = testConversation(id = "conversation-1", title = "Kotlin notes")
+        var selected: Conversation? = null
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        loading = false,
+                        searchQuery = "kotlin",
+                        searchResults = listOf(testSearchResult(conversation = conversation)),
+                    ),
+                    onNewChat = {},
+                    onSelect = { selected = it },
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(
+            ConversationListTestTags.searchResult("conversation-1"),
+        ).performClick()
+
+        assertThat(selected).isEqualTo(conversation)
     }
 }

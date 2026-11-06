@@ -27,6 +27,20 @@ abstract class ConversationDao {
     @Query("SELECT * FROM conversations WHERE id = :id")
     abstract suspend fun getById(id: String): ConversationEntity?
 
+    /**
+     * Case-insensitive title search over active conversations.
+     *
+     * [pattern] is a pre-escaped `LIKE` pattern supplied by the repository.
+     * Only the conversations table is scanned; message text is searched through
+     * the FTS index instead.
+     */
+    @Query(
+        "SELECT * FROM conversations WHERE archived = 0 " +
+            "AND title LIKE :pattern ESCAPE '\\' " +
+            "ORDER BY pinned DESC, lastMessageAt DESC LIMIT :limit",
+    )
+    abstract suspend fun searchByTitle(pattern: String, limit: Int): List<ConversationEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun upsert(conversation: ConversationEntity)
 

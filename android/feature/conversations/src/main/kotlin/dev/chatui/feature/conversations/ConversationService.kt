@@ -6,6 +6,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.chatui.core.database.repository.ConversationRepository
+import dev.chatui.core.database.repository.MessageRepository
 import dev.chatui.core.database.repository.ModelRepository
 import dev.chatui.core.database.repository.ProviderRepository
 import dev.chatui.core.datastore.settings.SettingsDataStore
@@ -66,6 +67,17 @@ interface ConversationService {
     suspend fun getLastActiveConversation(): Conversation?
 
     suspend fun getConversation(id: String): Conversation?
+
+    /**
+     * Search active conversation titles and message text.
+     *
+     * The default keeps lightweight test doubles source-compatible; the
+     * production implementation overrides it with the FTS-backed search.
+     */
+    suspend fun searchConversations(
+        query: String,
+        limit: Int = 50,
+    ): List<ConversationSearchResult> = emptyList()
 }
 
 /**
@@ -79,6 +91,7 @@ interface ConversationService {
  */
 class DefaultConversationService @Inject constructor(
     private val conversations: ConversationRepository,
+    private val messages: MessageRepository,
     private val providers: ProviderRepository,
     private val models: ModelRepository,
     private val settings: SettingsDataStore,
@@ -191,6 +204,59 @@ class DefaultConversationService @Inject constructor(
     }
 
     override suspend fun getConversation(id: String): Conversation? = conversations.get(id)
+
+    override suspend fun searchConversations(
+        query: String,
+        limit: Int,
+    ): List<ConversationSearchResult> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
+
+        val titleMatches = conversations.searchByTitle(trimmed, limit)
+        val ftsQuery = buildFtsQuery(trimmed)
+        val messageHits = if (ftsQuery == null) {
+            emptyList()
+        } else {
+            messages.searchWithConversations(ftsQuery, limit)
+        }
+
+        val grouped = linkedMapOf<String, MutableSearchResult>()
+        titleMatches.forEach { conversation ->
+            grouped.getOrPut(conversation.id) { MutableSearchResult(conversation) }
+                .titleMatched = true
+        }
+        messageHits.forEach { hit ->
+            val result = grouped.getOrPut(hit.conversation.id) {
+                MutableSearchResult(hit.conversation)
+            }
+            result.messageMatches += ConversationSearchMessageMatch(
+                messageId = hit.message.id,
+                sequence = hit.message.sequence,
+                role = hit.message.role,
+                snippet = searchSnippet(hit.message, trimmed),
+                createdAt = hit.message.createdAt,
+            )
+        }
+
+        return grouped.values
+            .map { it.toResult() }
+            .sortedWith(
+                compareByDescending<ConversationSearchResult> { it.conversation.pinned }
+                    .thenByDescending { it.conversation.lastMessageAt },
+            )
+            .take(limit)
+    }
+
+    private class MutableSearchResult(val conversation: Conversation) {
+        var titleMatched: Boolean = false
+        val messageMatches = mutableListOf<ConversationSearchMessageMatch>()
+
+        fun toResult(): ConversationSearchResult = ConversationSearchResult(
+            conversation = conversation,
+            titleMatched = titleMatched,
+            messageMatches = messageMatches.sortedByDescending { it.sequence },
+        )
+    }
 
     private suspend fun resolveProvider(preferredId: String?): Provider? {
         if (preferredId != null) {
