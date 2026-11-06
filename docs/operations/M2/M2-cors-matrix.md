@@ -1,6 +1,6 @@
 # M2 CORS Matrix
 
-- Status: Verified 2026-11-06 for cloud presets; local and custom presets remain `unknown`.
+- Status: Finalized 2026-11-06 by M2-09.1. Cloud presets verified; local and custom presets remain `unknown`.
 - Owner: M2-02.4 records web adapter results; M2-09.1 records the final matrix.
 - Scope: every preset in `contracts/providers.json`.
 - Source plan: [M2 Providers and Content Implementation Plan](../M2-providers-and-content-implementation-plan.md)
@@ -110,6 +110,10 @@ Ollama, LM Studio, llama.cpp, and Custom remain `unknown`: no local server was
 available and the Custom base URL is only a placeholder. They must not be
 presented as verified until a real configured server passes the same checks.
 No proxy was added.
+
+M2-09.1 reviewed this matrix on 2026-11-06 and made no `browserCors` value
+changes. The final values are recorded in
+[M2-verification.md](M2-verification.md).
 
 ## 5. Unsupported and local fallback paths
 
