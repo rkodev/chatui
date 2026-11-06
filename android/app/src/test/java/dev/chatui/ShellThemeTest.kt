@@ -7,7 +7,6 @@ import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.model.Conversation
 import dev.chatui.core.model.Density
 import dev.chatui.core.model.Theme
-import dev.chatui.feature.conversations.ConversationListTestTags
 import dev.chatui.feature.conversations.ConversationService
 import dev.chatui.feature.conversations.CreateConversationResult
 import dev.chatui.shell.ChatUiApp
@@ -42,7 +41,8 @@ class ShellThemeTest {
         composeRule.onNodeWithTag(
             ShellTestTags.appearance(Theme.DARK, Density.COMPACT),
         ).assertExists()
-        composeRule.onNodeWithTag(ConversationListTestTags.Screen).assertIsDisplayed()
+        composeRule.onNodeWithTag(ShellTestTags.ConversationsPlaceholder)
+            .assertIsDisplayed()
     }
 }
 

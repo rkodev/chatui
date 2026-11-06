@@ -23,7 +23,6 @@ import dev.chatui.feature.chat.ChatEntryPoint
 import dev.chatui.feature.chat.ChatPlaceholder
 import dev.chatui.feature.chat.ChatRoute
 import dev.chatui.feature.conversations.ConversationEntryPoint
-import dev.chatui.feature.conversations.ConversationRoute
 import dev.chatui.feature.conversations.ConversationService
 import dev.chatui.feature.onboarding.OnboardingEntryPoint
 import dev.chatui.feature.onboarding.OnboardingRoute
@@ -133,22 +132,9 @@ fun NavGraphBuilder.shellDestinations(
         }
     }
     composable(ShellDestination.Conversations.route) {
-        val context = LocalContext.current
-        val service = conversationService ?: remember(context.applicationContext) {
-            EntryPointAccessors.fromApplication(
-                context.applicationContext,
-                ConversationEntryPoint::class.java,
-            ).conversationService()
-        }
-
-        ConversationRoute(
-            service = service,
-            onOpenConversation = { conversationId ->
-                navController.navigate(ChatDestination.createRoute(conversationId)) {
-                    launchSingleTop = true
-                }
-            },
-        )
+        // The conversation history lives in the adaptive sidebar/drawer so the
+        // main content can keep the current chat or destination.
+        ConversationsPlaceholder()
     }
     composable(ShellDestination.Providers.route) {
         val service = rememberProviderManagementService()
