@@ -47,11 +47,24 @@ export {
 } from './ConversationHistoryProvider'
 export {
   DEFAULT_UNDO_WINDOW_MS,
+  sortConversations,
   useConversationHistory,
   type UseConversationHistoryOptions,
   type UseConversationHistoryResult,
 } from './useConversationHistory'
-export { ConversationSidebar, type ConversationSidebarProps } from './ConversationSidebar'
+export {
+  DEFAULT_SEARCH_DEBOUNCE_MS,
+  useConversationSearch,
+  type ConversationSearchState,
+  type ConversationSearchStatus,
+  type UseConversationSearchOptions,
+} from './useConversationSearch'
+export {
+  ConversationSidebar,
+  type ConversationSidebarProps,
+  type ConversationSidebarSearchProps,
+  type ConversationSidebarView,
+} from './ConversationSidebar'
 export { formatConversationTimestamp } from './formatConversationTimestamp'
 export {
   ConversationSidebarContainer,

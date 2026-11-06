@@ -9,6 +9,7 @@ import dev.chatui.core.database.repository.ConversationRepository
 import dev.chatui.core.database.repository.ModelRepository
 import dev.chatui.core.database.repository.ProviderRepository
 import dev.chatui.core.datastore.settings.SettingsDataStore
+import dev.chatui.core.model.ChatParams
 import dev.chatui.core.model.Conversation
 import dev.chatui.core.model.InputModality
 import dev.chatui.core.model.Model
@@ -17,8 +18,11 @@ import dev.chatui.core.model.ModelPricing
 import dev.chatui.core.model.ModelSource
 import dev.chatui.core.model.OutputModality
 import dev.chatui.core.model.Provider
+import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.model.newId
 import dev.chatui.core.network.ProviderRegistry
+import dev.chatui.core.providers.CreateCustomProviderInput
+import dev.chatui.core.providers.CreatePresetProviderInput
 import dev.chatui.core.providers.ModelService
 import dev.chatui.core.providers.ProviderService
 import dev.chatui.core.providers.RefreshModelsResult
@@ -42,6 +46,7 @@ data class ProviderAvailability(
     val enabled: Boolean,
     val recommended: Boolean,
     val statusLabel: String?,
+    val requiresKey: Boolean = true,
 )
 
 /** User-supplied model that is not present in the catalog. */
@@ -95,6 +100,10 @@ interface ProviderManagementService {
 
     suspend fun getProvider(providerId: String): Provider?
 
+    suspend fun createPresetProvider(input: CreatePresetProviderInput): Provider
+
+    suspend fun createCustomProvider(input: CreateCustomProviderInput): Provider
+
     suspend fun validateProviderKey(providerId: String): Provider
 
     suspend fun rotateKey(providerId: String, apiKey: String): Provider
@@ -122,6 +131,21 @@ interface ProviderManagementService {
     suspend fun getConversation(conversationId: String): Conversation?
 
     suspend fun setConversationModel(conversationId: String, modelId: String): Conversation
+
+    /**
+     * Persist the per-conversation system prompt and/or generation parameters.
+     *
+     * A null argument leaves that field unchanged. Values are written
+     * immediately so the next send uses them.
+     */
+    suspend fun setConversationSettings(
+        conversationId: String,
+        systemPrompt: String? = null,
+        params: ChatParams? = null,
+    ): Conversation
+
+    /** Hard-delete a conversation and clear a matching last-active pointer. */
+    suspend fun deleteConversation(conversationId: String)
 
     suspend fun getConversationRouting(conversationId: String): RoutingPreferences
 
@@ -161,6 +185,12 @@ class DefaultProviderManagementService @Inject constructor(
     override suspend fun listProviders(): List<Provider> = providers.observeAll().first()
 
     override suspend fun getProvider(providerId: String): Provider? = providers.get(providerId)
+
+    override suspend fun createPresetProvider(input: CreatePresetProviderInput): Provider =
+        providerService.createPresetProvider(input)
+
+    override suspend fun createCustomProvider(input: CreateCustomProviderInput): Provider =
+        providerService.createCustomProvider(input)
 
     override suspend fun validateProviderKey(providerId: String): Provider =
         providerService.validateProviderKey(providerId)
@@ -323,14 +353,48 @@ class DefaultProviderManagementService @Inject constructor(
             )
         }
 
+        val params = if (conversation.providerId != provider.id) {
+            conversation.params.copy(
+                extra = pruneExtrasForPreset(conversation.params.extra, provider.presetId),
+            )
+        } else {
+            conversation.params
+        }
+
         return conversations.update(
             conversation.copy(
                 providerId = provider.id,
                 modelId = model.id,
                 modelLabel = model.label,
+                params = params,
                 updatedAt = clock.instant(),
             ),
         )
+    }
+
+    override suspend fun setConversationSettings(
+        conversationId: String,
+        systemPrompt: String?,
+        params: ChatParams?,
+    ): Conversation {
+        val conversation = requireConversation(conversationId)
+
+        return conversations.update(
+            conversation.copy(
+                systemPrompt = systemPrompt ?: conversation.systemPrompt,
+                params = params ?: conversation.params,
+                updatedAt = clock.instant(),
+            ),
+        )
+    }
+
+    override suspend fun deleteConversation(conversationId: String) {
+        requireConversation(conversationId)
+        conversations.delete(conversationId)
+
+        if (settings.current().lastActiveConversationId == conversationId) {
+            settings.setLastActiveConversation(null)
+        }
     }
 
     override suspend fun getConversationRouting(conversationId: String): RoutingPreferences {
@@ -436,6 +500,7 @@ class DefaultProviderManagementService @Inject constructor(
                 enabled = availability.enabled,
                 recommended = availability.preset.id == ProviderService.OPENROUTER_PRESET_ID,
                 statusLabel = if (availability.enabled) null else "Coming later",
+                requiresKey = availability.preset.auth.type != ProviderAuthType.NONE,
             )
         }
 

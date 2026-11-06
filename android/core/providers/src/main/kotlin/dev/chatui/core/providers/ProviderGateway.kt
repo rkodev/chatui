@@ -2,6 +2,7 @@ package dev.chatui.core.providers
 
 import dev.chatui.core.network.ModelInfo
 import dev.chatui.core.network.OpenRouterAdapter
+import dev.chatui.core.network.ProviderAdapterRegistry
 import dev.chatui.core.network.ProviderContext
 import dev.chatui.core.network.ProviderKeyInfo
 
@@ -44,6 +45,40 @@ class OpenRouterGateway(
         context: ProviderContext,
         forceRefresh: Boolean,
     ): List<ModelInfo> {
+        if (!forceRefresh) {
+            return adapter.listModels(context)
+        }
+
+        val result = adapter.refreshCatalog(context)
+        result.refreshError?.let { error ->
+            if (result.stale) {
+                throw error
+            }
+        }
+        return result.models
+    }
+}
+
+/**
+ * [ProviderGateway] that dispatches to the native adapter for the provider's
+ * kind.
+ *
+ * OpenAI-compatible providers keep the M1 OpenRouter transport. Anthropic
+ * providers use the native Anthropic adapter for key validation and catalog
+ * discovery.
+ */
+class RoutingProviderGateway(
+    private val adapters: ProviderAdapterRegistry,
+) : ProviderGateway {
+    override suspend fun validateKey(context: ProviderContext): ProviderKeyInfo =
+        adapters.requireAdapter(context).validateKey(context)
+
+    override suspend fun listModels(
+        context: ProviderContext,
+        forceRefresh: Boolean,
+    ): List<ModelInfo> {
+        val adapter = adapters.requireCatalogAdapter(context)
+
         if (!forceRefresh) {
             return adapter.listModels(context)
         }

@@ -15,8 +15,8 @@ export const testConfig: AppConfig = {
   appName: 'ChatUI',
   defaultTheme: 'system',
   defaultProviderPreset: 'openrouter',
-  enabledPresets: ['openrouter'],
-  allowCustomProviders: false,
+  enabledPresets: ['openrouter', 'openai', 'custom'],
+  allowCustomProviders: true,
   openRouter: {
     attributionOrigin: 'https://chat.example.com',
     appTitle: 'ChatUI',
@@ -132,6 +132,16 @@ export function createFakeProviderManagementService(
   return {
     listProviders: async () => [provider],
     getProvider: async () => provider,
+    createCustomProvider: async (input) => ({
+      ...provider,
+      id: 'custom-provider',
+      presetId: 'custom',
+      label: input.label?.trim() || 'Custom OpenAI-compatible',
+      baseUrl: input.baseUrl,
+      authType: input.authType,
+      headers: input.headers ?? {},
+      secretId: input.authType === 'none' ? null : 'custom-secret',
+    }),
     validateProviderKey: async () => provider,
     rotateKey: async () => provider,
     removeKey: async () => ({ ...provider, secretId: null }),
@@ -165,6 +175,11 @@ export function createFakeProviderManagementService(
       modelId,
       modelLabel: model.label,
     }),
+    setConversationSettings: async (_conversationId, patch) => ({
+      ...conversation,
+      ...patch,
+    }),
+    deleteConversation: async () => undefined,
     setConversationRouting: async (_conversationId, preferences) => ({
       ...conversation,
       params: withRoutingPreferences(conversation.params, preferences),

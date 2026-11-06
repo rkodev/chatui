@@ -33,6 +33,9 @@ object ProviderDetailTestTags {
     const val Error = "provider-detail-error"
     const val Notice = "provider-detail-notice"
     const val KeyPanel = "provider-detail-key"
+    const val Preset = "provider-detail-preset"
+    const val BaseUrl = "provider-detail-base-url"
+    const val AuthType = "provider-detail-auth-type"
     const val KeyLabel = "provider-detail-key-label"
     const val Usage = "provider-detail-usage"
     const val Limit = "provider-detail-limit"
@@ -170,6 +173,18 @@ private fun KeyPanel(provider: dev.chatui.core.model.Provider, docsUrl: String?)
         ) {
             Text("Key and usage", style = MaterialTheme.typography.titleMedium)
             Text(
+                text = "Preset: ${provider.presetId}",
+                modifier = Modifier.testTag(ProviderDetailTestTags.Preset),
+            )
+            Text(
+                text = "Base URL: ${provider.baseUrl}",
+                modifier = Modifier.testTag(ProviderDetailTestTags.BaseUrl),
+            )
+            Text(
+                text = "Auth: ${provider.authType.name.lowercase().replace('_', '-')}",
+                modifier = Modifier.testTag(ProviderDetailTestTags.AuthType),
+            )
+            Text(
                 text = "Key label: ${metadata?.label ?: provider.label}",
                 modifier = Modifier.testTag(ProviderDetailTestTags.KeyLabel),
             )
@@ -193,18 +208,20 @@ private fun KeyPanel(provider: dev.chatui.core.model.Provider, docsUrl: String?)
                 text = "CORS: ${formatCors(provider.browserCors)}",
                 modifier = Modifier.testTag(ProviderDetailTestTags.Cors),
             )
-            Text(
-                text = "OpenRouter may route the same model to different upstream " +
-                    "providers with different data policies.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (provider.presetId == "openrouter") {
+                Text(
+                    text = "OpenRouter may route the same model to different upstream " +
+                        "providers with different data policies.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (docsUrl != null) {
                 TextButton(
                     onClick = { uriHandler.openUri(docsUrl) },
                     modifier = Modifier.testTag(ProviderDetailTestTags.DocsLink),
                 ) {
-                    Text("OpenRouter documentation")
+                    Text("${provider.label} documentation")
                 }
             }
         }

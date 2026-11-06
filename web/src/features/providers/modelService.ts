@@ -1,5 +1,7 @@
 import { newId, nowIso, type Model } from '../../domain'
+import { mapOpenAIModel, catalogDefaultsForPreset } from '../../providers/openaiCatalog'
 import type { ModelInfo } from '../../providers/openrouter'
+import { fallbackModelIdsFor, selectFallbackModel } from '../../providers/fallbackModels'
 import { getPreset } from '../../providers/registry'
 import { buildProviderContext } from './runtime'
 import {
@@ -9,16 +11,6 @@ import {
   type ModelServiceOptions,
   type RefreshModelsResult,
 } from './types'
-
-function compareRemoteIds(left: string, right: string): number {
-  if (left < right) {
-    return -1
-  }
-  if (left > right) {
-    return 1
-  }
-  return 0
-}
 
 function modelFromInfo(
   info: ModelInfo,
@@ -89,17 +81,36 @@ export class ModelService {
     options: { signal?: AbortSignal; forceRefresh?: boolean } = {},
   ): Promise<RefreshModelsResult> {
     const provider = await this.requireProvider(providerId)
+    const preset = getPreset(provider.presetId)
     const signal = options.signal ?? new AbortController().signal
-    const infos = await this.adapter.listModels(
-      buildProviderContext(provider, this.runtime, null),
-      signal,
-      {
-        forceRefresh: options.forceRefresh ?? true,
-        cache: this.runtime.catalogCache,
-        now: this.runtime.now,
-      },
-    )
+    let infos: ModelInfo[]
 
+    try {
+      infos = await this.adapter.listModels(
+        buildProviderContext(provider, this.runtime, null),
+        signal,
+        {
+          forceRefresh: options.forceRefresh ?? true,
+          cache: this.runtime.catalogCache,
+          now: this.runtime.now,
+        },
+      )
+    } catch (error) {
+      if (signal.aborted) {
+        throw error
+      }
+
+      return this.degradedRefresh(providerId, preset, error)
+    }
+
+    const result = await this.upsertModels(providerId, infos)
+    return { ...result, degraded: false, notice: null }
+  }
+
+  private async upsertModels(
+    providerId: string,
+    infos: readonly ModelInfo[],
+  ): Promise<RefreshModelsResult> {
     const existing = await this.models.list({ providerId })
     const byRemoteId = new Map(existing.map((model) => [model.remoteId, model]))
     const now = this.timestamp()
@@ -126,6 +137,87 @@ export class ModelService {
   }
 
   /**
+   * Keep chat usable when discovery is blocked.
+   *
+   * Cached models are returned unchanged. When the cache is empty, the preset's
+   * fallback list is persisted so model selection and onboarding still work.
+   * The result carries a non-blocking notice; callers never need to treat this
+   * as a send failure.
+   */
+  private async degradedRefresh(
+    providerId: string,
+    preset: ReturnType<typeof getPreset>,
+    error: unknown,
+  ): Promise<RefreshModelsResult> {
+    const existing = await this.models.list({ providerId })
+
+    if (existing.length > 0) {
+      return {
+        models: existing,
+        created: 0,
+        updated: 0,
+        degraded: true,
+        notice: `Discovery unavailable; using ${existing.length} cached model${existing.length === 1 ? '' : 's'}.`,
+        refreshError: error instanceof Error ? error : new Error(String(error)),
+      }
+    }
+
+    if (!preset) {
+      throw error
+    }
+
+    const fallbackIds = fallbackModelIdsFor(preset.id, preset)
+    const fallbackModels = await this.ensureFallbackModels(providerId, preset, fallbackIds)
+
+    if (fallbackModels.length === 0) {
+      throw error
+    }
+
+    const notice =
+      fallbackIds.length === 1
+        ? `Discovery unavailable; using fallback model ${fallbackIds[0]}.`
+        : `Discovery unavailable; using ${fallbackModels.length} fallback models.`
+
+    return {
+      models: fallbackModels,
+      created: fallbackModels.length,
+      updated: 0,
+      degraded: true,
+      notice,
+      refreshError: error instanceof Error ? error : new Error(String(error)),
+    }
+  }
+
+  private async ensureFallbackModels(
+    providerId: string,
+    preset: NonNullable<ReturnType<typeof getPreset>>,
+    fallbackIds: readonly string[],
+  ): Promise<Model[]> {
+    const existing = await this.models.list({ providerId })
+    const byRemoteId = new Map(existing.map((model) => [model.remoteId, model]))
+    const defaults = catalogDefaultsForPreset(preset.id)
+    const created: Model[] = []
+
+    for (const remoteId of fallbackIds) {
+      if (byRemoteId.has(remoteId)) {
+        continue
+      }
+
+      const info = mapOpenAIModel({ id: remoteId }, defaults)
+
+      if (!info) {
+        continue
+      }
+
+      info.metadata = { fallback: true }
+      const model = modelFromInfo(info, providerId, undefined, this.timestamp(), this.generateId())
+      created.push(await this.models.create(model))
+    }
+
+    return [...existing, ...created]
+  }
+
+  /**
    * Select the default model using the M1-01.2 fallback rule.
    *
    * 1. Use the preset `defaultModelId` when it exists in the catalog, even if
@@ -146,33 +238,52 @@ export class ModelService {
       )
     }
 
-    const models = await this.models.list({ providerId })
-    const presetDefault = models.find((model) => model.remoteId === preset.defaultModelId)
+    let models = await this.models.list({ providerId })
+    const fallbackModelIds = fallbackModelIdsFor(preset.id, preset)
 
-    if (presetDefault) {
-      return {
-        modelId: presetDefault.id,
-        remoteId: presetDefault.remoteId,
-        notice: null,
-      }
+    if (models.length === 0 && fallbackModelIds.length > 0) {
+      models = await this.ensureFallbackModels(providerId, preset, fallbackModelIds)
     }
 
-    const fallback = models
-      .filter((model) => !model.hidden && model.outputModalities.includes('text'))
-      .sort((left, right) => compareRemoteIds(left.remoteId, right.remoteId))[0]
+    // Fallback rows are marked in metadata. Treat them as an empty catalog so
+    // the rule reports that discovery was unavailable instead of pretending the
+    // placeholder is a discovered default.
+    const onlyFallback =
+      models.length > 0 && models.every((model) => model.metadata?.fallback === true)
+    const catalog = onlyFallback
+      ? []
+      : models.map((model) => ({
+          remoteId: model.remoteId,
+          hidden: model.hidden,
+          outputModalities: model.outputModalities,
+        }))
 
-    if (fallback) {
+    const selection = selectFallbackModel({
+      catalog,
+      presetDefaultModelId: preset.defaultModelId,
+      fallbackModelIds,
+    })
+
+    if (selection.selectedModelId === null) {
+      return { modelId: null, remoteId: null, notice: selection.notice }
+    }
+
+    const selected = models.find((model) => model.remoteId === selection.selectedModelId)
+
+    if (!selected) {
       return {
-        modelId: fallback.id,
-        remoteId: fallback.remoteId,
-        notice: `Default model ${preset.defaultModelId} is unavailable; using ${fallback.remoteId}.`,
+        modelId: null,
+        remoteId: null,
+        notice:
+          selection.notice ??
+          `Default model ${preset.defaultModelId} is unavailable; no text model is available.`,
       }
     }
 
     return {
-      modelId: null,
-      remoteId: null,
-      notice: `Default model ${preset.defaultModelId} is unavailable; no text model is available.`,
+      modelId: selected.id,
+      remoteId: selected.remoteId,
+      notice: selection.notice,
     }
   }
 

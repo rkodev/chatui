@@ -26,6 +26,19 @@ data class NormalizedMessage(
 )
 
 /**
+ * Attachment bytes resolved by the caller before request serialization.
+ *
+ * The normalized request never carries bytes inside message parts; parts
+ * reference attachments by id and the caller supplies the resolved bytes here.
+ */
+@Serializable
+data class ResolvedAttachment(
+    val mimeType: String,
+    val name: String? = null,
+    val dataBase64: String,
+)
+
+/**
  * Normalized chat request from spec section 7.3.
  *
  * The system prompt is separate from [messages]. Only completed or partial
@@ -38,4 +51,5 @@ data class NormalizedChatRequest(
     val system: String?,
     val messages: List<NormalizedMessage>,
     val params: ChatParams,
+    val attachments: Map<String, ResolvedAttachment> = emptyMap(),
 )

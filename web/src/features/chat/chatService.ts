@@ -1,8 +1,19 @@
-import { nowIso, type ChatError, type Conversation, type Message, type Model, type Provider, type SendKey } from '../../domain'
+import {
+  nowIso,
+  type ChatError,
+  type Conversation,
+  type Message,
+  type Model,
+  type Provider,
+  type SendKey,
+} from '../../domain'
 import type { ProviderRuntime } from '../providers/types'
 import type { SecretStoreLike } from '../providers/types'
 import type { ConversationStore } from '../conversations/types'
 import type { MessageListOptions, MessagePage } from '../../storage'
+import type { ResolvedAttachment } from '../../providers/openaiCompatible'
+import type { NormalizedChatRequest } from '../../providers/openrouterStream'
+import type { AddAttachmentsResult } from '../attachments/attachmentService'
 import { buildProviderContext } from '../providers/runtime'
 import type {
   ChatRunFailureReason,
@@ -10,7 +21,7 @@ import type {
   ChatRunResult,
   RegenerateInput,
 } from './ChatRunner'
-import { buildChatRequest } from './chatRequest'
+import { attachmentIdsForMessage, buildChatRequest } from './chatRequest'
 
 export type ChatAvailability =
   | { ok: true; model: Model; provider: Provider }
@@ -22,6 +33,23 @@ export type ChatSendFailureReason =
 export type ChatSendResult =
   | { ok: true; message: Message }
   | { ok: false; reason: ChatSendFailureReason; message: string; error?: ChatError }
+
+/**
+ * Attachment surface used by the composer.
+ *
+ * `AttachmentService` implements this; component tests can provide a fake.
+ */
+export interface ChatAttachmentServiceLike {
+  addFiles(
+    files: readonly File[],
+    options?: { messageId?: string | null },
+  ): Promise<AddAttachmentsResult>
+  remove(id: string): Promise<void>
+  getDataUrl(id: string): Promise<string | null>
+  resolveForMessages(messages: readonly Message[]): Promise<Record<string, ResolvedAttachment>>
+  attachToMessage(attachmentIds: readonly string[], messageId: string): Promise<void>
+  deleteForMessages(messageIds: readonly string[]): Promise<void>
+}
 
 /**
  * UI-facing chat surface.
@@ -36,11 +64,15 @@ export interface ChatServiceLike {
   getAvailability(conversation: Conversation): Promise<ChatAvailability>
   getShowTokenUsage(): Promise<boolean>
   getSendKey(): Promise<SendKey>
+  getLoadRemoteImages(): Promise<boolean>
   send(conversation: Conversation, userMessage?: Message): Promise<ChatSendResult>
   retry(conversation: Conversation, target: Message): Promise<ChatSendResult>
   editLastUser(conversation: Conversation, target: Message, text: string): Promise<ChatSendResult>
   cancel(conversationId: string): Promise<Message | null>
   isStreaming(conversationId: string): boolean
+  addAttachments(files: readonly File[]): Promise<AddAttachmentsResult>
+  removeAttachment(id: string): Promise<void>
+  getAttachmentDataUrl(id: string): Promise<string | null>
 }
 
 /** Minimal runner surface used by the chat service. */
@@ -73,9 +105,11 @@ export interface ChatServiceOptions {
   settings: {
     getShowTokenUsage(): Promise<boolean>
     getSendKey(): Promise<SendKey>
+    getLoadRemoteImages(): Promise<boolean>
   }
   runner: ChatRunnerLike
   runtime: ProviderRuntime
+  attachments?: ChatAttachmentServiceLike
 }
 
 const PAGE_SIZE = 200
@@ -107,6 +141,7 @@ export class ChatService implements ChatServiceLike {
   private readonly settings: ChatServiceOptions['settings']
   private readonly runner: ChatRunnerLike
   private readonly runtime: ProviderRuntime
+  private readonly attachments: ChatAttachmentServiceLike | undefined
 
   constructor(options: ChatServiceOptions) {
     this.conversations = options.conversations
@@ -117,6 +152,34 @@ export class ChatService implements ChatServiceLike {
     this.settings = options.settings
     this.runner = options.runner
     this.runtime = options.runtime
+    this.attachments = options.attachments
+  }
+
+  async addAttachments(files: readonly File[]): Promise<AddAttachmentsResult> {
+    if (!this.attachments) {
+      return {
+        attachments: [],
+        errors: files.map((file) => ({
+          fileName: file.name,
+          code: 'unsupported_type',
+          message: 'Attachment storage is not available.',
+        })),
+      }
+    }
+
+    return this.attachments.addFiles(files)
+  }
+
+  async removeAttachment(id: string): Promise<void> {
+    await this.attachments?.remove(id)
+  }
+
+  async getAttachmentDataUrl(id: string): Promise<string | null> {
+    if (!this.attachments) {
+      return null
+    }
+
+    return this.attachments.getDataUrl(id)
   }
 
   async getConversation(conversationId: string): Promise<Conversation | null> {
@@ -136,6 +199,10 @@ export class ChatService implements ChatServiceLike {
 
   async getSendKey(): Promise<SendKey> {
     return this.settings.getSendKey()
+  }
+
+  async getLoadRemoteImages(): Promise<boolean> {
+    return this.settings.getLoadRemoteImages()
   }
 
   isStreaming(conversationId: string): boolean {
@@ -243,6 +310,16 @@ export class ChatService implements ChatServiceLike {
     if (userMessage) {
       try {
         const appended = await this.conversations.appendMessage(userMessage)
+        const attachmentIds = attachmentIdsForMessage(userMessage)
+
+        if (attachmentIds.length > 0) {
+          if (!this.attachments) {
+            throw new Error('Attachment storage is not available.')
+          }
+
+          await this.attachments.attachToMessage(attachmentIds, userMessage.id)
+        }
+
         current = appended.conversation
       } catch (error) {
         return {
@@ -255,7 +332,10 @@ export class ChatService implements ChatServiceLike {
 
     try {
       const history = await this.loadAllMessages(current.id)
-      const request = buildChatRequest(current, availability.model.remoteId, history)
+      const request = await this.withAttachments(
+        buildChatRequest(current, availability.model.remoteId, history),
+        history,
+      )
       const context = buildProviderContext(availability.provider, this.runtime, apiKey)
       const result = await this.runner.send({
         conversation: current,
@@ -310,7 +390,10 @@ export class ChatService implements ChatServiceLike {
     try {
       const history = await this.loadAllMessages(conversation.id)
       const beforeTarget = history.filter((message) => message.sequence < target.sequence)
-      const request = buildChatRequest(conversation, availability.model.remoteId, beforeTarget)
+      const request = await this.withAttachments(
+        buildChatRequest(conversation, availability.model.remoteId, beforeTarget),
+        beforeTarget,
+      )
       const context = buildProviderContext(availability.provider, this.runtime, apiKey)
       const result = await this.runner.regenerate({
         conversation,
@@ -403,6 +486,12 @@ export class ChatService implements ChatServiceLike {
       }
 
       await this.messages.truncateAfter(conversation.id, target.sequence)
+      await this.attachments?.deleteForMessages([
+        target.id,
+        ...history
+          .filter((message) => message.sequence > target.sequence)
+          .map((message) => message.id),
+      ])
 
       const updatedTarget: Message = {
         ...target,
@@ -416,7 +505,10 @@ export class ChatService implements ChatServiceLike {
       const appended = await this.conversations.appendMessage(updatedTarget)
       const current = appended.conversation
       const remaining = await this.loadAllMessages(current.id)
-      const request = buildChatRequest(current, availability.model.remoteId, remaining)
+      const request = await this.withAttachments(
+        buildChatRequest(current, availability.model.remoteId, remaining),
+        remaining,
+      )
       const context = buildProviderContext(availability.provider, this.runtime, apiKey)
       const result = await this.runner.send({
         conversation: current,
@@ -455,6 +547,30 @@ export class ChatService implements ChatServiceLike {
     }
 
     return this.secrets.getSecret(provider.secretId)
+  }
+
+  /**
+   * Resolve attachment bytes for every image/file part in the request history.
+   * A text-only history remains byte-for-byte the same request object shape.
+   */
+  private async withAttachments(
+    request: NormalizedChatRequest,
+    history: readonly Message[],
+  ): Promise<NormalizedChatRequest> {
+    const hasAttachments = history.some((message) => attachmentIdsForMessage(message).length > 0)
+
+    if (!hasAttachments) {
+      return request
+    }
+
+    if (!this.attachments) {
+      throw new Error('Attachment storage is not available.')
+    }
+
+    return {
+      ...request,
+      attachments: await this.attachments.resolveForMessages(history),
+    }
   }
 
   private async loadAllMessages(conversationId: string): Promise<Message[]> {

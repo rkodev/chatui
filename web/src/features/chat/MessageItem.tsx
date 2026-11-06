@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { ContentPart, Message, MessageRole, Usage } from '../../domain'
 import { formatUsd } from '../providers/format'
+import { MessageAttachments } from '../attachments'
 import { Button } from '../../ui/primitives'
 import { describeChatError } from './chatErrorCopy'
 import { MarkdownRenderer } from './MarkdownRenderer'
@@ -53,7 +54,9 @@ function textParts(message: Message): string[] {
 
 function reasoningParts(message: Message): string[] {
   return message.parts
-    .filter((part): part is Extract<ContentPart, { type: 'reasoning' }> => part.type === 'reasoning')
+    .filter(
+      (part): part is Extract<ContentPart, { type: 'reasoning' }> => part.type === 'reasoning',
+    )
     .map((part) => part.text)
     .filter((text) => text !== '')
 }
@@ -61,6 +64,7 @@ function reasoningParts(message: Message): string[] {
 function MessageItemComponent({
   message,
   showTokenUsage,
+  loadRemoteImages = false,
   onRetry,
   onRegenerate,
   onEditLastUser,
@@ -72,6 +76,7 @@ function MessageItemComponent({
   const text = textParts(message)
   const reasoning = reasoningParts(message)
   const hasText = text.some((part) => part.trim() !== '')
+  const hasAttachments = message.parts.some((part) => part.type === 'image' || part.type === 'file')
   const errorCopy = message.error === null ? null : describeChatError(message.error)
   const usage = message.usage === null ? '' : formatUsage(message.usage)
   const isInterrupted = message.status === 'streaming' && !isActiveStream
@@ -103,16 +108,23 @@ function MessageItemComponent({
         )}
 
         {text.map((part, index) => (
-          <MarkdownRenderer key={index} markdown={part} className="message__markdown" />
+          <MarkdownRenderer
+            key={index}
+            markdown={part}
+            className="message__markdown"
+            loadRemoteImages={loadRemoteImages}
+          />
         ))}
 
-        {!hasText && message.status === 'streaming' && isActiveStream && (
+        <MessageAttachments parts={message.parts} />
+
+        {!hasText && !hasAttachments && message.status === 'streaming' && isActiveStream && (
           <p className="message__typing" aria-label="Assistant is typing">
             <span aria-hidden="true">…</span>
           </p>
         )}
 
-        {!hasText && message.status === 'complete' && (
+        {!hasText && !hasAttachments && message.status === 'complete' && (
           <p className="message__empty">No content.</p>
         )}
 

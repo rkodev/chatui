@@ -13,7 +13,7 @@ function renderScreen(session: ChatSession) {
     () => <ChatScreen session={session} />,
     'chat/$conversationId',
     '/chat/conversation-1',
-    ['/', 'settings/providers/new', 'settings/models'],
+    ['/', 'settings/providers/new', 'settings/models', 'chat/$conversationId/settings'],
   )
 
   render(<RouterProvider router={router} />)
@@ -90,6 +90,14 @@ describe('ChatScreen', () => {
 
     expect(await screen.findByRole('heading', { name: 'Start the conversation' })).toBeInTheDocument()
     expect(await screen.findByTestId('chat-composer-slot')).toBeInTheDocument()
+  })
+
+  it('links to conversation settings from the chat header', async () => {
+    renderScreen(createTestChatSession())
+
+    expect(
+      await screen.findByRole('link', { name: 'Conversation settings' }),
+    ).toHaveAttribute('href', '/chat/conversation-1/settings')
   })
 
   it('renders complete history and the live-region announcement', async () => {

@@ -6,6 +6,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.chatui.core.database.repository.ConversationRepository
+import dev.chatui.core.database.repository.MessageRepository
 import dev.chatui.core.database.repository.ModelRepository
 import dev.chatui.core.database.repository.ProviderRepository
 import dev.chatui.core.datastore.settings.SettingsDataStore
@@ -18,6 +19,7 @@ import java.time.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -53,11 +55,35 @@ class ConversationServiceException(
 interface ConversationService {
     fun observeConversations(): Flow<List<Conversation>>
 
+    /**
+     * Observe archived conversations for the archive view.
+     *
+     * The default keeps lightweight test doubles source-compatible; the
+     * production implementation overrides it with the archived repository flow.
+     */
+    fun observeArchivedConversations(): Flow<List<Conversation>> = emptyFlow()
+
     fun observeLastActiveConversationId(): Flow<String?>
 
     suspend fun createConversation(title: String? = null): CreateConversationResult
 
     suspend fun renameConversation(id: String, title: String): Conversation
+
+    /**
+     * Pin or unpin a conversation.
+     *
+     * The default keeps lightweight test doubles source-compatible; the
+     * production implementation persists the flag and returns the updated row.
+     */
+    suspend fun setPinned(id: String, pinned: Boolean): Conversation? = null
+
+    /**
+     * Archive or unarchive a conversation.
+     *
+     * The default keeps lightweight test doubles source-compatible; the
+     * production implementation persists the flag and returns the updated row.
+     */
+    suspend fun setArchived(id: String, archived: Boolean): Conversation? = null
 
     suspend fun deleteConversation(id: String)
 
@@ -66,6 +92,17 @@ interface ConversationService {
     suspend fun getLastActiveConversation(): Conversation?
 
     suspend fun getConversation(id: String): Conversation?
+
+    /**
+     * Search active conversation titles and message text.
+     *
+     * The default keeps lightweight test doubles source-compatible; the
+     * production implementation overrides it with the FTS-backed search.
+     */
+    suspend fun searchConversations(
+        query: String,
+        limit: Int = 50,
+    ): List<ConversationSearchResult> = emptyList()
 }
 
 /**
@@ -79,6 +116,7 @@ interface ConversationService {
  */
 class DefaultConversationService @Inject constructor(
     private val conversations: ConversationRepository,
+    private val messages: MessageRepository,
     private val providers: ProviderRepository,
     private val models: ModelRepository,
     private val settings: SettingsDataStore,
@@ -89,6 +127,9 @@ class DefaultConversationService @Inject constructor(
 
     override fun observeConversations(): Flow<List<Conversation>> =
         conversations.observeActive()
+
+    override fun observeArchivedConversations(): Flow<List<Conversation>> =
+        conversations.observeArchived()
 
     override fun observeLastActiveConversationId(): Flow<String?> =
         settings.settings.map { it.lastActiveConversationId }
@@ -166,6 +207,40 @@ class DefaultConversationService @Inject constructor(
         }
     }
 
+    override suspend fun setPinned(id: String, pinned: Boolean): Conversation {
+        if (!conversations.setPinned(id, pinned)) {
+            throw ConversationServiceException(
+                ConversationServiceErrorCode.NOT_FOUND,
+                "Conversation $id was not found.",
+                id,
+            )
+        }
+
+        return conversations.get(id)
+            ?: throw ConversationServiceException(
+                ConversationServiceErrorCode.NOT_FOUND,
+                "Conversation $id was not found.",
+                id,
+            )
+    }
+
+    override suspend fun setArchived(id: String, archived: Boolean): Conversation {
+        if (!conversations.setArchived(id, archived)) {
+            throw ConversationServiceException(
+                ConversationServiceErrorCode.NOT_FOUND,
+                "Conversation $id was not found.",
+                id,
+            )
+        }
+
+        return conversations.get(id)
+            ?: throw ConversationServiceException(
+                ConversationServiceErrorCode.NOT_FOUND,
+                "Conversation $id was not found.",
+                id,
+            )
+    }
+
     override suspend fun setLastActiveConversation(id: String?) {
         if (id != null && conversations.get(id) == null) {
             throw ConversationServiceException(
@@ -191,6 +266,59 @@ class DefaultConversationService @Inject constructor(
     }
 
     override suspend fun getConversation(id: String): Conversation? = conversations.get(id)
+
+    override suspend fun searchConversations(
+        query: String,
+        limit: Int,
+    ): List<ConversationSearchResult> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
+
+        val titleMatches = conversations.searchByTitle(trimmed, limit)
+        val ftsQuery = buildFtsQuery(trimmed)
+        val messageHits = if (ftsQuery == null) {
+            emptyList()
+        } else {
+            messages.searchWithConversations(ftsQuery, limit)
+        }
+
+        val grouped = linkedMapOf<String, MutableSearchResult>()
+        titleMatches.forEach { conversation ->
+            grouped.getOrPut(conversation.id) { MutableSearchResult(conversation) }
+                .titleMatched = true
+        }
+        messageHits.forEach { hit ->
+            val result = grouped.getOrPut(hit.conversation.id) {
+                MutableSearchResult(hit.conversation)
+            }
+            result.messageMatches += ConversationSearchMessageMatch(
+                messageId = hit.message.id,
+                sequence = hit.message.sequence,
+                role = hit.message.role,
+                snippet = searchSnippet(hit.message, trimmed),
+                createdAt = hit.message.createdAt,
+            )
+        }
+
+        return grouped.values
+            .map { it.toResult() }
+            .sortedWith(
+                compareByDescending<ConversationSearchResult> { it.conversation.pinned }
+                    .thenByDescending { it.conversation.lastMessageAt },
+            )
+            .take(limit)
+    }
+
+    private class MutableSearchResult(val conversation: Conversation) {
+        var titleMatched: Boolean = false
+        val messageMatches = mutableListOf<ConversationSearchMessageMatch>()
+
+        fun toResult(): ConversationSearchResult = ConversationSearchResult(
+            conversation = conversation,
+            titleMatched = titleMatched,
+            messageMatches = messageMatches.sortedByDescending { it.sequence },
+        )
+    }
 
     private suspend fun resolveProvider(preferredId: String?): Provider? {
         if (preferredId != null) {

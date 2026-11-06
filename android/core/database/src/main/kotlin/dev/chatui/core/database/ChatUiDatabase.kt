@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import dev.chatui.core.database.dao.AttachmentDao
 import dev.chatui.core.database.dao.BackupConfigDao
 import dev.chatui.core.database.dao.ConversationDao
+import dev.chatui.core.database.dao.ImportDao
 import dev.chatui.core.database.dao.MessageDao
 import dev.chatui.core.database.dao.ModelDao
 import dev.chatui.core.database.dao.ProviderDao
@@ -62,6 +63,8 @@ abstract class ChatUiDatabase : RoomDatabase() {
     abstract fun backupConfigDao(): BackupConfigDao
 
     abstract fun syncQueueDao(): SyncQueueDao
+
+    abstract fun importDao(): ImportDao
 
     companion object {
         const val NAME: String = "chatui.db"

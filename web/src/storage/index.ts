@@ -26,15 +26,29 @@ export type {
 export { migrations, runMigrations } from './migrations'
 export type { Migration, MigrationContext } from './migrations'
 
-export { ConversationRepository } from './ConversationRepository'
+export {
+  ConversationRepository,
+  DEFAULT_SEARCH_CONVERSATION_SCAN_LIMIT,
+  DEFAULT_SEARCH_LIMIT,
+  DEFAULT_SEARCH_MESSAGE_MATCH_LIMIT,
+  DEFAULT_SEARCH_MESSAGE_SCAN_LIMIT,
+  searchSnippet,
+} from './ConversationRepository'
 export type {
   ConversationListOptions,
   ConversationPage,
+  ConversationSearchGroup,
+  ConversationSearchMessageMatch,
+  ConversationSearchOptions,
+  ConversationSearchResult,
   NewConversation,
 } from './ConversationRepository'
 
 export { DEFAULT_MESSAGE_LIMIT, MessageRepository } from './MessageRepository'
 export type { AppendMessageResult, MessageListOptions, MessagePage } from './MessageRepository'
+
+export { ExportReader } from './ExportReader'
+export type { ExportReaderOptions, ExportSettingsSource, ExportSnapshot } from './ExportReader'
 
 export { AttachmentRepository } from './AttachmentRepository'
 export type { AttachmentListOptions } from './AttachmentRepository'

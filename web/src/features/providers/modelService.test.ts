@@ -11,6 +11,7 @@ import { deleteDatabase, openDatabase, type ChatUiDB } from '../../storage/db'
 import { ModelRepository } from '../../storage/ModelRepository'
 import { ProviderRepository } from '../../storage/ProviderRepository'
 import { ModelService } from './modelService'
+import type { ProviderAdapter } from './types'
 
 const modelsFixture: Record<string, unknown> = JSON.parse(
   readFileSync(
@@ -243,7 +244,7 @@ describe('ModelService', () => {
     expect((await service.setModelHidden(manual.id, true)).hidden).toBe(true)
   })
 
-  it('leaves existing models intact when discovery fails', async () => {
+  it('keeps cached models and returns a non-blocking notice when discovery fails', async () => {
     const provider = await providers.create(makeProvider())
     const existing = await models.create(makeModel(provider.id, 'openai/gpt-4o-mini-2024-07-18'))
     server.use(
@@ -252,10 +253,89 @@ describe('ModelService', () => {
       ),
     )
 
-    await expect(service.refreshModels(provider.id)).rejects.toMatchObject({
-      code: 'provider',
-      status: 500,
-    })
+    const failed = await service.refreshModels(provider.id)
+
+    expect(failed.degraded).toBe(true)
+    expect(failed.notice).toMatch(/Discovery unavailable; using 1 cached model/)
+    expect(failed.models.map((model) => model.id)).toEqual([existing.id])
     expect(await models.get(existing.id)).not.toBeNull()
+  })
+
+  it('persists preset fallback models when discovery is blocked and no cache exists', async () => {
+    const provider = await providers.create(
+      makeProvider({
+        presetId: 'openai',
+        label: 'OpenAI',
+        baseUrl: 'https://api.openai.com/v1',
+      }),
+    )
+    const failingAdapter: ProviderAdapter = {
+      validateKey: async () => ({
+        label: null,
+        usageUsd: null,
+        limitUsd: null,
+        limitRemainingUsd: null,
+        isFreeTier: null,
+        rateLimit: null,
+      }),
+      listModels: async () => {
+        throw new Error('Discovery blocked')
+      },
+    }
+    const fallbackService = new ModelService({
+      providers,
+      models,
+      adapter: failingAdapter,
+      catalogCache: new MemoryCatalogCache(),
+    })
+
+    const result = await fallbackService.refreshModels(provider.id)
+
+    expect(result.degraded).toBe(true)
+    expect(result.created).toBe(2)
+    expect(result.notice).toBe('Discovery unavailable; using 2 fallback models.')
+    expect(result.models.map((model) => model.remoteId)).toEqual(['gpt-4o-mini', 'gpt-4o'])
+    expect(result.models.every((model) => model.metadata?.fallback === true)).toBe(true)
+
+    const selection = await fallbackService.selectDefaultModel(provider.id)
+
+    expect(selection).toMatchObject({ remoteId: 'gpt-4o-mini' })
+    expect(selection.notice).toBe('Discovery unavailable; using fallback model gpt-4o-mini.')
+  })
+
+  it('creates fallback models during selection when none were refreshed', async () => {
+    const provider = await providers.create(
+      makeProvider({
+        presetId: 'openai',
+        label: 'OpenAI',
+        baseUrl: 'https://api.openai.com/v1',
+      }),
+    )
+    const failingAdapter: ProviderAdapter = {
+      validateKey: async () => ({
+        label: null,
+        usageUsd: null,
+        limitUsd: null,
+        limitRemainingUsd: null,
+        isFreeTier: null,
+        rateLimit: null,
+      }),
+      listModels: async () => {
+        throw new Error('Discovery blocked')
+      },
+    }
+    const fallbackService = new ModelService({
+      providers,
+      models,
+      adapter: failingAdapter,
+      catalogCache: new MemoryCatalogCache(),
+    })
+
+    const selection = await fallbackService.selectDefaultModel(provider.id)
+    const persisted = await fallbackService.listModels(provider.id)
+
+    expect(selection.remoteId).toBe('gpt-4o-mini')
+    expect(selection.notice).toBe('Discovery unavailable; using fallback model gpt-4o-mini.')
+    expect(persisted.map((model) => model.remoteId)).toEqual(['gpt-4o-mini', 'gpt-4o'])
   })
 })

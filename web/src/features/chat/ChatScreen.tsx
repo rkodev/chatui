@@ -79,10 +79,19 @@ export function ChatScreen({ session, composer }: ChatScreenProps) {
           <h2 id="chat-title">{conversation.title}</h2>
           <p className="chat-screen__subtitle">{modelLabel}</p>
         </div>
-        <ModelChip
-          label={modelLabel}
-          warning={unavailable?.reason === 'model_unavailable' ? unavailable.message : null}
-        />
+        <div className="chat-screen__actions">
+          <ModelChip
+            label={modelLabel}
+            warning={unavailable?.reason === 'model_unavailable' ? unavailable.message : null}
+          />
+          <Link
+            to="/chat/$conversationId/settings"
+            params={{ conversationId: conversation.id }}
+            className="chat-screen__link"
+          >
+            Conversation settings
+          </Link>
+        </div>
       </header>
 
       {unavailable !== null && unavailable.reason === 'no_provider' && (
@@ -125,6 +134,7 @@ export function ChatScreen({ session, composer }: ChatScreenProps) {
             loadingOlder={session.loadingOlder}
             onLoadOlder={session.loadOlder}
             showTokenUsage={session.showTokenUsage}
+            loadRemoteImages={session.loadRemoteImages}
             onRetry={session.retry}
             onRegenerate={session.regenerate}
             onEditLastUser={session.editLastUser}

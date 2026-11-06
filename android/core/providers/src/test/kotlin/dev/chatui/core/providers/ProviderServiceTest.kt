@@ -4,13 +4,21 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.database.ChatUiDatabase
+import dev.chatui.core.database.dao.ProviderDao
+import dev.chatui.core.database.entity.ProviderEntity
 import dev.chatui.core.database.repository.ModelRepository
 import dev.chatui.core.database.repository.ProviderRepository
+import dev.chatui.core.datastore.secret.SecretCipher
 import dev.chatui.core.datastore.secret.SecretStore
+import dev.chatui.core.model.ProviderAuthType
+import dev.chatui.core.model.ProviderKind
 import dev.chatui.core.network.ProviderRegistry
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -209,4 +217,295 @@ class ProviderServiceTest {
         assertThat((error as ProviderServiceException).code)
             .isEqualTo(ProviderServiceErrorCode.NOT_FOUND)
     }
+
+    @Test
+    fun `createPresetProvider uses contract metadata and stores the key separately`() = runTest {
+        val provider = service.createPresetProvider(
+            CreatePresetProviderInput(
+                presetId = "openai",
+                apiKey = "sk-openai-secret",
+                label = "OpenAI work",
+            ),
+        )
+
+        assertThat(provider.presetId).isEqualTo("openai")
+        assertThat(provider.label).isEqualTo("OpenAI work")
+        assertThat(provider.baseUrl).isEqualTo("https://api.openai.com/v1")
+        assertThat(provider.authType).isEqualTo(ProviderAuthType.BEARER)
+        assertThat(provider.headers).isEmpty()
+        assertThat(provider.secretId).isNotNull()
+        assertThat(secretStore.get(provider.secretId!!)).isEqualTo("sk-openai-secret")
+
+        val entity = database.providerDao().getById(provider.id)!!
+        assertThat(entity.headersJson).doesNotContain("sk-openai-secret")
+    }
+
+    @Test
+    fun `createPresetProvider supports a no-key local preset`() = runTest {
+        val provider = service.createPresetProvider(
+            CreatePresetProviderInput(presetId = "lmstudio"),
+        )
+
+        assertThat(provider.presetId).isEqualTo("lmstudio")
+        assertThat(provider.authType).isEqualTo(ProviderAuthType.NONE)
+        assertThat(provider.secretId).isNull()
+        assertThat(database.secretDao().getAll()).isEmpty()
+    }
+
+    @Test
+    fun `createPresetProvider accepts Anthropic and rejects unknown presets`() = runTest {
+        val anthropic = service.createPresetProvider(
+            CreatePresetProviderInput(presetId = "anthropic", apiKey = "sk-ant"),
+        )
+        assertThat(anthropic.presetId).isEqualTo("anthropic")
+        assertThat(anthropic.kind).isEqualTo(ProviderKind.ANTHROPIC)
+        assertThat(anthropic.authType).isEqualTo(ProviderAuthType.X_API_KEY)
+
+        val unknown = runCatching {
+            service.createPresetProvider(
+                CreatePresetProviderInput(presetId = "missing", apiKey = "sk"),
+            )
+        }.exceptionOrNull()
+        assertThat(unknown).isInstanceOf(ProviderServiceException::class.java)
+        assertThat((unknown as ProviderServiceException).code)
+            .isEqualTo(ProviderServiceErrorCode.INVALID_INPUT)
+    }
+
+    @Test
+    fun `createCustomProvider stores base url auth and non-secret headers`() = runTest {
+        val provider = service.createCustomProvider(
+            CreateCustomProviderInput(
+                baseUrl = "https://api.example.com/v1",
+                authType = ProviderAuthType.X_API_KEY,
+                apiKey = "custom-secret",
+                label = "My server",
+                headers = mapOf("X-Org" to "team-a"),
+            ),
+        )
+
+        assertThat(provider.presetId).isEqualTo("custom")
+        assertThat(provider.label).isEqualTo("My server")
+        assertThat(provider.baseUrl).isEqualTo("https://api.example.com/v1")
+        assertThat(provider.authType).isEqualTo(ProviderAuthType.X_API_KEY)
+        assertThat(provider.headers).containsExactly("X-Org", "team-a")
+        assertThat(provider.secretId).isNotNull()
+        assertThat(secretStore.get(provider.secretId!!)).isEqualTo("custom-secret")
+
+        val entity = database.providerDao().getById(provider.id)!!
+        assertThat(entity.headersJson).contains("X-Org")
+        assertThat(entity.headersJson).doesNotContain("custom-secret")
+    }
+
+    @Test
+    fun `createCustomProvider rejects invalid base urls`() = runTest {
+        val cases = listOf(
+            "",
+            "not a url",
+            "ftp://example.com/v1",
+            "https://user:pass@example.com/v1",
+            "https://example.com/v1?key=value",
+            "https://example.com/v1#fragment",
+        )
+
+        for (baseUrl in cases) {
+            val error = runCatching {
+                service.createCustomProvider(
+                    CreateCustomProviderInput(
+                        baseUrl = baseUrl,
+                        authType = ProviderAuthType.BEARER,
+                        apiKey = "sk",
+                    ),
+                )
+            }.exceptionOrNull()
+
+            assertThat(error).isInstanceOf(ProviderServiceException::class.java)
+            assertThat((error as ProviderServiceException).code)
+                .isEqualTo(ProviderServiceErrorCode.INVALID_INPUT)
+        }
+
+        assertThat(providerRepository.observeAll().first()).isEmpty()
+    }
+
+    @Test
+    fun `createCustomProvider rejects query-key auth and missing keys`() = runTest {
+        val queryKey = runCatching {
+            service.createCustomProvider(
+                CreateCustomProviderInput(
+                    baseUrl = "https://api.example.com/v1",
+                    authType = ProviderAuthType.QUERY_KEY,
+                    apiKey = "sk",
+                ),
+            )
+        }.exceptionOrNull()
+        assertThat((queryKey as ProviderServiceException).code)
+            .isEqualTo(ProviderServiceErrorCode.INVALID_INPUT)
+
+        val missingKey = runCatching {
+            service.createCustomProvider(
+                CreateCustomProviderInput(
+                    baseUrl = "https://api.example.com/v1",
+                    authType = ProviderAuthType.BEARER,
+                ),
+            )
+        }.exceptionOrNull()
+        assertThat((missingKey as ProviderServiceException).code)
+            .isEqualTo(ProviderServiceErrorCode.INVALID_INPUT)
+
+        val unexpectedKey = runCatching {
+            service.createCustomProvider(
+                CreateCustomProviderInput(
+                    baseUrl = "https://api.example.com/v1",
+                    authType = ProviderAuthType.NONE,
+                    apiKey = "sk",
+                ),
+            )
+        }.exceptionOrNull()
+        assertThat((unexpectedKey as ProviderServiceException).code)
+            .isEqualTo(ProviderServiceErrorCode.INVALID_INPUT)
+    }
+
+    @Test
+    fun `createCustomProvider rejects authentication and malformed headers`() = runTest {
+        val cases = listOf(
+            mapOf("Authorization" to "Bearer sk"),
+            mapOf("x-api-key" to "sk"),
+            mapOf("Cookie" to "session=1"),
+            mapOf("Bad Header" to "value"),
+            mapOf("X-Org" to ""),
+            mapOf("X-Org" to "line\nbreak"),
+        )
+
+        for (headers in cases) {
+            val error = runCatching {
+                service.createCustomProvider(
+                    CreateCustomProviderInput(
+                        baseUrl = "https://api.example.com/v1",
+                        authType = ProviderAuthType.BEARER,
+                        apiKey = "sk",
+                        headers = headers,
+                    ),
+                )
+            }.exceptionOrNull()
+
+            assertThat(error).isInstanceOf(ProviderServiceException::class.java)
+            assertThat((error as ProviderServiceException).code)
+                .isEqualTo(ProviderServiceErrorCode.INVALID_INPUT)
+        }
+
+        assertThat(providerRepository.observeAll().first()).isEmpty()
+    }
+
+    @Test
+    fun `createCustomProvider rejects duplicate labels`() = runTest {
+        service.createCustomProvider(
+            CreateCustomProviderInput(
+                baseUrl = "https://api.example.com/v1",
+                authType = ProviderAuthType.BEARER,
+                apiKey = "sk",
+                label = "My server",
+            ),
+        )
+
+        val error = runCatching {
+            service.createCustomProvider(
+                CreateCustomProviderInput(
+                    baseUrl = "https://api.example.com/v2",
+                    authType = ProviderAuthType.BEARER,
+                    apiKey = "sk",
+                    label = "my server",
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(ProviderServiceException::class.java)
+        assertThat((error as ProviderServiceException).code)
+            .isEqualTo(ProviderServiceErrorCode.INVALID_INPUT)
+    }
+
+    @Test
+    fun `failed provider write removes the newly written secret`() = runTest {
+        val failingService = ProviderService(
+            providers = ProviderRepository(FailingProviderDao(), clock),
+            secrets = secretStore,
+            gateway = gateway,
+            registry = registry,
+            clock = clock,
+            generateId = { "id-${nextId++}" },
+        )
+
+        val error = runCatching {
+            failingService.createCustomProvider(
+                CreateCustomProviderInput(
+                    baseUrl = "https://api.example.com/v1",
+                    authType = ProviderAuthType.BEARER,
+                    apiKey = "sk-orphan",
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(ProviderServiceException::class.java)
+        assertThat((error as ProviderServiceException).code)
+            .isEqualTo(ProviderServiceErrorCode.STORAGE)
+        assertThat(database.secretDao().getAll()).isEmpty()
+    }
+
+    @Test
+    fun `failed secret write leaves no provider record`() = runTest {
+        val failingSecrets = SecretStore(
+            dao = database.secretDao(),
+            cipher = FailingSecretCipher(),
+            clock = { clock.instant() },
+        )
+        val failingService = ProviderService(
+            providers = providerRepository,
+            secrets = failingSecrets,
+            gateway = gateway,
+            registry = registry,
+            clock = clock,
+            generateId = { "id-${nextId++}" },
+        )
+
+        val error = runCatching {
+            failingService.createCustomProvider(
+                CreateCustomProviderInput(
+                    baseUrl = "https://api.example.com/v1",
+                    authType = ProviderAuthType.BEARER,
+                    apiKey = "sk",
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(ProviderServiceException::class.java)
+        assertThat((error as ProviderServiceException).code)
+            .isEqualTo(ProviderServiceErrorCode.STORAGE)
+        assertThat(providerRepository.observeAll().first()).isEmpty()
+    }
+}
+
+private class FailingProviderDao : ProviderDao() {
+    override suspend fun upsert(provider: ProviderEntity) {
+        throw IllegalStateException("provider write failed")
+    }
+
+    override suspend fun update(provider: ProviderEntity) {
+        throw IllegalStateException("provider write failed")
+    }
+
+    override fun observeAll(): Flow<List<ProviderEntity>> = flowOf(emptyList())
+
+    override suspend fun getById(id: String): ProviderEntity? = null
+
+    override suspend fun deleteById(id: String) = Unit
+
+    override suspend fun deleteModelsForProvider(providerId: String) = Unit
+
+    override suspend fun deleteSecretsForProvider(providerId: String) = Unit
+}
+
+private class FailingSecretCipher : SecretCipher {
+    override fun encrypt(plaintext: String): String =
+        throw IllegalStateException("secret write failed")
+
+    override fun decrypt(ciphertext: String): String =
+        throw IllegalStateException("secret read failed")
 }

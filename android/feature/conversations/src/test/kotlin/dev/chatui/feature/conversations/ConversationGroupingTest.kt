@@ -50,6 +50,38 @@ class ConversationGroupingTest {
     }
 
     @Test
+    fun `pinned conversations sort first in their own group`() {
+        val groups = groupConversationsByDate(
+            listOf(
+                testConversation(
+                    id = "newer-unpinned",
+                    lastMessageAt = Instant.parse("2026-11-03T11:00:00Z"),
+                ),
+                testConversation(
+                    id = "older-pinned",
+                    lastMessageAt = Instant.parse("2026-09-01T10:00:00Z"),
+                    pinned = true,
+                ),
+                testConversation(
+                    id = "newer-pinned",
+                    lastMessageAt = Instant.parse("2026-10-01T10:00:00Z"),
+                    pinned = true,
+                ),
+            ),
+            now,
+            zone,
+        )
+
+        assertThat(groups.first().key).isEqualTo(ConversationGroupKey.PINNED)
+        assertThat(groups.first().label).isEqualTo("Pinned")
+        assertThat(groups.first().conversations.map { it.id })
+            .containsExactly("newer-pinned", "older-pinned")
+            .inOrder()
+        assertThat(groups.drop(1).flatMap { group -> group.conversations.map { it.id } })
+            .containsExactly("newer-unpinned")
+    }
+
+    @Test
     fun `empty buckets are omitted`() {
         val groups = groupConversationsByDate(
             listOf(testConversation(id = "today", lastMessageAt = now)),

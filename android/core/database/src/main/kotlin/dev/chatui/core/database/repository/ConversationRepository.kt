@@ -23,7 +23,34 @@ class ConversationRepository(
     fun observeActive(): Flow<List<Conversation>> =
         dao.observeActive().map { conversations -> conversations.map { it.toDomain() } }
 
+    fun observeArchived(): Flow<List<Conversation>> =
+        dao.observeArchived().map { conversations -> conversations.map { it.toDomain() } }
+
     suspend fun get(id: String): Conversation? = dao.getById(id)?.toDomain()
+
+    /** Every conversation, including archived rows, for export. */
+    suspend fun all(): List<Conversation> = dao.all().map { it.toDomain() }
+
+    /**
+     * Search active conversation titles.
+     *
+     * The query is trimmed and `LIKE` wildcards are escaped so a user typing
+     * `%` or `_` cannot turn the search into a full-table match.
+     */
+    suspend fun searchByTitle(
+        query: String,
+        limit: Int = 50,
+    ): List<Conversation> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
+
+        val escaped = trimmed
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+
+        return dao.searchByTitle("%$escaped%", limit).map { it.toDomain() }
+    }
 
     suspend fun create(conversation: Conversation): Conversation {
         dao.upsert(conversation.toEntity())

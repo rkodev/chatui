@@ -1,0 +1,53 @@
+{
+  "name": "ollama-extras",
+  "kind": "chat-request",
+  "providerId": "ollama",
+  "request": {
+    "model": "llama3.2:latest",
+    "system": null,
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Hello"
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": 256,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {
+        "ollama": {
+          "keep_alive": "5m"
+        }
+      }
+    }
+  },
+  "supportedParameters": [
+    "stream",
+    "max_tokens"
+  ],
+  "expected": {
+    "body": {
+      "model": "llama3.2:latest",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello"
+        }
+      ],
+      "stream": true,
+      "options": {
+        "num_predict": 256
+      },
+      "keep_alive": "5m"
+    }
+  }
+}

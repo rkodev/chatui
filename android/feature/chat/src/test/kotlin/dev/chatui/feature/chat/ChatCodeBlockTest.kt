@@ -52,4 +52,31 @@ class ChatCodeBlockTest {
         composeRule.onNodeWithTag(ChatCodeBlockTestTags.Language).assertTextEquals("made-up")
         composeRule.onNodeWithTag(ChatCodeBlockTestTags.Code).assertTextEquals("not code")
     }
+
+    @Test
+    fun `toggles wrap and scroll while preserving exact copy`() {
+        var copied: String? = null
+        val code = "val answer = 42\nprintln(answer)"
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatCodeBlock(
+                    code = code,
+                    language = "kotlin",
+                    onCopy = { copied = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatCodeBlockTestTags.Wrap).assertTextEquals("Wrap")
+        composeRule.onNodeWithTag(ChatCodeBlockTestTags.Wrap).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ChatCodeBlockTestTags.Wrap).assertTextEquals("Scroll")
+
+        composeRule.onNodeWithTag(ChatCodeBlockTestTags.Copy).performClick()
+        composeRule.waitForIdle()
+
+        assertThat(copied).isEqualTo(code)
+        composeRule.onNodeWithTag(ChatCodeBlockTestTags.Code).assertTextEquals(code)
+    }
 }

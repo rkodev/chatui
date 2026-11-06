@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.MessageRole
 import dev.chatui.core.network.NormalizedRole
+import dev.chatui.core.network.ResolvedAttachment
 import org.junit.Test
 
 class ChatRequestBuilderTest {
@@ -37,5 +38,49 @@ class ChatRequestBuilderTest {
 
         assertThat(request.messages).isEmpty()
         assertThat(request.system).isNull()
+    }
+
+    @Test
+    fun `image and file parts are preserved with resolved bytes`() {
+        val conversation = testConversation()
+        val message = testMessage(id = "user-1", sequence = 1).copy(
+            parts = listOf(
+                ContentPart.Text("Look"),
+                ContentPart.Image("image-1", "image/png", "photo.png"),
+                ContentPart.File("file-1", "text/plain", "notes.txt"),
+            ),
+        )
+        val resolved = mapOf(
+            "image-1" to ResolvedAttachment("image/png", "photo.png", "AAAA"),
+            "file-1" to ResolvedAttachment("text/plain", "notes.txt", "Ym9keQ=="),
+        )
+
+        val request = buildChatRequest(
+            conversation = conversation,
+            modelRemoteId = "openrouter/auto",
+            messages = listOf(message),
+            attachments = resolved,
+        )
+
+        assertThat(request.messages.single().parts).containsExactly(
+            ContentPart.Text("Look"),
+            ContentPart.Image("image-1", "image/png", "photo.png"),
+            ContentPart.File("file-1", "text/plain", "notes.txt"),
+        ).inOrder()
+        assertThat(request.attachments).isEqualTo(resolved)
+    }
+
+    @Test
+    fun `image-only messages are not dropped`() {
+        val conversation = testConversation()
+        val message = testMessage(id = "user-1", sequence = 1).copy(
+            parts = listOf(ContentPart.Image("image-1", "image/png", "photo.png")),
+        )
+
+        val request = buildChatRequest(conversation, "openrouter/auto", listOf(message))
+
+        assertThat(request.messages).hasSize(1)
+        assertThat(request.messages.single().parts)
+            .containsExactly(ContentPart.Image("image-1", "image/png", "photo.png"))
     }
 }

@@ -15,11 +15,28 @@ export function createFakeConversationHistoryService(
 
   return {
     listConversations: async () => ({ items: [conversation], nextCursor: null }),
+    searchConversations: async (query: string) => ({
+      query,
+      groups: [],
+      truncated: false,
+      scannedConversations: 0,
+      scannedMessages: 0,
+    }),
     createConversation: async () => ({ ok: true, conversation }),
     renameConversation: async (id: string, title: string): Promise<Conversation> => ({
       ...conversation,
       id,
       title,
+    }),
+    setConversationPinned: async (id: string, pinned: boolean): Promise<Conversation> => ({
+      ...conversation,
+      id,
+      pinned,
+    }),
+    setConversationArchived: async (id: string, archived: boolean): Promise<Conversation> => ({
+      ...conversation,
+      id,
+      archived,
     }),
     deleteConversation: async () => undefined,
     getLastActiveConversation: async () => conversation,

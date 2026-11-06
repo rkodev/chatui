@@ -16,6 +16,8 @@ import dev.chatui.core.model.OutputModality
 import dev.chatui.core.model.Provider
 import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.model.ProviderKind
+import dev.chatui.core.providers.CreateCustomProviderInput
+import dev.chatui.core.providers.CreatePresetProviderInput
 import dev.chatui.core.providers.RefreshModelsResult
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
@@ -163,7 +165,10 @@ class FakeProviderManagementService : ProviderManagementService {
     var routing: MutableMap<String, RoutingPreferences> = mutableMapOf()
     var options: List<ProviderAvailability> = listOf(
         ProviderAvailability("openrouter", "OpenRouter", true, true, null),
-        ProviderAvailability("openai", "OpenAI", false, false, "Coming later"),
+        ProviderAvailability("openai", "OpenAI", true, false, null),
+        ProviderAvailability("custom", "Custom", true, false, null),
+        ProviderAvailability("anthropic", "Anthropic", true, false, null),
+        ProviderAvailability("google", "Google Gemini", false, false, "Coming later"),
     )
     var docsUrl: String? = "https://openrouter.ai/docs"
     var error: Throwable? = null
@@ -171,6 +176,9 @@ class FakeProviderManagementService : ProviderManagementService {
     var lastRotatedKey: String? = null
     var lastSelectedModelId: String? = null
     var lastRouting: RoutingPreferences? = null
+    var lastCustomInput: CreateCustomProviderInput? = null
+    var lastPresetInput: CreatePresetProviderInput? = null
+    var createError: Throwable? = null
     var refreshCalls: Int = 0
 
     override fun observeProviders(): Flow<List<Provider>> =
@@ -182,6 +190,36 @@ class FakeProviderManagementService : ProviderManagementService {
     override suspend fun getProvider(providerId: String): Provider? {
         error?.let { throw it }
         return providersFlow.value.firstOrNull { it.id == providerId }
+    }
+
+    override suspend fun createPresetProvider(input: CreatePresetProviderInput): Provider {
+        createError?.let { throw it }
+        lastPresetInput = input
+        val provider = testProvider(
+            id = "provider-${providersFlow.value.size + 1}",
+            label = input.label ?: input.presetId,
+            presetId = input.presetId,
+            secretId = if (input.apiKey == null) null else "secret-new",
+        )
+        providersFlow.value = providersFlow.value + provider
+        return provider
+    }
+
+    override suspend fun createCustomProvider(input: CreateCustomProviderInput): Provider {
+        createError?.let { throw it }
+        lastCustomInput = input
+        val provider = testProvider(
+            id = "provider-${providersFlow.value.size + 1}",
+            label = input.label ?: "Custom",
+            presetId = "custom",
+            secretId = if (input.apiKey == null) null else "secret-new",
+        ).copy(
+            baseUrl = input.baseUrl,
+            authType = input.authType,
+            headers = input.headers,
+        )
+        providersFlow.value = providersFlow.value + provider
+        return provider
     }
 
     override suspend fun validateProviderKey(providerId: String): Provider {
@@ -300,13 +338,46 @@ class FakeProviderManagementService : ProviderManagementService {
                 "Model $modelId was not found.",
             )
         lastSelectedModelId = modelId
+        val provider = providersFlow.value.firstOrNull { it.id == model.providerId }
+        val params = if (provider != null && conversation.providerId != provider.id) {
+            conversation.params.copy(
+                extra = pruneExtrasForPreset(conversation.params.extra, provider.presetId),
+            )
+        } else {
+            conversation.params
+        }
         val updated = conversation.copy(
             providerId = model.providerId,
             modelId = model.id,
             modelLabel = model.label,
+            params = params,
         )
         conversations[conversationId] = updated
         return updated
+    }
+
+    override suspend fun setConversationSettings(
+        conversationId: String,
+        systemPrompt: String?,
+        params: dev.chatui.core.model.ChatParams?,
+    ): Conversation {
+        error?.let { throw it }
+        val conversation = conversations[conversationId]
+            ?: throw ProviderManagementException(
+                ProviderManagementErrorCode.NOT_FOUND,
+                "Conversation $conversationId was not found.",
+            )
+        val updated = conversation.copy(
+            systemPrompt = systemPrompt ?: conversation.systemPrompt,
+            params = params ?: conversation.params,
+        )
+        conversations[conversationId] = updated
+        return updated
+    }
+
+    override suspend fun deleteConversation(conversationId: String) {
+        error?.let { throw it }
+        conversations.remove(conversationId)
     }
 
     override suspend fun getConversationRouting(conversationId: String): RoutingPreferences =

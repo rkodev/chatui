@@ -39,6 +39,8 @@ class ChatScreenTest {
         hasOlder: Boolean = false,
         announcement: String = "",
         error: ChatError? = null,
+        attachmentWarning: String? = null,
+        confirmSend: Boolean = false,
     ) = ChatUiState(
         conversationId = "conversation-1",
         conversation = testConversation(),
@@ -50,6 +52,8 @@ class ChatScreenTest {
         availability = availability,
         announcement = announcement,
         error = error,
+        attachmentWarning = attachmentWarning,
+        confirmSendWithUnsupportedAttachments = confirmSend,
     )
 
     private fun screen(
@@ -61,6 +65,9 @@ class ChatScreenTest {
         onRegenerateMessage: (dev.chatui.core.model.Message) -> Unit = {},
         onEditLastUser: (dev.chatui.core.model.Message, String) -> Unit = { _, _ -> },
         onOpenProviders: () -> Unit = {},
+        onOpenConversationSettings: () -> Unit = {},
+        onConfirmSend: () -> Unit = {},
+        onCancelSendConfirmation: () -> Unit = {},
     ) {
         composeRule.setContent {
             ChatUiTheme {
@@ -75,6 +82,9 @@ class ChatScreenTest {
                     onRegenerateMessage = onRegenerateMessage,
                     onEditLastUser = onEditLastUser,
                     onOpenProviders = onOpenProviders,
+                    onOpenConversationSettings = onOpenConversationSettings,
+                    onConfirmSend = onConfirmSend,
+                    onCancelSendConfirmation = onCancelSendConfirmation,
                     zoneId = java.time.ZoneOffset.UTC,
                 )
             }
@@ -294,5 +304,37 @@ class ChatScreenTest {
 
         composeRule.onNodeWithTag(ChatScreenTestTags.Announcement)
             .assertContentDescriptionEquals("Response complete")
+    }
+
+    @Test
+    fun `conversation settings entry point is available from the header`() {
+        var opened = 0
+        screen(state(), onOpenConversationSettings = { opened += 1 })
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.ConversationSettings).performClick()
+
+        assertThat(opened).isEqualTo(1)
+    }
+
+    @Test
+    fun `unsupported attachment warning and confirmation are shown`() {
+        var confirmed = 0
+        var cancelled = 0
+        screen(
+            state(
+                attachmentWarning = "This model cannot receive images.",
+                confirmSend = true,
+            ),
+            onConfirmSend = { confirmed += 1 },
+            onCancelSendConfirmation = { cancelled += 1 },
+        )
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.AttachmentWarning).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatScreenTestTags.SendConfirmation).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatScreenTestTags.SendAnyway).performClick()
+        composeRule.onNodeWithTag(ChatScreenTestTags.CancelSend).performClick()
+
+        assertThat(confirmed).isEqualTo(1)
+        assertThat(cancelled).isEqualTo(1)
     }
 }

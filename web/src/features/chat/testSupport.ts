@@ -1,4 +1,4 @@
-import { nowIso, type Message } from '../../domain'
+import { nowIso, type Attachment, type Message } from '../../domain'
 import {
   createTestConversation,
   createTestModel,
@@ -32,6 +32,26 @@ export function createTestMessage(overrides: Partial<Message> = {}): Message {
   }
 }
 
+export function createTestAttachment(overrides: Partial<Attachment> = {}): Attachment {
+  const now = nowIso()
+  const sha256 = 'a'.repeat(64)
+
+  return {
+    id: 'attachment-1',
+    messageId: null,
+    kind: 'image',
+    mimeType: 'image/png',
+    name: 'pixel.png',
+    size: 68,
+    sha256,
+    storageKey: `attachments/${sha256}`,
+    width: 1,
+    height: 1,
+    createdAt: now,
+    ...overrides,
+  }
+}
+
 /**
  * In-memory chat service fake for component and route tests.
  *
@@ -50,11 +70,25 @@ export function createFakeChatService(overrides: Partial<ChatServiceLike> = {}):
     getAvailability: async () => ({ ok: true, model, provider }),
     getShowTokenUsage: async () => true,
     getSendKey: async () => 'enter',
+    getLoadRemoteImages: async () => false,
     send: async () => ({ ok: true, message }),
     retry: async () => ({ ok: true, message }),
     editLastUser: async () => ({ ok: true, message }),
     cancel: async () => null,
     isStreaming: () => false,
+    addAttachments: async (files) => ({
+      attachments: files.map((file, index) =>
+        createTestAttachment({
+          id: `attachment-${index + 1}`,
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          kind: file.type.startsWith('image/') ? 'image' : 'file',
+        }),
+      ),
+      errors: [],
+    }),
+    removeAttachment: async () => undefined,
+    getAttachmentDataUrl: async () => null,
     ...overrides,
   }
 }
@@ -75,9 +109,16 @@ export function createTestChatSession(overrides: Partial<ChatSession> = {}): Cha
     availability: { ok: true, model, provider },
     showTokenUsage: true,
     sendKey: 'enter',
+    loadRemoteImages: false,
     streamingMessageId: null,
     isStreaming: false,
     announcement: '',
+    attachments: [],
+    addAttachments: async (files) => ({
+      attachments: files.map(() => createTestAttachment()),
+      errors: [],
+    }),
+    removeAttachment: async () => undefined,
     loadOlder: async () => undefined,
     send: async () => true,
     cancel: async () => undefined,

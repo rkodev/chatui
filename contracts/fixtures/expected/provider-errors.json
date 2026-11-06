@@ -1,0 +1,491 @@
+{
+  "source": "provider-errors",
+  "cases": [
+    {
+      "name": "openai-401-auth",
+      "providerId": "openai",
+      "kind": "http",
+      "fixture": "errors/openai-401.json",
+      "status": 401,
+      "error": {
+        "code": "auth",
+        "message": "Incorrect API key provided.",
+        "providerId": "openai",
+        "status": 401,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": "req_openai_401",
+        "details": null
+      }
+    },
+    {
+      "name": "openai-403-permission",
+      "providerId": "openai",
+      "kind": "http",
+      "fixture": "errors/openai-403.json",
+      "status": 403,
+      "error": {
+        "code": "permission",
+        "message": "You do not have permission to access this model.",
+        "providerId": "openai",
+        "status": 403,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "openai-429-rate-limit",
+      "providerId": "openai",
+      "kind": "http",
+      "fixture": "errors/openai-429.json",
+      "status": 429,
+      "error": {
+        "code": "rate_limit",
+        "message": "Rate limit reached. Please try again in 2 seconds.",
+        "providerId": "openai",
+        "status": 429,
+        "retryable": true,
+        "retryAfterSeconds": 2,
+        "requestId": "req_openai_429",
+        "details": {
+          "retryAfterSeconds": 2
+        }
+      }
+    },
+    {
+      "name": "openai-404-model-not-found",
+      "providerId": "openai",
+      "kind": "http",
+      "fixture": "errors/openai-404.json",
+      "status": 404,
+      "error": {
+        "code": "model_not_found",
+        "message": "The model `missing-model` does not exist or you do not have access to it.",
+        "providerId": "openai",
+        "status": 404,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "openai-400-context-length",
+      "providerId": "openai",
+      "kind": "http",
+      "fixture": "errors/openai-400-context.json",
+      "status": 400,
+      "error": {
+        "code": "context_length",
+        "message": "This model's maximum context length is 128000 tokens. However, your messages resulted in 200000 tokens.",
+        "providerId": "openai",
+        "status": 400,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "openai-400-content-filter",
+      "providerId": "openai",
+      "kind": "http",
+      "fixture": "errors/openai-400-content-filter.json",
+      "status": 400,
+      "error": {
+        "code": "content_filter",
+        "message": "Your request was rejected by the safety system.",
+        "providerId": "openai",
+        "status": 400,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "openai-500-provider",
+      "providerId": "openai",
+      "kind": "http",
+      "fixture": "errors/openai-500.json",
+      "status": 500,
+      "error": {
+        "code": "provider",
+        "message": "The server had an error while processing your request.",
+        "providerId": "openai",
+        "status": 500,
+        "retryable": true,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "openai-stream-server-error",
+      "providerId": "openai",
+      "kind": "stream",
+      "fixture": "errors/openai-stream-error.sse",
+      "httpStatus": 200,
+      "status": 500,
+      "error": {
+        "code": "provider",
+        "message": "The server had an error while processing your request.",
+        "providerId": "openai",
+        "status": 500,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "anthropic-401-auth",
+      "providerId": "anthropic",
+      "kind": "http",
+      "fixture": "errors/anthropic-401.json",
+      "status": 401,
+      "error": {
+        "code": "auth",
+        "message": "invalid x-api-key",
+        "providerId": "anthropic",
+        "status": 401,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": "req_anthropic_401",
+        "details": null
+      }
+    },
+    {
+      "name": "anthropic-403-permission",
+      "providerId": "anthropic",
+      "kind": "http",
+      "fixture": "errors/anthropic-403.json",
+      "status": 403,
+      "error": {
+        "code": "permission",
+        "message": "You do not have permission to use this model.",
+        "providerId": "anthropic",
+        "status": 403,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "anthropic-429-rate-limit",
+      "providerId": "anthropic",
+      "kind": "http",
+      "fixture": "errors/anthropic-429.json",
+      "status": 429,
+      "error": {
+        "code": "rate_limit",
+        "message": "Number of requests has exceeded your rate limit.",
+        "providerId": "anthropic",
+        "status": 429,
+        "retryable": true,
+        "retryAfterSeconds": 2,
+        "requestId": "req_anthropic_429",
+        "details": {
+          "retryAfterSeconds": 2
+        }
+      }
+    },
+    {
+      "name": "anthropic-404-model-not-found",
+      "providerId": "anthropic",
+      "kind": "http",
+      "fixture": "errors/anthropic-404.json",
+      "status": 404,
+      "error": {
+        "code": "model_not_found",
+        "message": "model: missing-model",
+        "providerId": "anthropic",
+        "status": 404,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "anthropic-400-context-length",
+      "providerId": "anthropic",
+      "kind": "http",
+      "fixture": "errors/anthropic-400-context.json",
+      "status": 400,
+      "error": {
+        "code": "context_length",
+        "message": "prompt is too long: 200000 tokens > 200000 maximum",
+        "providerId": "anthropic",
+        "status": 400,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "anthropic-529-provider",
+      "providerId": "anthropic",
+      "kind": "http",
+      "fixture": "errors/anthropic-529.json",
+      "status": 529,
+      "error": {
+        "code": "provider",
+        "message": "Overloaded",
+        "providerId": "anthropic",
+        "status": 529,
+        "retryable": true,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "anthropic-stream-overloaded",
+      "providerId": "anthropic",
+      "kind": "stream",
+      "fixture": "errors/anthropic-stream-error.sse",
+      "httpStatus": 200,
+      "status": 529,
+      "error": {
+        "code": "provider",
+        "message": "Overloaded",
+        "providerId": "anthropic",
+        "status": 529,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "gemini-400-api-key-auth",
+      "providerId": "google",
+      "kind": "http",
+      "fixture": "errors/gemini-400-api-key.json",
+      "status": 400,
+      "error": {
+        "code": "auth",
+        "message": "API key not valid. Please pass a valid API key.",
+        "providerId": "google",
+        "status": 400,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": "req_gemini_400",
+        "details": null
+      }
+    },
+    {
+      "name": "gemini-403-permission",
+      "providerId": "google",
+      "kind": "http",
+      "fixture": "errors/gemini-403-permission.json",
+      "status": 403,
+      "error": {
+        "code": "permission",
+        "message": "Permission denied.",
+        "providerId": "google",
+        "status": 403,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "gemini-429-rate-limit",
+      "providerId": "google",
+      "kind": "http",
+      "fixture": "errors/gemini-429.json",
+      "status": 429,
+      "error": {
+        "code": "rate_limit",
+        "message": "Resource exhausted.",
+        "providerId": "google",
+        "status": 429,
+        "retryable": true,
+        "retryAfterSeconds": 2,
+        "requestId": "req_gemini_429",
+        "details": {
+          "retryAfterSeconds": 2
+        }
+      }
+    },
+    {
+      "name": "gemini-404-model-not-found",
+      "providerId": "google",
+      "kind": "http",
+      "fixture": "errors/gemini-404.json",
+      "status": 404,
+      "error": {
+        "code": "model_not_found",
+        "message": "Model not found.",
+        "providerId": "google",
+        "status": 404,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "gemini-400-context-length",
+      "providerId": "google",
+      "kind": "http",
+      "fixture": "errors/gemini-400-context.json",
+      "status": 400,
+      "error": {
+        "code": "context_length",
+        "message": "The input token count exceeds the maximum number of tokens allowed.",
+        "providerId": "google",
+        "status": 400,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "gemini-500-provider",
+      "providerId": "google",
+      "kind": "http",
+      "fixture": "errors/gemini-500.json",
+      "status": 500,
+      "error": {
+        "code": "provider",
+        "message": "Internal error.",
+        "providerId": "google",
+        "status": 500,
+        "retryable": true,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "gemini-stream-internal",
+      "providerId": "google",
+      "kind": "stream",
+      "fixture": "errors/gemini-stream-error.sse",
+      "httpStatus": 200,
+      "status": 500,
+      "error": {
+        "code": "provider",
+        "message": "Internal error.",
+        "providerId": "google",
+        "status": 500,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "ollama-404-model-not-found",
+      "providerId": "ollama",
+      "kind": "http",
+      "fixture": "errors/ollama-404.json",
+      "status": 404,
+      "error": {
+        "code": "model_not_found",
+        "message": "model 'missing-model' not found",
+        "providerId": "ollama",
+        "status": 404,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "ollama-500-provider",
+      "providerId": "ollama",
+      "kind": "http",
+      "fixture": "errors/ollama-500.json",
+      "status": 500,
+      "error": {
+        "code": "provider",
+        "message": "internal server error",
+        "providerId": "ollama",
+        "status": 500,
+        "retryable": true,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "ollama-stream-error",
+      "providerId": "ollama",
+      "kind": "stream",
+      "fixture": "errors/ollama-stream-error.txt",
+      "httpStatus": 200,
+      "status": 500,
+      "error": {
+        "code": "provider",
+        "message": "internal server error",
+        "providerId": "ollama",
+        "status": 500,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "provider-quota",
+      "providerId": "openai",
+      "kind": "synthetic",
+      "synthetic": true,
+      "status": 402,
+      "error": {
+        "code": "quota",
+        "message": "The provider reports insufficient credits or an exhausted quota.",
+        "providerId": "openai",
+        "status": 402,
+        "retryable": false,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "network-before-first-token",
+      "providerId": "openai",
+      "kind": "synthetic",
+      "synthetic": true,
+      "status": null,
+      "error": {
+        "code": "network",
+        "message": "Could not reach the provider. Check your connection and base URL.",
+        "providerId": "openai",
+        "status": null,
+        "retryable": true,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    },
+    {
+      "name": "timeout-before-first-token",
+      "providerId": "openai",
+      "kind": "synthetic",
+      "synthetic": true,
+      "status": null,
+      "error": {
+        "code": "timeout",
+        "message": "The provider took too long to respond. Try again.",
+        "providerId": "openai",
+        "status": null,
+        "retryable": true,
+        "retryAfterSeconds": null,
+        "requestId": null,
+        "details": null
+      }
+    }
+  ]
+}

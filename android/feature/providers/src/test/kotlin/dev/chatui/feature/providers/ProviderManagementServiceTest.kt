@@ -12,7 +12,10 @@ import dev.chatui.core.database.repository.ProviderRepository
 import dev.chatui.core.datastore.secret.SecretStore
 import dev.chatui.core.datastore.settings.SettingsDataStore
 import dev.chatui.core.model.ModelSource
+import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.network.ProviderRegistry
+import dev.chatui.core.providers.CreateCustomProviderInput
+import dev.chatui.core.providers.CreatePresetProviderInput
 import dev.chatui.core.providers.ModelService
 import dev.chatui.core.providers.ProviderService
 import java.io.File
@@ -21,6 +24,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -119,13 +123,69 @@ class ProviderManagementServiceTest {
     }
 
     @Test
-    fun `provider options enable only OpenRouter`() {
+    fun `provider options enable M2 OpenAI-compatible presets`() {
         val options = service.providerOptions()
 
         assertThat(options.first { it.id == "openrouter" }.enabled).isTrue()
         assertThat(options.first { it.id == "openrouter" }.recommended).isTrue()
-        assertThat(options.filter { it.id != "openrouter" }.all { !it.enabled }).isTrue()
+        assertThat(options.first { it.id == "openai" }.enabled).isTrue()
+        assertThat(options.first { it.id == "custom" }.enabled).isTrue()
+        assertThat(options.first { it.id == "anthropic" }.enabled).isTrue()
+        assertThat(options.first { it.id == "google" }.enabled).isTrue()
+        assertThat(options.first { it.id == "ollama" }.enabled).isTrue()
+        assertThat(options.first { it.id == "ollama" }.statusLabel).isNull()
         assertThat(service.docsUrl("openrouter")).isNotNull()
+    }
+
+    @Test
+    fun `createPresetProvider persists an enabled preset`() = runTest {
+        val provider = service.createPresetProvider(
+            CreatePresetProviderInput(
+                presetId = "groq",
+                apiKey = "gsk-test",
+                label = "Groq",
+            ),
+        )
+
+        assertThat(provider.presetId).isEqualTo("groq")
+        assertThat(provider.baseUrl).isEqualTo("https://api.groq.com/openai/v1")
+        assertThat(providerRepository.get(provider.id)).isNotNull()
+    }
+
+    @Test
+    fun `createCustomProvider persists base url auth and headers`() = runTest {
+        val provider = service.createCustomProvider(
+            CreateCustomProviderInput(
+                baseUrl = "https://api.example.com/v1",
+                authType = ProviderAuthType.BEARER,
+                apiKey = "sk-custom",
+                label = "Custom server",
+                headers = mapOf("X-Org" to "team-a"),
+            ),
+        )
+
+        assertThat(provider.presetId).isEqualTo("custom")
+        assertThat(provider.baseUrl).isEqualTo("https://api.example.com/v1")
+        assertThat(provider.authType).isEqualTo(ProviderAuthType.BEARER)
+        assertThat(provider.headers).containsExactly("X-Org", "team-a")
+        assertThat(providerRepository.get(provider.id)!!.headers)
+            .containsExactly("X-Org", "team-a")
+    }
+
+    @Test
+    fun `createCustomProvider rejects invalid input`() = runTest {
+        val error = runCatching {
+            service.createCustomProvider(
+                CreateCustomProviderInput(
+                    baseUrl = "ftp://example.com",
+                    authType = ProviderAuthType.BEARER,
+                    apiKey = "sk",
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(dev.chatui.core.providers.ProviderServiceException::class.java)
+        assertThat(providerRepository.observeAll().first()).isEmpty()
     }
 
     @Test

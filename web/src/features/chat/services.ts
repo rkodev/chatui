@@ -8,6 +8,8 @@ import { ProviderRepository } from '../../storage/ProviderRepository'
 import { SecretStore } from '../../storage/SecretStore'
 import { SettingsRepository } from '../../storage/SettingsRepository'
 import { openDatabase } from '../../storage/db'
+import { AttachmentStore } from '../../storage/AttachmentStore'
+import { AttachmentService } from '../attachments/attachmentService'
 import { ConversationService } from '../conversations'
 import { ModelService } from '../providers'
 import { SettingsService } from '../settings'
@@ -54,6 +56,14 @@ export async function createChatService(config: AppConfig): Promise<ChatService>
     adapter: openRouterAdapter.streamChat,
     messages: conversations,
   })
+  const attachmentService = new AttachmentService({
+    db,
+    store: new AttachmentStore({ db }),
+  })
+
+  // Best-effort startup cleanup removes metadata for deleted messages and
+  // bytes left without metadata by a crash, a failed write, or an edit.
+  await attachmentService.cleanupOrphans().catch(() => [])
 
   return new ChatService({
     conversations: {
@@ -70,5 +80,6 @@ export async function createChatService(config: AppConfig): Promise<ChatService>
       fetch: globalThis.fetch,
       attribution,
     },
+    attachments: attachmentService,
   })
 }

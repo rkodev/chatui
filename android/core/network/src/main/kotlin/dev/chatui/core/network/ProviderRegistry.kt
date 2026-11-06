@@ -12,12 +12,29 @@ class ProviderRegistryException(
 ) : IllegalArgumentException(message)
 
 /**
- * M1 exposes OpenRouter only. Other presets stay in contracts so later
- * milestones can enable them without duplicating provider metadata.
+ * Presets enabled in M2.
+ *
+ * Anthropic, Gemini, and Ollama have native adapters. `custom` is enabled
+ * because Custom providers use the OpenAI-compatible transport.
  */
-val M1_ENABLED_PRESET_IDS: Set<String> = setOf("openrouter")
+val M2_ENABLED_PRESET_IDS: Set<String> = setOf(
+    "openrouter",
+    "openai",
+    "anthropic",
+    "google",
+    "ollama",
+    "groq",
+    "mistral",
+    "deepseek",
+    "xai",
+    "together",
+    "fireworks",
+    "lmstudio",
+    "llamacpp",
+    "custom",
+)
 
-fun isPresetEnabledInM1(id: String): Boolean = id in M1_ENABLED_PRESET_IDS
+fun isPresetEnabledInM2(id: String): Boolean = id in M2_ENABLED_PRESET_IDS
 
 enum class PresetAvailabilityStatus {
     AVAILABLE,
@@ -52,13 +69,13 @@ class ProviderRegistry private constructor(
 
     fun getRequiredPreset(): ProviderPreset = presets.single { it.required }
 
-    /** Presets usable in M1. Only OpenRouter is enabled. */
+    /** Presets usable in M2. Native-adapter presets remain coming later. */
     fun getEnabledPresets(): List<ProviderPreset> =
-        presets.filter { isPresetEnabledInM1(it.id) }
+        presets.filter { isPresetEnabledInM2(it.id) }
 
     /** Describe every contract preset for UI code without hiding later presets. */
     fun getPresetAvailability(): List<PresetAvailability> = presets.map { preset ->
-        val enabled = isPresetEnabledInM1(preset.id)
+        val enabled = isPresetEnabledInM2(preset.id)
         PresetAvailability(
             preset = preset,
             enabled = enabled,

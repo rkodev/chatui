@@ -1,0 +1,22 @@
+{
+  "source": "ollama-ndjson.txt",
+  "events": [
+    { "type": "start", "responseId": null },
+    { "type": "text-delta", "text": "Hello" },
+    { "type": "text-delta", "text": " from Ollama." },
+    { "type": "finish", "reason": "stop" },
+    {
+      "type": "usage",
+      "usage": {
+        "inputTokens": 8,
+        "outputTokens": 5,
+        "totalTokens": 13,
+        "costUsd": null,
+        "estimated": false
+      }
+    }
+  ],
+  "text": "Hello from Ollama.",
+  "reasoning": "",
+  "retryAllowed": false
+}

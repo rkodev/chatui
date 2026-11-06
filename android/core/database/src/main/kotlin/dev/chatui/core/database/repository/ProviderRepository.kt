@@ -5,6 +5,7 @@ import dev.chatui.core.model.Provider
 import java.time.Clock
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /**
@@ -22,6 +23,10 @@ class ProviderRepository(
         dao.observeAll().map { providers -> providers.map { it.toDomain() } }
 
     suspend fun get(id: String): Provider? = dao.getById(id)?.toDomain()
+
+    /** Every provider, including disabled rows, for export. */
+    suspend fun all(): List<Provider> =
+        dao.observeAll().first().map { it.toDomain() }
 
     suspend fun upsert(provider: Provider): Provider {
         dao.upsert(provider.toEntity())

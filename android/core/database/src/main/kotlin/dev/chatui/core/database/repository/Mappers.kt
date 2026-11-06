@@ -1,10 +1,18 @@
 package dev.chatui.core.database.repository
 
 import dev.chatui.core.database.entity.ConversationEntity
+import dev.chatui.core.database.entity.AttachmentEntity
+import dev.chatui.core.database.entity.BackupConfigEntity
 import dev.chatui.core.database.entity.MessageEntity
 import dev.chatui.core.database.entity.ModelEntity
 import dev.chatui.core.database.entity.ProviderEntity
+import dev.chatui.core.model.BackupBackend
+import dev.chatui.core.model.BackupConfig
+import dev.chatui.core.model.BackupEncryption
+import dev.chatui.core.model.BackupKdf
 import dev.chatui.core.model.BrowserCors
+import dev.chatui.core.model.Attachment
+import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.ChatParams
 import dev.chatui.core.model.ChatUiJson
@@ -92,8 +100,51 @@ internal fun Conversation.toEntity(): ConversationEntity = ConversationEntity(
     syncState = sync?.let { serialName(SyncState.serializer(), it.state) },
 )
 
-internal fun MessageEntity.toDomain(): Message = Message(
+internal fun AttachmentEntity.toDomain(): Attachment = Attachment(
     id = id,
+    messageId = messageId,
+    kind = parseSerialName(AttachmentKind.serializer(), kind),
+    mimeType = mimeType,
+    name = name,
+    size = size,
+    sha256 = sha256,
+    storageKey = storageKey,
+    width = width,
+    height = height,
+    createdAt = Instant.parse(createdAt),
+)
+
+internal fun Attachment.toEntity(): AttachmentEntity = AttachmentEntity(
+    id = id,
+    messageId = messageId,
+    kind = serialName(AttachmentKind.serializer(), kind),
+    mimeType = mimeType,
+    name = name,
+    size = size,
+    sha256 = sha256,
+    storageKey = storageKey,
+    width = width,
+    height = height,
+    createdAt = createdAt.toString(),
+)
+
+internal fun BackupConfigEntity.toDomain(): BackupConfig = BackupConfig(
+    enabled = enabled,
+    backend = parseSerialName(BackupBackend.serializer(), backend),
+    endpoint = endpoint,
+    region = region,
+    bucket = bucket,
+    prefix = prefix,
+    credentialSecretId = credentialSecretId,
+    encryption = parseSerialName(BackupEncryption.serializer(), encryption),
+    kdf = parseSerialName(BackupKdf.serializer(), kdf),
+    kdfSalt = kdfSalt,
+    lastSyncAt = lastSyncAt?.let(Instant::parse),
+    lastManifestEtag = lastManifestEtag,
+    deviceId = deviceId,
+)
+
+internal fun MessageEntity.toDomain(): Message = Message(    id = id,
     conversationId = conversationId,
     sequence = sequence,
     role = parseSerialName(MessageRole.serializer(), role),
@@ -263,7 +314,7 @@ internal fun Model.toEntity(): ModelEntity = ModelEntity(
  * results, image alt text, and file names are included so search can find
  * messages whose visible content is not a text part.
  */
-internal fun searchableText(parts: List<ContentPart>): String = parts.mapNotNull { part ->
+fun searchableText(parts: List<ContentPart>): String = parts.mapNotNull { part ->
     when (part) {
         is ContentPart.Text -> part.text
         is ContentPart.Reasoning -> part.text

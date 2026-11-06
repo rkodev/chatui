@@ -82,6 +82,34 @@ class ChatMessageListTest {
     }
 
     @Test
+    fun `ten thousand message history composes only visible rows`() {
+        val messages = (0 until 10_000).map { index ->
+            testMessage(
+                id = "message-$index",
+                sequence = index.toLong(),
+                role = if (index % 2 == 0) MessageRole.USER else MessageRole.ASSISTANT,
+                text = "Message $index",
+            )
+        }
+        val composed = AtomicInteger(0)
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatMessageList(
+                    messages = messages,
+                    streaming = null,
+                    zoneId = java.time.ZoneOffset.UTC,
+                    onMessageComposed = { composed.incrementAndGet() },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertThat(composed.get()).isLessThan(100)
+        composeRule.onNodeWithText("Message 9999", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
     fun `history rows keep stable identity when a message is updated in place`() {
         val user = testMessage(
             id = "user-1",

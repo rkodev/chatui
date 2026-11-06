@@ -1,7 +1,9 @@
 package dev.chatui.feature.chat
 
+import dev.chatui.core.model.Attachment
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.Conversation
+import dev.chatui.core.model.InputModality
 import dev.chatui.core.model.Message
 import dev.chatui.core.model.SendKey
 
@@ -34,6 +36,12 @@ data class ChatUiState(
     val announcement: String = "",
     val error: ChatError? = null,
     val notice: String? = null,
+    val pendingAttachments: List<Attachment> = emptyList(),
+    val attachmentsByMessage: Map<String, Attachment> = emptyMap(),
+    val attachmentError: String? = null,
+    val attachmentWarning: String? = null,
+    val modelInputModalities: List<InputModality> = listOf(InputModality.TEXT),
+    val confirmSendWithUnsupportedAttachments: Boolean = false,
 ) {
     /** True while the active stream has not reached a terminal state. */
     val isStreaming: Boolean
@@ -47,6 +55,10 @@ data class ChatUiState(
     val canSend: Boolean
         get() = !sending &&
             !isStreaming &&
-            draft.isNotBlank() &&
+            (draft.isNotBlank() || pendingAttachments.isNotEmpty()) &&
             availability?.available != false
+
+    /** Capability comparison for the pending attachments. */
+    val attachmentSupport: AttachmentSupport
+        get() = attachmentSupport(pendingAttachments, modelInputModalities)
 }

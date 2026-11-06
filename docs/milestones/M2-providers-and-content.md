@@ -1,11 +1,12 @@
 # M2 - Providers and content
 
-- Status: Planned
+- Status: Complete
 - Target: 2 weeks
 - Depends on: M1
 - Blocks: M3, M4
 - Platforms: web, android
 - Spec: sections 3.2-3.7, 5.3-5.4, 6.2, 7.5-7.9, 8.3-8.5, 9.3-9.8, 11.3-11.8, 12.2-12.4, 15.2 (cases 11-14, 19, 22-25, plus regressions), 17 (M2), 21.4
+- Completed: 2026-11-06. Exit-gate evidence: [M2-verification.md](../operations/M2/M2-verification.md).
 
 ## Objective
 

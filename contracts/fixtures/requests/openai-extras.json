@@ -1,0 +1,50 @@
+{
+  "name": "openai-extras",
+  "kind": "chat-request",
+  "providerId": "openai",
+  "request": {
+    "model": "gpt-4o-mini",
+    "system": null,
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Hello"
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": null,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {
+        "openai": {
+          "user": "contract-test"
+        }
+      }
+    }
+  },
+  "supportedParameters": ["stream"],
+  "expected": {
+    "body": {
+      "model": "gpt-4o-mini",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello"
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "user": "contract-test"
+    }
+  }
+}

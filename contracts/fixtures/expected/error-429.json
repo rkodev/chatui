@@ -1,0 +1,23 @@
+{
+  "source": "error-429.sse",
+  "events": [
+    {
+      "type": "error",
+      "error": {
+        "code": "rate_limit",
+        "message": "Rate limit exceeded. Please retry after 2 seconds.",
+        "providerId": null,
+        "status": 429,
+        "retryable": true,
+        "retryAfterSeconds": 2,
+        "requestId": null,
+        "details": {
+          "retryAfterSeconds": 2
+        }
+      }
+    }
+  ],
+  "text": "",
+  "reasoning": "",
+  "retryAllowed": true
+}

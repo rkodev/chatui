@@ -1,11 +1,15 @@
 package dev.chatui.core.database.repository
 
 import dev.chatui.core.model.BrowserCors
+import dev.chatui.core.model.Attachment
+import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.ChatErrorCode
+import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.ChatParams
 import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.Conversation
+import dev.chatui.core.model.Density
 import dev.chatui.core.model.FinishReason
 import dev.chatui.core.model.InputModality
 import dev.chatui.core.model.Message
@@ -19,8 +23,11 @@ import dev.chatui.core.model.OutputModality
 import dev.chatui.core.model.Provider
 import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.model.ProviderKind
+import dev.chatui.core.model.SendKey
+import dev.chatui.core.model.Settings
 import dev.chatui.core.model.SyncMeta
 import dev.chatui.core.model.SyncState
+import dev.chatui.core.model.Theme
 import dev.chatui.core.model.Usage
 import java.time.Instant
 import kotlinx.serialization.json.JsonObject
@@ -210,5 +217,46 @@ internal object RepositoryTestData {
         totalTokens = 30,
         costUsd = 0.001,
         estimated = false,
+    )
+
+    fun attachment(
+        id: String = "attachment-1",
+        messageId: String? = "message-1",
+        kind: AttachmentKind = AttachmentKind.FILE,
+        mimeType: String = "text/plain",
+        name: String = "notes.txt",
+        size: Long = 5,
+        sha256: String = "abc123",
+        storageKey: String = "attachments/abc123",
+        createdAt: Instant = NOW,
+    ): Attachment = Attachment(
+        id = id,
+        messageId = messageId,
+        kind = kind,
+        mimeType = mimeType,
+        name = name,
+        size = size,
+        sha256 = sha256,
+        storageKey = storageKey,
+        width = null,
+        height = null,
+        createdAt = createdAt,
+    )
+
+    fun settings(): Settings = Settings(
+        theme = Theme.SYSTEM,
+        density = Density.COMFORTABLE,
+        chatFontSize = ChatFontSize.MD,
+        sendKey = SendKey.ENTER,
+        defaultProviderId = "provider-1",
+        defaultModelId = "model-1",
+        defaultSystemPrompt = "",
+        defaultParams = chatParams(),
+        rememberKeysOnWeb = false,
+        showTokenUsage = true,
+        loadRemoteImages = false,
+        lastActiveConversationId = "conversation-1",
+        backup = null,
+        onboardingCompleted = true,
     )
 }

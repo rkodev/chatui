@@ -4,14 +4,23 @@ import dev.chatui.core.database.repository.ModelRepository
 import dev.chatui.core.database.repository.ProviderRepository
 import dev.chatui.core.model.Model
 import dev.chatui.core.model.ModelSource
-import dev.chatui.core.model.OutputModality
 import dev.chatui.core.model.Provider
 import dev.chatui.core.model.newId
+import dev.chatui.core.network.FallbackCatalogEntry
 import dev.chatui.core.network.ModelInfo
 import dev.chatui.core.network.ProviderContext
+import dev.chatui.core.network.ProviderPreset
 import dev.chatui.core.network.ProviderRegistry
+import dev.chatui.core.network.catalogDefaultsForPreset
+import dev.chatui.core.network.fallbackModelIdsFor
+import dev.chatui.core.network.mapOpenAIModel
+import dev.chatui.core.network.selectFallbackModel
 import java.time.Clock
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Model catalog and selection service.
@@ -37,12 +46,19 @@ class ModelService(
      */
     suspend fun refreshModels(providerId: String): RefreshModelsResult {
         val provider = requireProvider(providerId)
+        val preset = registry.getPreset(provider.presetId)
         // The OpenRouter catalog is public. Discovery must work before a key
         // is validated, so the adapter receives no key.
-        val infos = gateway.listModels(
-            ProviderContext(provider, apiKey = null),
-            forceRefresh = true,
-        )
+        val infos = try {
+            gateway.listModels(
+                ProviderContext(provider, apiKey = null),
+                forceRefresh = true,
+            )
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            return degradedRefresh(providerId, preset, error)
+        }
 
         val existing = models.forProvider(providerId).associateBy { it.remoteId }
         val now = clock.instant()
@@ -74,13 +90,111 @@ class ModelService(
     }
 
     /**
-     * Select the default model using the M1-01.2 fallback rule.
+     * Keep chat usable when discovery is blocked.
+     *
+     * Cached models are returned unchanged. When the cache is empty, the
+     * preset's fallback list is persisted so model selection and onboarding
+     * still work. The result carries a non-blocking notice; callers never need
+     * to treat this as a send failure.
+     */
+    private suspend fun degradedRefresh(
+        providerId: String,
+        preset: ProviderPreset?,
+        error: Throwable,
+    ): RefreshModelsResult {
+        val existing = models.forProvider(providerId)
+
+        if (existing.isNotEmpty()) {
+            val suffix = if (existing.size == 1) "" else "s"
+            return RefreshModelsResult(
+                models = existing,
+                created = 0,
+                updated = 0,
+                degraded = true,
+                notice = "Discovery unavailable; using ${existing.size} cached model$suffix.",
+                refreshError = error,
+            )
+        }
+
+        if (preset == null) {
+            throw error
+        }
+
+        val fallbackIds = fallbackModelIdsFor(preset.id, preset)
+        val fallbackModels = ensureFallbackModels(providerId, preset, fallbackIds)
+
+        if (fallbackModels.isEmpty()) {
+            throw error
+        }
+
+        val notice = if (fallbackIds.size == 1) {
+            "Discovery unavailable; using fallback model ${fallbackIds[0]}."
+        } else {
+            "Discovery unavailable; using ${fallbackModels.size} fallback models."
+        }
+
+        return RefreshModelsResult(
+            models = fallbackModels,
+            created = fallbackModels.size,
+            updated = 0,
+            degraded = true,
+            notice = notice,
+            refreshError = error,
+        )
+    }
+
+    /**
+     * Persist fallback rows for a preset whose discovery is blocked.
+     *
+     * Rows are marked with `metadata.fallback` so default selection can tell a
+     * placeholder from a discovered model. Existing rows are never overwritten.
+     */
+    private suspend fun ensureFallbackModels(
+        providerId: String,
+        preset: ProviderPreset,
+        fallbackIds: List<String>,
+    ): List<Model> {
+        val existing = models.forProvider(providerId)
+        val byRemoteId = existing.associateBy { it.remoteId }
+        val defaults = catalogDefaultsForPreset(preset.id)
+        val created = mutableListOf<Model>()
+
+        for (remoteId in fallbackIds) {
+            if (byRemoteId.containsKey(remoteId)) {
+                continue
+            }
+
+            val info = mapOpenAIModel(
+                buildJsonObject { put("id", remoteId) },
+                defaults,
+            ) ?: continue
+
+            val model = modelFromInfo(
+                info = info.copy(
+                    metadata = buildJsonObject { put("fallback", JsonPrimitive(true)) },
+                ),
+                providerId = providerId,
+                existing = null,
+                now = clock.instant(),
+            )
+            created += models.upsertPreservingFlags(model)
+        }
+
+        return existing + created
+    }
+
+    /**
+     * Select the default model using the shared fallback rule.
      *
      * 1. Use the preset `defaultModelId` when it exists in the catalog, even
      *    if the model is hidden.
-     * 2. Otherwise use the first non-hidden text-output model ordered by
+     * 2. Otherwise use the first fallback id present in the catalog.
+     * 3. Otherwise use the first non-hidden text-output model ordered by
      *    `remoteId` ascending.
-     * 3. If no text model exists, return null and a non-blocking notice.
+     * 4. If no text model exists, return null and a non-blocking notice.
+     *
+     * When the catalog is empty, fallback rows are created so onboarding still
+     * has a selectable model.
      */
     suspend fun selectDefaultModel(providerId: String): DefaultModelSelection {
         val provider = requireProvider(providerId)
@@ -91,39 +205,62 @@ class ModelService(
                 providerId,
             )
 
-        val providerModels = models.forProvider(providerId)
-        val presetDefault = providerModels.firstOrNull {
-            it.remoteId == preset.defaultModelId
+        var providerModels = models.forProvider(providerId)
+        val fallbackModelIds = fallbackModelIdsFor(preset.id, preset)
+
+        if (providerModels.isEmpty() && fallbackModelIds.isNotEmpty()) {
+            providerModels = ensureFallbackModels(providerId, preset, fallbackModelIds)
         }
 
-        if (presetDefault != null) {
+        // Fallback rows are marked in metadata. Treat them as an empty catalog
+        // so the rule reports that discovery was unavailable instead of
+        // pretending the placeholder is a discovered default.
+        val onlyFallback = providerModels.isNotEmpty() &&
+            providerModels.all { it.metadata?.get("fallback") == JsonPrimitive(true) }
+        val catalog = if (onlyFallback) {
+            emptyList()
+        } else {
+            providerModels.map { model ->
+                FallbackCatalogEntry(
+                    remoteId = model.remoteId,
+                    hidden = model.hidden,
+                    outputModalities = model.outputModalities,
+                )
+            }
+        }
+
+        val selection = selectFallbackModel(
+            catalog = catalog,
+            presetDefaultModelId = preset.defaultModelId,
+            fallbackModelIds = fallbackModelIds,
+        )
+
+        if (selection.selectedModelId == null) {
             return DefaultModelSelection(
-                modelId = presetDefault.id,
-                remoteId = presetDefault.remoteId,
-                notice = null,
+                modelId = null,
+                remoteId = null,
+                notice = selection.notice,
             )
         }
 
-        val fallback = providerModels
-            .filter { model ->
-                !model.hidden && OutputModality.TEXT in model.outputModalities
-            }
-            .minByOrNull { it.remoteId }
+        val selected = providerModels.firstOrNull {
+            it.remoteId == selection.selectedModelId
+        }
 
-        if (fallback != null) {
+        if (selected == null) {
             return DefaultModelSelection(
-                modelId = fallback.id,
-                remoteId = fallback.remoteId,
-                notice = "Default model ${preset.defaultModelId} is unavailable; " +
-                    "using ${fallback.remoteId}.",
+                modelId = null,
+                remoteId = null,
+                notice = selection.notice
+                    ?: "Default model ${preset.defaultModelId} is unavailable; " +
+                    "no text model is available.",
             )
         }
 
         return DefaultModelSelection(
-            modelId = null,
-            remoteId = null,
-            notice = "Default model ${preset.defaultModelId} is unavailable; " +
-                "no text model is available.",
+            modelId = selected.id,
+            remoteId = selected.remoteId,
+            notice = selection.notice,
         )
     }
 

@@ -1,7 +1,7 @@
 # ChatUI Feature Parity
 
 - Source: [IMPLEMENTATION.md section 5.4](../docs/IMPLEMENTATION.md#54-parity-checklist)
-- Updated: 2026-11-04
+- Updated: 2026-11-06
 - Purpose: authoritative cross-client requirement and commitment table.
 
 | Feature | Web | Android | Rust |
@@ -70,3 +70,75 @@ Not delivered in M1 (M2 or later):
   packaging.
 - The remote-image loading setting and per-conversation system-prompt/sampling
   parameter UI remain M2.
+
+## Implementation status (M2, 2026-11-06)
+
+M2 generalizes the M1 OpenRouter path to the launch provider set and adds the
+content, parameter, attachment, conversation-management, and data surfaces. The
+commitment table above is unchanged; this section records what is implemented.
+
+Implemented on both clients:
+
+- OpenAI-compatible transport parameterized by preset: OpenRouter, OpenAI,
+  Groq, Mistral, DeepSeek, xAI, Together, Fireworks, LM Studio, llama.cpp, and
+  Custom. Custom providers store base URL, auth style, and non-secret headers;
+  keys stay in the secret store.
+- Native Anthropic, Google Gemini, and Ollama adapters. Anthropic sends
+  `x-api-key` and `anthropic-version` (the browser-only
+  `anthropic-dangerous-direct-browser-access` header is web-only); Gemini uses
+  `x-goog-api-key` and `alt=sse`; Ollama uses native `/api/chat` NDJSON and
+  `/api/tags` discovery with an OpenAI-compatible fallback.
+- Per-preset discovery, fallback model lists, capability inference, and
+  non-blocking degraded-discovery notices. OpenRouter keeps its M1 catalog,
+  routing, reasoning, usage/cost, and error behavior.
+- Reasoning is displayed separately from answer text across providers.
+- Markdown, fenced code with language label, copy, and wrap/scroll toggle, and
+  math. Web renders math with a lazy-loaded KaTeX renderer and raw-source
+  fallback; Android renders standalone math blocks as bounded raw source (no
+  typesetting library) and keeps inline math as raw text. Raw HTML is inert,
+  links are sanitized, and remote images are blocked until the setting or a
+  per-message action allows them.
+- Per-conversation system prompt, temperature, top P, max output tokens, stop
+  sequences, reasoning effort, streaming toggle, and provider extras under
+  `params.extra[<presetId>]`. Unsupported values stay stored and show an inline
+  note; `model`, `messages`, `stream`, and `stream_options` are protected.
+- Attachments: PNG/JPEG/WebP/GIF images and text files, local content-addressed
+  storage, 2048 px longest-edge downscale with metadata stripping, composer
+  chips, capability warnings and confirmation, and provider-specific content
+  parts. Web supports picker, drag-and-drop, and clipboard paste; Android
+  supports photo picker, SAF document picker, clipboard image paste, and
+  drag-and-drop.
+- Search, pin, archive, rename, and delete with a 5-second undo on both
+  clients. Web uses a bounded cursor scan; Android uses SQLite FTS4.
+- Export/import: `chatui.export` JSON, per-conversation JSON, and Markdown;
+  schema validation; merge-by-default with optional replace; IDs, ordering,
+  model snapshots, and attachment references preserved; secrets excluded;
+  attachment bytes opt-in; invalid imports do not mutate local data.
+- Data controls: storage usage, clear-all with typed confirmation, per-key
+  deletion, export/import entry points, and a backup placeholder.
+- Settings: web routes for appearance, chat defaults, providers/models, data,
+  backup, and about/privacy; Android screens for appearance, chat defaults,
+  providers, data, backup, and about/privacy. Send key, token usage, remote
+  images, default system prompt/parameters, remember-keys, and last-active
+  conversation are wired to behavior.
+
+Not delivered in M2 (later milestones or recorded deferrals):
+
+- PWA install, service worker, deployment, and release packaging (M4).
+- Android share target, deep links, tablet/foldable permanent sidebar, Compose
+  UI test suite, Roborazzi screenshots, baseline profiles, release signing, and
+  the final device matrix (M3).
+- Rust desktop client (M3.5), backup/sync (M5), and managed hosting (M6).
+- Android math typesetting: standalone math blocks render as raw source, the
+  documented safe fallback; inline math remains raw text.
+- Android local Ollama over cleartext HTTP needs a network security config that
+  is not yet in the app manifest. The adapter and guidance are present, and an
+  HTTPS endpoint works. Recorded as a deferral for M3.
+- Android Anthropic and Gemini model discovery currently runs without a key and
+  falls back to the shared fallback model lists; chat and key validation work.
+  Recorded as a deferral for a follow-up.
+- Web case 23 (10,000-message windowing) has a manual code check, not an
+  automated web test; Android has an automated equivalent.
+- Live provider smoke and valid-key success for every cloud preset were not
+  re-run; CORS evidence proves browser readability with placeholder
+  credentials. Local and Custom CORS remain `unknown`.

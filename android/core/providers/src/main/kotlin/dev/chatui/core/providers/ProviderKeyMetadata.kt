@@ -102,11 +102,20 @@ private fun JsonObject.doubleOrNull(key: String): Double? =
 private fun JsonObject.booleanOrNull(key: String): Boolean? =
     (this[key] as? JsonPrimitive)?.booleanOrNull
 
-/** Result of a catalog refresh. */
+/**
+ * Result of a catalog refresh.
+ *
+ * [degraded] is true when discovery failed but cached or fallback models keep
+ * chat usable. [notice] is a non-blocking message for the UI, and
+ * [refreshError] carries the original failure for diagnostics.
+ */
 data class RefreshModelsResult(
     val models: List<Model>,
     val created: Int,
     val updated: Int,
+    val degraded: Boolean = false,
+    val notice: String? = null,
+    val refreshError: Throwable? = null,
 )
 
 /** Result of the M1-01.2 default-model selection rule. */

@@ -7,8 +7,8 @@ const validConfig = {
   appName: 'ChatUI',
   defaultTheme: 'system',
   defaultProviderPreset: 'openrouter',
-  enabledPresets: ['openrouter'],
-  allowCustomProviders: false,
+  enabledPresets: ['openrouter', 'openai', 'custom'],
+  allowCustomProviders: true,
   openRouter: {
     attributionOrigin: 'https://chat.example.com',
     appTitle: 'ChatUI',
@@ -39,8 +39,10 @@ describe('configSchema', () => {
     const parsed = configSchema.parse(JSON.parse(raw))
 
     expect(parsed.appName).toBe('ChatUI')
-    expect(parsed.enabledPresets).toEqual(['openrouter'])
-    expect(parsed.allowCustomProviders).toBe(false)
+    expect(parsed.enabledPresets).toEqual(
+      expect.arrayContaining(['openrouter', 'openai', 'custom']),
+    )
+    expect(parsed.allowCustomProviders).toBe(true)
   })
 
   it('accepts a valid config object', () => {
@@ -119,12 +121,27 @@ describe('loadConfig', () => {
     }
   })
 
-  it('rejects presets that are not enabled in M1', async () => {
+  it('accepts the M2 launch presets', async () => {
     const fetchMock = vi.fn<FetchLike>(async () =>
-      fakeResponse({ ...validConfig, enabledPresets: ['openrouter', 'openai'] }),
+      fakeResponse({
+        ...validConfig,
+        enabledPresets: ['openrouter', 'openai', 'groq', 'custom'],
+      }),
     )
 
-    await expect(loadConfig(fetchMock)).rejects.toThrow('"openai" is not available in M1')
+    await expect(loadConfig(fetchMock)).resolves.toMatchObject({
+      enabledPresets: ['openrouter', 'openai', 'groq', 'custom'],
+    })
+  })
+
+  it('accepts the Ollama preset now that its native adapter exists', async () => {
+    const fetchMock = vi.fn<FetchLike>(async () =>
+      fakeResponse({ ...validConfig, enabledPresets: ['openrouter', 'ollama', 'custom'] }),
+    )
+
+    await expect(loadConfig(fetchMock)).resolves.toMatchObject({
+      enabledPresets: ['openrouter', 'ollama', 'custom'],
+    })
   })
 
   it('rejects unknown presets', async () => {
@@ -137,21 +154,60 @@ describe('loadConfig', () => {
     )
   })
 
-  it('rejects custom provider creation', async () => {
+  it('rejects duplicate enabled presets', async () => {
     const fetchMock = vi.fn<FetchLike>(async () =>
-      fakeResponse({ ...validConfig, allowCustomProviders: true }),
+      fakeResponse({ ...validConfig, enabledPresets: ['openrouter', 'openrouter'] }),
     )
 
     await expect(loadConfig(fetchMock)).rejects.toThrow(
-      'custom providers are not available in M1',
+      'duplicate provider preset "openrouter"',
+    )
+  })
+
+  it('rejects custom in enabledPresets when custom creation is disabled', async () => {
+    const fetchMock = vi.fn<FetchLike>(async () =>
+      fakeResponse({ ...validConfig, allowCustomProviders: false }),
+    )
+
+    await expect(loadConfig(fetchMock)).rejects.toThrow(
+      '"custom" requires allowCustomProviders to be true',
+    )
+  })
+
+  it('rejects custom creation without custom in enabledPresets', async () => {
+    const fetchMock = vi.fn<FetchLike>(async () =>
+      fakeResponse({
+        ...validConfig,
+        enabledPresets: ['openrouter', 'openai'],
+        allowCustomProviders: true,
+      }),
+    )
+
+    await expect(loadConfig(fetchMock)).rejects.toThrow(
+      '"custom" must be listed in enabledPresets',
+    )
+  })
+
+  it('rejects a default preset that is not OpenRouter', async () => {
+    const fetchMock = vi.fn<FetchLike>(async () =>
+      fakeResponse({ ...validConfig, defaultProviderPreset: 'openai' }),
+    )
+
+    await expect(loadConfig(fetchMock)).rejects.toThrow(
+      'defaultProviderPreset: must be "openrouter"',
     )
   })
 
   it('rejects a default preset that is not enabled', async () => {
     const fetchMock = vi.fn<FetchLike>(async () =>
-      fakeResponse({ ...validConfig, defaultProviderPreset: 'openai' }),
+      fakeResponse({
+        ...validConfig,
+        enabledPresets: ['openai', 'custom'],
+      }),
     )
 
-    await expect(loadConfig(fetchMock)).rejects.toThrow('"openai" is not in enabledPresets')
+    await expect(loadConfig(fetchMock)).rejects.toThrow(
+      '"openrouter" is not in enabledPresets',
+    )
   })
 })

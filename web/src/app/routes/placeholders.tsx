@@ -30,15 +30,6 @@ export function ChatPlaceholder() {
   )
 }
 
-export function SettingsAppearancePlaceholder() {
-  return (
-    <RoutePlaceholder
-      title="Appearance settings placeholder"
-      description="Theme, density, and font size controls arrive in M0-03.2."
-    />
-  )
-}
-
 export {
   ProviderDetailRoute as SettingsProviderDetailPlaceholder,
   ProvidersSettingsRoute as SettingsProvidersPlaceholder,
@@ -50,33 +41,6 @@ export function SettingsProviderNewPlaceholder() {
     <RoutePlaceholder
       title="New provider placeholder"
       description="Provider onboarding arrives in M1."
-    />
-  )
-}
-
-export function SettingsDataPlaceholder() {
-  return (
-    <RoutePlaceholder
-      title="Data settings placeholder"
-      description="Storage usage and export/import controls arrive in M1."
-    />
-  )
-}
-
-export function SettingsBackupPlaceholder() {
-  return (
-    <RoutePlaceholder
-      title="Backup settings placeholder"
-      description="Backup configuration arrives in M5."
-    />
-  )
-}
-
-export function SettingsAboutPlaceholder() {
-  return (
-    <RoutePlaceholder
-      title="About settings placeholder"
-      description="Version, licenses, and privacy information arrive in M1."
     />
   )
 }

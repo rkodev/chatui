@@ -3,8 +3,8 @@
 - Source plan: [M2 Providers and Content Implementation Plan](../M2-providers-and-content-implementation-plan.md)
 - Milestone: [M2 Providers and content](../../milestones/M2-providers-and-content.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: Not started
-- Last updated: 2026-11-04
+- Status: Complete
+- Last updated: 2026-11-06
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
 - Scope: web and Android only. Rust, M3 Android depth, M4 release work, backup/sync, and deployment are out of scope.
 
@@ -35,44 +35,44 @@
 
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [M2-00.1 Expected streams and error fixtures](M2-00.1-expected-streams-errors.md) | Not started | none | contracts | none; unblocks provider work |
-| 2 | [M2-00.2 Catalogs, request vectors, math/export fixtures, and CORS plan](M2-00.2-catalogs-requests-fixtures.md) | Not started | M2-00.1 | contracts | none |
-| 3 | [M2-01.1 Web OpenAI-compatible transport](M2-01.1-web-openai-compatible-transport.md) | Not started | M2-00.2 | web | M2-05.1 |
-| 4 | [M2-01.2 Web preset enablement and Custom providers](M2-01.2-web-preset-enablement-custom.md) | Not started | M2-01.1 | web | M2-05.2 |
-| 5 | [M2-01.3 Web discovery, fallback, capabilities, reasoning, and provider UI](M2-01.3-web-discovery-capability-reasoning-ui.md) | Not started | M2-01.2 | web | M2-05.3 |
-| 6 | [M2-02.1 Web Anthropic adapter](M2-02.1-web-anthropic-adapter.md) | Not started | M2-01.3 | web | M2-02.2, M2-02.3, M2-06.1 |
-| 7 | [M2-02.2 Web Gemini adapter](M2-02.2-web-gemini-adapter.md) | Not started | M2-01.3 | web | M2-02.1, M2-02.3, M2-06.2 |
-| 8 | [M2-02.3 Web Ollama adapter](M2-02.3-web-ollama-adapter.md) | Not started | M2-01.3 | web | M2-02.1, M2-02.2, M2-06.3 |
-| 9 | [M2-02.4 Web CORS classification and matrix](M2-02.4-web-cors-matrix.md) | Not started | M2-02.1, M2-02.2, M2-02.3 | web | M2-03.1 |
-| 10 | [M2-03.1 Web content and reasoning rendering](M2-03.1-web-content-rendering.md) | Not started | M2-01.3 | web | M2-02.1, M2-02.2, M2-02.3 |
-| 11 | [M2-03.2 Web parameters and conversation settings](M2-03.2-web-parameters-conversation-settings.md) | Not started | M2-01.3 | web | M2-03.1 |
-| 12 | [M2-03.3 Web attachments end-to-end](M2-03.3-web-attachments.md) | Not started | M2-03.1, M2-03.2 | web | M2-06.6 |
-| 13 | [M2-03.4 Web settings routes and behavior wiring](M2-03.4-web-settings-routes.md) | Not started | M2-01.3 | web | M2-04.1 |
-| 14 | [M2-04.1 Web conversation search](M2-04.1-web-search.md) | Not started | M2-03.4 | web | M2-04.2 no; sidebar files shared |
-| 15 | [M2-04.2 Web pin, archive, and delete undo](M2-04.2-web-pin-archive-undo.md) | Not started | M2-04.1 | web | M2-07.2 |
-| 16 | [M2-04.3 Web export](M2-04.3-web-export.md) | Not started | M2-03.4 | web | M2-07.3 |
-| 17 | [M2-04.4 Web import](M2-04.4-web-import.md) | Not started | M2-04.3 | web | M2-07.4 |
-| 18 | [M2-04.5 Web data controls](M2-04.5-web-data-controls.md) | Not started | M2-04.3, M2-04.4 | web | M2-07.5 |
-| 19 | [M2-04.6 Web Playwright suite](M2-04.6-web-playwright.md) | Not started | M2-04.1 through M2-04.5, M2-03.3 | web | M2-08.2 |
-| 20 | [M2-05.1 Android OpenAI-compatible transport](M2-05.1-android-openai-compatible-transport.md) | Not started | M2-00.2 | android | M2-01.1 |
-| 21 | [M2-05.2 Android preset enablement and Custom providers](M2-05.2-android-preset-enablement-custom.md) | Not started | M2-05.1 | android | M2-01.2 |
-| 22 | [M2-05.3 Android discovery, fallback, capabilities, and reasoning](M2-05.3-android-discovery-capability-reasoning.md) | Not started | M2-05.2 | android | M2-01.3 |
-| 23 | [M2-05.4 Android provider UI and shell wiring](M2-05.4-android-provider-ui-shell.md) | Not started | M2-05.3 | android | none; blocks Android adapter tasks |
-| 24 | [M2-06.1 Android Anthropic adapter](M2-06.1-android-anthropic-adapter.md) | Not started | M2-05.4 | android | M2-06.2, M2-06.3, M2-02.1 |
-| 25 | [M2-06.2 Android Gemini adapter](M2-06.2-android-gemini-adapter.md) | Not started | M2-05.4 | android | M2-06.1, M2-06.3, M2-02.2 |
-| 26 | [M2-06.3 Android Ollama adapter](M2-06.3-android-ollama-adapter.md) | Not started | M2-05.4 | android | M2-06.1, M2-06.2, M2-02.3 |
-| 27 | [M2-06.4 Android content and reasoning rendering](M2-06.4-android-content-rendering.md) | Not started | M2-05.4 | android | M2-06.5 |
-| 28 | [M2-06.5 Android parameters, conversation settings, and settings screens](M2-06.5-android-parameters-settings.md) | Not started | M2-05.4 | android | M2-06.4 |
-| 29 | [M2-06.6 Android attachments end-to-end](M2-06.6-android-attachments.md) | Not started | M2-06.4, M2-06.5 | android | M2-03.3 |
-| 30 | [M2-07.1 Android conversation search](M2-07.1-android-search.md) | Not started | M2-06.5 | android | M2-07.2 no; conversation files shared |
-| 31 | [M2-07.2 Android pin, archive, and delete undo](M2-07.2-android-pin-archive-undo.md) | Not started | M2-07.1 | android | M2-04.2 |
-| 32 | [M2-07.3 Android export](M2-07.3-android-export.md) | Not started | M2-06.5 | android | M2-04.3 |
-| 33 | [M2-07.4 Android import](M2-07.4-android-import.md) | Not started | M2-07.3 | android | M2-04.4 |
-| 34 | [M2-07.5 Android data controls and shell integration](M2-07.5-android-data-controls-shell.md) | Not started | M2-07.3, M2-07.4 | android | M2-04.5 |
-| 35 | [M2-08.1 Android provider adapter tests](M2-08.1-android-provider-tests.md) | Not started | M2-06.1, M2-06.2, M2-06.3 | android | none; M2-08.2 follows |
-| 36 | [M2-08.2 Android persistence, data, and critical-case tests](M2-08.2-android-persistence-data-tests.md) | Not started | M2-06.6, M2-07.3, M2-07.4, M2-07.5, M2-08.1 | android | M2-04.6 |
-| 37 | [M2-09.1 CORS matrix and conformance evidence](M2-09.1-cors-conformance-evidence.md) | Not started | M2-02.4, M2-04.6, M2-08.1, M2-08.2 | verification | none |
-| 38 | [M2-09.2 Parity and exit gate](M2-09.2-parity-exit-gate.md) | Not started | all prior tasks | verification | none |
+| 1 | [M2-00.1 Expected streams and error fixtures](M2-00.1-expected-streams-errors.md) | Complete | none | contracts | none; unblocks provider work |
+| 2 | [M2-00.2 Catalogs, request vectors, math/export fixtures, and CORS plan](M2-00.2-catalogs-requests-fixtures.md) | Complete | M2-00.1 | contracts | none |
+| 3 | [M2-01.1 Web OpenAI-compatible transport](M2-01.1-web-openai-compatible-transport.md) | Complete | M2-00.2 | web | M2-05.1 |
+| 4 | [M2-01.2 Web preset enablement and Custom providers](M2-01.2-web-preset-enablement-custom.md) | Complete | M2-01.1 | web | M2-05.2 |
+| 5 | [M2-01.3 Web discovery, fallback, capabilities, reasoning, and provider UI](M2-01.3-web-discovery-capability-reasoning-ui.md) | Complete | M2-01.2 | web | M2-05.3 |
+| 6 | [M2-02.1 Web Anthropic adapter](M2-02.1-web-anthropic-adapter.md) | Complete | M2-01.3 | web | M2-02.2, M2-02.3, M2-06.1 |
+| 7 | [M2-02.2 Web Gemini adapter](M2-02.2-web-gemini-adapter.md) | Complete | M2-01.3 | web | M2-02.1, M2-02.3, M2-06.2 |
+| 8 | [M2-02.3 Web Ollama adapter](M2-02.3-web-ollama-adapter.md) | Complete | M2-01.3 | web | M2-02.1, M2-02.2, M2-06.3 |
+| 9 | [M2-02.4 Web CORS classification and matrix](M2-02.4-web-cors-matrix.md) | Complete | M2-02.1, M2-02.2, M2-02.3 | web | M2-03.1 |
+| 10 | [M2-03.1 Web content and reasoning rendering](M2-03.1-web-content-rendering.md) | Complete | M2-01.3 | web | M2-02.1, M2-02.2, M2-02.3 |
+| 11 | [M2-03.2 Web parameters and conversation settings](M2-03.2-web-parameters-conversation-settings.md) | Complete | M2-01.3 | web | M2-03.1 |
+| 12 | [M2-03.3 Web attachments end-to-end](M2-03.3-web-attachments.md) | Complete | M2-03.1, M2-03.2 | web | M2-06.6 |
+| 13 | [M2-03.4 Web settings routes and behavior wiring](M2-03.4-web-settings-routes.md) | Complete | M2-01.3 | web | M2-04.1 |
+| 14 | [M2-04.1 Web conversation search](M2-04.1-web-search.md) | Complete | M2-03.4 | web | M2-04.2 no; sidebar files shared |
+| 15 | [M2-04.2 Web pin, archive, and delete undo](M2-04.2-web-pin-archive-undo.md) | Complete | M2-04.1 | web | M2-07.2 |
+| 16 | [M2-04.3 Web export](M2-04.3-web-export.md) | Complete | M2-03.4 | web | M2-07.3 |
+| 17 | [M2-04.4 Web import](M2-04.4-web-import.md) | Complete | M2-04.3 | web | M2-07.4 |
+| 18 | [M2-04.5 Web data controls](M2-04.5-web-data-controls.md) | Complete | M2-04.3, M2-04.4 | web | M2-07.5 |
+| 19 | [M2-04.6 Web Playwright suite](M2-04.6-web-playwright.md) | Complete | M2-04.1 through M2-04.5, M2-03.3 | web | M2-08.2 |
+| 20 | [M2-05.1 Android OpenAI-compatible transport](M2-05.1-android-openai-compatible-transport.md) | Complete | M2-00.2 | android | M2-01.1 |
+| 21 | [M2-05.2 Android preset enablement and Custom providers](M2-05.2-android-preset-enablement-custom.md) | Complete | M2-05.1 | android | M2-01.2 |
+| 22 | [M2-05.3 Android discovery, fallback, capabilities, and reasoning](M2-05.3-android-discovery-capability-reasoning.md) | Complete | M2-05.2 | android | M2-01.3 |
+| 23 | [M2-05.4 Android provider UI and shell wiring](M2-05.4-android-provider-ui-shell.md) | Complete | M2-05.3 | android | none; blocks Android adapter tasks |
+| 24 | [M2-06.1 Android Anthropic adapter](M2-06.1-android-anthropic-adapter.md) | Complete | M2-05.4 | android | M2-06.2, M2-06.3, M2-02.1 |
+| 25 | [M2-06.2 Android Gemini adapter](M2-06.2-android-gemini-adapter.md) | Complete | M2-05.4 | android | M2-06.1, M2-06.3, M2-02.2 |
+| 26 | [M2-06.3 Android Ollama adapter](M2-06.3-android-ollama-adapter.md) | Complete | M2-05.4 | android | M2-06.1, M2-06.2, M2-02.3 |
+| 27 | [M2-06.4 Android content and reasoning rendering](M2-06.4-android-content-rendering.md) | Complete | M2-05.4 | android | M2-06.5 |
+| 28 | [M2-06.5 Android parameters, conversation settings, and settings screens](M2-06.5-android-parameters-settings.md) | Complete | M2-05.4 | android | M2-06.4 |
+| 29 | [M2-06.6 Android attachments end-to-end](M2-06.6-android-attachments.md) | Complete | M2-06.4, M2-06.5 | android | M2-03.3 |
+| 30 | [M2-07.1 Android conversation search](M2-07.1-android-search.md) | Complete | M2-06.5 | android | M2-07.2 no; conversation files shared |
+| 31 | [M2-07.2 Android pin, archive, and delete undo](M2-07.2-android-pin-archive-undo.md) | Complete | M2-07.1 | android | M2-04.2 |
+| 32 | [M2-07.3 Android export](M2-07.3-android-export.md) | Complete | M2-06.5 | android | M2-04.3 |
+| 33 | [M2-07.4 Android import](M2-07.4-android-import.md) | Complete | M2-07.3 | android | M2-04.4 |
+| 34 | [M2-07.5 Android data controls and shell integration](M2-07.5-android-data-controls-shell.md) | Complete | M2-07.3, M2-07.4 | android | M2-04.5 |
+| 35 | [M2-08.1 Android provider adapter tests](M2-08.1-android-provider-tests.md) | Complete | M2-06.1, M2-06.2, M2-06.3 | android | none; M2-08.2 follows |
+| 36 | [M2-08.2 Android persistence, data, and critical-case tests](M2-08.2-android-persistence-data-tests.md) | Complete | M2-06.6, M2-07.3, M2-07.4, M2-07.5, M2-08.1 | android | M2-04.6 |
+| 37 | [M2-09.1 CORS matrix and conformance evidence](M2-09.1-cors-conformance-evidence.md) | Complete | M2-02.4, M2-04.6, M2-08.1, M2-08.2 | verification | none |
+| 38 | [M2-09.2 Parity and exit gate](M2-09.2-parity-exit-gate.md) | Complete | all prior tasks | verification | none |
 
 ## Parallel execution groups
 

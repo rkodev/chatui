@@ -1,0 +1,11 @@
+{
+  "status": 403,
+  "headers": {},
+  "body": {
+    "type": "error",
+    "error": {
+      "type": "permission_error",
+      "message": "You do not have permission to use this model."
+    }
+  }
+}

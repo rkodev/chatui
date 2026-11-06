@@ -1,0 +1,15 @@
+{
+  "status": 429,
+  "headers": {
+    "retry-after": "2",
+    "x-request-id": "req_openai_429"
+  },
+  "body": {
+    "error": {
+      "message": "Rate limit reached. Please try again in 2 seconds.",
+      "type": "rate_limit_error",
+      "param": null,
+      "code": "rate_limit_exceeded"
+    }
+  }
+}

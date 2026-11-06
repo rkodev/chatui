@@ -1,0 +1,22 @@
+{
+  "source": "anthropic-text.sse",
+  "events": [
+    { "type": "start", "responseId": "msg_example_text" },
+    { "type": "text-delta", "text": "Hello" },
+    { "type": "text-delta", "text": " from Anthropic." },
+    {
+      "type": "usage",
+      "usage": {
+        "inputTokens": 10,
+        "outputTokens": 6,
+        "totalTokens": 16,
+        "costUsd": null,
+        "estimated": false
+      }
+    },
+    { "type": "finish", "reason": "stop" }
+  ],
+  "text": "Hello from Anthropic.",
+  "reasoning": "",
+  "retryAllowed": false
+}

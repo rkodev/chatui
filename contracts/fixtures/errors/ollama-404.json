@@ -1,0 +1,7 @@
+{
+  "status": 404,
+  "headers": {},
+  "body": {
+    "error": "model 'missing-model' not found"
+  }
+}

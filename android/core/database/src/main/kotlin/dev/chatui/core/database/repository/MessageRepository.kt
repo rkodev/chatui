@@ -15,6 +15,12 @@ data class AppendMessageResult(
     val conversation: Conversation,
 )
 
+/** One FTS message hit joined to its owning conversation. */
+data class MessageSearchHit(
+    val message: Message,
+    val conversation: Conversation,
+)
+
 /**
  * Domain repository for messages.
  *
@@ -27,6 +33,16 @@ class MessageRepository(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     suspend fun get(id: String): Message? = dao.getById(id)?.toDomain()
+
+    /** Every message, including deleted rows, for export. */
+    suspend fun all(): List<Message> = dao.all().map { it.toDomain() }
+
+    /** Every message in one conversation, including deleted rows, for export. */
+    suspend fun allForConversation(conversationId: String): List<Message> =
+        dao.allForConversation(conversationId).map { it.toDomain() }
+
+    /** Every message id, including deleted rows, for attachment cleanup. */
+    suspend fun allIds(): List<String> = dao.allIds()
 
     /** Newest page, oldest message first. */
     suspend fun latest(
@@ -85,6 +101,22 @@ class MessageRepository(
         query: String,
         limit: Int = MessageDao.DEFAULT_PAGE_SIZE,
     ): List<Message> = dao.searchPage(query, limit).map { it.toDomain() }
+
+    /**
+     * Full-text search joined to the owning conversation.
+     *
+     * Archived conversations are excluded. The join happens in SQLite so the
+     * caller receives ready-to-group hits without loading every message.
+     */
+    suspend fun searchWithConversations(
+        query: String,
+        limit: Int = MessageDao.DEFAULT_PAGE_SIZE,
+    ): List<MessageSearchHit> = dao.searchWithConversations(query, limit).map { row ->
+        MessageSearchHit(
+            message = row.message.toDomain(),
+            conversation = row.conversation.toDomain(),
+        )
+    }
 
     /** Messages left in the `streaming` state, oldest first. */
     suspend fun streamingMessages(): List<Message> = dao.streaming().map { it.toDomain() }

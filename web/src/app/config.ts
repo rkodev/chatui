@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 import { z } from 'zod'
 import {
-  isPresetEnabledInM1,
+  isPresetEnabledInM2,
   providerPresets,
   type ProviderPreset,
 } from '../providers/registry'
@@ -11,7 +11,7 @@ import {
  *
  * This file must never contain secrets. The schema validates the config shape;
  * `loadConfig` also cross-checks preset IDs against `contracts/providers.json`
- * and enforces the M1 OpenRouter-only gate.
+ * and enforces the M2 enablement contract.
  */
 export const configSchema = z
   .object({
@@ -66,15 +66,25 @@ function formatIssues(error: z.ZodError): string[] {
 /**
  * Cross-check runtime config against the provider contracts.
  *
- * M1 exposes OpenRouter only. Other presets may remain in contracts, but a
- * deployment cannot enable them or custom-provider creation yet.
+ * M2 enables the launch OpenAI-compatible presets. OpenRouter remains the
+ * contract default and must stay enabled. Custom providers are allowed only
+ * when `allowCustomProviders` is true and `custom` is listed in
+ * `enabledPresets`. Native-adapter presets stay unavailable until their
+ * adapters land.
  */
 export function validateConfigPresets(
   config: AppConfig,
   presets: readonly ProviderPreset[] = providerPresets,
 ): string[] {
   const issues: string[] = []
-  const known = new Set(presets.map((preset) => preset.id))
+  const known = new Map(presets.map((preset) => [preset.id, preset]))
+  const defaultPreset = presets.find((preset) => preset.default)
+
+  if (!defaultPreset) {
+    issues.push('contracts: no provider preset is marked as default')
+  } else if (config.defaultProviderPreset !== defaultPreset.id) {
+    issues.push(`defaultProviderPreset: must be "${defaultPreset.id}"`)
+  }
 
   if (!known.has(config.defaultProviderPreset)) {
     issues.push(
@@ -88,19 +98,37 @@ export function validateConfigPresets(
     )
   }
 
+  const seen = new Set<string>()
+
   for (const id of config.enabledPresets) {
+    if (seen.has(id)) {
+      issues.push(`enabledPresets: duplicate provider preset "${id}"`)
+      continue
+    }
+
+    seen.add(id)
+
     if (!known.has(id)) {
       issues.push(`enabledPresets: unknown provider preset "${id}"`)
       continue
     }
 
-    if (!isPresetEnabledInM1(id)) {
-      issues.push(`enabledPresets: "${id}" is not available in M1`)
+    if (!isPresetEnabledInM2(id)) {
+      issues.push(`enabledPresets: "${id}" is not available in M2`)
+      continue
+    }
+
+    if (id === 'custom' && !config.allowCustomProviders) {
+      issues.push('enabledPresets: "custom" requires allowCustomProviders to be true')
     }
   }
 
-  if (config.allowCustomProviders) {
-    issues.push('allowCustomProviders: custom providers are not available in M1')
+  if (config.allowCustomProviders && !config.enabledPresets.includes('custom')) {
+    issues.push('allowCustomProviders: "custom" must be listed in enabledPresets')
+  }
+
+  if (defaultPreset && !defaultPreset.required) {
+    issues.push(`contracts: default preset "${defaultPreset.id}" must be marked required`)
   }
 
   return issues

@@ -38,6 +38,16 @@ class ConversationRepositoryTest : DatabaseTestBase() {
     }
 
     @Test
+    fun `observe archived returns only archived conversations`() = runTest {
+        repository.create(RepositoryTestData.conversation(id = "active"))
+        repository.create(RepositoryTestData.conversation(id = "archived", archived = true))
+
+        val ids = repository.observeArchived().first().map { it.id }
+
+        assertThat(ids).containsExactly("archived")
+    }
+
+    @Test
     fun `rename pin and archive update timestamps`() = runTest {
         repository.create(RepositoryTestData.conversation())
 

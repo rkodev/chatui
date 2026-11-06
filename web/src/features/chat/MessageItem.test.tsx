@@ -11,10 +11,7 @@ describe('MessageItem', () => {
     const message = createTestMessage()
 
     expect(
-      messageItemPropsEqual(
-        { message, showTokenUsage: false },
-        { message, showTokenUsage: false },
-      ),
+      messageItemPropsEqual({ message, showTokenUsage: false }, { message, showTokenUsage: false }),
     ).toBe(true)
   })
 
@@ -82,6 +79,34 @@ describe('MessageItem', () => {
     expect(screen.getByText(/interrupted/i)).toBeInTheDocument()
   })
 
+  it('renders attachment chips without a "No content" placeholder', () => {
+    const message = createTestMessage({
+      parts: [
+        { type: 'text', text: 'See attached' },
+        { type: 'image', attachmentId: 'image-1', mimeType: 'image/png', alt: 'pixel.png' },
+        { type: 'file', attachmentId: 'file-1', mimeType: 'text/plain', name: 'notes.txt' },
+      ],
+    })
+
+    render(<MessageItem message={message} showTokenUsage={false} />)
+
+    expect(screen.getByText('See attached')).toBeInTheDocument()
+    expect(screen.getByText('pixel.png')).toBeInTheDocument()
+    expect(screen.getByText('notes.txt')).toBeInTheDocument()
+    expect(screen.queryByText('No content.')).not.toBeInTheDocument()
+  })
+
+  it('renders an image-only message without the empty placeholder', () => {
+    const message = createTestMessage({
+      parts: [{ type: 'image', attachmentId: 'image-1', mimeType: 'image/png', alt: 'pixel.png' }],
+    })
+
+    render(<MessageItem message={message} showTokenUsage={false} />)
+
+    expect(screen.getByText('pixel.png')).toBeInTheDocument()
+    expect(screen.queryByText('No content.')).not.toBeInTheDocument()
+  })
+
   it('shows a typing indicator only for the active stream', () => {
     const streaming = createTestMessage({ status: 'streaming', parts: [] })
     const { rerender } = render(
@@ -119,6 +144,54 @@ describe('MessageItem', () => {
     await user.click(screen.getByRole('button', { name: 'Regenerate response' }))
 
     expect(onRegenerate).toHaveBeenCalledWith(message)
+  })
+
+  it('renders reasoning separately without replaying it in the answer', () => {
+    const message = createTestMessage({
+      role: 'assistant',
+      parts: [
+        { type: 'reasoning', text: 'internal step one' },
+        { type: 'text', text: 'final answer' },
+      ],
+    })
+    const { container } = render(<MessageItem message={message} showTokenUsage={false} />)
+
+    expect(screen.getByText('Reasoning')).toBeInTheDocument()
+    expect(screen.getByText('internal step one')).toBeInTheDocument()
+    expect(screen.getByText('final answer')).toBeInTheDocument()
+
+    const reasoning = container.querySelector('.message__reasoning')
+    const answer = container.querySelector('.message__markdown')
+
+    expect(reasoning).toHaveTextContent('internal step one')
+    expect(reasoning).not.toHaveTextContent('final answer')
+    expect(answer).toHaveTextContent('final answer')
+    expect(answer).not.toHaveTextContent('internal step one')
+  })
+
+  it('passes the remote-image setting through to the Markdown renderer', () => {
+    const message = createTestMessage({
+      role: 'assistant',
+      parts: [{ type: 'text', text: '![Diagram](https://example.com/diagram.png)' }],
+    })
+    const { container, rerender } = render(<MessageItem message={message} showTokenUsage={false} />)
+
+    expect(container.querySelector('img')).toBeNull()
+
+    rerender(<MessageItem message={message} showTokenUsage={false} loadRemoteImages />)
+
+    expect(container.querySelector('img')).toHaveAttribute('src', 'https://example.com/diagram.png')
+  })
+
+  it('invalidates memoization when the remote-image setting changes', () => {
+    const message = createTestMessage()
+
+    expect(
+      messageItemPropsEqual(
+        { message, showTokenUsage: false, loadRemoteImages: false },
+        { message, showTokenUsage: false, loadRemoteImages: true },
+      ),
+    ).toBe(false)
   })
 
   it('shows usage only when enabled', () => {

@@ -7,6 +7,7 @@ import dev.chatui.core.model.MessageRole
 import dev.chatui.core.network.NormalizedChatRequest
 import dev.chatui.core.network.NormalizedMessage
 import dev.chatui.core.network.NormalizedRole
+import dev.chatui.core.network.ResolvedAttachment
 
 /**
  * Build the normalized request for the next assistant response.
@@ -14,12 +15,14 @@ import dev.chatui.core.network.NormalizedRole
  * History is sent in sequence order. Empty assistant placeholders, deleted
  * messages, and system messages are skipped; the conversation system prompt is
  * sent separately. Reasoning parts are presentation-only and are not replayed
- * to the provider.
+ * to the provider. Image and file parts are preserved and their bytes are
+ * supplied through [attachments].
  */
 fun buildChatRequest(
     conversation: Conversation,
     modelRemoteId: String,
     messages: List<Message>,
+    attachments: Map<String, ResolvedAttachment> = emptyMap(),
 ): NormalizedChatRequest {
     val normalized = messages
         .asSequence()
@@ -33,6 +36,7 @@ fun buildChatRequest(
         system = conversation.systemPrompt.trim().ifEmpty { null },
         messages = normalized,
         params = conversation.params,
+        attachments = attachments,
     )
 }
 
@@ -44,14 +48,19 @@ private fun Message.toNormalizedMessage(): NormalizedMessage? {
         MessageRole.SYSTEM -> return null
     }
 
-    val text = parts
-        .filterIsInstance<ContentPart.Text>()
-        .joinToString("\n") { it.text }
+    val normalizedParts = parts.mapNotNull { part ->
+        when (part) {
+            is ContentPart.Text -> part.takeIf { it.text.isNotEmpty() }
+            is ContentPart.Image -> part
+            is ContentPart.File -> part
+            else -> null
+        }
+    }
 
-    if (text.isBlank()) return null
+    if (normalizedParts.isEmpty()) return null
 
     return NormalizedMessage(
         role = normalizedRole,
-        parts = listOf(ContentPart.Text(text)),
+        parts = normalizedParts,
     )
 }

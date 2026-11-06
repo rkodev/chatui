@@ -9,7 +9,7 @@ import {
 import { ChatServiceContext } from './chatServiceContext'
 import type { ChatServiceLike } from './chatService'
 import { createStreamingState, useStreamingStore } from './streamingStore'
-import { createFakeChatService, createTestMessage } from './testSupport'
+import { createFakeChatService, createTestAttachment, createTestMessage } from './testSupport'
 import { useChatSession } from './useChatSession'
 
 function wrapperFor(service: ChatServiceLike) {
@@ -34,6 +34,7 @@ describe('useChatSession', () => {
       getAvailability: async () => ({ ok: true, model, provider }),
       getShowTokenUsage: async () => false,
       getSendKey: async () => 'mod-enter',
+      getLoadRemoteImages: async () => true,
     })
 
     const { result } = renderHook(() => useChatSession(conversation.id), {
@@ -47,6 +48,7 @@ describe('useChatSession', () => {
     expect(result.current.availability).toEqual({ ok: true, model, provider })
     expect(result.current.showTokenUsage).toBe(false)
     expect(result.current.sendKey).toBe('mod-enter')
+    expect(result.current.loadRemoteImages).toBe(true)
   })
 
   it('announces start, complete, and error but not token updates', async () => {
@@ -147,6 +149,59 @@ describe('useChatSession', () => {
         parts: [{ type: 'text', text: 'Hello' }],
       }),
     )
+  })
+
+  it('adds attachments and includes them in the optimistic user message', async () => {
+    const conversation = createTestConversation()
+    const attachment = createTestAttachment({
+      kind: 'file',
+      name: 'notes.txt',
+      mimeType: 'text/plain',
+    })
+    const addAttachments = vi.fn(async () => ({ attachments: [attachment], errors: [] }))
+    const send = vi.fn(async () => ({
+      ok: true as const,
+      message: createTestMessage({ id: 'assistant-1', sequence: 2, role: 'assistant' }),
+    }))
+    const service = createFakeChatService({
+      getConversation: async () => conversation,
+      listMessages: async () => ({ items: [], nextCursor: null }),
+      addAttachments,
+      send,
+    })
+    const { result } = renderHook(() => useChatSession(conversation.id), {
+      wrapper: wrapperFor(service),
+    })
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      await result.current.addAttachments([
+        new File(['notes'], 'notes.txt', { type: 'text/plain' }),
+      ])
+    })
+
+    expect(result.current.attachments).toEqual([attachment])
+
+    await act(async () => {
+      await result.current.send('Read this', [attachment])
+    })
+
+    expect(send).toHaveBeenCalledWith(
+      conversation,
+      expect.objectContaining({
+        parts: [
+          { type: 'text', text: 'Read this' },
+          {
+            type: 'file',
+            attachmentId: attachment.id,
+            mimeType: 'text/plain',
+            name: 'notes.txt',
+          },
+        ],
+      }),
+    )
+    expect(result.current.attachments).toEqual([])
   })
 
   it('surfaces a send failure', async () => {

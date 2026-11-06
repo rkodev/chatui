@@ -1,0 +1,11 @@
+{
+  "status": 404,
+  "headers": {},
+  "body": {
+    "type": "error",
+    "error": {
+      "type": "not_found_error",
+      "message": "model: missing-model"
+    }
+  }
+}

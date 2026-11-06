@@ -1,0 +1,13 @@
+{
+  "status": 401,
+  "headers": {
+    "request-id": "req_anthropic_401"
+  },
+  "body": {
+    "type": "error",
+    "error": {
+      "type": "authentication_error",
+      "message": "invalid x-api-key"
+    }
+  }
+}

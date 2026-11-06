@@ -1,5 +1,10 @@
 import type { Conversation } from '../../domain'
-import type { ConversationListOptions, ConversationPage } from '../../storage'
+import type {
+  ConversationListOptions,
+  ConversationPage,
+  ConversationSearchOptions,
+  ConversationSearchResult,
+} from '../../storage'
 import type { AppConfig } from '../../app/config'
 import { openRouterAdapter } from '../../providers/openrouter'
 import { getDefaultCatalogCache } from '../../providers/openrouterCatalog'
@@ -24,8 +29,14 @@ import type { CreateConversationInput, CreateConversationResult } from './types'
  */
 export interface ConversationHistoryServiceLike {
   listConversations(options?: ConversationListOptions): Promise<ConversationPage>
+  searchConversations(
+    query: string,
+    options?: ConversationSearchOptions,
+  ): Promise<ConversationSearchResult>
   createConversation(input?: CreateConversationInput): Promise<CreateConversationResult>
   renameConversation(id: string, title: string): Promise<Conversation>
+  setConversationPinned(id: string, pinned: boolean): Promise<Conversation>
+  setConversationArchived(id: string, archived: boolean): Promise<Conversation>
   deleteConversation(id: string): Promise<void>
   getLastActiveConversation(): Promise<Conversation | null>
   setLastActiveConversation(id: string | null): Promise<void>

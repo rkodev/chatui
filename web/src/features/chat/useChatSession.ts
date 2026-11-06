@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
-import { newId, nowIso, type Conversation, type Message, type SendKey } from '../../domain'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  newId,
+  nowIso,
+  type Attachment,
+  type Conversation,
+  type Message,
+  type SendKey,
+} from '../../domain'
+import type { AddAttachmentsResult } from '../attachments/attachmentService'
 import { useChatService } from './chatServiceContext'
 import type { ChatAvailability } from './chatService'
 import { describeChatError } from './chatErrorCopy'
@@ -19,11 +27,15 @@ export interface ChatSession {
   availability: ChatAvailability | null
   showTokenUsage: boolean
   sendKey: SendKey
+  loadRemoteImages: boolean
   streamingMessageId: string | null
   isStreaming: boolean
   announcement: string
+  attachments: Attachment[]
+  addAttachments: (files: readonly File[]) => Promise<AddAttachmentsResult>
+  removeAttachment: (id: string) => Promise<void>
   loadOlder: () => Promise<void>
-  send: (text: string) => Promise<boolean>
+  send: (text: string, attachments?: readonly Attachment[]) => Promise<boolean>
   cancel: () => Promise<void>
   retry: (message: Message) => Promise<void>
   regenerate: (message: Message) => Promise<void>
@@ -62,7 +74,16 @@ export function useChatSession(conversationId: string): ChatSession {
   const [availability, setAvailability] = useState<ChatAvailability | null>(null)
   const [showTokenUsage, setShowTokenUsage] = useState(true)
   const [sendKey, setSendKey] = useState<SendKey>('enter')
+  const [loadRemoteImages, setLoadRemoteImages] = useState(false)
   const [announcement, setAnnouncement] = useState('')
+  const [attachmentState, setAttachmentState] = useState<{
+    conversationId: string
+    items: Attachment[]
+  }>({ conversationId, items: [] })
+  const attachments = useMemo(
+    () => (attachmentState.conversationId === conversationId ? attachmentState.items : []),
+    [attachmentState, conversationId],
+  )
 
   const streamingMessageId = useStreamingStore(
     (state) => state.streams[conversationId]?.messageId ?? null,
@@ -80,20 +101,24 @@ export function useChatSession(conversationId: string): ChatSession {
         availability: null,
         showTokenUsage: true,
         sendKey: 'enter' as SendKey,
+        loadRemoteImages: false,
       }
     }
 
-    const [nextAvailability, nextShowTokenUsage, nextSendKey] = await Promise.all([
-      service.getAvailability(value),
-      service.getShowTokenUsage(),
-      service.getSendKey(),
-    ])
+    const [nextAvailability, nextShowTokenUsage, nextSendKey, nextLoadRemoteImages] =
+      await Promise.all([
+        service.getAvailability(value),
+        service.getShowTokenUsage(),
+        service.getSendKey(),
+        service.getLoadRemoteImages(),
+      ])
 
     return {
       conversation: value,
       availability: nextAvailability,
       showTokenUsage: nextShowTokenUsage,
       sendKey: nextSendKey,
+      loadRemoteImages: nextLoadRemoteImages,
     }
   }, [conversationId, service])
 
@@ -110,6 +135,7 @@ export function useChatSession(conversationId: string): ChatSession {
       setAvailability(result.availability)
       setShowTokenUsage(result.showTokenUsage)
       setSendKey(result.sendKey)
+      setLoadRemoteImages(result.loadRemoteImages)
 
       if (!service.isStreaming(conversationId)) {
         useStreamingStore.getState().clearStream(conversationId)
@@ -207,25 +233,84 @@ export function useChatSession(conversationId: string): ChatSession {
     })
   }, [conversationId, loadNewest])
 
+  const addAttachments = useCallback(
+    async (files: readonly File[]): Promise<AddAttachmentsResult> => {
+      const result = await service.addAttachments(files)
+
+      if (result.attachments.length > 0) {
+        setAttachmentState((current) => {
+          const items = current.conversationId === conversationId ? current.items : []
+          return { conversationId, items: [...items, ...result.attachments] }
+        })
+      }
+
+      return result
+    },
+    [conversationId, service],
+  )
+
+  const removeAttachment = useCallback(
+    async (id: string): Promise<void> => {
+      setAttachmentState((current) => ({
+        conversationId,
+        items:
+          current.conversationId === conversationId
+            ? current.items.filter((attachment) => attachment.id !== id)
+            : [],
+      }))
+
+      try {
+        await service.removeAttachment(id)
+      } catch {
+        // Removing a draft attachment is best-effort; the chip is already gone.
+      }
+    },
+    [conversationId, service],
+  )
+
   const send = useCallback(
-    async (text: string): Promise<boolean> => {
+    async (text: string, pending: readonly Attachment[] = attachments): Promise<boolean> => {
       if (!conversation) {
         return false
       }
 
       const trimmed = text.trim()
 
-      if (trimmed === '') {
+      if (trimmed === '' && pending.length === 0) {
         return false
       }
 
       const timestamp = nowIso()
+      const parts: Message['parts'] = []
+
+      if (trimmed !== '') {
+        parts.push({ type: 'text', text: trimmed })
+      }
+
+      for (const attachment of pending) {
+        if (attachment.kind === 'image') {
+          parts.push({
+            type: 'image',
+            attachmentId: attachment.id,
+            mimeType: attachment.mimeType,
+            alt: attachment.name,
+          })
+        } else {
+          parts.push({
+            type: 'file',
+            attachmentId: attachment.id,
+            mimeType: attachment.mimeType,
+            name: attachment.name,
+          })
+        }
+      }
+
       const userMessage: Message = {
         id: newId(),
         conversationId,
         sequence: conversation.messageCount + 1,
         role: 'user',
-        parts: [{ type: 'text', text: trimmed }],
+        parts,
         status: 'complete',
         providerId: conversation.providerId,
         modelId: conversation.modelId,
@@ -252,6 +337,7 @@ export function useChatSession(conversationId: string): ChatSession {
           return false
         }
 
+        setAttachmentState({ conversationId, items: [] })
         await load()
         return true
       } catch (cause) {
@@ -260,7 +346,7 @@ export function useChatSession(conversationId: string): ChatSession {
         return false
       }
     },
-    [appendOptimistic, conversation, conversationId, load, loadNewest, service],
+    [appendOptimistic, attachments, conversation, conversationId, load, loadNewest, service],
   )
 
   const cancel = useCallback(async () => {
@@ -350,9 +436,13 @@ export function useChatSession(conversationId: string): ChatSession {
     availability: isCurrent ? availability : null,
     showTokenUsage,
     sendKey,
+    loadRemoteImages,
     streamingMessageId,
     isStreaming,
     announcement,
+    attachments,
+    addAttachments,
+    removeAttachment,
     loadOlder,
     send,
     cancel,

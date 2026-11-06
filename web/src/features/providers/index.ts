@@ -3,7 +3,9 @@ export { ProviderService, getProviderKeyMetadata } from './providerService'
 export { buildProviderContext } from './runtime'
 export {
   ProviderServiceError,
+  type CreateCustomProviderInput,
   type CreateOpenRouterProviderInput,
+  type CreatePresetProviderInput,
   type DefaultModelSelection,
   type ManualModelInput,
   type ModelServiceOptions,
@@ -33,6 +35,7 @@ export {
 export { useProviderManagement } from './providerManagementContext'
 export { ProviderListScreen } from './ProviderListScreen'
 export { ProviderDetailScreen } from './ProviderDetailScreen'
+export { CustomProviderForm, type CustomProviderFormProps } from './CustomProviderForm'
 export { ProviderDetailRoute, ProvidersSettingsRoute } from './ProviderRoutes'
 export { ModelPickerDialog, type ModelPickerDialogProps } from './ModelPickerDialog'
 export { ModelChip, type ModelChipProps } from './ModelChip'
@@ -54,6 +57,22 @@ export {
   type ModelPickerGroup,
   type ModelPickerOptions,
 } from './modelPicker'
+export {
+  CORE_PARAMETER_DEFINITIONS,
+  PROTECTED_EXTRA_FIELDS,
+  extraNamespaceForPreset,
+  parseProviderExtras,
+  pruneExtrasForPreset,
+  readProviderExtras,
+  stringifyProviderExtras,
+  unsupportedParameterNote,
+  unsupportedParameters,
+  withProviderExtras,
+  type CoreParameterDefinition,
+  type CoreParameterKey,
+  type ProtectedExtraField,
+  type ProviderExtrasParseResult,
+} from './parameterSupport'
 export {
   DEFAULT_ROUTING_PREFERENCES,
   buildProviderRouting,

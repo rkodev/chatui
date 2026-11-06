@@ -1,5 +1,7 @@
 package dev.chatui.feature.chat
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,36 +22,48 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
+import dev.chatui.core.database.attachment.formatAttachmentSize
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.model.Attachment
+import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.Message
 import dev.chatui.core.model.MessageRole
 import dev.chatui.core.model.MessageStatus
 import dev.chatui.core.model.Usage
+import java.io.File
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /** Test tags exposed by one message row. */
 object ChatMessageTestTags {
     const val Reasoning = "chat-message-reasoning"
+    const val ReasoningText = "chat-message-reasoning-text"
     const val Typing = "chat-message-typing"
     const val Cancelled = "chat-message-cancelled"
     const val Error = "chat-message-error"
     const val Retry = "chat-message-retry"
     const val Meta = "chat-message-meta"
+    const val AttachmentImage = "chat-message-attachment-image"
+    const val AttachmentFile = "chat-message-attachment-file"
 
     fun message(id: String): String = "chat-message-$id"
 
     fun text(id: String): String = "chat-message-text-$id"
 
     fun errorDetails(id: String): String = "chat-message-error-details-$id"
+
+    fun attachment(id: String): String = "chat-message-attachment-$id"
 }
 
 private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
@@ -93,6 +108,7 @@ fun ChatMessageItem(
     modifier: Modifier = Modifier,
     chatFontSize: ChatFontSize = ChatFontSize.MD,
     showTokenUsage: Boolean = false,
+    loadRemoteImages: Boolean = false,
     isActiveStream: Boolean = false,
     showActions: Boolean = true,
     canRegenerate: Boolean = false,
@@ -102,6 +118,8 @@ fun ChatMessageItem(
     onEditLastUser: ((Message, String) -> Unit)? = null,
     zoneId: ZoneId = ZoneId.systemDefault(),
     onComposed: ((String) -> Unit)? = null,
+    attachments: Map<String, Attachment> = emptyMap(),
+    attachmentFile: (String) -> File? = { null },
 ) {
     SideEffect { onComposed?.invoke(message.id) }
     val dimens = LocalDimens.current
@@ -109,7 +127,11 @@ fun ChatMessageItem(
     val isUser = message.role == MessageRole.USER
     val text = message.textParts()
     val reasoning = message.reasoningParts()
+    val attachmentParts = message.parts.filter { part ->
+        part is ContentPart.Image || part is ContentPart.File
+    }
     val hasText = text.any { it.isNotBlank() }
+    val hasContent = hasText || attachmentParts.isNotEmpty()
     val errorCopy = message.error?.let(::describeChatError)
     val bodyStyle: TextStyle = Typography.chatStyle(chatFontSize)
     val alignment = if (isUser) Alignment.End else Alignment.Start
@@ -171,6 +193,7 @@ fun ChatMessageItem(
                         text = reasoning.joinToString("\n"),
                         style = bodyStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag(ChatMessageTestTags.ReasoningText),
                     )
                 }
             }
@@ -180,10 +203,28 @@ fun ChatMessageItem(
                     content = part,
                     modifier = Modifier.testTag(ChatMessageTestTags.text(message.id)),
                     chatFontSize = chatFontSize,
+                    loadRemoteImages = loadRemoteImages,
                 )
             }
 
-            if (!hasText && message.status == MessageStatus.STREAMING && isActiveStream) {
+            attachmentParts.forEach { part ->
+                when (part) {
+                    is ContentPart.Image -> MessageImageAttachment(
+                        part = part,
+                        attachment = attachments[part.attachmentId],
+                        file = attachmentFile(part.attachmentId),
+                    )
+
+                    is ContentPart.File -> MessageFileAttachment(
+                        part = part,
+                        attachment = attachments[part.attachmentId],
+                    )
+
+                    else -> Unit
+                }
+            }
+
+            if (!hasContent && message.status == MessageStatus.STREAMING && isActiveStream) {
                 Text(
                     text = "…",
                     style = bodyStyle,
@@ -193,7 +234,7 @@ fun ChatMessageItem(
                 )
             }
 
-            if (!hasText && message.status == MessageStatus.COMPLETE) {
+            if (!hasContent && message.status == MessageStatus.COMPLETE) {
                 Text(
                     text = "No content.",
                     style = MaterialTheme.typography.bodySmall,
@@ -297,6 +338,73 @@ fun ChatMessageItem(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag(ChatMessageTestTags.Meta),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MessageImageAttachment(
+    part: ContentPart.Image,
+    attachment: Attachment?,
+    file: File?,
+) {
+    val dimens = LocalDimens.current
+    val bitmap = remember(part.attachmentId, file?.path) {
+        if (file != null) BitmapFactory.decodeFile(file.path) else null
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = attachment?.name ?: part.alt,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 320.dp)
+                .testTag(ChatMessageTestTags.attachment(part.attachmentId))
+                .semantics { contentDescription = attachment?.name ?: part.alt },
+        )
+    } else {
+        Text(
+            text = attachment?.name ?: part.alt.ifBlank { "Image attachment" },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .testTag(ChatMessageTestTags.AttachmentImage)
+                .semantics { contentDescription = "Image attachment" },
+        )
+    }
+}
+
+@Composable
+private fun MessageFileAttachment(
+    part: ContentPart.File,
+    attachment: Attachment?,
+) {
+    val dimens = LocalDimens.current
+    val name = attachment?.name ?: part.name
+    val size = attachment?.size
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ChatMessageTestTags.attachment(part.attachmentId))
+            .semantics { contentDescription = "File attachment $name" },
+        horizontalArrangement = Arrangement.spacedBy(dimens.space2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f),
+        )
+        if (size != null) {
+            Text(
+                text = formatAttachmentSize(size),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(ChatMessageTestTags.AttachmentFile),
             )
         }
     }

@@ -42,6 +42,7 @@ object ChatCodeBlockTestTags {
     const val Code = "chat-code-block-code"
     const val Language = "chat-code-block-language"
     const val Copy = "chat-code-block-copy"
+    const val Wrap = "chat-code-block-wrap"
 }
 
 /**
@@ -67,6 +68,7 @@ fun ChatCodeBlock(
     }
     val label = remember(language) { codeLanguageLabel(language) }
     var copied by remember(code) { mutableStateOf(false) }
+    var wrapped by remember(code) { mutableStateOf(false) }
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
 
@@ -100,32 +102,49 @@ fun ChatCodeBlock(
                     .padding(top = dimens.space2)
                     .testTag(ChatCodeBlockTestTags.Language),
             )
-            TextButton(
-                onClick = {
-                    if (onCopy != null) {
-                        onCopy(code)
-                    } else {
-                        clipboard.setText(AnnotatedString(code))
-                    }
-                    copied = true
-                },
-                modifier = Modifier
-                    .heightIn(min = dimens.touchTargetMin)
-                    .testTag(ChatCodeBlockTestTags.Copy),
-            ) {
-                Text(if (copied) "Copied" else "Copy code")
+            Row(horizontalArrangement = Arrangement.spacedBy(dimens.space1)) {
+                TextButton(
+                    onClick = { wrapped = !wrapped },
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatCodeBlockTestTags.Wrap),
+                ) {
+                    Text(if (wrapped) "Scroll" else "Wrap")
+                }
+                TextButton(
+                    onClick = {
+                        if (onCopy != null) {
+                            onCopy(code)
+                        } else {
+                            clipboard.setText(AnnotatedString(code))
+                        }
+                        copied = true
+                    },
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatCodeBlockTestTags.Copy),
+                ) {
+                    Text(if (copied) "Copied" else "Copy code")
+                }
             }
         }
 
         SelectionContainer {
-            Text(
-                text = highlighted ?: AnnotatedString(code),
-                style = style,
-                modifier = Modifier
+            val codeModifier = if (wrapped) {
+                Modifier
+                    .fillMaxWidth()
+                    .padding(dimens.space3)
+            } else {
+                Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
                     .padding(dimens.space3)
-                    .testTag(ChatCodeBlockTestTags.Code),
+            }
+            Text(
+                text = highlighted ?: AnnotatedString(code),
+                style = style,
+                softWrap = wrapped,
+                modifier = codeModifier.testTag(ChatCodeBlockTestTags.Code),
             )
         }
     }

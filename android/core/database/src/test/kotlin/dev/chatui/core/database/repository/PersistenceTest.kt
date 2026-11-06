@@ -4,16 +4,22 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.database.ChatUiDatabase
+import dev.chatui.core.database.attachment.AttachmentInput
+import dev.chatui.core.database.attachment.AttachmentService
+import dev.chatui.core.database.attachment.AttachmentStorage
 import dev.chatui.core.database.recovery.StreamingRecoveryService
 import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.MessageStatus
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -25,6 +31,9 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class PersistenceTest {
+    @get:Rule
+    val temporaryFolder = TemporaryFolder()
+
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val databaseName = "chatui-persistence-test.db"
     private val clock = Clock.fixed(
@@ -83,6 +92,28 @@ class PersistenceTest {
     }
 
     @Test
+    fun `pin and archive flags survive a database reopen`() = runTest {
+        withDatabase { db ->
+            val conversations = ConversationRepository(db.conversationDao(), clock)
+            conversations.create(RepositoryTestData.conversation(id = "active"))
+            conversations.create(RepositoryTestData.conversation(id = "archived"))
+            conversations.setPinned("active", true)
+            conversations.setArchived("archived", true)
+        }
+
+        withDatabase { db ->
+            val conversations = ConversationRepository(db.conversationDao(), clock)
+
+            assertThat(conversations.get("active")!!.pinned).isTrue()
+            assertThat(conversations.get("archived")!!.archived).isTrue()
+            assertThat(conversations.observeActive().first().map { it.id })
+                .containsExactly("active")
+            assertThat(conversations.observeArchived().first().map { it.id })
+                .containsExactly("archived")
+        }
+    }
+
+    @Test
     fun `a streaming message is recovered after a reopen with partial content`() = runTest {
         withDatabase { db ->
             val conversations = ConversationRepository(db.conversationDao(), clock)
@@ -129,6 +160,56 @@ class PersistenceTest {
             assertThat(messages.count("conversation-1")).isEqualTo(1)
             assertThat(messages.latest("conversation-1").map { it.id })
                 .containsExactly("message-1")
+        }
+    }
+
+    @Test
+    fun `attachment metadata and bytes survive a database reopen`() = runTest {
+        val storage = AttachmentStorage(temporaryFolder.newFolder("attachments"))
+        val bytes = "persisted attachment".toByteArray()
+        var attachmentId: String? = null
+
+        withDatabase { db ->
+            val conversations = ConversationRepository(db.conversationDao(), clock)
+            val messages = MessageRepository(db.messageDao(), clock)
+            conversations.create(RepositoryTestData.conversation())
+            messages.appendMessage(RepositoryTestData.message(id = "message-1", sequence = 1))
+
+            val service = AttachmentService(
+                repository = AttachmentRepository(db.attachmentDao()),
+                messages = messages,
+                storage = storage,
+                clock = clock,
+                newId = { "attachment-1" },
+            )
+            val added = service.addFiles(
+                listOf(
+                    AttachmentInput(
+                        name = "notes.txt",
+                        mimeType = "text/plain",
+                        size = bytes.size.toLong(),
+                        bytes = bytes,
+                    ),
+                ),
+                messageId = "message-1",
+            ).attachments.single()
+            attachmentId = added.id
+        }
+
+        withDatabase { db ->
+            val service = AttachmentService(
+                repository = AttachmentRepository(db.attachmentDao()),
+                messages = MessageRepository(db.messageDao(), clock),
+                storage = storage,
+                clock = clock,
+            )
+
+            val reloaded = service.get(attachmentId!!)!!
+            assertThat(reloaded.name).isEqualTo("notes.txt")
+            assertThat(reloaded.messageId).isEqualTo("message-1")
+            assertThat(service.forMessage("message-1").map { it.id })
+                .containsExactly(attachmentId)
+            assertThat(storage.read(reloaded.storageKey)).isEqualTo(bytes)
         }
     }
 

@@ -129,8 +129,10 @@ fun testMessage(
 fun testChatContext(
     provider: Provider = testProvider(),
     modelRemoteId: String = "openrouter/auto",
+    inputModalities: List<InputModality> = listOf(InputModality.TEXT),
 ): ChatContext = ChatContext(
     providerContext = ProviderContext(provider, "test-key"),
     modelRemoteId = modelRemoteId,
     supportedParameters = emptyList(),
+    inputModalities = inputModalities,
 )

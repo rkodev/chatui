@@ -2,8 +2,23 @@
   "appName": "ChatUI",
   "defaultTheme": "system",
   "defaultProviderPreset": "openrouter",
-  "enabledPresets": ["openrouter"],
-  "allowCustomProviders": false,
+  "enabledPresets": [
+    "openrouter",
+    "openai",
+    "anthropic",
+    "google",
+    "groq",
+    "mistral",
+    "deepseek",
+    "xai",
+    "together",
+    "fireworks",
+    "ollama",
+    "lmstudio",
+    "llamacpp",
+    "custom"
+  ],
+  "allowCustomProviders": true,
   "openRouter": {
     "attributionOrigin": "https://chat.example.com",
     "appTitle": "ChatUI"

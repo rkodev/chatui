@@ -312,6 +312,39 @@ describe('ConversationService', () => {
     expect(await settings.getLastActiveConversationId()).toBeNull()
   })
 
+  it('persists pin and archive flags without changing the updated timestamp', async () => {
+    await configureDefaults()
+    const created = await service.createConversation()
+
+    expect(created.ok).toBe(true)
+    if (!created.ok) {
+      return
+    }
+
+    const pinned = await service.setConversationPinned(created.conversation.id, true)
+    const archived = await service.setConversationArchived(created.conversation.id, true)
+
+    expect(pinned.pinned).toBe(true)
+    expect(pinned.updatedAt).toBe(created.conversation.updatedAt)
+    expect(archived.archived).toBe(true)
+    expect(archived.updatedAt).toBe(created.conversation.updatedAt)
+
+    const reloaded = await service.getConversation(created.conversation.id)
+    expect(reloaded).toMatchObject({ pinned: true, archived: true })
+
+    const active = await service.listConversations({ archived: false })
+    expect(active.items).toEqual([])
+    const archive = await service.listConversations({ archived: true })
+    expect(archive.items.map((item) => item.id)).toEqual([created.conversation.id])
+
+    await expect(service.setConversationPinned('missing', true)).rejects.toMatchObject({
+      code: 'not_found',
+    })
+    await expect(service.setConversationArchived('missing', true)).rejects.toMatchObject({
+      code: 'not_found',
+    })
+  })
+
   it('rejects blank rename titles and missing conversations', async () => {
     await configureDefaults()
     const created = await service.createConversation()

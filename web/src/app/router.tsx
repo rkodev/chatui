@@ -6,16 +6,20 @@ import {
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router'
-import { ChatRoute } from '../features/chat'
+import { ChatRoute, ConversationSettingsRoute } from '../features/chat'
 import { HomeRoute, OnboardingRoute } from '../features/onboarding'
+import {
+  AboutSettingsScreen,
+  AppearanceSettingsScreen,
+  BackupSettingsScreen,
+  ChatSettingsRoute,
+  DataSettingsScreen,
+  ModelsSettingsRoute,
+  SettingsLayout,
+} from '../features/settings'
 import { RootLayout } from './routes/RootLayout'
 import {
   NotFoundPlaceholder,
-  SettingsAboutPlaceholder,
-  SettingsAppearancePlaceholder,
-  SettingsBackupPlaceholder,
-  SettingsDataPlaceholder,
-  SettingsModelsPlaceholder,
   SettingsProviderDetailPlaceholder,
   SettingsProvidersPlaceholder,
 } from './routes/placeholders'
@@ -37,9 +41,16 @@ const chatRoute = createRoute({
   component: ChatRoute,
 })
 
+const conversationSettingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'chat/$conversationId/settings',
+  component: ConversationSettingsRoute,
+})
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'settings',
+  component: SettingsLayout,
 })
 
 const settingsIndexRoute = createRoute({
@@ -53,7 +64,13 @@ const settingsIndexRoute = createRoute({
 const settingsAppearanceRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: 'appearance',
-  component: SettingsAppearancePlaceholder,
+  component: AppearanceSettingsScreen,
+})
+
+const settingsChatRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: 'chat',
+  component: ChatSettingsRoute,
 })
 
 const settingsProvidersRoute = createRoute({
@@ -82,33 +99,35 @@ const settingsProviderDetailRoute = createRoute({
 const settingsModelsRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: 'models',
-  component: SettingsModelsPlaceholder,
+  component: ModelsSettingsRoute,
 })
 
 const settingsDataRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: 'data',
-  component: SettingsDataPlaceholder,
+  component: DataSettingsScreen,
 })
 
 const settingsBackupRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: 'backup',
-  component: SettingsBackupPlaceholder,
+  component: BackupSettingsScreen,
 })
 
 const settingsAboutRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: 'about',
-  component: SettingsAboutPlaceholder,
+  component: AboutSettingsScreen,
 })
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
   chatRoute,
+  conversationSettingsRoute,
   settingsRoute.addChildren([
     settingsIndexRoute,
     settingsAppearanceRoute,
+    settingsChatRoute,
     settingsProvidersRoute.addChildren([
       settingsProvidersIndexRoute,
       settingsProviderNewRoute,

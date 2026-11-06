@@ -125,14 +125,15 @@ describe('web shell smoke tests', () => {
   it.each([
     ['/', 'Welcome to ChatUI'],
     ['/chat/conversation-1', 'Conversation not found'],
-    ['/settings/appearance', 'Appearance settings placeholder'],
+    ['/settings/appearance', 'Appearance'],
+    ['/settings/chat', 'Chat defaults'],
     ['/settings/providers', 'Providers'],
     ['/settings/providers/new', 'Welcome to ChatUI'],
     ['/settings/providers/provider-1', 'OpenRouter'],
     ['/settings/models', 'Models'],
-    ['/settings/data', 'Data settings placeholder'],
-    ['/settings/backup', 'Backup settings placeholder'],
-    ['/settings/about', 'About settings placeholder'],
+    ['/settings/data', 'Data'],
+    ['/settings/backup', 'Backup'],
+    ['/settings/about', 'About'],
   ])('renders the %s route', async (path, heading) => {
     renderShell(path)
 

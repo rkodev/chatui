@@ -21,11 +21,13 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.model.Attachment
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.Conversation
 import dev.chatui.core.model.Message
 import dev.chatui.core.model.MessageRole
+import java.io.File
 import java.time.ZoneId
 
 /** Test tags exposed by the chat message list. */
@@ -57,10 +59,13 @@ fun ChatMessageList(
     onEditLastUser: ((Message, String) -> Unit)? = null,
     actionsEnabled: Boolean = true,
     showTokenUsage: Boolean = false,
+    loadRemoteImages: Boolean = false,
     chatFontSize: ChatFontSize = ChatFontSize.MD,
     zoneId: ZoneId = ZoneId.systemDefault(),
     listState: LazyListState = rememberLazyListState(),
     onMessageComposed: ((String) -> Unit)? = null,
+    attachments: Map<String, Attachment> = emptyMap(),
+    attachmentFile: (String) -> File? = { null },
 ) {
     val dimens = LocalDimens.current
     val isStreaming = streaming?.done == false
@@ -93,7 +98,7 @@ fun ChatMessageList(
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.totalItemsCount }.collect { total ->
             if (total > 0 && !initialScrollDone) {
-                listState.scrollToItem(total - 1)
+                listState.requestScrollToItem(total - 1)
                 initialScrollDone = true
             }
         }
@@ -103,7 +108,7 @@ fun ChatMessageList(
         val total = listState.layoutInfo.totalItemsCount
         if (total == 0 || !initialScrollDone) return@LaunchedEffect
         if (isNearBottom) {
-            listState.scrollToItem(total - 1)
+            listState.requestScrollToItem(total - 1)
         }
     }
 
@@ -142,6 +147,7 @@ fun ChatMessageList(
                 message = message,
                 chatFontSize = chatFontSize,
                 showTokenUsage = showTokenUsage,
+                loadRemoteImages = loadRemoteImages,
                 onRetry = onRetry,
                 onRegenerate = onRegenerate,
                 onEditLastUser = onEditLastUser,
@@ -149,6 +155,8 @@ fun ChatMessageList(
                 canEditLastUser = actionsEnabled && message.id == lastUserId,
                 zoneId = zoneId,
                 onComposed = onMessageComposed,
+                attachments = attachments,
+                attachmentFile = attachmentFile,
             )
         }
 
@@ -158,6 +166,7 @@ fun ChatMessageList(
                     message = stream.toMessage(conversation),
                     chatFontSize = chatFontSize,
                     showTokenUsage = showTokenUsage,
+                    loadRemoteImages = loadRemoteImages,
                     isActiveStream = !stream.done,
                     showActions = false,
                     onRetry = onRetry?.takeIf { stream.done },

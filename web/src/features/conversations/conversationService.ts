@@ -7,7 +7,13 @@ import {
   type Model,
   type Provider,
 } from '../../domain'
-import type { AppendMessageResult, ConversationListOptions, ConversationPage } from '../../storage'
+import type {
+  AppendMessageResult,
+  ConversationListOptions,
+  ConversationPage,
+  ConversationSearchOptions,
+  ConversationSearchResult,
+} from '../../storage'
 import {
   ConversationServiceError,
   type ConversationServiceOptions,
@@ -173,6 +179,14 @@ export class ConversationService {
     return this.conversations.list(options)
   }
 
+  /** Search titles and message text through the repository's bounded scan. */
+  async searchConversations(
+    query: string,
+    options: ConversationSearchOptions = {},
+  ): Promise<ConversationSearchResult> {
+    return this.conversations.search(query, options)
+  }
+
   /** Rename a conversation. Blank titles are rejected. */
   async renameConversation(id: string, title: string): Promise<Conversation> {
     const trimmed = title.trim()
@@ -192,6 +206,21 @@ export class ConversationService {
     }
 
     return this.conversations.update(id, { title: trimmed })
+  }
+
+  /** Pin or unpin a conversation without changing its timestamp. */
+  async setConversationPinned(id: string, pinned: boolean): Promise<Conversation> {
+    return this.updateConversationFlags(id, { pinned })
+  }
+
+  /**
+   * Archive or unarchive a conversation.
+   *
+   * Archived conversations stay in storage and are excluded from the active
+   * history list by the repository filter.
+   */
+  async setConversationArchived(id: string, archived: boolean): Promise<Conversation> {
+    return this.updateConversationFlags(id, { archived })
   }
 
   /**
@@ -269,6 +298,22 @@ export class ConversationService {
     }
 
     return conversation
+  }
+
+  private async updateConversationFlags(
+    id: string,
+    flags: Pick<Partial<Conversation>, 'pinned' | 'archived'>,
+  ): Promise<Conversation> {
+    const existing = await this.conversations.get(id)
+
+    if (!existing) {
+      throw new ConversationServiceError('not_found', `Conversation ${id} was not found.`, id)
+    }
+
+    return this.conversations.update(id, {
+      ...flags,
+      updatedAt: existing.updatedAt,
+    })
   }
 
   private async resolveProvider(preferredId: string | null): Promise<Provider | null> {

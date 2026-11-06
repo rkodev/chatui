@@ -1,0 +1,49 @@
+{
+  "name": "anthropic-basic",
+  "kind": "chat-request",
+  "providerId": "anthropic",
+  "request": {
+    "model": "claude-sonnet-4-5",
+    "system": "You are a concise assistant.",
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Hello"
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": 256,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {}
+    }
+  },
+  "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "stream"],
+  "expected": {
+    "body": {
+      "model": "claude-sonnet-4-5",
+      "system": "You are a concise assistant.",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hello"
+            }
+          ]
+        }
+      ],
+      "max_tokens": 256,
+      "stream": true
+    }
+  }
+}

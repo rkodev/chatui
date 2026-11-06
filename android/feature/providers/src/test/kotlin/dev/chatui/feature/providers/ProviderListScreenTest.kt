@@ -1,8 +1,10 @@
 package dev.chatui.feature.providers
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -41,7 +43,9 @@ class ProviderListScreenTest {
         ),
         options = listOf(
             ProviderAvailability("openrouter", "OpenRouter", true, true, null),
-            ProviderAvailability("openai", "OpenAI", false, false, "Coming later"),
+            ProviderAvailability("openai", "OpenAI", true, false, null),
+            ProviderAvailability("anthropic", "Anthropic", true, false, null),
+            ProviderAvailability("google", "Google Gemini", false, false, "Coming later"),
         ),
         loading = false,
     )
@@ -66,7 +70,7 @@ class ProviderListScreenTest {
     }
 
     @Test
-    fun `shows other presets as coming later and no custom creation`() {
+    fun `shows enabled presets and coming-later presets`() {
         composeRule.setContent {
             ChatUiTheme {
                 ProviderListScreen(
@@ -81,10 +85,135 @@ class ProviderListScreenTest {
             .performScrollToNode(hasTestTag(ProviderListTestTags.providerOption("openai")))
         composeRule.onNodeWithTag(ProviderListTestTags.providerOption("openai"))
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Coming later").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Available").assertCountEquals(2)
+
         composeRule.onNodeWithTag(ProviderListTestTags.Screen)
-            .performScrollToNode(hasTestTag(ProviderListTestTags.NoCustomProvider))
-        composeRule.onNodeWithTag(ProviderListTestTags.NoCustomProvider).assertIsDisplayed()
+            .performScrollToNode(hasTestTag(ProviderListTestTags.providerOption("google")))
+        composeRule.onNodeWithTag(ProviderListTestTags.providerOption("google"))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Coming later").assertIsDisplayed()
+    }
+
+    @Test
+    fun `shows enabled preset options and the preset form`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state(),
+                    onOpenProvider = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.PresetForm))
+        composeRule.onNodeWithTag(ProviderListTestTags.PresetForm).assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.presetOption("openai"))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.presetOption("anthropic"))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.presetOption("google"))
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun `preset form forwards selection and creation`() {
+        var selected: String? = null
+        var created = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state().copy(
+                        presetForm = PresetProviderFormState(presetId = "openai"),
+                    ),
+                    onOpenProvider = {},
+                    onRetry = {},
+                    onPresetSelected = { selected = it },
+                    onCreatePresetProvider = { created = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.PresetForm))
+        composeRule.onNodeWithTag(ProviderListTestTags.presetOption("openai"))
+            .performClick()
+        composeRule.onNodeWithTag(ProviderListTestTags.PresetApiKey).assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.PresetCreate))
+        composeRule.onNodeWithTag(ProviderListTestTags.PresetCreate).performClick()
+
+        assertThat(selected).isEqualTo("openai")
+        assertThat(created).isTrue()
+    }
+
+    @Test
+    fun `shows the custom provider form`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state(),
+                    onOpenProvider = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.CustomForm))
+        composeRule.onNodeWithTag(ProviderListTestTags.CustomForm).assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.CustomBaseUrl).assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.CustomCreate))
+        composeRule.onNodeWithTag(ProviderListTestTags.CustomCreate).assertIsDisplayed()
+    }
+
+    @Test
+    fun `custom form forwards the create action`() {
+        var created = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state(),
+                    onOpenProvider = {},
+                    onRetry = {},
+                    onCreateCustomProvider = { created = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.CustomCreate))
+        composeRule.onNodeWithTag(ProviderListTestTags.CustomCreate).performClick()
+
+        assertThat(created).isTrue()
+    }
+
+    @Test
+    fun `shows custom form errors and notices`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state().copy(
+                        customForm = CustomProviderFormState(error = "Enter a base URL."),
+                        notice = "Custom provider added.",
+                    ),
+                    onOpenProvider = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.CustomError))
+        composeRule.onNodeWithTag(ProviderListTestTags.CustomError).assertIsDisplayed()
+        composeRule.onNodeWithText("Enter a base URL.").assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.CustomNotice))
+        composeRule.onNodeWithTag(ProviderListTestTags.CustomNotice).assertIsDisplayed()
     }
 
     @Test

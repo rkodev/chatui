@@ -1,0 +1,53 @@
+{
+  "name": "anthropic-protected",
+  "kind": "protected-fields",
+  "providerId": "anthropic",
+  "request": {
+    "model": "claude-sonnet-4-5",
+    "system": null,
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Hello"
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": null,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {
+        "anthropic": {
+          "model": "attacker/model",
+          "messages": [],
+          "stream": false,
+          "stream_options": {
+            "include_usage": false
+          }
+        }
+      }
+    }
+  },
+  "supportedParameters": ["stream"],
+  "expected": {
+    "error": {
+      "code": "invalid_request",
+      "message": "Advanced JSON cannot override protected fields: messages, model, stream, stream_options.",
+      "providerId": "anthropic",
+      "status": null,
+      "retryable": false,
+      "retryAfterSeconds": null,
+      "requestId": null,
+      "details": {
+        "protectedFields": ["messages", "model", "stream", "stream_options"]
+      }
+    }
+  }
+}

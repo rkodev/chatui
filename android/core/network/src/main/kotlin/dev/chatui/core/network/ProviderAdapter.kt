@@ -33,3 +33,20 @@ interface ProviderAdapter {
         request: NormalizedChatRequest,
     ): Flow<StreamEvent>
 }
+
+/**
+ * A [ProviderAdapter] that also exposes cache-aware catalog operations.
+ *
+ * Provider and model services use this surface for forced refreshes so the
+ * adapter's last-known-good cache is updated instead of bypassed.
+ */
+interface CatalogAdapter : ProviderAdapter {
+    /** Load the catalog, optionally bypassing the cache TTL. */
+    suspend fun loadCatalog(
+        context: ProviderContext,
+        forceRefresh: Boolean = false,
+    ): CatalogResult
+
+    /** Force a catalog refresh while preserving last-known-good behavior. */
+    suspend fun refreshCatalog(context: ProviderContext): CatalogResult
+}

@@ -1,0 +1,12 @@
+{
+  "status": 403,
+  "headers": {},
+  "body": {
+    "error": {
+      "message": "You do not have permission to access this model.",
+      "type": "permission_error",
+      "param": null,
+      "code": "model_permission_denied"
+    }
+  }
+}

@@ -3,7 +3,7 @@ import {
   getDefaultPreset,
   getEnabledPresets,
   getPreset,
-  isPresetEnabledInM1,
+  isPresetEnabledInM2,
   providerPresets,
 } from './registry'
 import {
@@ -26,7 +26,7 @@ export function ProviderRegistryProvider({
       enabledPresets: getEnabledPresets(presets),
       getPreset: (id) => getPreset(id, presets),
       getDefaultPreset: () => getDefaultPreset(presets),
-      isEnabled: isPresetEnabledInM1,
+      isEnabled: isPresetEnabledInM2,
     }),
     [presets],
   )

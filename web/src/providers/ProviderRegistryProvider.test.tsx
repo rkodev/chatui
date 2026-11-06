@@ -21,7 +21,7 @@ function RegistryProbe() {
 }
 
 describe('ProviderRegistryProvider', () => {
-  it('supplies contracts presets and M1 gating to feature code', () => {
+  it('supplies contracts presets and M2 enablement to feature code', () => {
     render(
       <ProviderRegistryProvider>
         <RegistryProbe />
@@ -29,9 +29,11 @@ describe('ProviderRegistryProvider', () => {
     )
 
     expect(screen.getByTestId('preset-count')).toHaveTextContent(String(providerPresets.length))
-    expect(screen.getByTestId('enabled-presets')).toHaveTextContent('openrouter')
+    expect(screen.getByTestId('enabled-presets')).toHaveTextContent(
+      'openrouter,openai,anthropic,google,groq,mistral,deepseek,xai,together,fireworks,ollama,lmstudio,llamacpp,custom',
+    )
     expect(screen.getByTestId('default-preset')).toHaveTextContent('openrouter')
     expect(screen.getByTestId('openrouter-label')).toHaveTextContent('OpenRouter')
-    expect(screen.getByTestId('custom-enabled')).toHaveTextContent('false')
+    expect(screen.getByTestId('custom-enabled')).toHaveTextContent('true')
   })
 })

@@ -57,6 +57,42 @@ class MarkdownSupportTest {
     }
 
     @Test
+    fun `splits standalone block math and leaves inline math as text`() {
+        val blocks = splitBlockMath("Before\n\n\$\$\n\\int_0^1 x^2 dx\n\$\$\n\nInline \$a+b\$ after")
+
+        assertThat(blocks).hasSize(3)
+        assertThat(blocks[0]).isInstanceOf(MathBlock.Text::class.java)
+        assertThat((blocks[0] as MathBlock.Text).text).contains("Before")
+        assertThat(blocks[1]).isEqualTo(MathBlock.Math("\\int_0^1 x^2 dx"))
+        assertThat((blocks[2] as MathBlock.Text).text).contains("Inline \$a+b\$ after")
+    }
+
+    @Test
+    fun `leaves unterminated block math and fenced code untouched`() {
+        val unterminated = splitBlockMath("Before\n\$\$\nstill text")
+        assertThat(unterminated).hasSize(1)
+        assertThat(unterminated.first()).isInstanceOf(MathBlock.Text::class.java)
+
+        val fenced = splitBlockMath("```\n\$\$\nnot math\n\$\$\n```")
+        assertThat(fenced).hasSize(1)
+        assertThat(fenced.first()).isInstanceOf(MathBlock.Text::class.java)
+    }
+
+    @Test
+    fun `only absolute http and https image sources are loadable`() {
+        assertThat(sanitizeImageUrl("https://example.com/cat.png"))
+            .isEqualTo("https://example.com/cat.png")
+        assertThat(sanitizeImageUrl("http://example.com/cat.png"))
+            .isEqualTo("http://example.com/cat.png")
+
+        assertThat(sanitizeImageUrl("javascript:alert(1)")).isNull()
+        assertThat(sanitizeImageUrl("data:image/png;base64,abc")).isNull()
+        assertThat(sanitizeImageUrl("mailto:user@example.com")).isNull()
+        assertThat(sanitizeImageUrl("/relative.png")).isNull()
+        assertThat(sanitizeImageUrl(null)).isNull()
+    }
+
+    @Test
     fun `message copy joins text parts with a blank line`() {
         val message = testMessage(text = "First").copy(
             role = MessageRole.ASSISTANT,

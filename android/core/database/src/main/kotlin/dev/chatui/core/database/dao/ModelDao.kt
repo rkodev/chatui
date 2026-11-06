@@ -34,6 +34,10 @@ abstract class ModelDao {
     @Query("SELECT * FROM models WHERE id = :id")
     abstract suspend fun getById(id: String): ModelEntity?
 
+    /** Every model, including hidden rows, for export. */
+    @Query("SELECT * FROM models")
+    abstract suspend fun all(): List<ModelEntity>
+
     @Query("SELECT * FROM models WHERE providerId = :providerId AND remoteId = :remoteId")
     abstract suspend fun findByRemoteId(providerId: String, remoteId: String): ModelEntity?
 

@@ -1,0 +1,11 @@
+{
+  "status": 403,
+  "headers": {},
+  "body": {
+    "error": {
+      "code": 403,
+      "message": "Permission denied.",
+      "status": "PERMISSION_DENIED"
+    }
+  }
+}

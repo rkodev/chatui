@@ -5,9 +5,9 @@ import {
   createTestModel,
   createTestProvider,
 } from '../providers/testSupport'
-import { ChatService, type ChatRunnerLike } from './chatService'
+import { ChatService, type ChatAttachmentServiceLike, type ChatRunnerLike } from './chatService'
 import { createStreamingState } from './streamingStore'
-import { createTestMessage } from './testSupport'
+import { createTestAttachment, createTestMessage } from './testSupport'
 
 function createHarness(
   overrides: {
@@ -17,6 +17,7 @@ function createHarness(
     model?: ReturnType<typeof createTestModel> | null
     apiKey?: string | null
     runner?: Partial<ChatRunnerLike>
+    attachments?: ChatAttachmentServiceLike
   } = {},
 ) {
   const conversation = overrides.conversation ?? createTestConversation()
@@ -102,9 +103,11 @@ function createHarness(
     settings: {
       getShowTokenUsage: async () => true,
       getSendKey: async () => 'enter',
+      getLoadRemoteImages: async () => false,
     },
     runner,
     runtime: { fetch: globalThis.fetch },
+    ...(overrides.attachments === undefined ? {} : { attachments: overrides.attachments }),
   })
 
   return {
@@ -168,6 +171,61 @@ describe('ChatService', () => {
           ],
         }),
         sequence: 2,
+      }),
+    )
+  })
+
+  it('resolves attachment bytes and binds them to the appended message', async () => {
+    const attachment = createTestAttachment()
+    const attachToMessage = vi.fn(async () => undefined)
+    const resolveForMessages = vi.fn(async () => ({
+      [attachment.id]: {
+        mimeType: attachment.mimeType,
+        name: attachment.name,
+        dataBase64: 'cGl4ZWw=',
+      },
+    }))
+    const { service, conversation, runner } = createHarness({
+      attachments: {
+        addFiles: vi.fn(async () => ({ attachments: [], errors: [] })),
+        remove: vi.fn(async () => undefined),
+        getDataUrl: vi.fn(async () => null),
+        resolveForMessages,
+        attachToMessage,
+        deleteForMessages: vi.fn(async () => undefined),
+      },
+    })
+    const userMessage = createTestMessage({
+      id: 'm2',
+      sequence: 2,
+      role: 'user',
+      parts: [
+        { type: 'text', text: 'What is this?' },
+        {
+          type: 'image',
+          attachmentId: attachment.id,
+          mimeType: attachment.mimeType,
+          alt: attachment.name,
+        },
+      ],
+    })
+
+    const result = await service.send(conversation, userMessage)
+
+    expect(result.ok).toBe(true)
+    expect(attachToMessage).toHaveBeenCalledWith([attachment.id], userMessage.id)
+    expect(resolveForMessages).toHaveBeenCalled()
+    expect(runner.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: expect.objectContaining({
+          attachments: {
+            [attachment.id]: {
+              mimeType: attachment.mimeType,
+              name: attachment.name,
+              dataBase64: 'cGl4ZWw=',
+            },
+          },
+        }),
       }),
     )
   })

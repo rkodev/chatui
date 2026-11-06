@@ -28,22 +28,94 @@ const EXPECTED_STREAM_SOURCES = new Map([
   ['openrouter-reasoning.json', 'openrouter-reasoning.sse'],
   ['openrouter-usage.json', 'openrouter-usage.sse'],
   ['openrouter-error-200.json', 'openrouter-error-200.sse'],
+  ['openai-text.json', 'openai-text.sse'],
+  ['openai-reasoning.json', 'openai-reasoning.sse'],
+  ['anthropic-text.json', 'anthropic-text.sse'],
+  ['gemini-text.json', 'gemini-text.sse'],
+  ['ollama-ndjson.json', 'ollama-ndjson.txt'],
+  ['error-429.json', 'error-429.sse'],
 ]);
 const EXPECTED_KEY_FILE = 'openrouter-key.json';
 const EXPECTED_ERRORS_FILE = 'openrouter-errors.json';
+const EXPECTED_PROVIDER_ERRORS_FILE = 'provider-errors.json';
+const EXPECTED_ANTHROPIC_THINKING_FILE = 'anthropic-thinking.json';
+const EXPECTED_GEMINI_FINISH_REASONS_FILE = 'gemini-finish-reasons.json';
+const EXPECTED_CATALOGS_FILE = 'catalogs.json';
+const EXPECTED_CAPABILITY_INFERENCE_FILE = 'capability-inference.json';
+const EXPECTED_FALLBACK_MODELS_FILE = 'fallback-models.json';
+const EXPECTED_MATH_FILE = 'math.json';
+const EXPECTED_EXPORT_FILE = 'chatui-export.json';
 const EXPECTED_FILES = new Set([
   ...EXPECTED_STREAM_SOURCES.keys(),
   EXPECTED_KEY_FILE,
   EXPECTED_ERRORS_FILE,
+  EXPECTED_PROVIDER_ERRORS_FILE,
+  EXPECTED_ANTHROPIC_THINKING_FILE,
+  EXPECTED_GEMINI_FINISH_REASONS_FILE,
+  EXPECTED_CATALOGS_FILE,
+  EXPECTED_CAPABILITY_INFERENCE_FILE,
+  EXPECTED_FALLBACK_MODELS_FILE,
+  EXPECTED_MATH_FILE,
+  EXPECTED_EXPORT_FILE,
 ]);
 
 const REQUEST_KINDS = ['chat-request', 'protected-fields', 'attribution', 'default-model'];
+const REQUEST_PROVIDER_IDS = ['openrouter', 'openai', 'anthropic', 'google', 'ollama'];
+const EXTRA_NAMESPACE_BY_PROVIDER = {
+  openrouter: 'openrouter',
+  openai: 'openai',
+  anthropic: 'anthropic',
+  google: 'google',
+  ollama: 'ollama',
+};
 const REQUIRED_REQUEST_FILES = [
   'openrouter-basic.json',
   'openrouter-routing.json',
   'openrouter-advanced-protected.json',
   'openrouter-attribution.json',
+  'openai-basic.json',
+  'openai-attachments.json',
+  'openai-extras.json',
+  'openai-protected.json',
+  'anthropic-basic.json',
+  'anthropic-attachments.json',
+  'anthropic-extras.json',
+  'anthropic-protected.json',
+  'gemini-basic.json',
+  'gemini-attachments.json',
+  'gemini-extras.json',
+  'gemini-protected.json',
+  'ollama-basic.json',
+  'ollama-attachments.json',
+  'ollama-extras.json',
+  'ollama-protected.json',
 ];
+const REQUIRED_REQUEST_PROVIDERS = ['openai', 'anthropic', 'google', 'ollama'];
+const CATALOG_PROVIDER_IDS = ['openai', 'anthropic', 'google', 'ollama'];
+const CATALOG_ENTRY_FIELDS = [
+  'remoteId',
+  'label',
+  'contextWindow',
+  'maxOutputTokens',
+  'inputModalities',
+  'outputModalities',
+  'capabilities',
+  'supportedParameters',
+  'pricing',
+  'hidden',
+];
+const CAPABILITY_ORDER = ['text', 'vision', 'files', 'tools', 'reasoning', 'streaming'];
+const CAPABILITY_INFERENCE_FIELDS = [
+  'inputModalities',
+  'outputModalities',
+  'capabilities',
+  'supportedParameters',
+  'contextWindow',
+  'maxOutputTokens',
+];
+const FALLBACK_PRESET_IDS = ['openai', 'anthropic', 'google', 'ollama'];
+const MATH_SEGMENT_TYPES = ['text', 'math'];
+const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
 const PROTECTED_REQUEST_FIELDS = ['model', 'messages', 'stream', 'stream_options'];
 const REQUEST_BODY_FIELDS = [
   'model',
@@ -101,6 +173,65 @@ const CHAT_ERROR_CODES = [
   'parse',
   'storage',
   'unknown',
+];
+
+const PROVIDER_ERROR_IDS = ['openai', 'anthropic', 'google', 'ollama', 'openrouter'];
+const PROVIDER_ERROR_KINDS = ['http', 'stream', 'synthetic'];
+const REQUIRED_PROVIDER_ERROR_CODES = [
+  'auth',
+  'permission',
+  'rate_limit',
+  'quota',
+  'model_not_found',
+  'context_length',
+  'content_filter',
+  'network',
+  'timeout',
+  'provider',
+];
+const PROVIDER_REQUEST_ID_HEADERS = {
+  openai: ['x-request-id'],
+  anthropic: ['request-id'],
+  google: ['x-goog-request-id'],
+  ollama: [],
+  openrouter: [],
+};
+
+const ANTHROPIC_RAW_EVENT_TYPES = [
+  'message_start',
+  'content_block_start',
+  'content_block_delta',
+  'content_block_stop',
+  'message_delta',
+  'message_stop',
+  'error',
+];
+
+const GEMINI_FINISH_REASONS = [
+  'STOP',
+  'MAX_TOKENS',
+  'SAFETY',
+  'RECITATION',
+  'OTHER',
+  'BLOCKLIST',
+  'PROHIBITED_CONTENT',
+  'SPII',
+  'MALFORMED_FUNCTION_CALL',
+  'UNEXPECTED_TOOL_CALL',
+  'LANGUAGE',
+  'FINISH_REASON_UNSPECIFIED',
+];
+const GEMINI_FINISH_MAPPING = {
+  STOP: 'stop',
+  MAX_TOKENS: 'length',
+  SAFETY: 'content_filter',
+  RECITATION: 'content_filter',
+};
+
+const SECRET_PATTERNS = [
+  /\bsk-[A-Za-z0-9]{16,}\b/,
+  /\bAIza[0-9A-Za-z_-]{20,}\b/,
+  /\bBearer\s+[A-Za-z0-9._-]{16,}\b/,
 ];
 
 const REQUIRED_SCHEMA_FILES = [
@@ -772,6 +903,1368 @@ function validateErrorsExpected(filePath, document) {
   });
 }
 
+function providerRequestIdFromHeaders(providerId, headers) {
+  for (const name of PROVIDER_REQUEST_ID_HEADERS[providerId] ?? []) {
+    if (typeof headers[name] === 'string' && headers[name].length > 0) {
+      return headers[name];
+    }
+  }
+  return null;
+}
+
+function validateProviderHttpErrorFixture(fixturePath, caseStatus, providerId) {
+  const document = readJson(fixturePath);
+  if (document === undefined) {
+    return undefined;
+  }
+  if (!checkObjectShape(fixturePath, '', document, ['status', 'headers', 'body'], ['status', 'headers', 'body'])) {
+    return undefined;
+  }
+
+  if (!Number.isInteger(document.status)) {
+    addError(fixturePath, '/status', 'must be an integer');
+  } else if (document.status !== caseStatus) {
+    addError(fixturePath, '/status', `must equal the case status ${caseStatus}`);
+  }
+
+  if (!isPlainObject(document.headers)) {
+    addError(fixturePath, '/headers', 'must be an object');
+    return undefined;
+  }
+  for (const [key, value] of Object.entries(document.headers)) {
+    if (typeof value !== 'string') {
+      addError(fixturePath, `/headers/${key}`, 'must be a string');
+    }
+  }
+
+  if (!isPlainObject(document.body)) {
+    addError(fixturePath, '/body', 'must be an object');
+  } else if (!Object.prototype.hasOwnProperty.call(document.body, 'error')) {
+    addError(fixturePath, '/body/error', 'required property is missing');
+  } else if (!isPlainObject(document.body.error) && typeof document.body.error !== 'string') {
+    addError(fixturePath, '/body/error', 'must be an object or string');
+  }
+
+  return providerRequestIdFromHeaders(providerId, document.headers);
+}
+
+function validateProviderErrorsExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'cases'], ['source', 'cases'])) {
+    return;
+  }
+
+  if (document.source !== 'provider-errors') {
+    addError(filePath, '/source', 'must be "provider-errors"');
+  }
+
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  const seenCodes = new Set();
+  let httpCases = 0;
+  let streamCases = 0;
+
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'providerId', 'kind', 'fixture', 'synthetic', 'httpStatus', 'status', 'error'],
+        ['name', 'providerId', 'kind', 'status', 'error'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (!PROVIDER_ERROR_IDS.includes(item.providerId)) {
+      addError(filePath, `${field}/providerId`, `must be one of ${JSON.stringify(PROVIDER_ERROR_IDS)}`);
+    }
+
+    if (!PROVIDER_ERROR_KINDS.includes(item.kind)) {
+      addError(filePath, `${field}/kind`, `must be one of ${JSON.stringify(PROVIDER_ERROR_KINDS)}`);
+    } else if (item.kind === 'http') {
+      httpCases += 1;
+    } else if (item.kind === 'stream') {
+      streamCases += 1;
+    }
+
+    let fixtureRequestId;
+    if (item.fixture !== undefined) {
+      if (typeof item.fixture !== 'string' || item.fixture.length === 0) {
+        addError(filePath, `${field}/fixture`, 'must be a non-empty string');
+      } else {
+        const fixturePath = path.resolve(fixturesDir, item.fixture);
+        const errorsDir = path.join(fixturesDir, 'errors');
+        if (!fixturePath.startsWith(`${errorsDir}${path.sep}`)) {
+          addError(filePath, `${field}/fixture`, 'must reference a file under fixtures/errors');
+        } else if (!existsSync(fixturePath)) {
+          addError(filePath, `${field}/fixture`, `references missing fixture "${item.fixture}"`);
+        } else if (item.kind === 'http') {
+          fixtureRequestId = validateProviderHttpErrorFixture(fixturePath, item.status, item.providerId);
+        }
+      }
+    } else if (item.synthetic !== true) {
+      addError(filePath, `${field}/fixture`, 'must reference a fixture or set synthetic to true');
+    }
+
+    if (item.synthetic !== undefined && typeof item.synthetic !== 'boolean') {
+      addError(filePath, `${field}/synthetic`, 'must be a boolean');
+    }
+
+    if (item.status !== null && !Number.isInteger(item.status)) {
+      addError(filePath, `${field}/status`, 'must be an integer or null');
+    }
+    if (item.kind === 'http' && item.status === null) {
+      addError(filePath, `${field}/status`, 'must be an integer for an HTTP error');
+    }
+    if (item.kind === 'stream' && item.status === null) {
+      addError(filePath, `${field}/status`, 'must be an integer for an in-stream error');
+    }
+
+    if (item.httpStatus !== undefined) {
+      if (!Number.isInteger(item.httpStatus)) {
+        addError(filePath, `${field}/httpStatus`, 'must be an integer');
+      } else if (item.kind === 'stream' && item.httpStatus !== 200) {
+        addError(filePath, `${field}/httpStatus`, 'must be 200 for an in-stream error');
+      } else if (item.kind === 'http' && item.httpStatus !== item.status) {
+        addError(filePath, `${field}/httpStatus`, 'must equal the case status for an HTTP error');
+      }
+    } else if (item.kind === 'stream') {
+      addError(filePath, `${field}/httpStatus`, 'must be 200 for an in-stream error');
+    }
+
+    validateChatError(filePath, `${field}/error`, item.error);
+    if (isPlainObject(item.error)) {
+      if (item.error.status !== item.status) {
+        addError(filePath, `${field}/error/status`, 'must match the case status');
+      }
+      if (item.error.providerId !== item.providerId) {
+        addError(filePath, `${field}/error/providerId`, 'must match the case providerId');
+      }
+      if (typeof item.error.code === 'string') {
+        seenCodes.add(item.error.code);
+      }
+      if (fixtureRequestId !== undefined && item.error.requestId !== fixtureRequestId) {
+        addError(
+          filePath,
+          `${field}/error/requestId`,
+          `must equal the fixture request ID ${JSON.stringify(fixtureRequestId)}`,
+        );
+      }
+    }
+  });
+
+  if (httpCases === 0) {
+    addError(filePath, '/cases', 'must contain at least one HTTP error case');
+  }
+  if (streamCases === 0) {
+    addError(filePath, '/cases', 'must contain at least one in-stream error case');
+  }
+  for (const code of REQUIRED_PROVIDER_ERROR_CODES) {
+    if (!seenCodes.has(code)) {
+      addError(filePath, '/cases', `missing required error code "${code}"`);
+    }
+  }
+}
+
+function validateAnthropicThinkingExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'cases'], ['source', 'cases'])) {
+    return;
+  }
+
+  if (document.source !== 'anthropic-thinking') {
+    addError(filePath, '/source', 'must be "anthropic-thinking"');
+  }
+
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'rawEvents', 'events', 'text', 'reasoning'],
+        ['name', 'rawEvents', 'events', 'text', 'reasoning'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (!Array.isArray(item.rawEvents) || item.rawEvents.length === 0) {
+      addError(filePath, `${field}/rawEvents`, 'must be a non-empty array');
+    } else {
+      item.rawEvents.forEach((rawEvent, rawIndex) => {
+        const rawField = `${field}/rawEvents/${rawIndex}`;
+        if (!isPlainObject(rawEvent)) {
+          addError(filePath, rawField, 'must be an object');
+          return;
+        }
+        if (!ANTHROPIC_RAW_EVENT_TYPES.includes(rawEvent.type)) {
+          addError(filePath, `${rawField}/type`, `must be one of ${JSON.stringify(ANTHROPIC_RAW_EVENT_TYPES)}`);
+        }
+      });
+    }
+
+    if (!Array.isArray(item.events) || item.events.length === 0) {
+      addError(filePath, `${field}/events`, 'must be a non-empty array');
+    } else {
+      item.events.forEach((event, eventIndex) => validateEvent(filePath, `${field}/events/${eventIndex}`, event));
+
+      const text = item.events
+        .filter((event) => isPlainObject(event) && event.type === 'text-delta' && typeof event.text === 'string')
+        .map((event) => event.text)
+        .join('');
+      const reasoning = item.events
+        .filter(
+          (event) => isPlainObject(event) && event.type === 'reasoning-delta' && typeof event.text === 'string',
+        )
+        .map((event) => event.text)
+        .join('');
+
+      if (typeof item.text === 'string' && item.text !== text) {
+        addError(filePath, `${field}/text`, `must equal the concatenated text-delta events (${JSON.stringify(text)})`);
+      }
+      if (typeof item.reasoning === 'string' && item.reasoning !== reasoning) {
+        addError(
+          filePath,
+          `${field}/reasoning`,
+          `must equal the concatenated reasoning-delta events (${JSON.stringify(reasoning)})`,
+        );
+      }
+      if (!item.events.some((event) => isPlainObject(event) && event.type === 'reasoning-delta')) {
+        addError(filePath, `${field}/events`, 'must contain at least one reasoning-delta event');
+      }
+      if (!item.events.some((event) => isPlainObject(event) && event.type === 'text-delta')) {
+        addError(filePath, `${field}/events`, 'must contain at least one text-delta event');
+      }
+    }
+
+    if (typeof item.text !== 'string') {
+      addError(filePath, `${field}/text`, 'must be a string');
+    }
+    if (typeof item.reasoning !== 'string') {
+      addError(filePath, `${field}/reasoning`, 'must be a string');
+    }
+  });
+}
+
+function validateGeminiFinishReasonsExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'cases'], ['source', 'cases'])) {
+    return;
+  }
+
+  if (document.source !== 'gemini-finish-reasons') {
+    addError(filePath, '/source', 'must be "gemini-finish-reasons"');
+  }
+
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  const seenReasons = new Set();
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'finishReason', 'expected'],
+        ['name', 'finishReason', 'expected'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (!GEMINI_FINISH_REASONS.includes(item.finishReason)) {
+      addError(filePath, `${field}/finishReason`, `must be one of ${JSON.stringify(GEMINI_FINISH_REASONS)}`);
+    } else {
+      seenReasons.add(item.finishReason);
+    }
+
+    if (!FINISH_REASONS.includes(item.expected)) {
+      addError(filePath, `${field}/expected`, `must be one of ${JSON.stringify(FINISH_REASONS)}`);
+    }
+
+    const mapped = GEMINI_FINISH_MAPPING[item.finishReason];
+    if (mapped !== undefined && item.expected !== mapped) {
+      addError(filePath, `${field}/expected`, `must be "${mapped}" for finishReason "${item.finishReason}"`);
+    }
+  });
+
+  for (const reason of ['STOP', 'MAX_TOKENS', 'SAFETY', 'RECITATION']) {
+    if (!seenReasons.has(reason)) {
+      addError(filePath, '/cases', `missing required finishReason "${reason}"`);
+    }
+  }
+}
+
+function validateStringArrayField(filePath, field, value, allowedValues) {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    addError(filePath, field, 'must be an array of strings');
+    return false;
+  }
+  if (allowedValues !== undefined) {
+    for (const item of value) {
+      if (!allowedValues.includes(item)) {
+        addError(filePath, field, `must contain only ${JSON.stringify(allowedValues)}`);
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function validateCatalogEntry(filePath, field, entry) {
+  if (!checkObjectShape(filePath, field, entry, CATALOG_ENTRY_FIELDS, CATALOG_ENTRY_FIELDS)) {
+    return false;
+  }
+  if (typeof entry.remoteId !== 'string' || entry.remoteId.length === 0) {
+    addError(filePath, `${field}/remoteId`, 'must be a non-empty string');
+  }
+  if (typeof entry.label !== 'string' || entry.label.length === 0) {
+    addError(filePath, `${field}/label`, 'must be a non-empty string');
+  }
+  for (const key of ['contextWindow', 'maxOutputTokens']) {
+    const value = entry[key];
+    if (value !== null && (!Number.isInteger(value) || value < 1)) {
+      addError(filePath, `${field}/${key}`, 'must be a positive integer or null');
+    }
+  }
+  validateStringArrayField(filePath, `${field}/inputModalities`, entry.inputModalities, [
+    'text',
+    'image',
+    'file',
+    'audio',
+    'video',
+  ]);
+  validateStringArrayField(filePath, `${field}/outputModalities`, entry.outputModalities, [
+    'text',
+    'image',
+    'audio',
+  ]);
+  validateStringArrayField(filePath, `${field}/capabilities`, entry.capabilities, [
+    'text',
+    'vision',
+    'files',
+    'tools',
+    'reasoning',
+    'streaming',
+  ]);
+  validateStringArrayField(filePath, `${field}/supportedParameters`, entry.supportedParameters);
+  if (entry.pricing !== null && !isPlainObject(entry.pricing)) {
+    addError(filePath, `${field}/pricing`, 'must be an object or null');
+  }
+  if (typeof entry.hidden !== 'boolean') {
+    addError(filePath, `${field}/hidden`, 'must be a boolean');
+  }
+  return true;
+}
+
+function mapOpenAICatalog(raw, preset) {
+  const items = Array.isArray(raw.data) ? raw.data : [];
+  return items.map((item) => ({
+    remoteId: item.id,
+    label: item.id,
+    contextWindow: null,
+    maxOutputTokens: null,
+    inputModalities: [...preset.inputModalities],
+    outputModalities: [...preset.outputModalities],
+    capabilities: [...preset.capabilities],
+    supportedParameters: [...preset.supportedParameters],
+    pricing: null,
+    hidden: /embedding/i.test(item.id),
+  }));
+}
+
+function mapAnthropicCatalog(raw, preset) {
+  const items = Array.isArray(raw.data) ? raw.data : [];
+  return items.map((item) => ({
+    remoteId: item.id,
+    label:
+      typeof item.display_name === 'string' && item.display_name.length > 0
+        ? item.display_name
+        : item.id,
+    contextWindow: null,
+    maxOutputTokens: null,
+    inputModalities: [...preset.inputModalities],
+    outputModalities: [...preset.outputModalities],
+    capabilities: [...preset.capabilities],
+    supportedParameters: [...preset.supportedParameters],
+    pricing: null,
+    hidden: false,
+  }));
+}
+
+function mapGeminiCatalog(raw, preset) {
+  const items = Array.isArray(raw.models) ? raw.models : [];
+  return items.map((item) => {
+    const remoteId =
+      typeof item.baseModelId === 'string' && item.baseModelId.length > 0
+        ? item.baseModelId
+        : String(item.name ?? '').replace(/^models\//, '');
+    return {
+      remoteId,
+      label:
+        typeof item.displayName === 'string' && item.displayName.length > 0
+          ? item.displayName
+          : remoteId,
+      contextWindow: Number.isInteger(item.inputTokenLimit) ? item.inputTokenLimit : null,
+      maxOutputTokens: Number.isInteger(item.outputTokenLimit) ? item.outputTokenLimit : null,
+      inputModalities: [...preset.inputModalities],
+      outputModalities: [...preset.outputModalities],
+      capabilities: [...preset.capabilities],
+      supportedParameters: [...preset.supportedParameters],
+      pricing: null,
+      hidden: false,
+    };
+  });
+}
+
+function mapOllamaCatalog(raw, preset) {
+  const items = Array.isArray(raw.models) ? raw.models : [];
+  return items.map((item) => {
+    const remoteId =
+      typeof item.model === 'string' && item.model.length > 0 ? item.model : item.name;
+    return {
+      remoteId,
+      label: typeof item.name === 'string' && item.name.length > 0 ? item.name : remoteId,
+      contextWindow: null,
+      maxOutputTokens: null,
+      inputModalities: [...preset.inputModalities],
+      outputModalities: [...preset.outputModalities],
+      capabilities: [...preset.capabilities],
+      supportedParameters: [...preset.supportedParameters],
+      pricing: null,
+      hidden: /embed/i.test(remoteId),
+    };
+  });
+}
+
+function mapCatalog(providerId, raw, preset) {
+  switch (providerId) {
+    case 'openai':
+      return mapOpenAICatalog(raw, preset);
+    case 'anthropic':
+      return mapAnthropicCatalog(raw, preset);
+    case 'google':
+      return mapGeminiCatalog(raw, preset);
+    case 'ollama':
+      return mapOllamaCatalog(raw, preset);
+    default:
+      return [];
+  }
+}
+
+function validateCatalogPreset(filePath, field, preset) {
+  if (
+    !checkObjectShape(
+      filePath,
+      field,
+      preset,
+      ['inputModalities', 'outputModalities', 'capabilities', 'supportedParameters'],
+      ['inputModalities', 'outputModalities', 'capabilities', 'supportedParameters'],
+    )
+  ) {
+    return false;
+  }
+  validateStringArrayField(filePath, `${field}/inputModalities`, preset.inputModalities, [
+    'text',
+    'image',
+    'file',
+    'audio',
+    'video',
+  ]);
+  validateStringArrayField(filePath, `${field}/outputModalities`, preset.outputModalities, [
+    'text',
+    'image',
+    'audio',
+  ]);
+  validateStringArrayField(filePath, `${field}/capabilities`, preset.capabilities, [
+    'text',
+    'vision',
+    'files',
+    'tools',
+    'reasoning',
+    'streaming',
+  ]);
+  validateStringArrayField(filePath, `${field}/supportedParameters`, preset.supportedParameters);
+  return true;
+}
+
+function validateCatalogsExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'cases'], ['source', 'cases'])) {
+    return;
+  }
+  if (document.source !== 'catalogs') {
+    addError(filePath, '/source', 'must be "catalogs"');
+  }
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  const seenProviders = new Set();
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'providerId', 'fixture', 'preset', 'expected'],
+        ['name', 'providerId', 'fixture', 'preset', 'expected'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (!CATALOG_PROVIDER_IDS.includes(item.providerId)) {
+      addError(filePath, `${field}/providerId`, `must be one of ${JSON.stringify(CATALOG_PROVIDER_IDS)}`);
+      return;
+    }
+    seenProviders.add(item.providerId);
+
+    if (typeof item.fixture !== 'string' || item.fixture.length === 0) {
+      addError(filePath, `${field}/fixture`, 'must be a non-empty string');
+      return;
+    }
+    const fixturePath = path.resolve(fixturesDir, item.fixture);
+    const modelsDir = path.join(fixturesDir, 'models');
+    if (!fixturePath.startsWith(`${modelsDir}${path.sep}`)) {
+      addError(filePath, `${field}/fixture`, 'must reference a file under fixtures/models');
+      return;
+    }
+    if (!existsSync(fixturePath)) {
+      addError(filePath, `${field}/fixture`, `references missing fixture "${item.fixture}"`);
+      return;
+    }
+
+    if (!validateCatalogPreset(filePath, `${field}/preset`, item.preset)) {
+      return;
+    }
+
+    if (!Array.isArray(item.expected)) {
+      addError(filePath, `${field}/expected`, 'must be an array');
+      return;
+    }
+    if (item.expected.length === 0) {
+      addError(filePath, `${field}/expected`, 'must contain at least one model');
+    }
+    item.expected.forEach((entry, entryIndex) =>
+      validateCatalogEntry(filePath, `${field}/expected/${entryIndex}`, entry),
+    );
+
+    const raw = readJson(fixturePath);
+    if (raw === undefined) {
+      return;
+    }
+    const mapped = mapCatalog(item.providerId, raw, item.preset);
+    if (mapped.length !== item.expected.length) {
+      addError(
+        filePath,
+        `${field}/expected`,
+        `must contain ${mapped.length} entries to match the raw fixture`,
+      );
+      return;
+    }
+    mapped.forEach((expectedEntry, entryIndex) => {
+      const actual = item.expected[entryIndex];
+      if (!isPlainObject(actual)) {
+        return;
+      }
+      for (const key of CATALOG_ENTRY_FIELDS) {
+        if (!isDeepStrictEqual(actual[key], expectedEntry[key])) {
+          addError(
+            filePath,
+            `${field}/expected/${entryIndex}/${key}`,
+            `must equal ${JSON.stringify(expectedEntry[key])} per the catalog mapping rule`,
+          );
+        }
+      }
+    });
+  });
+
+  for (const providerId of CATALOG_PROVIDER_IDS) {
+    if (!seenProviders.has(providerId)) {
+      addError(filePath, '/cases', `missing catalog case for provider "${providerId}"`);
+    }
+  }
+}
+
+function inferCapabilities(inputModalities, outputModalities, supportedParameters, presetCapabilities) {
+  const capabilities = new Set();
+  if (outputModalities.includes('text')) {
+    capabilities.add('text');
+  }
+  if (inputModalities.includes('image')) {
+    capabilities.add('vision');
+  }
+  if (inputModalities.includes('file')) {
+    capabilities.add('files');
+  }
+  if (supportedParameters.includes('tools')) {
+    capabilities.add('tools');
+  }
+  if (supportedParameters.includes('reasoning')) {
+    capabilities.add('reasoning');
+  }
+  if (presetCapabilities.includes('streaming') || supportedParameters.includes('stream')) {
+    capabilities.add('streaming');
+  }
+  return CAPABILITY_ORDER.filter((capability) => capabilities.has(capability));
+}
+
+function validateCapabilityInferenceExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'cases'], ['source', 'cases'])) {
+    return;
+  }
+  if (document.source !== 'capability-inference') {
+    addError(filePath, '/source', 'must be "capability-inference"');
+  }
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'preset', 'raw', 'expected'],
+        ['name', 'preset', 'raw', 'expected'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (
+      !checkObjectShape(
+        filePath,
+        `${field}/preset`,
+        item.preset,
+        ['id', 'kind', 'inputModalities', 'outputModalities', 'capabilities', 'supportedParameters'],
+        ['id', 'kind', 'inputModalities', 'outputModalities', 'capabilities', 'supportedParameters'],
+      )
+    ) {
+      return;
+    }
+    validateStringArrayField(filePath, `${field}/preset/inputModalities`, item.preset.inputModalities);
+    validateStringArrayField(filePath, `${field}/preset/outputModalities`, item.preset.outputModalities);
+    validateStringArrayField(filePath, `${field}/preset/capabilities`, item.preset.capabilities);
+    validateStringArrayField(filePath, `${field}/preset/supportedParameters`, item.preset.supportedParameters);
+
+    if (!isPlainObject(item.raw)) {
+      addError(filePath, `${field}/raw`, 'must be an object');
+      return;
+    }
+
+    if (
+      !checkObjectShape(
+        filePath,
+        `${field}/expected`,
+        item.expected,
+        CAPABILITY_INFERENCE_FIELDS,
+        CAPABILITY_INFERENCE_FIELDS,
+      )
+    ) {
+      return;
+    }
+
+    const inputModalities = Array.isArray(item.raw.inputModalities)
+      ? item.raw.inputModalities
+      : item.preset.inputModalities;
+    const outputModalities = Array.isArray(item.raw.outputModalities)
+      ? item.raw.outputModalities
+      : item.preset.outputModalities;
+    const supportedParameters = Array.isArray(item.raw.supportedParameters)
+      ? item.raw.supportedParameters
+      : item.preset.supportedParameters;
+    const capabilities = Array.isArray(item.raw.capabilities)
+      ? item.raw.capabilities
+      : inferCapabilities(
+          inputModalities,
+          outputModalities,
+          supportedParameters,
+          item.preset.capabilities,
+        );
+    const contextWindow = Number.isInteger(item.raw.contextWindow) ? item.raw.contextWindow : null;
+    const maxOutputTokens = Number.isInteger(item.raw.maxOutputTokens)
+      ? item.raw.maxOutputTokens
+      : null;
+
+    const expected = {
+      inputModalities,
+      outputModalities,
+      capabilities,
+      supportedParameters,
+      contextWindow,
+      maxOutputTokens,
+    };
+    for (const key of CAPABILITY_INFERENCE_FIELDS) {
+      if (!isDeepStrictEqual(item.expected[key], expected[key])) {
+        addError(
+          filePath,
+          `${field}/expected/${key}`,
+          `must equal ${JSON.stringify(expected[key])} per the capability inference rule`,
+        );
+      }
+    }
+  });
+}
+
+function computeFallbackSelection(presetDefaultModelId, catalog, fallbackModelIds) {
+  if (catalog.length === 0) {
+    if (fallbackModelIds.length > 0) {
+      return {
+        selectedModelId: fallbackModelIds[0],
+        notice: `Discovery unavailable; using fallback model ${fallbackModelIds[0]}.`,
+      };
+    }
+    return {
+      selectedModelId: null,
+      notice: 'Discovery unavailable; no fallback model is available.',
+    };
+  }
+
+  const hasPresetDefault =
+    presetDefaultModelId !== null &&
+    catalog.some((model) => isPlainObject(model) && model.remoteId === presetDefaultModelId);
+  if (hasPresetDefault) {
+    return { selectedModelId: presetDefaultModelId, notice: null };
+  }
+
+  const candidates = catalog
+    .filter(
+      (model) =>
+        isPlainObject(model) &&
+        model.hidden === false &&
+        Array.isArray(model.outputModalities) &&
+        model.outputModalities.includes('text'),
+    )
+    .map((model) => model.remoteId)
+    .sort();
+  if (candidates.length > 0) {
+    return {
+      selectedModelId: candidates[0],
+      notice: `Default model ${presetDefaultModelId ?? '(none)'} is unavailable; using ${candidates[0]}.`,
+    };
+  }
+  return {
+    selectedModelId: null,
+    notice: `Default model ${presetDefaultModelId ?? '(none)'} is unavailable; no text model is available.`,
+  };
+}
+
+function validateFallbackModelsExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'presets', 'cases'], ['source', 'presets', 'cases'])) {
+    return;
+  }
+  if (document.source !== 'fallback-models') {
+    addError(filePath, '/source', 'must be "fallback-models"');
+  }
+
+  if (!Array.isArray(document.presets)) {
+    addError(filePath, '/presets', 'must be an array');
+  } else {
+    const seenPresets = new Set();
+    document.presets.forEach((preset, index) => {
+      const field = `/presets/${index}`;
+      if (!checkObjectShape(filePath, field, preset, ['providerId', 'fallbackModelIds'], ['providerId', 'fallbackModelIds'])) {
+        return;
+      }
+      if (!FALLBACK_PRESET_IDS.includes(preset.providerId)) {
+        addError(filePath, `${field}/providerId`, `must be one of ${JSON.stringify(FALLBACK_PRESET_IDS)}`);
+      } else if (seenPresets.has(preset.providerId)) {
+        addError(filePath, `${field}/providerId`, `duplicate preset "${preset.providerId}"`);
+      } else {
+        seenPresets.add(preset.providerId);
+      }
+      if (
+        !Array.isArray(preset.fallbackModelIds) ||
+        preset.fallbackModelIds.some((value) => typeof value !== 'string' || value.length === 0)
+      ) {
+        addError(filePath, `${field}/fallbackModelIds`, 'must be an array of non-empty strings');
+      }
+    });
+    for (const providerId of FALLBACK_PRESET_IDS) {
+      if (!seenPresets.has(providerId)) {
+        addError(filePath, '/presets', `missing fallback list for provider "${providerId}"`);
+      }
+    }
+  }
+
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'providerId', 'presetDefaultModelId', 'fallbackModelIds', 'catalog', 'expected'],
+        ['name', 'providerId', 'presetDefaultModelId', 'fallbackModelIds', 'catalog', 'expected'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (!FALLBACK_PRESET_IDS.includes(item.providerId)) {
+      addError(filePath, `${field}/providerId`, `must be one of ${JSON.stringify(FALLBACK_PRESET_IDS)}`);
+    }
+    if (
+      item.presetDefaultModelId !== null &&
+      (typeof item.presetDefaultModelId !== 'string' || item.presetDefaultModelId.length === 0)
+    ) {
+      addError(filePath, `${field}/presetDefaultModelId`, 'must be a non-empty string or null');
+    }
+    if (
+      !Array.isArray(item.fallbackModelIds) ||
+      item.fallbackModelIds.some((value) => typeof value !== 'string' || value.length === 0)
+    ) {
+      addError(filePath, `${field}/fallbackModelIds`, 'must be an array of non-empty strings');
+    }
+    if (!Array.isArray(item.catalog)) {
+      addError(filePath, `${field}/catalog`, 'must be an array');
+      return;
+    }
+
+    const seenRemoteIds = new Set();
+    item.catalog.forEach((model, modelIndex) => {
+      const modelField = `${field}/catalog/${modelIndex}`;
+      if (
+        !checkObjectShape(
+          filePath,
+          modelField,
+          model,
+          ['remoteId', 'hidden', 'outputModalities'],
+          ['remoteId', 'hidden', 'outputModalities'],
+        )
+      ) {
+        return;
+      }
+      if (typeof model.remoteId !== 'string' || model.remoteId.length === 0) {
+        addError(filePath, `${modelField}/remoteId`, 'must be a non-empty string');
+      } else if (seenRemoteIds.has(model.remoteId)) {
+        addError(filePath, `${modelField}/remoteId`, `duplicate remoteId "${model.remoteId}"`);
+      } else {
+        seenRemoteIds.add(model.remoteId);
+      }
+      if (typeof model.hidden !== 'boolean') {
+        addError(filePath, `${modelField}/hidden`, 'must be a boolean');
+      }
+      validateStringArrayField(filePath, `${modelField}/outputModalities`, model.outputModalities);
+    });
+
+    if (
+      !checkObjectShape(
+        filePath,
+        `${field}/expected`,
+        item.expected,
+        ['selectedModelId', 'notice'],
+        ['selectedModelId', 'notice'],
+      )
+    ) {
+      return;
+    }
+    if (
+      item.expected.selectedModelId !== null &&
+      (typeof item.expected.selectedModelId !== 'string' || item.expected.selectedModelId.length === 0)
+    ) {
+      addError(filePath, `${field}/expected/selectedModelId`, 'must be a non-empty string or null');
+    }
+    if (
+      item.expected.notice !== null &&
+      (typeof item.expected.notice !== 'string' || item.expected.notice.length === 0)
+    ) {
+      addError(filePath, `${field}/expected/notice`, 'must be a non-empty string or null');
+    }
+
+    const selection = computeFallbackSelection(
+      item.presetDefaultModelId,
+      item.catalog,
+      Array.isArray(item.fallbackModelIds) ? item.fallbackModelIds : [],
+    );
+    if (item.expected.selectedModelId !== selection.selectedModelId) {
+      addError(
+        filePath,
+        `${field}/expected/selectedModelId`,
+        `must be ${JSON.stringify(selection.selectedModelId)} per the fallback model rule`,
+      );
+    }
+    if (item.expected.notice !== selection.notice) {
+      addError(
+        filePath,
+        `${field}/expected/notice`,
+        `must be ${JSON.stringify(selection.notice)} per the fallback model rule`,
+      );
+    }
+  });
+}
+
+function isBalancedBraces(source) {
+  let depth = 0;
+  for (const character of source) {
+    if (character === '{') {
+      depth += 1;
+    } else if (character === '}') {
+      depth -= 1;
+      if (depth < 0) {
+        return false;
+      }
+    }
+  }
+  return depth === 0;
+}
+
+function parseMath(input) {
+  const segments = [];
+  let index = 0;
+  let textStart = 0;
+
+  const pushText = (end) => {
+    if (end > textStart) {
+      segments.push({ type: 'text', text: input.slice(textStart, end) });
+    }
+  };
+  const rawFallback = () => ({ segments: [{ type: 'text', text: input }], fallback: 'raw' });
+
+  while (index < input.length) {
+    let open = null;
+    let close = null;
+    let display = false;
+    if (input.startsWith('$$', index)) {
+      open = '$$';
+      close = '$$';
+      display = true;
+    } else if (input.startsWith('\\[', index)) {
+      open = '\\[';
+      close = '\\]';
+      display = true;
+    } else if (input.startsWith('\\(', index)) {
+      open = '\\(';
+      close = '\\)';
+      display = false;
+    } else if (input[index] === '$') {
+      open = '$';
+      close = '$';
+      display = false;
+    }
+
+    if (open === null) {
+      index += 1;
+      continue;
+    }
+
+    const end = input.indexOf(close, index + open.length);
+    if (end === -1) {
+      return rawFallback();
+    }
+    pushText(index);
+    const source = input.slice(index + open.length, end).trim();
+    if (source.length === 0 || !isBalancedBraces(source)) {
+      return rawFallback();
+    }
+    segments.push({ type: 'math', display, source });
+    index = end + close.length;
+    textStart = index;
+  }
+
+  pushText(input.length);
+  return { segments, fallback: null };
+}
+
+function validateMathSegment(filePath, field, segment) {
+  if (!isPlainObject(segment)) {
+    addError(filePath, field, 'must be an object');
+    return;
+  }
+  if (!MATH_SEGMENT_TYPES.includes(segment.type)) {
+    addError(filePath, `${field}/type`, `must be one of ${JSON.stringify(MATH_SEGMENT_TYPES)}`);
+    return;
+  }
+  if (segment.type === 'text') {
+    if (!checkObjectShape(filePath, field, segment, ['type', 'text'], ['type', 'text'])) {
+      return;
+    }
+    if (typeof segment.text !== 'string') {
+      addError(filePath, `${field}/text`, 'must be a string');
+    }
+  } else {
+    if (!checkObjectShape(filePath, field, segment, ['type', 'display', 'source'], ['type', 'display', 'source'])) {
+      return;
+    }
+    if (typeof segment.display !== 'boolean') {
+      addError(filePath, `${field}/display`, 'must be a boolean');
+    }
+    if (typeof segment.source !== 'string' || segment.source.length === 0) {
+      addError(filePath, `${field}/source`, 'must be a non-empty string');
+    }
+  }
+}
+
+function validateMathExpected(filePath, document) {
+  if (!checkObjectShape(filePath, '', document, ['source', 'cases'], ['source', 'cases'])) {
+    return;
+  }
+  if (document.source !== 'math') {
+    addError(filePath, '/source', 'must be "math"');
+  }
+  if (!Array.isArray(document.cases)) {
+    addError(filePath, '/cases', 'must be an array');
+    return;
+  }
+  if (document.cases.length === 0) {
+    addError(filePath, '/cases', 'must contain at least one case');
+  }
+
+  const seenNames = new Set();
+  document.cases.forEach((item, index) => {
+    const field = `/cases/${index}`;
+    if (
+      !checkObjectShape(
+        filePath,
+        field,
+        item,
+        ['name', 'input', 'valid', 'expected'],
+        ['name', 'input', 'valid', 'expected'],
+      )
+    ) {
+      return;
+    }
+
+    if (typeof item.name !== 'string' || item.name.length === 0) {
+      addError(filePath, `${field}/name`, 'must be a non-empty string');
+    } else if (seenNames.has(item.name)) {
+      addError(filePath, `${field}/name`, `duplicate case name "${item.name}"`);
+    } else {
+      seenNames.add(item.name);
+    }
+
+    if (typeof item.input !== 'string') {
+      addError(filePath, `${field}/input`, 'must be a string');
+      return;
+    }
+    if (typeof item.valid !== 'boolean') {
+      addError(filePath, `${field}/valid`, 'must be a boolean');
+    }
+
+    if (
+      !checkObjectShape(
+        filePath,
+        `${field}/expected`,
+        item.expected,
+        ['segments', 'fallback'],
+        ['segments', 'fallback'],
+      )
+    ) {
+      return;
+    }
+    if (!Array.isArray(item.expected.segments) || item.expected.segments.length === 0) {
+      addError(filePath, `${field}/expected/segments`, 'must be a non-empty array');
+      return;
+    }
+    item.expected.segments.forEach((segment, segmentIndex) =>
+      validateMathSegment(filePath, `${field}/expected/segments/${segmentIndex}`, segment),
+    );
+    if (item.expected.fallback !== null && item.expected.fallback !== 'raw') {
+      addError(filePath, `${field}/expected/fallback`, 'must be "raw" or null');
+    }
+
+    const parsed = parseMath(item.input);
+    if (item.valid === true) {
+      if (!isDeepStrictEqual(item.expected.segments, parsed.segments)) {
+        addError(
+          filePath,
+          `${field}/expected/segments`,
+          `must equal ${JSON.stringify(parsed.segments)} per the math parsing rule`,
+        );
+      }
+      if (item.expected.fallback !== parsed.fallback) {
+        addError(
+          filePath,
+          `${field}/expected/fallback`,
+          `must be ${JSON.stringify(parsed.fallback)} per the math parsing rule`,
+        );
+      }
+    } else if (item.valid === false) {
+      const rawSegments = [{ type: 'text', text: item.input }];
+      if (!isDeepStrictEqual(item.expected.segments, rawSegments)) {
+        addError(
+          filePath,
+          `${field}/expected/segments`,
+          'must be one raw text segment equal to the input for invalid or incomplete math',
+        );
+      }
+      if (item.expected.fallback !== 'raw') {
+        addError(filePath, `${field}/expected/fallback`, 'must be "raw" for invalid or incomplete math');
+      }
+    }
+  });
+}
+
+function validateExportExpected(filePath, document, validateExportSchema) {
+  if (validateExportSchema) {
+    const valid = validateExportSchema(document);
+    if (!valid) {
+      reportAjvErrors(filePath, validateExportSchema);
+    }
+  }
+
+  if (!isPlainObject(document)) {
+    return;
+  }
+
+  const conversations = Array.isArray(document.conversations) ? document.conversations : [];
+  const messages = Array.isArray(document.messages) ? document.messages : [];
+  const attachments = Array.isArray(document.attachments) ? document.attachments : [];
+  const providers = Array.isArray(document.providers) ? document.providers : [];
+  const models = Array.isArray(document.models) ? document.models : [];
+
+  const conversationIds = new Set();
+  conversations.forEach((conversation, index) => {
+    if (!isPlainObject(conversation)) {
+      return;
+    }
+    if (typeof conversation.id === 'string') {
+      if (conversationIds.has(conversation.id)) {
+        addError(filePath, `/conversations/${index}/id`, `duplicate conversation id "${conversation.id}"`);
+      } else {
+        conversationIds.add(conversation.id);
+      }
+    }
+  });
+
+  const providerIds = new Set();
+  providers.forEach((provider, index) => {
+    if (!isPlainObject(provider)) {
+      return;
+    }
+    if (typeof provider.id === 'string') {
+      if (providerIds.has(provider.id)) {
+        addError(filePath, `/providers/${index}/id`, `duplicate provider id "${provider.id}"`);
+      } else {
+        providerIds.add(provider.id);
+      }
+    }
+  });
+
+  const modelIds = new Set();
+  const modelLabels = new Map();
+  models.forEach((model, index) => {
+    if (!isPlainObject(model)) {
+      return;
+    }
+    if (typeof model.id === 'string') {
+      if (modelIds.has(model.id)) {
+        addError(filePath, `/models/${index}/id`, `duplicate model id "${model.id}"`);
+      } else {
+        modelIds.add(model.id);
+        modelLabels.set(model.id, model.label);
+      }
+    }
+    if (typeof model.providerId === 'string' && !providerIds.has(model.providerId)) {
+      addError(filePath, `/models/${index}/providerId`, `references unknown provider "${model.providerId}"`);
+    }
+  });
+
+  const attachmentIds = new Set();
+  attachments.forEach((attachment, index) => {
+    if (!isPlainObject(attachment)) {
+      return;
+    }
+    if (typeof attachment.id === 'string') {
+      if (attachmentIds.has(attachment.id)) {
+        addError(filePath, `/attachments/${index}/id`, `duplicate attachment id "${attachment.id}"`);
+      } else {
+        attachmentIds.add(attachment.id);
+      }
+    }
+    if (attachment.dataBase64 !== undefined) {
+      if (
+        typeof attachment.dataBase64 !== 'string' ||
+        attachment.dataBase64.length === 0 ||
+        attachment.dataBase64.length % 4 !== 0 ||
+        !BASE64_PATTERN.test(attachment.dataBase64)
+      ) {
+        addError(filePath, `/attachments/${index}/dataBase64`, 'must be a non-empty base64 string');
+      }
+    }
+  });
+
+  const sequencesByConversation = new Map();
+  messages.forEach((message, index) => {
+    if (!isPlainObject(message)) {
+      return;
+    }
+    if (typeof message.conversationId === 'string' && !conversationIds.has(message.conversationId)) {
+      addError(
+        filePath,
+        `/messages/${index}/conversationId`,
+        `references unknown conversation "${message.conversationId}"`,
+      );
+    }
+    if (typeof message.conversationId === 'string' && Number.isInteger(message.sequence)) {
+      const sequences = sequencesByConversation.get(message.conversationId) ?? [];
+      sequences.push(message.sequence);
+      sequencesByConversation.set(message.conversationId, sequences);
+    }
+    if (Array.isArray(message.parts)) {
+      message.parts.forEach((part, partIndex) => {
+        if (
+          isPlainObject(part) &&
+          (part.type === 'image' || part.type === 'file') &&
+          typeof part.attachmentId === 'string' &&
+          !attachmentIds.has(part.attachmentId)
+        ) {
+          addError(
+            filePath,
+            `/messages/${index}/parts/${partIndex}/attachmentId`,
+            `references unknown attachment "${part.attachmentId}"`,
+          );
+        }
+      });
+    }
+    if (typeof message.modelId === 'string') {
+      if (!modelIds.has(message.modelId)) {
+        addError(filePath, `/messages/${index}/modelId`, `references unknown model "${message.modelId}"`);
+      } else if (message.modelLabel !== modelLabels.get(message.modelId)) {
+        addError(
+          filePath,
+          `/messages/${index}/modelLabel`,
+          `must equal the model snapshot label ${JSON.stringify(modelLabels.get(message.modelId))}`,
+        );
+      }
+    }
+  });
+
+  for (const [conversationId, sequences] of sequencesByConversation) {
+    const sorted = [...sequences].sort((left, right) => left - right);
+    const expected = sorted.map((_, index) => index);
+    if (!isDeepStrictEqual(sorted, expected)) {
+      addError(
+        filePath,
+        `/messages`,
+        `conversation "${conversationId}" sequences must be contiguous from 0`,
+      );
+    }
+  }
+
+  if (isPlainObject(document.settings)) {
+    if (
+      document.settings.defaultProviderId !== null &&
+      typeof document.settings.defaultProviderId === 'string' &&
+      !providerIds.has(document.settings.defaultProviderId)
+    ) {
+      addError(
+        filePath,
+        '/settings/defaultProviderId',
+        `references unknown provider "${document.settings.defaultProviderId}"`,
+      );
+    }
+    if (
+      document.settings.defaultModelId !== null &&
+      typeof document.settings.defaultModelId === 'string' &&
+      !modelIds.has(document.settings.defaultModelId)
+    ) {
+      addError(
+        filePath,
+        '/settings/defaultModelId',
+        `references unknown model "${document.settings.defaultModelId}"`,
+      );
+    }
+  }
+}
+
 function validateNormalizedRequest(filePath, field, request) {
   if (
     !checkObjectShape(
@@ -835,6 +2328,46 @@ function validateNormalizedRequest(filePath, field, request) {
         if (part.type === 'text' && typeof part.text !== 'string') {
           addError(filePath, `${partField}/text`, 'must be a string');
           valid = false;
+        }
+        if (part.type === 'image') {
+          if (
+            !checkObjectShape(
+              filePath,
+              partField,
+              part,
+              ['type', 'attachmentId', 'mimeType', 'alt'],
+              ['type', 'attachmentId', 'mimeType', 'alt'],
+            )
+          ) {
+            valid = false;
+            return;
+          }
+          for (const key of ['attachmentId', 'mimeType', 'alt']) {
+            if (typeof part[key] !== 'string') {
+              addError(filePath, `${partField}/${key}`, 'must be a string');
+              valid = false;
+            }
+          }
+        }
+        if (part.type === 'file') {
+          if (
+            !checkObjectShape(
+              filePath,
+              partField,
+              part,
+              ['type', 'attachmentId', 'mimeType', 'name'],
+              ['type', 'attachmentId', 'mimeType', 'name'],
+            )
+          ) {
+            valid = false;
+            return;
+          }
+          for (const key of ['attachmentId', 'mimeType', 'name']) {
+            if (typeof part[key] !== 'string' || part[key].length === 0) {
+              addError(filePath, `${partField}/${key}`, 'must be a non-empty string');
+              valid = false;
+            }
+          }
         }
       });
     });
@@ -1001,6 +2534,357 @@ function validateOpenRouterExtra(filePath, field, extra, allowProtected) {
   return openrouter;
 }
 
+function validateProviderExtra(filePath, field, extra, providerId, allowProtected) {
+  const namespace = EXTRA_NAMESPACE_BY_PROVIDER[providerId];
+  if (namespace === undefined) {
+    addError(filePath, field, `unsupported provider "${providerId}"`);
+    return undefined;
+  }
+  if (!checkObjectShape(filePath, field, extra, [namespace], [])) {
+    return undefined;
+  }
+  if (!Object.prototype.hasOwnProperty.call(extra, namespace)) {
+    return undefined;
+  }
+
+  if (providerId === 'openrouter') {
+    return validateOpenRouterExtra(filePath, field, extra, allowProtected);
+  }
+
+  const value = extra[namespace];
+  if (!isPlainObject(value)) {
+    addError(filePath, `${field}/${namespace}`, 'must be an object');
+    return undefined;
+  }
+
+  if (!allowProtected) {
+    for (const key of PROTECTED_REQUEST_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        addError(
+          filePath,
+          `${field}/${namespace}/${key}`,
+          'protected field must be rejected, not serialized',
+        );
+      }
+    }
+  }
+
+  return value;
+}
+
+function validateAttachmentsMap(filePath, field, attachments) {
+  if (!checkObjectShape(filePath, field, attachments, Object.keys(attachments), [])) {
+    return false;
+  }
+  for (const [id, attachment] of Object.entries(attachments)) {
+    const attachmentField = `${field}/${id}`;
+    if (id.length === 0) {
+      addError(filePath, attachmentField, 'attachment id must be non-empty');
+    }
+    if (
+      !checkObjectShape(
+        filePath,
+        attachmentField,
+        attachment,
+        ['mimeType', 'name', 'dataBase64'],
+        ['mimeType', 'name', 'dataBase64'],
+      )
+    ) {
+      continue;
+    }
+    for (const key of ['mimeType', 'name', 'dataBase64']) {
+      if (typeof attachment[key] !== 'string' || attachment[key].length === 0) {
+        addError(filePath, `${attachmentField}/${key}`, 'must be a non-empty string');
+      }
+    }
+    if (
+      typeof attachment.dataBase64 === 'string' &&
+      (attachment.dataBase64.length % 4 !== 0 || !BASE64_PATTERN.test(attachment.dataBase64))
+    ) {
+      addError(filePath, `${attachmentField}/dataBase64`, 'must be a base64 string');
+    }
+  }
+  return true;
+}
+
+function resolvedAttachment(attachments, attachmentId) {
+  return isPlainObject(attachments) ? attachments[attachmentId] : undefined;
+}
+
+function attachmentText(attachment) {
+  const content = Buffer.from(attachment.dataBase64, 'base64').toString('utf8');
+  return `\n\n[File: ${attachment.name}]\n${content}`;
+}
+
+function serializeOpenAIContent(parts, attachments) {
+  const hasImage = parts.some((part) => part.type === 'image');
+  if (!hasImage) {
+    return parts
+      .map((part) => {
+        if (part.type === 'text') {
+          return part.text;
+        }
+        if (part.type === 'file') {
+          const attachment = resolvedAttachment(attachments, part.attachmentId);
+          return attachment === undefined ? '' : attachmentText(attachment);
+        }
+        return '';
+      })
+      .join('');
+  }
+
+  return parts
+    .map((part) => {
+      if (part.type === 'text') {
+        return { type: 'text', text: part.text };
+      }
+      if (part.type === 'file') {
+        const attachment = resolvedAttachment(attachments, part.attachmentId);
+        return { type: 'text', text: attachment === undefined ? '' : attachmentText(attachment) };
+      }
+      if (part.type === 'image') {
+        const attachment = resolvedAttachment(attachments, part.attachmentId);
+        const data = attachment === undefined ? '' : attachment.dataBase64;
+        return {
+          type: 'image_url',
+          image_url: { url: `data:${part.mimeType};base64,${data}` },
+        };
+      }
+      return { type: 'text', text: '' };
+    })
+    .filter((part) => part.type !== 'text' || part.text.length > 0);
+}
+
+function serializeProviderRequest(request, attachments, providerId, supportedParameters) {
+  const supported = new Set(supportedParameters);
+  const namespace = EXTRA_NAMESPACE_BY_PROVIDER[providerId];
+  const extra = isPlainObject(request.params.extra[namespace])
+    ? request.params.extra[namespace]
+    : {};
+
+  if (providerId === 'openai') {
+    const messages = [];
+    if (request.system !== null) {
+      messages.push({ role: 'system', content: request.system });
+    }
+    for (const message of request.messages) {
+      messages.push({
+        role: message.role,
+        content: serializeOpenAIContent(message.parts, attachments),
+      });
+    }
+    const body = {
+      model: request.model,
+      messages,
+      stream: request.params.streaming,
+      stream_options: { include_usage: true },
+    };
+    if (request.params.maxOutputTokens !== null && supported.has('max_tokens')) {
+      body.max_tokens = request.params.maxOutputTokens;
+    }
+    if (request.params.temperature !== null && supported.has('temperature')) {
+      body.temperature = request.params.temperature;
+    }
+    if (request.params.topP !== null && supported.has('top_p')) {
+      body.top_p = request.params.topP;
+    }
+    if (request.params.stop.length > 0 && supported.has('stop')) {
+      body.stop = request.params.stop;
+    }
+    if (request.params.reasoningEffort !== null && supported.has('reasoning')) {
+      body.reasoning = { effort: request.params.reasoningEffort };
+    }
+    return { ...body, ...extra };
+  }
+
+  if (providerId === 'anthropic') {
+    const messages = request.messages.map((message) => ({
+      role: message.role,
+      content: message.parts.map((part) => {
+        if (part.type === 'text') {
+          return { type: 'text', text: part.text };
+        }
+        if (part.type === 'file') {
+          const attachment = resolvedAttachment(attachments, part.attachmentId);
+          return { type: 'text', text: attachment === undefined ? '' : attachmentText(attachment) };
+        }
+        if (part.type === 'image') {
+          const attachment = resolvedAttachment(attachments, part.attachmentId);
+          return {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: part.mimeType,
+              data: attachment === undefined ? '' : attachment.dataBase64,
+            },
+          };
+        }
+        return { type: 'text', text: '' };
+      }),
+    }));
+    const body = {
+      model: request.model,
+      messages,
+      max_tokens: request.params.maxOutputTokens ?? 1024,
+      stream: request.params.streaming,
+    };
+    if (request.system !== null) {
+      body.system = request.system;
+    }
+    if (request.params.temperature !== null && supported.has('temperature')) {
+      body.temperature = request.params.temperature;
+    }
+    if (request.params.topP !== null && supported.has('top_p')) {
+      body.top_p = request.params.topP;
+    }
+    if (request.params.stop.length > 0 && supported.has('stop')) {
+      body.stop_sequences = request.params.stop;
+    }
+    return { ...body, ...extra };
+  }
+
+  if (providerId === 'google') {
+    const contents = request.messages.map((message) => ({
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts: message.parts.map((part) => {
+        if (part.type === 'text') {
+          return { text: part.text };
+        }
+        if (part.type === 'file') {
+          const attachment = resolvedAttachment(attachments, part.attachmentId);
+          return { text: attachment === undefined ? '' : attachmentText(attachment) };
+        }
+        if (part.type === 'image') {
+          const attachment = resolvedAttachment(attachments, part.attachmentId);
+          return {
+            inlineData: {
+              mimeType: part.mimeType,
+              data: attachment === undefined ? '' : attachment.dataBase64,
+            },
+          };
+        }
+        return { text: '' };
+      }),
+    }));
+    const body = { contents };
+    if (request.system !== null) {
+      body.systemInstruction = { parts: [{ text: request.system }] };
+    }
+    const generationConfig = {};
+    if (request.params.temperature !== null && supported.has('temperature')) {
+      generationConfig.temperature = request.params.temperature;
+    }
+    if (request.params.topP !== null && supported.has('top_p')) {
+      generationConfig.topP = request.params.topP;
+    }
+    if (request.params.maxOutputTokens !== null && supported.has('max_tokens')) {
+      generationConfig.maxOutputTokens = request.params.maxOutputTokens;
+    }
+    if (request.params.stop.length > 0 && supported.has('stop')) {
+      generationConfig.stopSequences = request.params.stop;
+    }
+    if (Object.keys(generationConfig).length > 0) {
+      body.generationConfig = generationConfig;
+    }
+    return { ...body, ...extra };
+  }
+
+  if (providerId === 'ollama') {
+    const messages = [];
+    if (request.system !== null) {
+      messages.push({ role: 'system', content: request.system });
+    }
+    for (const message of request.messages) {
+      const content = message.parts
+        .map((part) => {
+          if (part.type === 'text') {
+            return part.text;
+          }
+          if (part.type === 'file') {
+            const attachment = resolvedAttachment(attachments, part.attachmentId);
+            return attachment === undefined ? '' : attachmentText(attachment);
+          }
+          return '';
+        })
+        .join('');
+      const images = message.parts
+        .filter((part) => part.type === 'image')
+        .map((part) => {
+          const attachment = resolvedAttachment(attachments, part.attachmentId);
+          return attachment === undefined ? '' : attachment.dataBase64;
+        });
+      const entry = { role: message.role, content };
+      if (images.length > 0) {
+        entry.images = images;
+      }
+      messages.push(entry);
+    }
+    const body = {
+      model: request.model,
+      messages,
+      stream: request.params.streaming,
+    };
+    const options = {};
+    if (request.params.temperature !== null && supported.has('temperature')) {
+      options.temperature = request.params.temperature;
+    }
+    if (request.params.topP !== null && supported.has('top_p')) {
+      options.top_p = request.params.topP;
+    }
+    if (request.params.maxOutputTokens !== null && supported.has('max_tokens')) {
+      options.num_predict = request.params.maxOutputTokens;
+    }
+    if (request.params.stop.length > 0 && supported.has('stop')) {
+      options.stop = request.params.stop;
+    }
+    if (Object.keys(options).length > 0) {
+      body.options = options;
+    }
+    return { ...body, ...extra };
+  }
+
+  return {};
+}
+
+function validateProviderChatRequestBody(filePath, document) {
+  const expectedBody = document.expected?.body;
+  if (!isPlainObject(expectedBody)) {
+    addError(filePath, '/expected/body', 'must be an object');
+    return;
+  }
+  const actual = serializeProviderRequest(
+    document.request,
+    document.attachments ?? {},
+    document.providerId,
+    document.supportedParameters,
+  );
+
+  for (const key of Object.keys(actual)) {
+    if (!Object.prototype.hasOwnProperty.call(expectedBody, key)) {
+      addError(
+        filePath,
+        `/expected/body/${key}`,
+        `must equal ${JSON.stringify(actual[key])} per the provider serialization rule`,
+      );
+    } else if (!isDeepStrictEqual(expectedBody[key], actual[key])) {
+      addError(
+        filePath,
+        `/expected/body/${key}`,
+        `must equal ${JSON.stringify(actual[key])} per the provider serialization rule`,
+      );
+    }
+  }
+  for (const key of Object.keys(expectedBody)) {
+    if (!Object.prototype.hasOwnProperty.call(actual, key)) {
+      addError(
+        filePath,
+        `/expected/body/${key}`,
+        'must be omitted because the provider serialization rule does not emit it',
+      );
+    }
+  }
+}
+
 function validateChatRequestBody(filePath, request, supportedParameters, expectedBody) {
   if (
     !checkObjectShape(
@@ -1122,7 +3006,7 @@ function validateChatRequestVector(filePath, document) {
       filePath,
       '',
       document,
-      ['name', 'kind', 'providerId', 'request', 'supportedParameters', 'expected'],
+      ['name', 'kind', 'providerId', 'request', 'attachments', 'supportedParameters', 'expected'],
       ['name', 'kind', 'providerId', 'request', 'supportedParameters', 'expected'],
     )
   ) {
@@ -1138,11 +3022,28 @@ function validateChatRequestVector(filePath, document) {
     addError(filePath, '/supportedParameters', 'must be an array of strings');
     return;
   }
-  validateOpenRouterExtra(filePath, '/request/params/extra', document.request.params.extra, false);
+  if (document.attachments !== undefined) {
+    if (!isPlainObject(document.attachments)) {
+      addError(filePath, '/attachments', 'must be an object');
+      return;
+    }
+    validateAttachmentsMap(filePath, '/attachments', document.attachments);
+  }
+  validateProviderExtra(
+    filePath,
+    '/request/params/extra',
+    document.request.params.extra,
+    document.providerId,
+    false,
+  );
   if (!checkObjectShape(filePath, '/expected', document.expected, ['body'], ['body'])) {
     return;
   }
-  validateChatRequestBody(filePath, document.request, document.supportedParameters, document.expected.body);
+  if (document.providerId === 'openrouter') {
+    validateChatRequestBody(filePath, document.request, document.supportedParameters, document.expected.body);
+  } else {
+    validateProviderChatRequestBody(filePath, document);
+  }
 }
 
 function validateProtectedFieldsVector(filePath, document) {
@@ -1167,19 +3068,21 @@ function validateProtectedFieldsVector(filePath, document) {
     addError(filePath, '/supportedParameters', 'must be an array of strings');
   }
 
-  const openrouter = validateOpenRouterExtra(
+  const namespace = EXTRA_NAMESPACE_BY_PROVIDER[document.providerId];
+  const providerExtra = validateProviderExtra(
     filePath,
     '/request/params/extra',
     document.request.params.extra,
+    document.providerId,
     true,
   );
-  const protectedFields = isPlainObject(openrouter)
-    ? PROTECTED_REQUEST_FIELDS.filter((key) => Object.prototype.hasOwnProperty.call(openrouter, key)).sort()
+  const protectedFields = isPlainObject(providerExtra)
+    ? PROTECTED_REQUEST_FIELDS.filter((key) => Object.prototype.hasOwnProperty.call(providerExtra, key)).sort()
     : [];
   if (protectedFields.length === 0) {
     addError(
       filePath,
-      '/request/params/extra/openrouter',
+      `/request/params/extra/${namespace ?? 'unknown'}`,
       `must contain at least one protected field (${PROTECTED_REQUEST_FIELDS.join(', ')})`,
     );
   }
@@ -1192,8 +3095,12 @@ function validateProtectedFieldsVector(filePath, document) {
     if (document.expected.error.code !== 'invalid_request') {
       addError(filePath, '/expected/error/code', 'must be "invalid_request"');
     }
-    if (document.expected.error.providerId !== 'openrouter') {
-      addError(filePath, '/expected/error/providerId', 'must be "openrouter"');
+    if (document.expected.error.providerId !== document.providerId) {
+      addError(
+        filePath,
+        '/expected/error/providerId',
+        `must be "${document.providerId}"`,
+      );
     }
     if (document.expected.error.retryable !== false) {
       addError(filePath, '/expected/error/retryable', 'must be false');
@@ -1444,6 +3351,7 @@ function validateRequestVectors() {
   }
 
   const seen = new Set();
+  const seenProviders = new Set();
   for (const filePath of requestFiles) {
     const name = path.basename(filePath, '.json');
     seen.add(path.basename(filePath));
@@ -1462,8 +3370,10 @@ function validateRequestVectors() {
       addError(filePath, '/kind', `must be one of ${JSON.stringify(REQUEST_KINDS)}`);
       continue;
     }
-    if (document.providerId !== 'openrouter') {
-      addError(filePath, '/providerId', 'must be "openrouter"');
+    if (!REQUEST_PROVIDER_IDS.includes(document.providerId)) {
+      addError(filePath, '/providerId', `must be one of ${JSON.stringify(REQUEST_PROVIDER_IDS)}`);
+    } else {
+      seenProviders.add(document.providerId);
     }
 
     switch (document.kind) {
@@ -1487,9 +3397,14 @@ function validateRequestVectors() {
       addError(path.join(requestsDir, name), '$', 'required request vector is missing');
     }
   }
+  for (const providerId of REQUIRED_REQUEST_PROVIDERS) {
+    if (!seenProviders.has(providerId)) {
+      addError(requestsDir, '$', `missing request vectors for provider "${providerId}"`);
+    }
+  }
 }
 
-function validateExpectedVectors() {
+function validateExpectedVectors(validators) {
   const expectedFiles = walkFiles(expectedDir).filter((file) => file.endsWith('.json'));
   const seen = new Set();
 
@@ -1512,6 +3427,22 @@ function validateExpectedVectors() {
       validateKeyExpected(filePath, document);
     } else if (name === EXPECTED_ERRORS_FILE) {
       validateErrorsExpected(filePath, document);
+    } else if (name === EXPECTED_PROVIDER_ERRORS_FILE) {
+      validateProviderErrorsExpected(filePath, document);
+    } else if (name === EXPECTED_ANTHROPIC_THINKING_FILE) {
+      validateAnthropicThinkingExpected(filePath, document);
+    } else if (name === EXPECTED_GEMINI_FINISH_REASONS_FILE) {
+      validateGeminiFinishReasonsExpected(filePath, document);
+    } else if (name === EXPECTED_CATALOGS_FILE) {
+      validateCatalogsExpected(filePath, document);
+    } else if (name === EXPECTED_CAPABILITY_INFERENCE_FILE) {
+      validateCapabilityInferenceExpected(filePath, document);
+    } else if (name === EXPECTED_FALLBACK_MODELS_FILE) {
+      validateFallbackModelsExpected(filePath, document);
+    } else if (name === EXPECTED_MATH_FILE) {
+      validateMathExpected(filePath, document);
+    } else if (name === EXPECTED_EXPORT_FILE) {
+      validateExportExpected(filePath, document, validators.get('chat-export.schema.json'));
     }
   }
 
@@ -1523,10 +3454,10 @@ function validateExpectedVectors() {
 
   const streamDir = path.join(fixturesDir, 'streams');
   const expectedSources = new Set(EXPECTED_STREAM_SOURCES.values());
-  for (const filePath of walkFiles(streamDir).filter((file) => file.endsWith('.sse'))) {
+  for (const filePath of walkFiles(streamDir).filter((file) => file.endsWith('.sse') || file.endsWith('.txt'))) {
     const name = path.basename(filePath);
-    if (name.startsWith('openrouter-') && !expectedSources.has(name)) {
-      addError(filePath, '$', 'OpenRouter stream fixture has no expected vector');
+    if (!expectedSources.has(name)) {
+      addError(filePath, '$', 'stream fixture has no expected vector');
     }
   }
 
@@ -1566,10 +3497,18 @@ function validateFixtureEncoding() {
       continue;
     }
 
+    let text;
     try {
-      new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+      text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
     } catch {
       addError(filePath, '$', 'fixture is not valid UTF-8');
+      continue;
+    }
+
+    for (const pattern of SECRET_PATTERNS) {
+      if (pattern.test(text)) {
+        addError(filePath, '$', `fixture appears to contain a secret matching ${pattern}`);
+      }
     }
   }
 }
@@ -1643,6 +3582,134 @@ function validateParity() {
   }
 }
 
+function runBrokenVectorSelfTest(validators) {
+  const start = errors.length;
+
+  const brokenStreamPath = path.join(expectedDir, '__broken-stream__.json');
+  validateStreamExpected(
+    brokenStreamPath,
+    {
+      source: 'openai-text.sse',
+      events: [
+        { type: 'start', responseId: 'broken' },
+        { type: 'text-delta', text: 'Hello' },
+        { type: 'finish', reason: 'stop' },
+      ],
+      text: 'Goodbye',
+      reasoning: '',
+      retryAllowed: false,
+    },
+    'openai-text.sse',
+  );
+
+  const brokenErrorPath = path.join(expectedDir, '__broken-error__.json');
+  validateChatError(brokenErrorPath, '/cases/0/error', {
+    code: 'not_a_chat_error_code',
+    message: 'Broken vector',
+    providerId: 'openai',
+    status: 401,
+    retryable: false,
+    retryAfterSeconds: null,
+    requestId: null,
+    details: null,
+  });
+
+  const brokenCatalogPath = path.join(expectedDir, '__broken-catalog__.json');
+  const catalogDocument = JSON.parse(
+    readFileSync(path.join(expectedDir, EXPECTED_CATALOGS_FILE), 'utf8'),
+  );
+  catalogDocument.cases[0].expected[0].label = 'wrong-label';
+  validateCatalogsExpected(brokenCatalogPath, catalogDocument);
+
+  const brokenRequestPath = path.join(requestsDir, '__broken-request__.json');
+  const requestDocument = JSON.parse(
+    readFileSync(path.join(requestsDir, 'openai-basic.json'), 'utf8'),
+  );
+  requestDocument.expected.body.model = 'wrong-model';
+  validateChatRequestVector(brokenRequestPath, requestDocument);
+
+  const brokenMathPath = path.join(expectedDir, '__broken-math__.json');
+  const mathDocument = JSON.parse(
+    readFileSync(path.join(expectedDir, EXPECTED_MATH_FILE), 'utf8'),
+  );
+  mathDocument.cases[0].expected.segments[0].text = 'wrong-text';
+  validateMathExpected(brokenMathPath, mathDocument);
+
+  const brokenExportPath = path.join(expectedDir, '__broken-export__.json');
+  const exportDocument = JSON.parse(
+    readFileSync(path.join(expectedDir, EXPECTED_EXPORT_FILE), 'utf8'),
+  );
+  exportDocument.format = 'wrong.format';
+  validateExportExpected(
+    brokenExportPath,
+    exportDocument,
+    validators.get('chat-export.schema.json'),
+  );
+
+  const produced = errors.slice(start);
+  errors.length = start;
+
+  const streamOk = produced.some(
+    (message) => message.includes(relative(brokenStreamPath)) && message.includes('/text'),
+  );
+  const errorOk = produced.some(
+    (message) => message.includes(relative(brokenErrorPath)) && message.includes('/cases/0/error/code'),
+  );
+  const catalogOk = produced.some(
+    (message) =>
+      message.includes(relative(brokenCatalogPath)) &&
+      message.includes('/cases/0/expected/0/label'),
+  );
+  const requestOk = produced.some(
+    (message) =>
+      message.includes(relative(brokenRequestPath)) &&
+      message.includes('/expected/body/model'),
+  );
+  const mathOk = produced.some(
+    (message) =>
+      message.includes(relative(brokenMathPath)) &&
+      message.includes('/cases/0/expected/segments'),
+  );
+  const exportOk = produced.some(
+    (message) => message.includes(relative(brokenExportPath)) && message.includes('/format'),
+  );
+
+  if (!streamOk) {
+    addError(brokenStreamPath, '/text', 'broken-vector self-test did not report the expected text mismatch');
+  }
+  if (!errorOk) {
+    addError(brokenErrorPath, '/cases/0/error/code', 'broken-vector self-test did not report the expected invalid code');
+  }
+  if (!catalogOk) {
+    addError(
+      brokenCatalogPath,
+      '/cases/0/expected/0/label',
+      'broken-vector self-test did not report the expected catalog mismatch',
+    );
+  }
+  if (!requestOk) {
+    addError(
+      brokenRequestPath,
+      '/expected/body/model',
+      'broken-vector self-test did not report the expected request mismatch',
+    );
+  }
+  if (!mathOk) {
+    addError(
+      brokenMathPath,
+      '/cases/0/expected/segments',
+      'broken-vector self-test did not report the expected math mismatch',
+    );
+  }
+  if (!exportOk) {
+    addError(
+      brokenExportPath,
+      '/format',
+      'broken-vector self-test did not report the expected export mismatch',
+    );
+  }
+}
+
 function main() {
   const schemas = loadSchemas();
   const validators = compileSchemas(schemas);
@@ -1650,10 +3717,11 @@ function main() {
   validateAllJsonFiles();
   validateProviders(validators);
   validateModelFixtures(validators);
-  validateExpectedVectors();
+  validateExpectedVectors(validators);
   validateRequestVectors();
   validateFixtureEncoding();
   validateParity();
+  runBrokenVectorSelfTest(validators);
 
   if (errors.length > 0) {
     for (const error of errors) {

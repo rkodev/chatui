@@ -24,6 +24,9 @@ class ModelRepository(
 
     suspend fun get(id: String): Model? = dao.getById(id)?.toDomain()
 
+    /** Every model, including hidden rows, for export. */
+    suspend fun all(): List<Model> = dao.all().map { it.toDomain() }
+
     suspend fun findByRemoteId(providerId: String, remoteId: String): Model? =
         dao.findByRemoteId(providerId, remoteId)?.toDomain()
 

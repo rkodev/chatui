@@ -2,7 +2,11 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { createTestConversation } from '../providers/testSupport'
 import { createFakeConversationHistoryService } from './testSupport'
-import { useConversationHistory } from './useConversationHistory'
+import {
+  DEFAULT_UNDO_WINDOW_MS,
+  sortConversations,
+  useConversationHistory,
+} from './useConversationHistory'
 
 const conversationA = createTestConversation({
   id: 'a',
@@ -233,5 +237,124 @@ describe('useConversationHistory', () => {
     })
 
     expect(result.current.conversations[0].title).toBe('Renamed')
+  })
+
+  it('sorts pinned conversations first across timestamps', () => {
+    const pinnedOlder = { ...conversationB, pinned: true }
+
+    expect(sortConversations([conversationA, pinnedOlder]).map((item) => item.id)).toEqual([
+      'b',
+      'a',
+    ])
+  })
+
+  it('loads the active list with the archive filter and pinned-first order', async () => {
+    const listConversations = vi.fn(async () => ({
+      items: [conversationA, { ...conversationB, pinned: true }],
+      nextCursor: null,
+    }))
+    const service = createFakeConversationHistoryService({ listConversations })
+    const { result } = renderHistory(service)
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    expect(listConversations).toHaveBeenCalledWith({
+      limit: 100,
+      cursor: null,
+      archived: false,
+    })
+    expect(result.current.conversations.map((item) => item.id)).toEqual(['b', 'a'])
+  })
+
+  it('loads the archive view with the archive filter', async () => {
+    const archived = { ...conversationA, archived: true }
+    const listConversations = vi.fn(async () => ({ items: [archived], nextCursor: null }))
+    const service = createFakeConversationHistoryService({ listConversations })
+    const { result } = renderHistory(service, { showArchived: true })
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    expect(listConversations).toHaveBeenCalledWith({
+      limit: 100,
+      cursor: null,
+      archived: true,
+    })
+    expect(result.current.conversations.map((item) => item.id)).toEqual(['a'])
+  })
+
+  it('pins and unpins through the service and reorders immediately', async () => {
+    const setConversationPinned = vi.fn(async (id: string, pinned: boolean) => ({
+      ...conversationB,
+      id,
+      pinned,
+    }))
+    const service = createFakeConversationHistoryService({
+      listConversations: async () => ({ items: [conversationA, conversationB], nextCursor: null }),
+      setConversationPinned,
+    })
+    const { result } = renderHistory(service)
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      await result.current.setPinned('b', true)
+    })
+
+    expect(setConversationPinned).toHaveBeenCalledWith('b', true)
+    expect(result.current.conversations.map((item) => item.id)).toEqual(['b', 'a'])
+
+    await act(async () => {
+      await result.current.setPinned('b', false)
+    })
+
+    expect(result.current.conversations.map((item) => item.id)).toEqual(['a', 'b'])
+  })
+
+  it('removes an archived conversation from the active list', async () => {
+    const setConversationArchived = vi.fn(async (id: string, archived: boolean) => ({
+      ...conversationA,
+      id,
+      archived,
+    }))
+    const service = createFakeConversationHistoryService({
+      listConversations: async () => ({ items: [conversationA, conversationB], nextCursor: null }),
+      setConversationArchived,
+    })
+    const { result } = renderHistory(service)
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      await result.current.setArchived('a', true)
+    })
+
+    expect(setConversationArchived).toHaveBeenCalledWith('a', true)
+    expect(result.current.conversations.map((item) => item.id)).toEqual(['b'])
+  })
+
+  it('restores an unarchived conversation into the archive list', async () => {
+    const archived = { ...conversationA, archived: true }
+    const setConversationArchived = vi.fn(async (id: string, archivedFlag: boolean) => ({
+      ...archived,
+      id,
+      archived: archivedFlag,
+    }))
+    const service = createFakeConversationHistoryService({
+      listConversations: async () => ({ items: [archived], nextCursor: null }),
+      setConversationArchived,
+    })
+    const { result } = renderHistory(service, { showArchived: true })
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      await result.current.setArchived('a', false)
+    })
+
+    expect(result.current.conversations).toEqual([])
+  })
+
+  it('keeps the delete undo window at five seconds by default', () => {
+    expect(DEFAULT_UNDO_WINDOW_MS).toBe(5000)
   })
 })

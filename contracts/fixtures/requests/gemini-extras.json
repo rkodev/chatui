@@ -1,0 +1,65 @@
+{
+  "name": "gemini-extras",
+  "kind": "chat-request",
+  "providerId": "google",
+  "request": {
+    "model": "gemini-2.5-flash",
+    "system": null,
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Hello"
+          }
+        ]
+      }
+    ],
+    "params": {
+      "temperature": null,
+      "topP": null,
+      "maxOutputTokens": 256,
+      "stop": [],
+      "reasoningEffort": null,
+      "streaming": true,
+      "extra": {
+        "google": {
+          "safetySettings": [
+            {
+              "category": "HARM_CATEGORY_HARASSMENT",
+              "threshold": "BLOCK_NONE"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "supportedParameters": [
+    "stream",
+    "max_tokens"
+  ],
+  "expected": {
+    "body": {
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "Hello"
+            }
+          ]
+        }
+      ],
+      "generationConfig": {
+        "maxOutputTokens": 256
+      },
+      "safetySettings": [
+        {
+          "category": "HARM_CATEGORY_HARASSMENT",
+          "threshold": "BLOCK_NONE"
+        }
+      ]
+    }
+  }
+}
