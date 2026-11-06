@@ -67,7 +67,7 @@
 | 30 | [M3-06.4 Release CI, artifacts, and developer targets](M3-06.4-release-ci-artifacts.md) | Complete | M3-06.1, M3-06.2, M3-06.3 | release | M3-05.* |
 | 31 | [M3-06.5 Image decode, Coil sizing, and release size measurement](M3-06.5-image-decode-size.md) | Complete | M3-06.1 | release | M3-05.* |
 | 32 | [M3-07.1 Performance and size evidence](M3-07.1-performance-size-evidence.md) | Complete | M3-06.4, M3-06.5, M3-05.5 | evidence | M3-07.2, M3-07.3, M3-07.4 |
-| 33 | [M3-07.2 Accessibility baseline and TalkBack](M3-07.2-accessibility.md) | Not started | M3-05.3, M3-03.4 | evidence | M3-07.1, M3-07.3, M3-07.4 |
+| 33 | [M3-07.2 Accessibility baseline and TalkBack](M3-07.2-accessibility.md) | Complete | M3-05.3, M3-03.4 | evidence | M3-07.1, M3-07.3, M3-07.4 |
 | 34 | [M3-07.3 Manual device matrix](M3-07.3-device-matrix.md) | Not started | M3-05.4, M3-06.4, M3-02.1, M3-02.2 | evidence | M3-07.1, M3-07.2, M3-07.4 |
 | 35 | [M3-07.4 M2 carryover closeout and platform input checks](M3-07.4-m2-carryover-closeout.md) | Not started | M3-01.5, M3-03.4, M3-05.4 | evidence | M3-07.1, M3-07.2, M3-07.3 |
 | 36 | [M3-07.5 Parity, regressions, and exit evidence](M3-07.5-parity-exit-evidence.md) | Not started | M3-01.1, M3-01.2, M3-01.3, M3-01.4, M3-01.5, M3-02.3, M3-07.1, M3-07.2, M3-07.3, M3-07.4 | evidence | none; final gate |

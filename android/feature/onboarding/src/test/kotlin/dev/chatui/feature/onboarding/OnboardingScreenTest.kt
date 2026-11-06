@@ -56,6 +56,7 @@ class OnboardingScreenTest {
         composeRule.onNodeWithText("Recommended").assertIsDisplayed()
         composeRule.onNodeWithTag(OnboardingTestTags.providerOption("openrouter"))
             .assertIsDisplayed()
+            .assertTextContains("OpenRouter")
         composeRule.onNodeWithTag(OnboardingTestTags.providerOption("openai"))
             .assertIsNotEnabled()
     }

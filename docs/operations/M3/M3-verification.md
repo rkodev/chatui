@@ -1051,3 +1051,119 @@ material is recorded in this section. The seeded provider key is the synthetic
 the image is a generated gradient. The measurement keystore path and passwords
 are not recorded.
 
+## 21. M3-07.2 Accessibility baseline and TalkBack
+
+Recorded 2026-11-06 on `Medium_Phone_API_36.1(AVD) - 16` (API 36), debug build.
+Only synthetic provider, conversation, and message data was used.
+
+### 21.1 Semantics and content-description audit
+
+| Surface | Interactive element | Accessible name | Result |
+| --- | --- | --- | --- |
+| Shell | Compact menu icon button | `Open navigation` (added) | Pass |
+| Shell | Keyboard-shortcuts icon button | `Keyboard shortcuts` | Pass |
+| Shell | Sidebar/drawer destinations | Visible text labels | Pass |
+| Conversations | Row overflow icon button | `Conversation actions` (added) | Pass |
+| Conversations | Row select target | Merged title and timestamp | Pass |
+| Conversations | Search result row | Merged title and match context | Pass |
+| Chat | Share, Settings, model chip | Visible text labels | Pass |
+| Chat | Message copy/regenerate/edit | `Copy message`, `Regenerate response`, `Edit last message` | Pass |
+| Chat | Message row | `Assistant message` / `You message` | Pass |
+| Chat | Image and file attachments | Attachment name / `File attachment <name>` | Pass |
+| Chat | Composer attach, paste, send, stop | Visible text labels | Pass |
+| Chat | Error retry and details | `Retry`, `Details` | Pass |
+| Onboarding | Provider rows | Merged provider label and status | Pass |
+| Providers | Manage, add, retry, save | Visible text labels | Pass |
+| Settings | Rows, chips, switches | Visible text labels | Pass |
+
+Two icon-only buttons rendered a glyph without an accessible name and were
+fixed: the compact shell menu button and the conversation row-actions button.
+Both now expose a content description, clear the glyph from semantics, and use
+`Modifier.size(dimens.touchTargetMin)`. Provider rows and conversation/search
+rows now merge descendant text so the clickable node carries the visible label.
+
+### 21.2 Streaming announcements
+
+`ChatViewModel.announcementFor` emits only on status transitions:
+`Response started`, `Response complete`, `Response cancelled`, and
+`Response failed. <message>`. Token deltas do not change the announcement.
+`ChatScreen` exposes the announcement through a 1 dp node with
+`liveRegion = LiveRegionMode.Polite`. `ChatViewModelTest` proves the announcement
+does not change on token updates, and `ChatScreenTest` now asserts the polite
+live-region property as well as the text.
+
+### 21.3 48 dp touch-target audit
+
+`Dimens.touchTargetMin` is 48 dp and `DesignSystemTest` asserts it. The audit
+found the three Material 3 `IconButton`s laid out at 40 dp even though the
+minimum-interactive-size touch target was larger. They now use
+`Modifier.size(dimens.touchTargetMin)` so the layout and touch target are both
+48 dp. Text buttons, chips, switches, and the composer already use
+`heightIn(min = touchTargetMin)` or Material 3 minimum interactive sizing.
+
+New tests assert the measured height is at least 48 dp for the chat header
+actions, the composer send button, and the conversation row-actions button.
+
+### 21.4 TalkBack pass
+
+TalkBack (`com.google.android.marvin.talkback`) was installed on the emulator
+and enabled with:
+
+```bash
+adb shell settings put secure enabled_accessibility_services \
+  com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService
+adb shell settings put secure accessibility_enabled 1
+```
+
+`dumpsys accessibility` reported the service bound with `FEEDBACK_SPOKEN`.
+Focus was moved with `KEYCODE_TAB` and the focused node was read from
+`uiautomator dump`. Observed focus order and names:
+
+| Flow | Focused nodes observed |
+| --- | --- |
+| Onboarding welcome | Provider rows (OpenRouter, OpenAI, Anthropic, ...), `Open navigation`, `Keyboard shortcuts` |
+| Chat | `Share conversation`, `Settings`, model chip, `Choose another model`, `Open navigation`, `Keyboard shortcuts` |
+| Drawer | `Close navigation menu`, Chats, Archived, New chat, Search conversations, conversation row, `Conversation actions`, Conversations, Providers, Settings, Data, Backup |
+| Providers | Provider label, `Manage`, `Add provider`, preset rows |
+| Settings | Appearance, Chat defaults, Providers, Data, Backup, About and privacy |
+| Error state | Model-unavailable banner and `Choose another model` action |
+
+The bottom-sheet model picker and conversation-settings sheet are separate
+windows that `uiautomator dump` does not expose. Their controls are text buttons
+and labelled fields, and `ModelPickerContentTest` / `ConversationSettingsSheet`
+tests cover their content. No TalkBack blocker was found.
+
+### 21.5 Reduced motion
+
+Set `animator_duration_scale`, `transition_animation_scale`, and
+`window_animation_scale` to `0`, force-stopped, and relaunched the app. The chat
+screen rendered in 1,482 ms with the header, availability banner, empty state,
+and composer all visible. `ChatUiTheme` reads the system animator scale through
+`rememberReducedMotion` and maps it to `ChatUiMotion.Reduced` (zero durations).
+The app has no production animation that could hide content, so reduced motion
+cannot remove content. Scales were restored to `1` after the check.
+
+### 21.6 Dynamic color and translations
+
+Dynamic color remains **optional / not implemented**. `ChatUiTheme` uses the
+fixed light/dark color schemes from `Color.kt`; no `dynamicLightColorScheme` or
+`dynamicDarkColorScheme` call exists. No translations or localized resources
+were added.
+
+### 21.7 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-lint` | `BUILD SUCCESSFUL`; 439 actionable tasks. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 997 aggregated tests, 0 failures, 0 errors, 0 skipped. |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | `BUILD SUCCESSFUL`; 10 tests, 0 failures, 0 errors, 2 skipped (manual restart/backup phases). |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:verifyRoborazziDebug` | `BUILD SUCCESSFUL`; screenshot goldens unchanged. |
+
+The 4 new JVM/Robolectric tests account for the increase from 993 to 997.
+
+### 21.8 Redaction
+
+No API key, prompt, conversation content, personal data, or signing material is
+recorded in this section. The seeded provider key is the synthetic
+`m3-backup-sentinel-not-a-real-key` sentinel and the conversation is synthetic.
+

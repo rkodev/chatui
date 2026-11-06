@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.designsystem.LocalDimens
@@ -220,6 +221,7 @@ private fun ProviderPicker(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = dimens.touchTargetMin)
+                    .semantics(mergeDescendants = true) {}
                     .selectable(
                         selected = option.id == state.selectedProviderId,
                         enabled = option.enabled,

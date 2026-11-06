@@ -105,7 +105,7 @@ class BackupSeedTest {
         id = PROVIDER_ID,
         presetId = "openrouter",
         label = "M3 backup sentinel provider",
-        kind = "openrouter",
+        kind = "openai-compatible",
         baseUrl = "https://openrouter.ai/api/v1",
         authType = "bearer",
         secretId = SECRET_ID,
@@ -124,7 +124,8 @@ class BackupSeedTest {
         providerId = PROVIDER_ID,
         modelId = MODEL_ID,
         modelLabel = "Sentinel model",
-        paramsJson = "{}",
+        paramsJson = "{\"temperature\":null,\"topP\":null,\"maxOutputTokens\":null," +
+            "\"stop\":[],\"reasoningEffort\":null,\"streaming\":true,\"extra\":{}}",
         pinned = false,
         archived = false,
         temporary = false,

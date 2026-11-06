@@ -1,6 +1,10 @@
 package dev.chatui.feature.chat
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -341,7 +345,29 @@ class ChatScreenTest {
         screen(state(announcement = "Response complete"))
 
         composeRule.onNodeWithTag(ChatScreenTestTags.Announcement)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.LiveRegion,
+                    LiveRegionMode.Polite,
+                ),
+            )
             .assertContentDescriptionEquals("Response complete")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `header and composer actions meet the 48 dp touch target`() {
+        screen(state(), onShareConversation = {})
+
+        listOf(
+            ChatScreenTestTags.Share,
+            ChatScreenTestTags.ConversationSettings,
+            ChatScreenTestTags.ModelChip,
+            ChatComposerTestTags.Send,
+        ).forEach { tag ->
+            val bounds = composeRule.onNodeWithTag(tag).getUnclippedBoundsInRoot()
+            assertThat((bounds.bottom - bounds.top).value).isAtLeast(48f)
+        }
     }
 
     @Test

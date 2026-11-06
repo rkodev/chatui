@@ -1,5 +1,6 @@
 package dev.chatui.feature.chat
 
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -85,6 +86,32 @@ class ChatMessageItemTest {
         composeRule.onNodeWithTag(ChatMessageTestTags.attachment(attachment.id)).assertExists()
         composeRule.onNodeWithText("notes.txt").assertExists()
         composeRule.onNodeWithText("2.0 KB").assertExists()
+    }
+
+    @Test
+    fun `message and attachment rows expose accessible descriptions`() {
+        val attachment = attachment(kind = AttachmentKind.FILE, name = "notes.txt", size = 2048)
+        val withFile = message.copy(
+            parts = listOf(
+                ContentPart.Text("See attached."),
+                ContentPart.File(attachment.id, attachment.mimeType, attachment.name),
+            ),
+        )
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatMessageItem(
+                    message = withFile,
+                    showActions = false,
+                    attachments = mapOf(attachment.id to attachment),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatMessageTestTags.message("assistant-1"))
+            .assertContentDescriptionEquals("Assistant message")
+        composeRule.onNodeWithTag(ChatMessageTestTags.attachment(attachment.id))
+            .assertContentDescriptionEquals("File attachment notes.txt")
     }
 
     @Test

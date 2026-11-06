@@ -1,5 +1,6 @@
 package dev.chatui
 
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -43,6 +44,19 @@ class ShellThemeTest {
         ).assertExists()
         composeRule.onNodeWithTag(ShellTestTags.ConversationsPlaceholder)
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun `compact shell menu button has an accessible name`() {
+        composeRule.setContent {
+            ChatUiApp(
+                settings = AndroidSettings(onboardingCompleted = true),
+                conversationService = EmptyConversationService(),
+            )
+        }
+
+        composeRule.onNodeWithTag(ShellTestTags.MenuButton)
+            .assertContentDescriptionEquals("Open navigation")
     }
 }
 
