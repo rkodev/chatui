@@ -1,15 +1,14 @@
 package dev.chatui.feature.chat
 
-import android.graphics.BitmapFactory
-import androidx.compose.foundation.Image
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,13 +21,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil3.compose.SubcomposeAsyncImage
+import coil3.request.ImageRequest
 import dev.chatui.core.database.attachment.formatAttachmentSize
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
@@ -349,31 +352,79 @@ private fun MessageImageAttachment(
     attachment: Attachment?,
     file: File?,
 ) {
-    val dimens = LocalDimens.current
-    val bitmap = remember(part.attachmentId, file?.path) {
-        if (file != null) BitmapFactory.decodeFile(file.path) else null
+    val description = attachment?.name ?: part.alt
+    if (file == null) {
+        ImageAttachmentFallback(description)
+        return
     }
 
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = attachment?.name ?: part.alt,
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val request = rememberChatImageRequest(
+            file = file,
+            maxWidth = maxWidth,
+            maxHeight = 320.dp,
+        )
+        SubcomposeAsyncImage(
+            model = request,
+            contentDescription = description,
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 320.dp)
                 .testTag(ChatMessageTestTags.attachment(part.attachmentId))
-                .semantics { contentDescription = attachment?.name ?: part.alt },
+                .semantics { contentDescription = description },
+            error = { ImageAttachmentFallback(description) },
         )
-    } else {
-        Text(
-            text = attachment?.name ?: part.alt.ifBlank { "Image attachment" },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .testTag(ChatMessageTestTags.AttachmentImage)
-                .semantics { contentDescription = "Image attachment" },
-        )
+    }
+}
+
+@Composable
+private fun ImageAttachmentFallback(description: String) {
+    Text(
+        text = description.ifBlank { "Image attachment" },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .testTag(ChatMessageTestTags.AttachmentImage)
+            .semantics { contentDescription = "Image attachment" },
+    )
+}
+
+/**
+ * Build a Coil request for a local attachment file.
+ *
+ * The request is bounded to the display size so Coil never decodes the full
+ * source bitmap. The cache key includes the file path, modification time, and
+ * target size so a resized request cannot reuse a differently sized bitmap.
+ */
+internal fun chatImageRequest(
+    context: Context,
+    file: File,
+    widthPx: Int,
+    heightPx: Int,
+): ImageRequest {
+    val boundedWidth = widthPx.coerceAtLeast(1)
+    val boundedHeight = heightPx.coerceAtLeast(1)
+    val cacheKey = "${file.path}:${file.lastModified()}:${boundedWidth}x$boundedHeight"
+    return ImageRequest.Builder(context)
+        .data(file)
+        .size(boundedWidth, boundedHeight)
+        .memoryCacheKey(cacheKey)
+        .build()
+}
+
+@Composable
+internal fun rememberChatImageRequest(
+    file: File,
+    maxWidth: Dp,
+    maxHeight: Dp,
+): ImageRequest {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val widthPx = with(density) { maxWidth.roundToPx() }
+    val heightPx = with(density) { maxHeight.roundToPx() }
+    return remember(file.path, widthPx, heightPx) {
+        chatImageRequest(context, file, widthPx, heightPx)
     }
 }
 

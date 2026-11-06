@@ -1,7 +1,5 @@
 package dev.chatui.feature.chat
 
-import android.graphics.BitmapFactory
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -39,6 +36,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import dev.chatui.core.database.attachment.formatAttachmentSize
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.model.Attachment
@@ -304,13 +302,6 @@ private fun AttachmentChip(
     onRemove: (() -> Unit)?,
 ) {
     val dimens = LocalDimens.current
-    val bitmap = remember(attachment.id, file?.path) {
-        if (attachment.kind == AttachmentKind.IMAGE && file != null) {
-            BitmapFactory.decodeFile(file.path)
-        } else {
-            null
-        }
-    }
 
     Row(
         modifier = Modifier
@@ -319,9 +310,14 @@ private fun AttachmentChip(
         horizontalArrangement = Arrangement.spacedBy(dimens.space2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap.asImageBitmap(),
+        if (attachment.kind == AttachmentKind.IMAGE && file != null) {
+            val request = rememberChatImageRequest(
+                file = file,
+                maxWidth = 48.dp,
+                maxHeight = 48.dp,
+            )
+            AsyncImage(
+                model = request,
                 contentDescription = attachment.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(48.dp),
