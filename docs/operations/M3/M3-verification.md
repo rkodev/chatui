@@ -558,3 +558,66 @@ added.
 | `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | `BUILD SUCCESSFUL`; 8 tests, 0 failures, 0 errors, 2 skipped (manual restart/backup phases). |
 
 The 14 new JVM/Robolectric tests account for the increase from 799 to 813.
+
+## 14. M3-04.1 Configuration-change stream survival
+
+Recorded 2026-11-06 on `Medium_Phone_API_36.1(AVD) - 16` (API 36,
+emulator-5554), debug build. Only synthetic conversation and message data was
+used.
+
+### 14.1 Automated recreation proof
+
+`ConfigChangeStreamTest.activeStreamSurvivesActivityRecreation` hosts the real
+`ChatRoute` in a debug-only test activity with a controlled
+`FakeProviderAdapter`. It starts a send, waits for the first `partial` delta,
+calls `ActivityScenario.recreate()`, and then emits a second delta.
+
+| Assertion | Result |
+| --- | --- |
+| The same assistant message id remains after recreation | Pass |
+| The partial text remains visible after recreation | Pass |
+| The second delta updates the same message | Pass |
+| The fake adapter was not cancelled | Pass |
+| Exactly one assistant message exists at completion | Pass |
+
+### 14.2 Real rotation proof
+
+`ConfigChangeStreamTest.realOrientationChangeKeepsStream` forces a real
+landscape configuration change with `ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE`
+and waits for the activity to recreate. The same assertions pass: the partial
+text survives, the adapter is not cancelled, the second delta arrives, and no
+duplicate assistant row is created.
+
+This is the device rotation evidence for the task. It exercises a real
+configuration change rather than only `ActivityScenario.recreate()`.
+
+### 14.3 Test harness decision
+
+The test activity is in `android/app/src/debug/`, not `androidTest`. An activity
+declared in the test APK resolves to the `dev.chatui.test` process, and
+`ActivityScenario` refuses to launch it from the target app process
+(`Intent in process dev.chatui resolved to different process dev.chatui.test`).
+The debug-only activity is test-only and is not part of release builds. No
+production streaming architecture changed.
+
+### 14.4 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 930 tests, 0 failures, 0 errors, 0 skipped (aggregated test-results XML). |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | `BUILD SUCCESSFUL`; 10 tests, 0 failures, 0 errors, 2 skipped (existing manual restart/backup phases). `ConfigChangeStreamTest` ran 2 tests, 0 failures. |
+
+### 14.5 CI availability
+
+The repository CI workflow runs `lintDebug testDebugUnitTest assembleDebug`; it
+does not boot an emulator or run `connectedDebugAndroidTest`. The
+configuration-change test is therefore a local instrumentation test on
+`Medium_Phone_API_36.1(AVD) - 16`. CI device availability remains the
+environment blocker for connected tests, as recorded in section 5. The test
+compiles in CI through `:app:compileDebugAndroidTestKotlin` only when that task
+is run; the current CI command does not include it.
+
+### 14.6 Redaction
+
+No API key, prompt, conversation content, personal data, or signing material is
+recorded in this section. The test uses synthetic `Hello` / `partial` text only.
