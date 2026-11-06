@@ -902,3 +902,152 @@ No API key, prompt, conversation content, personal data, or signing material is
 recorded in this section. The measurement keystore path and passwords are not
 recorded.
 
+## 20. M3-07.1 Performance and size evidence
+
+Recorded 2026-11-06 on `Medium_Phone_API_36.1(AVD) - 16` (API 36, x86_64,
+1080x2400, headless emulator with `swiftshader_indirect` GPU). The emulator is
+the available device; physical mid-tier validation remains M3-07.3. Only
+synthetic data was used.
+
+### 20.1 Cold start
+
+Build type: `release` (R8 minified, resource shrunk), signed with a throwaway
+local measurement keystore outside the repository. The keystore and passwords
+were deleted after measurement and are not recorded. Release signing policy
+remains M3-06.2/M3-06.4.
+
+Profile state: the baseline profile was installed and compiled before the
+measured runs.
+
+```bash
+adb install -r app-release.apk
+adb shell am broadcast -a androidx.profileinstaller.action.INSTALL_PROFILE \
+  -n dev.chatui/androidx.profileinstaller.ProfileInstallReceiver   # result=1
+adb shell cmd package compile -m speed-profile dev.chatui          # Success
+adb shell dumpsys package dev.chatui | grep status                 # [status=speed-profile]
+```
+
+Procedure: one warm-up launch after install (excluded), then five runs of
+`adb shell am force-stop dev.chatui` followed by
+`adb shell am start -W -n dev.chatui/.MainActivity`.
+
+| Run | TotalTime (ms) | WaitTime (ms) | LaunchState |
+| --- | --- | --- | --- |
+| 1 | 990 | 1191 | COLD |
+| 2 | 762 | 780 | COLD |
+| 3 | 1098 | 1195 | COLD |
+| 4 | 693 | 704 | COLD |
+| 5 | 1296 | 1423 | COLD |
+
+Median: **990 ms**. Budget: 1,500 ms. Result: **met** on the recorded emulator.
+
+Methodology note: the host load average was 4.65 at measurement. Earlier runs
+taken while the host load average was about 7.7 produced 1.1-2.3 s totals, so
+this emulator is sensitive to host CPU contention. The table above is one
+contiguous set taken after the profile was applied and after the host load had
+settled; no run was discarded from that set.
+
+### 20.2 Large-conversation bounded composition
+
+Command:
+
+```bash
+cd android && ANDROID_HOME=$HOME/Android/Sdk \
+  ./gradlew :feature:chat:testDebugUnitTest \
+  --tests 'dev.chatui.feature.chat.ChatMessageListTest'
+```
+
+Result: `BUILD SUCCESSFUL`; 4 tests, 0 failures, 0 errors, 0 skipped.
+
+| Test | Result | What it proves |
+| --- | --- | --- |
+| `ten thousand message history composes only visible rows` | Pass | A 10,000-message history composes fewer than 100 rows and the newest message is visible (spec 15.2 case 23). |
+| `token updates recompose only the streaming row` | Pass | A streaming token update does not recompose history rows. |
+| `history rows keep stable identity when a message is updated in place` | Pass | In-place updates keep stable keys. |
+| `duplicate-prone ids keep stable identity and do not collide with the streaming row` | Pass | Keys come from `Message.id`; the streaming row replaces rather than duplicates a history key. |
+
+The bounded-composition threshold is fewer than 100 composed rows, as recorded
+by M3-05.5. No production code changed for this evidence.
+
+### 20.3 Streaming recomposition
+
+The `token updates recompose only the streaming row` case above is the
+streaming-recomposition result. It passes on the Robolectric/JVM path. No
+device frame-time measurement was taken; this task gates bounded composition
+and history recomposition, not frame timing.
+
+### 20.4 Image decode and caching
+
+Unit evidence: `ChatMessageItemTest.local image requests are bounded to the
+display size` passes. It asserts the Coil request uses the local `File` as data
+and a `Size(1080, 960)` size resolver, matching the `BoxWithConstraints`-bounded
+message-image request from M3-06.5.
+
+Device check: the debug build was installed and a synthetic conversation was
+seeded with one image message. The image was a 6000x4000 PNG (24 MP,
+162,948 bytes on disk; about 96 MB if decoded at full size) stored at
+`files/attachments/<sha256>`. The app restored the last-active conversation and
+rendered the image.
+
+| Check | Result |
+| --- | --- |
+| Image node rendered | `uiautomator` reports an `ImageView` with `content-desc="large.png"` at 932x621 px. |
+| Full-size decode avoided | The rendered bounds are far below 6000x4000; the request is bounded by the display size. |
+| No OOM or crash | `logcat` has no `OutOfMemoryError`, `FATAL EXCEPTION`, or `AndroidRuntime` entry after launch. |
+| Memory after render | `dumpsys meminfo dev.chatui`: TOTAL PSS 118,460 KB, Java heap 22,868 KB, native heap 19,248 KB. |
+
+The memory figures are consistent with a bounded decode rather than a 96 MB
+full-size bitmap. The Coil request uses `File` data and a size-aware memory
+cache key, as implemented in M3-06.5. The seeded conversation used synthetic
+data only; the seed's `paramsJson` was set to a valid `ChatParams` JSON so the
+conversation could open. No product code changed.
+
+### 20.5 Artifact sizes
+
+Measured with `ls -l` on the actual build outputs.
+
+| Artifact | Bytes | MiB | Budget | Result |
+| --- | --- | --- | --- | --- |
+| Debug APK (`app-debug.apk`) | 18,734,354 | 17.87 | 20 MB | Met |
+| Release APK, signed measurement build (`app-release.apk`) | 2,907,246 | 2.77 | 15 MB | Met |
+| Release APK, unsigned local build (`app-release-unsigned.apk`) | 2,894,958 | 2.76 | 15 MB | Met |
+| Release AAB (`app-release.aab`) | 7,042,442 | 6.72 | none | Recorded |
+
+Largest release contributors: `classes.dex` 2,677,480 bytes, `classes2.dex`
+2,313,436 bytes, `resources.arsc` 152,908 bytes, and
+`assets/dexopt/baseline.prof` 13,191 bytes. The signed APK is 12,288 bytes
+larger than the unsigned APK because of the signature block.
+
+The signed APK was produced with a throwaway local measurement keystore outside
+the repository. CI signing secrets remain unavailable, so the CI-signed release
+artifact is still the M3-06.4 blocker; this section records the local
+measurement build only.
+
+### 20.6 Budget summary
+
+| Budget | Target | Measured | Result |
+| --- | --- | --- | --- |
+| Cold start | under 1,500 ms | 990 ms median | Met |
+| Debug APK | under 20 MB | 17.87 MiB | Met |
+| Release APK | under 15 MB | 2.77 MiB | Met |
+
+No budget was missed, so no cause or follow-up owner is required. No security
+or required functionality was removed to hit a budget.
+
+### 20.7 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 993 aggregated tests, 0 failures, 0 errors, 0 skipped. |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:assembleDebug :app:assembleRelease :app:bundleRelease` | `BUILD SUCCESSFUL`; debug APK, release APK, and release AAB produced. |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :feature:chat:testDebugUnitTest --tests 'dev.chatui.feature.chat.ChatMessageListTest'` | `BUILD SUCCESSFUL`; 4 tests, 0 failures. |
+| `adb shell am start -W -n dev.chatui/.MainActivity` (five runs) | COLD each run; totals 990, 762, 1098, 693, 1296 ms; median 990 ms. |
+
+### 20.8 Redaction
+
+No real API key, prompt, conversation content, personal data, or signing
+material is recorded in this section. The seeded provider key is the synthetic
+`m3-backup-sentinel-not-a-real-key` sentinel, the conversation is synthetic, and
+the image is a generated gradient. The measurement keystore path and passwords
+are not recorded.
+
