@@ -36,7 +36,7 @@
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | [M3-00.1 Preflight and baseline verification](M3-00.1-preflight-baseline.md) | Complete | none | preflight | none; blocks all |
-| 2 | [M3-00.2 Confirm M3 scope decisions](M3-00.2-confirm-decisions.md) | Not started | M3-00.1 | preflight | none; blocks implementation choices |
+| 2 | [M3-00.2 Confirm M3 scope decisions](M3-00.2-confirm-decisions.md) | Complete | M3-00.1 | preflight | none; blocks implementation choices |
 | 3 | [M3-05.1 Android test infrastructure and fake provider harness](M3-05.1-test-infrastructure.md) | Not started | M3-00.2 | tests | no; shares app build file with M3-06.1 |
 | 4 | [M3-06.1 Release minification, shrinking, mapping, and keep rules](M3-06.1-release-minification.md) | Not started | M3-00.1 | release | M3-01.*, M3-03.* |
 | 5 | [M3-01.1 Real Android Keystore and ciphertext-only proof](M3-01.1-keystore-proof.md) | Not started | M3-00.2, M3-05.1 | secrets | M3-01.4, M3-02.3 |
