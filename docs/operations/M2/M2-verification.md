@@ -1,7 +1,7 @@
 # M2 Verification Evidence
 
-- Status: Final for M2-09.1; recorded 2026-11-06.
-- Owner: M2-09.1 finalizes this file; M2-09.2 uses it for the parity and exit gate.
+- Status: Final exit-gate evidence recorded 2026-11-06; M2 gate passed.
+- Owner: M2-09.1 recorded the command and CORS evidence; M2-09.2 finalized the parity and exit gate.
 - Scope: web and Android M2 provider, content, data, and CORS evidence.
 - Source plan: [M2 Providers and Content Implementation Plan](../M2-providers-and-content-implementation-plan.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
@@ -168,5 +168,63 @@ Residual risks:
 - No live web or Android manual smoke was performed for M2-09.1. The evidence is
   command, fixture, unit, component, and Playwright coverage.
 
-Blockers: none for M2-09.1. The residual risks above are recorded for M2-09.2
-and later release checks; they do not change any `browserCors` value.
+Blockers: none for M2-09.1 or the final gate. The residual risks above are
+carried into section 11 with owners; they do not change any `browserCors` value.
+
+## 10. Exit-gate evidence matrix
+
+Reviewed against the M2 milestone exit gate and plan section 5 on 2026-11-06.
+
+| Exit-gate requirement | Evidence | Status |
+| --- | --- | --- |
+| Every launch provider works end-to-end where CORS permits | Sections 3-4; per-provider adapter suites; CORS matrix. Cloud presets are `supported`; local and Custom remain `unknown`. | Pass with the recorded deferrals in section 11. |
+| Streaming fixture conformance passes for all shared stream fixtures; OpenRouter shows no regression | Section 3 fixture table; section 6 M1 regression rows. | Pass. |
+| Anthropic thinking/text separation, Gemini `MAX_TOKENS`, and Ollama NDJSON behave correctly | Section 5 cases 12-14. | Pass. |
+| Reasoning is displayed separately across providers | Section 5 case 12; web and Android rendering tests. | Pass. |
+| Markdown, code, and math render safely; XSS payloads are inert; incomplete fences render as code | Section 5 case 22; web KaTeX and Android raw-source math tests; code-fence tests. | Pass with the Android math limitation in section 11. |
+| Per-conversation system prompt and parameters work; unsupported values are noted; protected fields cannot be overridden | Section 3 request vectors; web and Android parameter/settings tests. | Pass. |
+| Attachments are stored locally, survive reload, are downscaled, and warn when unsupported | Section 5 case 19; attachment persistence, image-processing, and capability tests. | Pass. |
+| Search, pin, archive, rename, and delete work | Web `useConversationHistory`/sidebar tests and Playwright delete/undo; Android `ConversationSearchTest`, `ConversationListViewModelTest`, and `ConversationListScreenTest`. | Pass. |
+| Export/import round trips preserve IDs, order, snapshots, and attachments; invalid imports do not mutate data; clearing data removes conversations, keys, and attachments | Section 5 cases 24-25; export/import/data-control suites. | Pass. |
+| CORS failures produce actionable errors and never silently proxy | Section 4; `networkError.test.ts` and adapter CORS cases. | Pass. |
+| Web Playwright suite passes; Android provider and persistence tests pass | Section 2. | Pass. |
+| Critical cases 11-14, 19, and 22-25 have evidence on both platforms; M1 cases still pass | Sections 5-6. | Pass with the web case 23 limitation in section 11. |
+| `contracts/parity.md` reflects what actually works | `contracts/parity.md` M2 implementation-status section; `make contracts-check`. | Pass. |
+
+## 11. Deferrals, residual risks, and owners
+
+No exit-gate blocker remains. The following items are recorded deferrals or
+residual risks; none is presented as a passing automated check.
+
+| Item | Impact | Owner / target | Evidence |
+| --- | --- | --- | --- |
+| Android local Ollama over cleartext HTTP | A real device cannot reach `http://localhost:11434` until a network security config permits cleartext for local/private hosts. HTTPS endpoints work; the adapter and guidance are present. | M3 Android depth | M2-06.3 handoff; `android/app/src/main/AndroidManifest.xml` has no `networkSecurityConfig`. |
+| Android Anthropic and Gemini discovery | `ModelService.refreshModels` passes no API key, so discovery falls back to the shared fallback model lists. Chat and key validation work. | Follow-up owner; target M3 | `ModelService.kt` passes `apiKey = null`; M2-06.1/M2-06.2 handoffs. |
+| Android math typesetting | Standalone math blocks render as bounded raw source; inline math stays raw text. This is the documented safe fallback, not typeset math. | M3 Android depth | M2-06.4 handoff; `ChatMarkdown.kt`. |
+| Android device-level input and visual checks | Photo picker, SAF, clipboard paste, drag-and-drop, and visual attachment/data screens are covered by unit/Compose tests, not a device matrix. | M3 Android depth | M2-08.2 handoff; section 7. |
+| Web case 23 automated coverage | The 10,000-message windowing path has a manual code check on web; Android has an automated equivalent. | M4 polish or follow-up | Section 5 case 23. |
+| Live provider smoke and valid-key success | CORS evidence proves browser readability with placeholder credentials; valid-key success was not re-run for every cloud preset. | M4 release check | Sections 4 and 7. |
+| Local and Custom CORS | Ollama, LM Studio, llama.cpp, and Custom remain `unknown` until a real configured server passes the same checks. | M4 release check | Section 4. |
+
+## 12. Final redaction and overclaim review
+
+- No API key, real prompt, conversation content, personal data, or response body
+  appears in this file, `M2-cors-matrix.md`, or the M2 task records.
+- CORS evidence records only status codes, headers, timestamps, and conclusions.
+- Playwright uses a fake key and failure-only screenshots/traces; video is
+  disabled.
+- `contracts/parity.md` keeps the commitment table unchanged and records M2
+  behavior in a status list. It does not claim PWA, share target, backup/sync,
+  Rust, deployment, Android math typesetting, or device-matrix work.
+- The M2 milestone is marked Complete only after this review; the deferrals in
+  section 11 are visible and owned.
+
+## 13. Sign-off
+
+| Area | Owner | Date | Result | Evidence |
+| --- | --- | --- | --- | --- |
+| Contracts and fixtures | M2-09.2 | 2026-11-06 | Pass | Sections 2-3; `make contracts-check`. |
+| Web providers, content, and data | M2-09.2 | 2026-11-06 | Pass | Sections 2-6. |
+| Android providers, content, and data | M2-09.2 | 2026-11-06 | Pass | Sections 2-6. |
+| CORS and browser release decision | M2-09.1 | 2026-11-06 | Pass | Section 4; `M2-cors-matrix.md`. |
+| Parity and final exit gate | M2-09.2 | 2026-11-06 | Pass | Sections 10-12; `contracts/parity.md`. |

@@ -3,8 +3,8 @@
 - Source plan: [M2 Providers and Content Implementation Plan](../M2-providers-and-content-implementation-plan.md)
 - Milestone: [M2 Providers and content](../../milestones/M2-providers-and-content.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: Not started
-- Last updated: 2026-11-05
+- Status: Complete
+- Last updated: 2026-11-06
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
 - Scope: web and Android only. Rust, M3 Android depth, M4 release work, backup/sync, and deployment are out of scope.
 
@@ -72,7 +72,7 @@
 | 35 | [M2-08.1 Android provider adapter tests](M2-08.1-android-provider-tests.md) | Complete | M2-06.1, M2-06.2, M2-06.3 | android | none; M2-08.2 follows |
 | 36 | [M2-08.2 Android persistence, data, and critical-case tests](M2-08.2-android-persistence-data-tests.md) | Complete | M2-06.6, M2-07.3, M2-07.4, M2-07.5, M2-08.1 | android | M2-04.6 |
 | 37 | [M2-09.1 CORS matrix and conformance evidence](M2-09.1-cors-conformance-evidence.md) | Complete | M2-02.4, M2-04.6, M2-08.1, M2-08.2 | verification | none |
-| 38 | [M2-09.2 Parity and exit gate](M2-09.2-parity-exit-gate.md) | Not started | all prior tasks | verification | none |
+| 38 | [M2-09.2 Parity and exit gate](M2-09.2-parity-exit-gate.md) | Complete | all prior tasks | verification | none |
 
 ## Parallel execution groups
 

@@ -10,14 +10,14 @@ Milestones are intentionally not task lists. Concrete tasks are generated later,
 | --- | --- | --- | --- | --- |
 | M0 | Foundations | Complete | none | shared, web, android |
 | M1 | OpenRouter-first core chat | Complete | M0 | web, android |
-| M2 | Providers and content | Planned | M1 | web, android |
+| M2 | Providers and content | Complete | M1 | web, android |
 | M3 | Android depth | Planned | M2 | android |
 | M3.5 | Rust desktop client | Optional / parallel | M0, M1 | rust desktop |
 | M4 | Polish and release | Planned | M1, M2, M3, M3.5 if shipping | all enabled clients |
 | M5 | Backup and sync | Future | M4 | all shipping clients |
 | M6 | Managed roksky hosting | Future | M4 (M5 for BYO storage) | web hosting |
 
-Repository bootstrap (root README, Makefile, ignore rules, directory skeleton) is complete. The completed record is [`docs/tasks/T000-foundations.md`](../tasks/T000-foundations.md). M0 is complete; the exit-gate evidence is in [`docs/operations/M0/M0-verification.md`](../operations/M0/M0-verification.md).
+Repository bootstrap (root README, Makefile, ignore rules, directory skeleton) is complete. The completed record is [`docs/tasks/T000-foundations.md`](../tasks/T000-foundations.md). M0 is complete; the exit-gate evidence is in [`docs/operations/M0/M0-verification.md`](../operations/M0/M0-verification.md). M1 and M2 are also complete; their exit-gate evidence is in [`docs/operations/M1/M1-verification.md`](../operations/M1/M1-verification.md) and [`docs/operations/M2/M2-verification.md`](../operations/M2/M2-verification.md).
 
 ## Dependency graph
 
