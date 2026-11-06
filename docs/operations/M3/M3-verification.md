@@ -131,3 +131,81 @@ that depend on them.
 - The keystore check records only that a path exists outside the repository; no
   path, alias, or password is recorded.
 - Test names, sizes, and command output are non-sensitive.
+
+## 9. M3-01.1 Android Keystore and ciphertext-only proof
+
+Recorded 2026-11-06 on `Medium_Phone_API_36.1(AVD) - 16` (API 36), debug build.
+Only the synthetic sentinel `m3-sentinel-not-a-real-key` was used.
+
+### 9.1 Automated instrumentation proof
+
+Command:
+
+```bash
+cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest
+```
+
+Result: `BUILD SUCCESSFUL`; 6 tests, 0 failures, 0 errors, 1 skipped. The skipped
+test is the manual two-phase restart proof described in section 9.2.
+
+| Test | Result | What it proves |
+| --- | --- | --- |
+| `KeystoreProofTest.secondCipherInstanceDecryptsAndroidKeystoreCiphertext` | Pass | `TinkSecretCipher.androidKeystore` encrypts the sentinel and a second cipher instance decrypts it. |
+| `KeystoreProofTest.roomStoresOnlyCiphertextForSentinel` | Pass | `SecretStore` writes a `SecretEntity` whose `ciphertext` differs from and does not contain the sentinel. |
+| `KeystoreProofTest.keysetPreferencesDoNotContainSentinel` | Pass | `shared_prefs/chatui_secret_keyset_prefs.xml` exists and its bytes do not contain the sentinel. |
+
+### 9.2 Process-restart procedure and result
+
+The restart proof is deliberately separate from the in-process test. It uses a
+file-backed `m3-keystore-restart.db` and the production Keystore-backed keyset.
+
+```bash
+adb shell am instrument -w \
+  -e class dev.chatui.security.KeystoreRestartProofTest#restartPhase \
+  -e phase store dev.chatui.test/androidx.test.runner.AndroidJUnitRunner
+adb shell am force-stop dev.chatui
+adb shell am instrument -w \
+  -e class dev.chatui.security.KeystoreRestartProofTest#restartPhase \
+  -e phase decrypt dev.chatui.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Result: store phase `OK (1 test)`; `adb shell pidof dev.chatui` returned no
+process after force-stop; decrypt phase `OK (1 test)`. The second phase ran in a
+new app process and decrypted the sentinel from the persisted Room row, proving
+the keyset is loaded from persistent Keystore-backed storage.
+
+### 9.3 Unit-test regression
+
+Command:
+
+```bash
+ANDROID_HOME=$HOME/Android/Sdk make android-test
+```
+
+Result: `BUILD SUCCESSFUL`; 781 tests, 0 failures, 0 errors, 0 skipped.
+
+### 9.4 Source and log audit
+
+Searched `android/**/*.kt` for `Log.`, `println`, `printStackTrace`,
+`System.out`, `System.err`, `HttpLoggingInterceptor`, `addInterceptor`, and
+`loggingInterceptor`.
+
+- The only production log is `MainActivity.kt:46`,
+  `Log.w(TAG, "Startup recovery failed", error)`. The message is content-free
+  and the exception is a startup recovery failure, not a key or request header.
+- `AppModule.provideOkHttpClient()` installs no interceptors or network
+  interceptors; `AppModuleTest.provides a shared HTTP client without logging
+  interceptors` asserts both lists are empty.
+- `println` appears only inside code-block fixture strings in
+  `ChatCodeBlockTest`, not in production logging.
+- No `printStackTrace`, `System.out`, or `System.err` appears in production
+  sources.
+- `TinkSecretCipher` exception messages are generic and do not include
+  plaintext; `TinkSecretCipherTest` and `SecretStoreTest` assert that failure
+  messages do not contain the plaintext.
+
+### 9.5 Redaction
+
+No real key, request header, prompt, or personal data is recorded in this
+section. The sentinel is synthetic and exists only in test sources and test
+output.
