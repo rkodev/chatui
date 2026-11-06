@@ -109,6 +109,33 @@ class ModelPickerContentTest {
     }
 
     @Test
+    fun `selecting a model forwards the chosen model`() {
+        var selected: String? = null
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ModelPickerContent(
+                    state = state(),
+                    onQueryChanged = {},
+                    onSelect = { selected = it.id },
+                    onPin = { _, _ -> },
+                    onHide = { _, _ -> },
+                    onManualRemoteIdChanged = {},
+                    onManualLabelChanged = {},
+                    onAddManual = {},
+                    onRefresh = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.Content)
+            .performScrollToNode(hasTestTag(ModelPickerTestTags.model("model-2")))
+        composeRule.onNodeWithText("Select").performClick()
+
+        assertThat(selected).isEqualTo("model-2")
+    }
+
+    @Test
     fun `shows an unavailable warning`() {
         composeRule.setContent {
             ChatUiTheme {

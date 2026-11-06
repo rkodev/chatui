@@ -61,6 +61,35 @@ class OnboardingScreenTest {
     }
 
     @Test
+    fun `provider picker forwards the selected provider`() {
+        var selected: String? = null
+
+        composeRule.setContent {
+            ChatUiTheme {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = { selected = it },
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.providerOption("openrouter"))
+            .performClick()
+
+        assertThat(selected).isEqualTo("openrouter")
+    }
+
+    @Test
     fun `invalid key shows an actionable error and preserves the form`() {
         composeRule.setContent {
             ChatUiTheme {
