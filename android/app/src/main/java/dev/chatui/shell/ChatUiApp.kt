@@ -1,8 +1,13 @@
 package dev.chatui.shell
 
 import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -89,6 +94,7 @@ fun ShellScaffold(
     modifier: Modifier = Modifier,
     startDestination: String = ShellDestination.Conversations.route,
     conversationService: ConversationService? = null,
+    windowInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
     val activity = LocalActivity.current
     val expanded = activity != null &&
@@ -107,9 +113,16 @@ fun ShellScaffold(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        // Consume safe-drawing once at the shell boundary. The top app bar
+        // handles the top/status-bar and cutout insets; the content receives
+        // the remaining bottom and horizontal insets through `innerPadding`.
+        contentWindowInsets = windowInsets,
         topBar = {
             TopAppBar(
                 title = { Text(currentDestination?.title ?: "ChatUI") },
+                windowInsets = windowInsets.only(
+                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                ),
                 navigationIcon = {
                     if (!expanded) {
                         IconButton(
@@ -126,7 +139,11 @@ fun ShellScaffold(
         AdaptiveShell(
             expanded = expanded,
             drawerState = drawerState,
-            modifier = Modifier.padding(innerPadding),
+            modifier = Modifier
+                .padding(innerPadding)
+                // Mark the shell padding as consumed so descendants (for
+                // example the chat IME padding) do not add it a second time.
+                .consumeWindowInsets(innerPadding),
             sidebar = {
                 ShellSidebar(
                     currentRoute = currentRoute,

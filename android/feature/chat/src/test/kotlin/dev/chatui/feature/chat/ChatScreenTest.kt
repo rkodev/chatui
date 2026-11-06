@@ -1,8 +1,10 @@
 package dev.chatui.feature.chat
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -10,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.ChatError
@@ -68,6 +71,7 @@ class ChatScreenTest {
         onOpenConversationSettings: () -> Unit = {},
         onConfirmSend: () -> Unit = {},
         onCancelSendConfirmation: () -> Unit = {},
+        imeInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
     ) {
         composeRule.setContent {
             ChatUiTheme {
@@ -86,6 +90,7 @@ class ChatScreenTest {
                     onConfirmSend = onConfirmSend,
                     onCancelSendConfirmation = onCancelSendConfirmation,
                     zoneId = java.time.ZoneOffset.UTC,
+                    imeInsets = imeInsets,
                 )
             }
         }
@@ -104,6 +109,37 @@ class ChatScreenTest {
         composeRule.onNodeWithTag(ChatScreenTestTags.Empty).assertIsDisplayed()
         composeRule.onNodeWithText("Start the conversation").assertIsDisplayed()
         composeRule.onNodeWithTag(ChatComposerTestTags.Composer).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `composer stays above the ime inset`() {
+        screen(
+            state(),
+            imeInsets = WindowInsets(0.dp, 0.dp, 0.dp, 300.dp),
+        )
+
+        val composer = composeRule
+            .onNodeWithTag(ChatComposerTestTags.Composer)
+            .getUnclippedBoundsInRoot()
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.Composer).assertIsDisplayed()
+        // The screen is 891 dp tall; a 300 dp keyboard must leave the composer
+        // above the remaining 591 dp.
+        assertThat(composer.bottom.value).isAtMost(591f)
+        assertThat(composer.bottom.value).isAtLeast(580f)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `composer sits at the bottom when the keyboard is closed`() {
+        screen(state(), imeInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp))
+
+        val composer = composeRule
+            .onNodeWithTag(ChatComposerTestTags.Composer)
+            .getUnclippedBoundsInRoot()
+
+        assertThat(composer.bottom.value).isAtLeast(880f)
     }
 
     @Test

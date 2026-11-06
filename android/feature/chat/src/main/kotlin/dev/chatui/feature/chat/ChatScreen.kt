@@ -12,11 +12,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -107,12 +110,17 @@ fun ChatScreen(
     chatFontSize: ChatFontSize = ChatFontSize.MD,
     offline: Boolean = false,
     zoneId: ZoneId = ZoneId.systemDefault(),
+    imeInsets: WindowInsets = WindowInsets.ime,
 ) {
     val dimens = LocalDimens.current
 
     Surface(
         modifier = modifier
             .fillMaxSize()
+            // Keep the composer above the keyboard. The shell consumes the
+            // navigation-bar inset first, so this only adds the remaining IME
+            // height instead of double-padding the bottom edge.
+            .windowInsetsPadding(imeInsets)
             .testTag(ChatScreenTestTags.Screen),
         color = MaterialTheme.colorScheme.background,
     ) {
