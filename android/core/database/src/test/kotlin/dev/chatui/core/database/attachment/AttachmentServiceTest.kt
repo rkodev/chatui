@@ -186,6 +186,129 @@ class AttachmentServiceTest : DatabaseTestBase() {
         assertThat(deleted).contains("attachments/orphan-hash")
     }
 
+    @Test
+    fun `deleteForMessages removes metadata and bytes for the given messages only`() =
+        kotlinx.coroutines.test.runTest {
+            db.conversationDao().upsert(TestData.conversation())
+            db.messageDao().insertMessage(TestData.message(id = "message-1", sequence = 1))
+            db.messageDao().insertMessage(TestData.message(id = "message-2", sequence = 2))
+
+            val first = service.addFiles(
+                listOf(AttachmentInput("first.txt", "text/plain", 5, "first".toByteArray())),
+                messageId = "message-1",
+            ).attachments.single()
+            val second = service.addFiles(
+                listOf(AttachmentInput("second.txt", "text/plain", 6, "second".toByteArray())),
+                messageId = "message-2",
+            ).attachments.single()
+
+            service.deleteForMessages(listOf("message-1"))
+
+            assertThat(repository.get(first.id)).isNull()
+            assertThat(storage.fileFor(first.storageKey).exists()).isFalse()
+            assertThat(repository.get(second.id)).isNotNull()
+            assertThat(storage.fileFor(second.storageKey).exists()).isTrue()
+        }
+
+    @Test
+    fun `removing one of two rows sharing a hash keeps the shared bytes`() =
+        kotlinx.coroutines.test.runTest {
+            val bytes = "shared".toByteArray()
+            val added = service.addFiles(
+                listOf(
+                    AttachmentInput("one.txt", "text/plain", bytes.size.toLong(), bytes),
+                    AttachmentInput("two.txt", "text/plain", bytes.size.toLong(), bytes),
+                ),
+            ).attachments
+
+            assertThat(added.map { it.sha256 }.distinct()).hasSize(1)
+            val storageKey = added.first().storageKey
+
+            service.remove(added.first().id)
+
+            assertThat(repository.get(added.first().id)).isNull()
+            assertThat(repository.get(added.last().id)).isNotNull()
+            assertThat(storage.fileFor(storageKey).exists()).isTrue()
+
+            service.remove(added.last().id)
+
+            assertThat(storage.fileFor(storageKey).exists()).isFalse()
+        }
+
+    @Test
+    fun `resolving missing metadata or bytes fails instead of sending a malformed request`() =
+        kotlinx.coroutines.test.runTest {
+            val bytes = "resolve".toByteArray()
+            val added = service.addFiles(
+                listOf(AttachmentInput("notes.txt", "text/plain", bytes.size.toLong(), bytes)),
+            ).attachments.single()
+            val message = messageWithParts(
+                ContentPart.File(added.id, added.mimeType, added.name),
+            )
+
+            repository.deleteById(added.id)
+            val missingMetadata = runCatching {
+                service.resolveForMessages(listOf(message))
+            }.exceptionOrNull()
+
+            assertThat(missingMetadata).isInstanceOf(IllegalStateException::class.java)
+            assertThat(missingMetadata!!.message).contains("missing from local storage")
+
+            val restored = service.addFiles(
+                listOf(AttachmentInput("notes.txt", "text/plain", bytes.size.toLong(), bytes)),
+            ).attachments.single()
+            storage.delete(restored.storageKey)
+            val missingBytes = runCatching {
+                service.resolveForMessages(
+                    listOf(messageWithParts(ContentPart.File(restored.id, restored.mimeType, restored.name))),
+                )
+            }.exceptionOrNull()
+
+            assertThat(missingBytes).isInstanceOf(IllegalStateException::class.java)
+            assertThat(missingBytes!!.message).contains("bytes are missing")
+        }
+
+    @Test
+    fun `getDataUrl returns a local data URL for images only`() =
+        kotlinx.coroutines.test.runTest {
+            val imageBytes = byteArrayOf(4, 5, 6)
+            val fileBytes = "text".toByteArray()
+            val added = service.addFiles(
+                listOf(
+                    AttachmentInput("photo.png", "image/png", imageBytes.size.toLong(), imageBytes),
+                    AttachmentInput("notes.txt", "text/plain", fileBytes.size.toLong(), fileBytes),
+                ),
+            ).attachments
+            val image = added.first { it.kind == AttachmentKind.IMAGE }
+            val file = added.first { it.kind == AttachmentKind.FILE }
+
+            val dataUrl = service.getDataUrl(image.id)
+
+            assertThat(dataUrl).startsWith("data:image/png;base64,")
+            assertThat(dataUrl!!.substringAfter(","))
+                .isEqualTo(Base64.getEncoder().encodeToString(imageBytes))
+            assertThat(service.getDataUrl(file.id)).isNull()
+            assertThat(service.getDataUrl("missing")).isNull()
+        }
+
+    @Test
+    fun `cleanup only removes rows created before the cutoff`() =
+        kotlinx.coroutines.test.runTest {
+            val draft = service.addFiles(
+                listOf(AttachmentInput("draft.txt", "text/plain", 5, "draft".toByteArray())),
+            ).attachments.single()
+
+            service.cleanupOrphans(before = now.minusSeconds(1))
+
+            assertThat(repository.get(draft.id)).isNotNull()
+            assertThat(storage.fileFor(draft.storageKey).exists()).isTrue()
+
+            service.cleanupOrphans(before = now.plusSeconds(1))
+
+            assertThat(repository.get(draft.id)).isNull()
+            assertThat(storage.fileFor(draft.storageKey).exists()).isFalse()
+        }
+
     private fun messageWithParts(vararg parts: ContentPart): Message = Message(
         id = "message-1",
         conversationId = "conversation-1",
