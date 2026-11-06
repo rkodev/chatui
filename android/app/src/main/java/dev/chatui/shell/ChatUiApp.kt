@@ -1,5 +1,6 @@
 package dev.chatui.shell
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -136,6 +137,18 @@ fun ShellScaffold(
             )
         },
     ) { innerPadding ->
+        // Fallback drawer handler. ModalNavigationDrawer registers its own
+        // predictive-back callback later in the composition, so that callback
+        // keeps the predictive animation and this handler only runs if the
+        // drawer implementation does not consume back itself.
+        BackHandler(
+            enabled = appHandlesBack(
+                BackState(drawerOpen = !expanded && drawerState.isOpen),
+            ),
+        ) {
+            scope.launch { drawerState.close() }
+        }
+
         AdaptiveShell(
             expanded = expanded,
             drawerState = drawerState,

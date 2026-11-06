@@ -4,6 +4,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -113,6 +114,14 @@ fun ChatScreen(
     imeInsets: WindowInsets = WindowInsets.ime,
 ) {
     val dimens = LocalDimens.current
+
+    // The confirmation dialog is a separate window and normally consumes back
+    // itself. This handler is the fallback for hosts that do not route back to
+    // the dialog window; it uses the same close function as onDismissRequest so
+    // the dialog can never both close and pop navigation.
+    BackHandler(enabled = state.confirmSendWithUnsupportedAttachments) {
+        onCancelSendConfirmation()
+    }
 
     Surface(
         modifier = modifier

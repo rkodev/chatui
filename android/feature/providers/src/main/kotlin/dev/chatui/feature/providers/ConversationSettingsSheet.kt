@@ -1,5 +1,6 @@
 package dev.chatui.feature.providers
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -95,6 +96,12 @@ fun ConversationSettingsSheet(
     val temperatureText = rememberNumericText(state.params.temperature)
     val topPText = rememberNumericText(state.params.topP)
     val maxOutputText = rememberIntText(state.params.maxOutputTokens)
+
+    // The sheet and its delete confirmation are separate windows and normally
+    // consume back themselves. These fallbacks share the same close functions
+    // as onDismissRequest so back can never close both layers at once.
+    BackHandler(enabled = !confirmDelete) { onDismiss() }
+    BackHandler(enabled = confirmDelete) { confirmDelete = false }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

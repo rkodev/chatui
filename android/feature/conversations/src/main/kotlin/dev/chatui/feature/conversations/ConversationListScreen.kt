@@ -1,5 +1,6 @@
 package dev.chatui.feature.conversations
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -115,6 +116,12 @@ fun ConversationListScreen(
     var renameTarget by remember { mutableStateOf<Conversation?>(null) }
     var renameValue by remember { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
+
+    // Dialogs are separate windows and normally consume back themselves. These
+    // handlers are fallbacks that share the same close functions as the
+    // dialogs' onDismissRequest callbacks.
+    BackHandler(enabled = renameTarget != null) { renameTarget = null }
+    BackHandler(enabled = state.pendingDelete != null) { onDeleteDismissed() }
 
     val archived = state.view == ConversationListView.ARCHIVED
     val groups = if (archived) state.archivedGroups else state.groups
