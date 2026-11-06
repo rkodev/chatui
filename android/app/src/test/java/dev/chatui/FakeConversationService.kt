@@ -39,8 +39,14 @@ class FakeConversationService(
         active.value = id
     }
 
-    override suspend fun getLastActiveConversation(): Conversation? =
-        active.value?.let { id -> conversationsFlow.value.firstOrNull { it.id == id } }
+    override suspend fun getLastActiveConversation(): Conversation? {
+        val id = active.value ?: return null
+        val conversation = conversationsFlow.value.firstOrNull { it.id == id }
+        if (conversation == null) {
+            active.value = null
+        }
+        return conversation
+    }
 
     override suspend fun getConversation(id: String): Conversation? =
         conversationsFlow.value.firstOrNull { it.id == id }

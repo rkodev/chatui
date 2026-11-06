@@ -621,3 +621,67 @@ is run; the current CI command does not include it.
 
 No API key, prompt, conversation content, personal data, or signing material is
 recorded in this section. The test uses synthetic `Hello` / `partial` text only.
+
+## 15. M3-04.3 Navigation and last-active restore
+
+Recorded 2026-11-06 on `Medium_Phone_API_36.1(AVD) - 16` (API 36,
+emulator-5554), debug build. Only synthetic conversation ids were used.
+
+### 15.1 Cold-start routing order
+
+`resolveShellStartDestination` in `ShellNavHost.kt` resolves the start
+destination in this order:
+
+1. Onboarding when `onboardingCompleted` is false.
+2. The conversation list when an external intent (deep link or share) is
+   pending, so the intent collector can route it without a last-active race.
+3. The last-active conversation when `getLastActiveConversation()` returns one.
+4. The conversation list otherwise.
+
+`getLastActiveConversation()` clears the persisted pointer when the
+conversation no longer exists, so a deleted conversation never opens a
+permanent not-found screen.
+
+### 15.2 Automated proof
+
+`ShellNavigationTest` covers the routing matrix and the stale-pointer path.
+
+| Test | Result | Evidence |
+| --- | --- | --- |
+| `completed onboarding restores the last active conversation` | Pass | Existing conversation id becomes the chat route. |
+| `resolver restores an existing last active conversation` | Pass | Store-backed resolver returns the chat route. |
+| `resolver falls back to the list and clears a deleted last active pointer` | Pass | Missing conversation returns the list and the pointer becomes null. |
+| `pending deep link takes precedence over last active restore` | Pass | Pending intent selects the list so the collector routes the link. |
+| `resolver prefers a pending deep link over last active restore` | Pass | Store-backed resolver selects the list. |
+| `onboarding takes precedence over pending deep link and last active` | Pass | Incomplete setup selects onboarding. |
+| `resolver keeps onboarding ahead of a pending deep link` | Pass | Store-backed resolver selects onboarding. |
+| `a consumed deep link does not override last active restore on recreation` | Pass | A consumed link is not pending, so recreation restores the last-active chat without duplicate navigation. |
+
+`ShellThemeTest` still renders the shell through `ChatUiApp` after the
+asynchronous start-destination resolution, proving the shell composes normally
+when no last-active conversation exists.
+
+### 15.3 Persistence and safety
+
+- Opening a chat still writes `lastActiveConversationId` from the chat
+  destination.
+- The write is guarded so a deep link to a missing conversation renders the
+  existing not-found state instead of throwing.
+- No new persistence was added. Provider keys, secrets, and transient dialog
+  state are not stored.
+- `rememberNavController()` remains the back-stack owner, so Navigation Compose
+  saved state restores the practical back stack.
+
+### 15.4 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-lint` | `BUILD SUCCESSFUL`; 439 actionable tasks. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 702 `testDebugUnitTest` tests, 0 failures, 0 errors, 0 skipped. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-assemble` | `BUILD SUCCESSFUL`; debug APK produced. |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | `BUILD SUCCESSFUL`; 10 tests, 0 failures, 0 errors, 2 skipped (existing manual restart/backup phases). |
+
+### 15.5 Redaction
+
+No API key, prompt, conversation content, personal data, or signing material is
+recorded in this section. The tests use synthetic conversation ids only.

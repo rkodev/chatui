@@ -101,10 +101,32 @@ fun ChatUiApp(
             ).chatDependencies().drafts
         }
 
-        // Collect after the NavController exists so a cold-start share can
-        // navigate as soon as the shell is ready. The action is consumed only
-        // after a conversation and its draft have been created.
-        LaunchedEffect(router, service, navController, settings.onboardingCompleted) {
+        // Resolve the cold-start destination once per activity creation. The
+        // conversation store is queried so a stale last-active pointer is
+        // cleared before the shell renders, and a pending deep link is not
+        // raced by last-active restore.
+        var startDestination by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(Unit) {
+            startDestination = resolveShellStartDestination(
+                settings = settings,
+                conversationService = service,
+                hasPendingExternalIntent = router.pending.value != null,
+            )
+        }
+
+        // Collect after the start destination is known so a cold-start share
+        // or deep link can navigate as soon as the shell is ready. The action
+        // is consumed only after a conversation and its draft have been
+        // created.
+        LaunchedEffect(
+            router,
+            service,
+            navController,
+            settings.onboardingCompleted,
+            startDestination,
+        ) {
+            if (startDestination == null) return@LaunchedEffect
+
             router.pending.collect { action ->
                 if (action == null) return@collect
 
@@ -126,14 +148,16 @@ fun ChatUiApp(
             }
         }
 
-        ShellScaffold(
-            navController = navController,
-            startDestination = shellStartDestination(settings),
-            conversationService = service,
-            modifier = modifier.testTag(
-                ShellTestTags.appearance(settings.theme, settings.density),
-            ),
-        )
+        startDestination?.let { destination ->
+            ShellScaffold(
+                navController = navController,
+                startDestination = destination,
+                conversationService = service,
+                modifier = modifier.testTag(
+                    ShellTestTags.appearance(settings.theme, settings.density),
+                ),
+            )
+        }
     }
 }
 

@@ -18,6 +18,7 @@ import androidx.navigation.navArgument
 import dagger.hilt.android.EntryPointAccessors
 import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.datastore.settings.SettingsDataStore
+import dev.chatui.core.model.Conversation
 import dev.chatui.feature.backup.BackupPlaceholder
 import dev.chatui.feature.chat.ChatEntryPoint
 import dev.chatui.feature.chat.ChatPlaceholder
@@ -35,6 +36,7 @@ import dev.chatui.feature.settings.DataControlsService
 import dev.chatui.feature.settings.SettingsEntryPoint
 import dev.chatui.feature.settings.SettingsRoute
 import dev.chatui.feature.settings.SettingsSection
+import kotlinx.coroutines.CancellationException
 
 /**
  * Registers every shell destination. Shared by the app and navigation tests.
@@ -100,7 +102,15 @@ fun NavGraphBuilder.shellDestinations(
             var showSettings by remember(conversationId) { mutableStateOf(false) }
 
             LaunchedEffect(conversationId) {
-                resolvedConversationService.setLastActiveConversation(conversationId)
+                try {
+                    resolvedConversationService.setLastActiveConversation(conversationId)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Throwable) {
+                    // A deep link to a missing conversation still renders the
+                    // not-found state. Never persist a pointer to a
+                    // conversation that does not exist.
+                }
             }
 
             ChatRoute(
@@ -262,20 +272,59 @@ private fun rememberDataControlsService(): DataControlsService {
 }
 
 /**
- * First-run routing: onboarding until setup completes, then the last-active
- * conversation when one is recorded, otherwise the conversation list.
+ * First-run routing: onboarding until setup completes, then a pending external
+ * intent, then the last-active conversation when it still exists, otherwise the
+ * conversation list.
+ *
+ * [lastActiveConversation] must be the result of
+ * [ConversationService.getLastActiveConversation] so a stale pointer is never
+ * opened. [hasPendingExternalIntent] covers deep links and shares that arrived
+ * before the shell existed; those are routed by the intent collector after the
+ * shell starts.
  */
-fun shellStartDestination(settings: AndroidSettings): String {
+fun shellStartDestination(
+    settings: AndroidSettings,
+    lastActiveConversation: Conversation? = null,
+    hasPendingExternalIntent: Boolean = false,
+): String {
     if (!settings.onboardingCompleted) {
         return ShellDestination.Onboarding.route
     }
 
-    val lastActive = settings.lastActiveConversationId?.takeIf { it.isNotBlank() }
-    return if (lastActive != null) {
-        ChatDestination.createRoute(lastActive)
-    } else {
-        ShellDestination.Conversations.route
+    if (hasPendingExternalIntent) {
+        return ShellDestination.Conversations.route
     }
+
+    return lastActiveConversation?.let { ChatDestination.createRoute(it.id) }
+        ?: ShellDestination.Conversations.route
+}
+
+/**
+ * Resolves the cold-start destination against the conversation store.
+ *
+ * Onboarding wins over everything. A pending deep link or share wins over
+ * last-active restore so the external intent is not raced by a restored chat.
+ * A missing or deleted last-active conversation is cleared by
+ * [ConversationService.getLastActiveConversation] and falls back to the list.
+ */
+suspend fun resolveShellStartDestination(
+    settings: AndroidSettings,
+    conversationService: ConversationService,
+    hasPendingExternalIntent: Boolean,
+): String {
+    if (!settings.onboardingCompleted) {
+        return ShellDestination.Onboarding.route
+    }
+
+    if (hasPendingExternalIntent) {
+        return ShellDestination.Conversations.route
+    }
+
+    val lastActive = conversationService.getLastActiveConversation()
+    return shellStartDestination(
+        settings = settings,
+        lastActiveConversation = lastActive,
+    )
 }
 
 /** Navigation host for the shell. */

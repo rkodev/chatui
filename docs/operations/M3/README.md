@@ -54,7 +54,7 @@
 | 17 | [M3-02.4 Outbound conversation share](M3-02.4-outbound-share.md) | Complete | M3-00.2, M3-02.1 | platform | M3-02.2, M3-02.3 |
 | 18 | [M3-04.1 Configuration-change stream survival](M3-04.1-config-change.md) | Complete | M3-03.4, M3-05.1 | lifecycle | M3-02.* |
 | 19 | [M3-04.2 Persistent drafts](M3-04.2-persistent-drafts.md) | Complete | M3-04.1 | lifecycle | M3-02.3 |
-| 20 | [M3-04.3 Navigation and last-active restore](M3-04.3-navigation-restore.md) | Not started | M3-04.2, M3-02.2 | lifecycle | none; startup/navigation files shared |
+| 20 | [M3-04.3 Navigation and last-active restore](M3-04.3-navigation-restore.md) | Complete | M3-04.2, M3-02.2 | lifecycle | none; startup/navigation files shared |
 | 21 | [M3-04.4 Process-death streaming recovery and case 26](M3-04.4-process-death-case-26.md) | Not started | M3-04.3 | lifecycle | none; startup files shared |
 | 22 | [M3-04.5 Startup orphan-attachment cleanup](M3-04.5-startup-attachment-cleanup.md) | Not started | M3-04.4 | lifecycle | none; startup files shared |
 | 23 | [M3-04.6 Background behavior documentation](M3-04.6-background-behavior.md) | Not started | M3-04.5 | lifecycle | M3-02.3, M3-05.1 |
