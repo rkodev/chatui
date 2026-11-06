@@ -18,10 +18,16 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.SecureScreen
@@ -46,6 +52,7 @@ object ProviderDetailTestTags {
     const val RateLimit = "provider-detail-rate-limit"
     const val Cors = "provider-detail-cors"
     const val DocsLink = "provider-detail-docs"
+    const val DocsError = "provider-detail-docs-error"
     const val EnabledToggle = "provider-detail-enabled"
     const val ValidateButton = "provider-detail-validate"
     const val RefreshModels = "provider-detail-refresh-models"
@@ -74,6 +81,7 @@ fun ProviderDetailScreen(
     onRefreshModels: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    documentationLauncher: DocumentationLauncher = LocalDocumentationLauncher.current,
 ) {
     SecureScreen {
         ProviderDetailContent(
@@ -86,6 +94,7 @@ fun ProviderDetailScreen(
             onValidate = onValidate,
             onRefreshModels = onRefreshModels,
             onRetry = onRetry,
+            documentationLauncher = documentationLauncher,
             modifier = modifier,
         )
     }
@@ -102,6 +111,7 @@ private fun ProviderDetailContent(
     onValidate: () -> Unit,
     onRefreshModels: () -> Unit,
     onRetry: () -> Unit,
+    documentationLauncher: DocumentationLauncher,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
@@ -158,6 +168,7 @@ private fun ProviderDetailContent(
                     docsUrl = state.docsUrl,
                     cleartextWarning = state.cleartextWarning,
                     cleartextError = state.cleartextError,
+                    documentationLauncher = documentationLauncher,
                 )
             }
             item {
@@ -198,10 +209,12 @@ private fun KeyPanel(
     docsUrl: String?,
     cleartextWarning: String?,
     cleartextError: String?,
+    documentationLauncher: DocumentationLauncher,
 ) {
     val dimens = LocalDimens.current
     val metadata = getProviderKeyMetadata(provider)
-    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    var docsError by remember(docsUrl) { mutableStateOf<String?>(null) }
 
     Card(
         modifier = Modifier
@@ -276,10 +289,27 @@ private fun KeyPanel(
             }
             if (docsUrl != null) {
                 TextButton(
-                    onClick = { uriHandler.openUri(docsUrl) },
-                    modifier = Modifier.testTag(ProviderDetailTestTags.DocsLink),
+                    onClick = {
+                        docsError = when (val result = documentationLauncher.open(context, docsUrl)) {
+                            is DocumentationOpenResult.Failed -> result.reason
+                            is DocumentationOpenResult.Refused -> result.reason
+                            else -> null
+                        }
+                    },
+                    modifier = Modifier
+                        .testTag(ProviderDetailTestTags.DocsLink)
+                        .semantics {
+                            contentDescription = "Open ${provider.label} documentation"
+                        },
                 ) {
                     Text("${provider.label} documentation")
+                }
+                docsError?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(ProviderDetailTestTags.DocsError),
+                    )
                 }
             }
         }

@@ -259,6 +259,77 @@ class ProviderDetailScreenTest {
     }
 
     @Test
+    fun `documentation action passes the contract url to the launcher`() {
+        val opened = mutableListOf<String>()
+        val launcher = DocumentationLauncher { _, url ->
+            opened += url
+            DocumentationOpenResult.OpenedInCustomTab
+        }
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderDetailScreen(
+                    state = ProviderDetailUiState(
+                        provider = providerWithMetadata(),
+                        docsUrl = "https://openrouter.ai/docs",
+                        loading = false,
+                    ),
+                    onNewKeyChanged = {},
+                    onRotateKey = {},
+                    onRemoveKey = {},
+                    onCancelRemove = {},
+                    onToggleEnabled = {},
+                    onValidate = {},
+                    onRefreshModels = {},
+                    onRetry = {},
+                    documentationLauncher = launcher,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.DocsLink))
+        composeRule.onNodeWithTag(ProviderDetailTestTags.DocsLink).performClick()
+
+        assertThat(opened).containsExactly("https://openrouter.ai/docs")
+    }
+
+    @Test
+    fun `documentation failure shows a safe message`() {
+        val launcher = DocumentationLauncher { _, _ ->
+            DocumentationOpenResult.Failed("No browser is available to open this link.")
+        }
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderDetailScreen(
+                    state = ProviderDetailUiState(
+                        provider = providerWithMetadata(),
+                        docsUrl = "https://openrouter.ai/docs",
+                        loading = false,
+                    ),
+                    onNewKeyChanged = {},
+                    onRotateKey = {},
+                    onRemoveKey = {},
+                    onCancelRemove = {},
+                    onToggleEnabled = {},
+                    onValidate = {},
+                    onRefreshModels = {},
+                    onRetry = {},
+                    documentationLauncher = launcher,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.DocsLink))
+        composeRule.onNodeWithTag(ProviderDetailTestTags.DocsLink).performClick()
+
+        composeRule.onNodeWithTag(ProviderDetailTestTags.DocsError)
+            .assertTextContains("No browser is available to open this link.")
+    }
+
+    @Test
     fun `shows an error and retry action`() {
         var retries = 0
 
