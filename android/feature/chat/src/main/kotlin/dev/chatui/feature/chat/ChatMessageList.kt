@@ -98,7 +98,7 @@ fun ChatMessageList(
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.totalItemsCount }.collect { total ->
             if (total > 0 && !initialScrollDone) {
-                listState.scrollToItem(total - 1)
+                listState.requestScrollToItem(total - 1)
                 initialScrollDone = true
             }
         }
@@ -108,7 +108,7 @@ fun ChatMessageList(
         val total = listState.layoutInfo.totalItemsCount
         if (total == 0 || !initialScrollDone) return@LaunchedEffect
         if (isNearBottom) {
-            listState.scrollToItem(total - 1)
+            listState.requestScrollToItem(total - 1)
         }
     }
 
