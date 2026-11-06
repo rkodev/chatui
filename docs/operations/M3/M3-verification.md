@@ -1,6 +1,6 @@
 # M3 Verification Evidence
 
-- Status: Baseline recorded 2026-11-06; M3 implementation not started.
+- Status: Baseline recorded 2026-11-06; M3 implementation in progress. Sections 9-12 record completed task evidence.
 - Owner: M3-00.1 recorded the preflight environment and baseline.
 - Scope: Android M3 preflight, baseline commands, measurements, and environment blockers.
 - Source plan: [M3 Android Depth Implementation Plan](../M3-android-depth-implementation-plan.md)
@@ -193,9 +193,9 @@ Searched `android/**/*.kt` for `Log.`, `println`, `printStackTrace`,
 - The only production log is `MainActivity.kt:46`,
   `Log.w(TAG, "Startup recovery failed", error)`. The message is content-free
   and the exception is a startup recovery failure, not a key or request header.
-- `AppModule.provideOkHttpClient()` installs no interceptors or network
-  interceptors; `AppModuleTest.provides a shared HTTP client without logging
-  interceptors` asserts both lists are empty.
+- At the time of this audit, `AppModule.provideOkHttpClient()` installed no
+  interceptors or network interceptors. M3-01.4 later adds the cleartext policy
+  interceptor; see section 12. No logging interceptor is installed.
 - `println` appears only inside code-block fixture strings in
   `ChatCodeBlockTest`, not in production logging.
 - No `printStackTrace`, `System.out`, or `System.err` appears in production
@@ -382,9 +382,9 @@ Searched production sources under `android/**/src/main` for `Log.`, `println`,
 - The only production log is `MainActivity.kt:46`,
   `Log.w(TAG, "Startup recovery failed", error)`. The message is content-free
   and the exception is a startup recovery failure, not a key or request header.
-- `AppModule.provideOkHttpClient()` installs no interceptors or network
-  interceptors. `AppModuleTest.provides a shared HTTP client without logging
-  interceptors` asserts both lists are empty.
+- At the time of this audit, `AppModule.provideOkHttpClient()` installed no
+  interceptors or network interceptors. M3-01.4 later adds the cleartext policy
+  interceptor; see section 12. No logging interceptor is installed.
 - No request/response body dump or debug logging interceptor exists.
 - Provider adapters route error text through `redactSecret` before building
   `ProviderRequestException` messages, and `Redaction` covers authorization,
@@ -404,3 +404,89 @@ interceptor is installed.
 
 The five new Robolectric tests account for the increase from the 781-test M2
 baseline to 786.
+
+## 12. M3-01.4 Network security config and local cleartext policy
+
+Recorded 2026-11-06 on `Medium_Phone_API_36.1(AVD) - 16` (API 36), debug build.
+No API key, prompt, conversation, or personal data is recorded here.
+
+### 12.1 Policy
+
+- `AndroidManifest.xml` declares
+  `android:networkSecurityConfig="@xml/network_security_config"`.
+- `res/xml/network_security_config.xml` sets
+  `base-config cleartextTrafficPermitted="true"` as the platform-level enabler.
+  The file documents that Android network-security-config XML cannot express
+  RFC1918, IPv6 ULA, or link-local CIDR ranges.
+- The real allowlist is `dev.chatui.core.network.CleartextHostPolicy`, applied
+  to every request by `CleartextPolicyInterceptor` on the shared production
+  OkHttp client. It allows:
+  - loopback: `localhost`, `127.0.0.0/8`, `::1`;
+  - Android emulator host loopback: `10.0.2.2`;
+  - mDNS names ending in `.local`;
+  - RFC1918 IPv4: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`;
+  - IPv6 unique-local `fc00::/7` and link-local `fe80::/10`.
+- It refuses every other cleartext host, including public IPv4/IPv6, CGNAT
+  `100.64.0.0/10`, and a `.local` or `localhost` name that resolves to a public
+  address. HTTPS is always allowed and is never resolved or inspected.
+- No trust-all manager, custom SSL socket factory, or certificate-validation
+  bypass was added. HTTPS behavior is unchanged.
+
+### 12.2 Automated tests
+
+| Test | Result | What it proves |
+| --- | --- | --- |
+| `CleartextHostPolicyTest.allows loopback and emulator literals` | Pass | `localhost`, `127.0.0.1`, `::1`, and `10.0.2.2` are allowed. |
+| `CleartextHostPolicyTest.allows RFC1918 IPv4 ranges` | Pass | All three RFC1918 ranges are allowed at their boundaries. |
+| `CleartextHostPolicyTest.allows IPv6 unique-local and link-local ranges` | Pass | `fc00::/7` and `fe80::/10` are allowed. |
+| `CleartextHostPolicyTest.allows mDNS local names` | Pass | `.local` names are allowed. |
+| `CleartextHostPolicyTest.refuses public and out-of-range hosts` | Pass | Public, CGNAT, link-local IPv4, and out-of-range addresses are refused. |
+| `CleartextHostPolicyTest.https is always allowed and non-http schemes are refused` | Pass | HTTPS is unaffected; non-http schemes are refused. |
+| `CleartextHostPolicyTest.local names are checked against their resolved addresses` | Pass | A `.local` name resolving to a public address is refused. |
+| `CleartextHostPolicyTest.localhost is checked against its resolved addresses` | Pass | `localhost` resolving to a public address is refused. |
+| `CleartextHostPolicyTest.literal addresses are not resolved` | Pass | Literal private addresses do not trigger DNS. |
+| `CleartextHostPolicyTest.interceptor refuses public cleartext before the request is sent` | Pass | The interceptor throws before OkHttp opens a connection. |
+| `CleartextHostPolicyTest.interceptor allows loopback cleartext` | Pass | An allowed loopback request reaches the server. |
+| `ShellManifestTest.manifest references the network security config` | Pass | The manifest attribute is present. |
+| `ShellManifestTest.network security config enables base cleartext as the platform enabler` | Pass | The XML contains the approved base config and limitation comment. |
+| `AppModuleTest.provides a shared HTTP client with only the cleartext policy interceptor` | Pass | The production client has exactly the cleartext policy interceptor and no logging interceptor. |
+
+### 12.3 Local-provider device check
+
+The host had Ollama listening on `127.0.0.1:11434`. The emulator reached it
+through the emulator host loopback:
+
+```bash
+adb shell 'printf "GET /api/tags HTTP/1.0\r\nHost: 10.0.2.2\r\n\r\n" | nc -w 5 10.0.2.2 11434'
+```
+
+Result: `HTTP/1.0 200 OK`, `Content-Type: application/json`, body
+`{"models":[]}`.
+
+The instrumentation test
+`LocalProviderCleartextTest.localOllamaPresetReachesHostServer` then used the
+production `CleartextPolicyInterceptor` and `OllamaAdapter` against
+`http://10.0.2.2:11434/v1`. Result: pass in 1.038 s. This closes the M2 local
+Ollama cleartext deferral for the emulator host loopback.
+
+Limitations recorded honestly:
+
+- LM Studio (`127.0.0.1:1234`) and llama.cpp (`127.0.0.1:8080`) were not
+  running, so those presets were not exercised on device. The policy covers
+  their loopback and RFC1918 addresses by the same tests.
+- `.local` mDNS resolution was not exercised on the emulator. The policy
+  resolves `.local` names and refuses a public result; RFC1918 literal
+  addresses remain the supported fallback if mDNS is unavailable.
+- The device check proves the emulator loopback path, not a physical-device LAN
+  path. RFC1918 literals are covered by unit tests.
+
+### 12.4 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-lint` | `BUILD SUCCESSFUL`; 439 actionable tasks. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 799 tests, 0 failures, 0 errors, 0 skipped. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-assemble` | `BUILD SUCCESSFUL`; debug APK produced. |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | `BUILD SUCCESSFUL`; 8 tests, 0 failures, 0 errors, 2 skipped (manual restart/backup phases). |
+
+The 13 new JVM/Robolectric tests account for the increase from 786 to 799.

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M3-01.4 local-provider cleartext policy.
+
+  Android network-security-config XML cannot express RFC1918, IPv6 ULA, or
+  link-local CIDR ranges. The M3 decision therefore enables base cleartext here
+  as the platform-level enabler only. The real allowlist is enforced in
+  dev.chatui.core.network.CleartextHostPolicy before every cleartext request:
+  loopback, 10.0.2.2, .local names, RFC1918 IPv4, IPv6 ULA, and IPv6 link-local
+  are allowed; every other cleartext host is refused. HTTPS is unchanged.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

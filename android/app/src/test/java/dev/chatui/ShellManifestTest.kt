@@ -21,4 +21,18 @@ class ShellManifestTest {
     fun `manifest uses the splash screen theme`() {
         assertThat(manifest).contains("android:theme=\"@style/Theme.ChatUI.Starting\"")
     }
+
+    @Test
+    fun `manifest references the network security config`() {
+        assertThat(manifest)
+            .contains("android:networkSecurityConfig=\"@xml/network_security_config\"")
+    }
+
+    @Test
+    fun `network security config enables base cleartext as the platform enabler`() {
+        val config = File("src/main/res/xml/network_security_config.xml").readText()
+
+        assertThat(config).contains("<base-config cleartextTrafficPermitted=\"true\" />")
+        assertThat(config).contains("cannot express")
+    }
 }

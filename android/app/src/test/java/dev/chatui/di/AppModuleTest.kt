@@ -14,6 +14,7 @@ import dev.chatui.core.database.recovery.StreamingRecoveryService
 import dev.chatui.core.datastore.secret.SecretCipher
 import dev.chatui.core.datastore.secret.SecretStore
 import dev.chatui.core.model.ProviderKind
+import dev.chatui.core.network.CleartextPolicyInterceptor
 import dev.chatui.core.network.ProviderRegistry
 import dev.chatui.core.providers.ModelService
 import dev.chatui.core.providers.ProviderGateway
@@ -77,13 +78,14 @@ class AppModuleTest {
     }
 
     @Test
-    fun `provides a shared HTTP client without logging interceptors`() {
+    fun `provides a shared HTTP client with only the cleartext policy interceptor`() {
         val client = AppModule.provideOkHttpClient()
 
         assertThat(client.connectTimeoutMillis).isEqualTo(30_000)
         assertThat(client.readTimeoutMillis).isEqualTo(30_000)
         assertThat(client.callTimeoutMillis).isEqualTo(60_000)
-        assertThat(client.interceptors).isEmpty()
+        assertThat(client.interceptors).hasSize(1)
+        assertThat(client.interceptors[0]).isInstanceOf(CleartextPolicyInterceptor::class.java)
         assertThat(client.networkInterceptors).isEmpty()
     }
 
