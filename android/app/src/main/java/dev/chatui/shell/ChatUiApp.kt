@@ -2,6 +2,7 @@ package dev.chatui.shell
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -20,12 +21,18 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -35,13 +42,19 @@ import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.Density
 import dev.chatui.core.model.Theme
+import dev.chatui.feature.chat.ChatShortcutState
+import dev.chatui.feature.chat.LocalChatShortcutState
 import dev.chatui.feature.conversations.ConversationEntryPoint
 import dev.chatui.feature.conversations.ConversationService
+import dev.chatui.feature.conversations.CreateConversationResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Test tags exposed by the shell for composition and navigation tests. */
 object ShellTestTags {
+    const val Root = "shell-root"
     const val MenuButton = "shell-menu-button"
+    const val ShortcutHelpButton = "shell-shortcut-help-button"
     const val Sidebar = "shell-sidebar"
     const val Drawer = "shell-drawer"
     const val MainContent = "shell-main-content"
@@ -96,6 +109,8 @@ fun ShellScaffold(
     startDestination: String = ShellDestination.Conversations.route,
     conversationService: ConversationService? = null,
     windowInsets: WindowInsets = WindowInsets.safeDrawing,
+    chatShortcutState: ChatShortcutState? = null,
+    shortcutActions: ShellShortcutActions? = null,
 ) {
     val activity = LocalActivity.current
     val expanded = activity != null &&
@@ -106,72 +121,172 @@ fun ShellScaffold(
     val currentRoute = backStackEntry?.destination?.route
     val currentDestination = ShellDestination.entries.firstOrNull { it.matches(currentRoute) }
     val service = conversationService ?: rememberConversationService()
+    val shortcuts = chatShortcutState ?: remember { ChatShortcutState() }
+    val conversationFlow = remember(service) { service.observeConversations() }
+    val conversations by conversationFlow.collectAsStateWithLifecycle(
+        initialValue = emptyList(),
+    )
+    val currentConversationId = backStackEntry
+        ?.arguments
+        ?.getString(ChatDestination.ARG_CONVERSATION_ID)
+    var helpOpen by remember { mutableStateOf(false) }
 
     val navigate: (String) -> Unit = { route ->
         scope.launch { drawerState.close() }
         navController.navigateToShellRoute(route)
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        // Consume safe-drawing once at the shell boundary. The top app bar
-        // handles the top/status-bar and cutout insets; the content receives
-        // the remaining bottom and horizontal insets through `innerPadding`.
-        contentWindowInsets = windowInsets,
-        topBar = {
-            TopAppBar(
-                title = { Text(currentDestination?.title ?: "ChatUI") },
-                windowInsets = windowInsets.only(
-                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
-                ),
-                navigationIcon = {
-                    if (!expanded) {
-                        IconButton(
-                            onClick = { scope.launch { drawerState.open() } },
-                            modifier = Modifier.testTag(ShellTestTags.MenuButton),
-                        ) {
-                            Text("☰")
-                        }
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
-        // Fallback drawer handler. ModalNavigationDrawer registers its own
-        // predictive-back callback later in the composition, so that callback
-        // keeps the predictive animation and this handler only runs if the
-        // drawer implementation does not consume back itself.
-        BackHandler(
-            enabled = appHandlesBack(
-                BackState(drawerOpen = !expanded && drawerState.isOpen),
-            ),
-        ) {
-            scope.launch { drawerState.close() }
-        }
+    fun navigateConversation(delta: Int): Boolean {
+        if (conversations.isEmpty()) return false
 
-        AdaptiveShell(
-            expanded = expanded,
-            drawerState = drawerState,
+        val currentIndex = conversations.indexOfFirst { it.id == currentConversationId }
+        val targetIndex = when {
+            currentIndex < 0 -> if (delta > 0) 0 else conversations.lastIndex
+            else -> (currentIndex + delta).coerceIn(0, conversations.lastIndex)
+        }
+        val target = conversations[targetIndex]
+        if (target.id == currentConversationId) return false
+
+        navController.navigateToShellRoute(ChatDestination.createRoute(target.id))
+        return true
+    }
+
+    val actions = shortcutActions ?: ShellShortcutActions(
+        overlayOpen = { helpOpen || shortcuts.overlayOpen },
+        onSearch = {
+            navController.navigateToShellRoute(ShellDestination.Conversations.route)
+            if (!expanded) scope.launch { drawerState.open() }
+        },
+        onNewChat = {
+            scope.launch {
+                try {
+                    when (val result = service.createConversation()) {
+                        is CreateConversationResult.Created ->
+                            navController.navigateToShellRoute(
+                                ChatDestination.createRoute(result.conversation.id),
+                            )
+
+                        is CreateConversationResult.NotConfigured ->
+                            navController.navigateToShellRoute(ShellDestination.Providers.route)
+                    }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Throwable) {
+                    // The list owns the detailed error copy. Send the user to
+                    // provider setup so the failure is actionable.
+                    navController.navigateToShellRoute(ShellDestination.Providers.route)
+                }
+            }
+        },
+        onStopOrClose = {
+            when {
+                shortcuts.stop() -> true
+                helpOpen -> {
+                    helpOpen = false
+                    true
+                }
+
+                !expanded && drawerState.isOpen -> {
+                    scope.launch { drawerState.close() }
+                    true
+                }
+
+                else -> false
+            }
+        },
+        onCopyLastResponse = { shortcuts.copyLastResponse() },
+        onPreviousConversation = { navigateConversation(-1) },
+        onNextConversation = { navigateConversation(1) },
+    )
+
+    CompositionLocalProvider(LocalChatShortcutState provides shortcuts) {
+        Box(
             modifier = Modifier
-                .padding(innerPadding)
-                // Mark the shell padding as consumed so descendants (for
-                // example the chat IME padding) do not add it a second time.
-                .consumeWindowInsets(innerPadding),
-            sidebar = {
-                ShellSidebar(
-                    currentRoute = currentRoute,
-                    conversationService = service,
-                    onNavigate = navigate,
+                .fillMaxSize()
+                .testTag(ShellTestTags.Root)
+                .shellShortcutHandler(actions),
+        ) {
+            Scaffold(
+                modifier = modifier.fillMaxSize(),
+                // Consume safe-drawing once at the shell boundary. The top app
+                // bar handles the top/status-bar and cutout insets; the content
+                // receives the remaining bottom and horizontal insets through
+                // `innerPadding`.
+                contentWindowInsets = windowInsets,
+                topBar = {
+                    TopAppBar(
+                        title = { Text(currentDestination?.title ?: "ChatUI") },
+                        windowInsets = windowInsets.only(
+                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                        ),
+                        navigationIcon = {
+                            if (!expanded) {
+                                IconButton(
+                                    onClick = { scope.launch { drawerState.open() } },
+                                    modifier = Modifier.testTag(ShellTestTags.MenuButton),
+                                ) {
+                                    Text("☰")
+                                }
+                            }
+                        },
+                        actions = {
+                            IconButton(
+                                onClick = { helpOpen = true },
+                                modifier = Modifier
+                                    .testTag(ShellTestTags.ShortcutHelpButton)
+                                    .semantics {
+                                        contentDescription = "Keyboard shortcuts"
+                                    },
+                            ) {
+                                Text("⌨")
+                            }
+                        },
+                    )
+                },
+            ) { innerPadding ->
+                // Fallback drawer handler. ModalNavigationDrawer registers its
+                // own predictive-back callback later in the composition, so
+                // that callback keeps the predictive animation and this handler
+                // only runs if the drawer implementation does not consume back
+                // itself.
+                BackHandler(
+                    enabled = appHandlesBack(
+                        BackState(drawerOpen = !expanded && drawerState.isOpen),
+                    ),
+                ) {
+                    scope.launch { drawerState.close() }
+                }
+
+                AdaptiveShell(
+                    expanded = expanded,
+                    drawerState = drawerState,
+                    modifier = Modifier
+                        .padding(innerPadding)
+                        // Mark the shell padding as consumed so descendants (for
+                        // example the chat IME padding) do not add it a second
+                        // time.
+                        .consumeWindowInsets(innerPadding),
+                    sidebar = {
+                        ShellSidebar(
+                            currentRoute = currentRoute,
+                            conversationService = service,
+                            onNavigate = navigate,
+                        )
+                    },
+                    mainContent = {
+                        ShellNavHost(
+                            navController = navController,
+                            startDestination = startDestination,
+                            conversationService = conversationService,
+                        )
+                    },
                 )
-            },
-            mainContent = {
-                ShellNavHost(
-                    navController = navController,
-                    startDestination = startDestination,
-                    conversationService = conversationService,
-                )
-            },
-        )
+            }
+
+            if (helpOpen) {
+                ShortcutHelpDialog(onDismiss = { helpOpen = false })
+            }
+        }
     }
 }
 

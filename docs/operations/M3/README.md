@@ -47,7 +47,7 @@
 | 10 | [M3-03.1 Adaptive shell with permanent sidebar and drawer](M3-03.1-adaptive-shell.md) | Complete | M3-00.2 | navigation | M3-01.*, M3-06.1 |
 | 11 | [M3-03.2 Window insets, IME, and edge-to-edge](M3-03.2-insets-ime.md) | Complete | M3-03.1 | navigation | M3-01.* |
 | 12 | [M3-03.3 Predictive back ordering](M3-03.3-predictive-back.md) | Complete | M3-03.1, M3-03.2 | navigation | none; shell files shared |
-| 13 | [M3-03.4 Hardware keyboard shortcuts](M3-03.4-keyboard-shortcuts.md) | Not started | M3-03.3 | navigation | none; shell files shared |
+| 13 | [M3-03.4 Hardware keyboard shortcuts](M3-03.4-keyboard-shortcuts.md) | Complete | M3-03.3 | navigation | none; shell files shared |
 | 14 | [M3-02.1 Share target and draft-preserving intent intake](M3-02.1-share-target.md) | Not started | M3-03.4 | platform | M3-02.3 |
 | 15 | [M3-02.2 Deep link routing](M3-02.2-deep-links.md) | Not started | M3-02.1 | platform | M3-02.3 |
 | 16 | [M3-02.3 Provider documentation in Custom Tabs](M3-02.3-custom-tabs.md) | Not started | M3-00.2 | platform | M3-02.1, M3-02.2, M3-04.* |

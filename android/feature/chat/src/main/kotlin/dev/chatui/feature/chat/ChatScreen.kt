@@ -31,14 +31,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -49,6 +53,7 @@ import dev.chatui.core.database.attachment.MAX_IMAGE_BYTES
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.Message
+import dev.chatui.core.model.MessageRole
 import dev.chatui.core.model.SendKey
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -114,6 +119,28 @@ fun ChatScreen(
     imeInsets: WindowInsets = WindowInsets.ime,
 ) {
     val dimens = LocalDimens.current
+    val shortcutState = LocalChatShortcutState.current
+    @Suppress("DEPRECATION")
+    val clipboard = LocalClipboardManager.current
+    val lastAssistant = state.messages.lastOrNull { it.role == MessageRole.ASSISTANT }
+    val copyLastResponse: (() -> Unit)? = lastAssistant?.let { message ->
+        { clipboard.setText(AnnotatedString(message.copyableText())) }
+    }
+
+    // Register the existing stop and copy actions with the shell's root key
+    // handler. The screen keeps ownership of streaming and message state; the
+    // shell only invokes these callbacks.
+    SideEffect {
+        shortcutState?.update(
+            streaming = state.canStop,
+            overlayOpen = state.confirmSendWithUnsupportedAttachments,
+            onStop = onStop,
+            onCopyLastResponse = copyLastResponse,
+        )
+    }
+    DisposableEffect(shortcutState) {
+        onDispose { shortcutState?.clear() }
+    }
 
     // The confirmation dialog is a separate window and normally consumes back
     // itself. This handler is the fallback for hosts that do not route back to
