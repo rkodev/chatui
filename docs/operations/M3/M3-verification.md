@@ -1,6 +1,6 @@
 # M3 Verification Evidence
 
-- Status: Baseline recorded 2026-11-06; M3 implementation in progress. Sections 9-12 record completed task evidence.
+- Status: Baseline recorded 2026-11-06; M3 implementation in progress. Sections 9-16 record completed task evidence.
 - Owner: M3-00.1 recorded the preflight environment and baseline.
 - Scope: Android M3 preflight, baseline commands, measurements, and environment blockers.
 - Source plan: [M3 Android Depth Implementation Plan](../M3-android-depth-implementation-plan.md)
@@ -685,3 +685,57 @@ when no last-active conversation exists.
 
 No API key, prompt, conversation content, personal data, or signing material is
 recorded in this section. The tests use synthetic conversation ids only.
+
+## 16. M3-04.4 Process-death streaming recovery and case 26
+
+Recorded 2026-11-06 on `Medium_Phone_API_36.1(AVD) - 16` (API 36,
+`emulator-5554`), debug build `0.1.0` (`versionCode 1`). Only synthetic fixture
+text and a synthetic placeholder key were used.
+
+### 16.1 Procedure
+
+The repeatable procedure is in
+[case-26-process-death.md](case-26-process-death.md). It starts a local
+OpenAI-compatible SSE fixture on host port `8765`, exposes it with
+`adb reverse tcp:8765 tcp:8765`, configures a Custom provider at
+`http://localhost:8765/v1`, starts a long stream, backgrounds the app, and kills
+the process with `adb shell am kill --user 0 dev.chatui`. It does not use
+`am force-stop`.
+
+### 16.2 Result
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Background process kill during streaming | Pass | `adb shell pidof dev.chatui` printed nothing after the kill. |
+| Partial content preserved after relaunch | Pass | The persisted synthetic prefix was rendered in the restored conversation. |
+| Message not stuck at `streaming` | Pass | The stored row was `cancelled` with `finishReason=cancelled`. |
+| Interruption explanation visible | Pass | `The app closed before this response finished. Partial content is preserved.` was rendered under the message. |
+| Regenerate works | Pass | Regenerate streamed again in the same assistant row and completed. |
+| No branch or duplicate history | Pass | The conversation kept one user and one assistant message; the assistant sequence was reused. |
+
+The recovery path is the existing `ChatRunner` persistence,
+`StreamingRecoveryService`, `AppStartup`, and `InterruptedMessageNotice`
+implementation. The procedure exposed no recovery or persistence defect, so no
+production code or regression test was changed.
+
+### 16.3 Persistence cadence
+
+`ChatRunner` persists partial text about once per second
+(`DEFAULT_PERSIST_INTERVAL_MS = 1_000`). The fixture emits two chunks per second,
+so the maximum text loss from a kill between writes is one persistence interval,
+about two fixture chunks. The recorded run preserved the last persisted prefix
+and lost only text produced after the last write.
+
+### 16.4 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 702 `testDebugUnitTest` tests, 0 failures, 0 errors, 0 skipped. |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | `BUILD SUCCESSFUL`; 10 tests, 0 failures, 0 errors, 2 skipped (existing manual restart/backup phases). |
+
+### 16.5 Redaction
+
+No real API key, prompt, conversation content, personal data, or signing
+material is recorded in this section. The provider key was a synthetic
+placeholder, the prompt was synthetic, and the streamed text was the fixture's
+`synthetic-NN` sequence.
