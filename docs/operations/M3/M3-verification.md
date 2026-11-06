@@ -490,3 +490,71 @@ Limitations recorded honestly:
 | `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | `BUILD SUCCESSFUL`; 8 tests, 0 failures, 0 errors, 2 skipped (manual restart/backup phases). |
 
 The 13 new JVM/Robolectric tests account for the increase from 786 to 799.
+
+## 13. M3-01.5 Cleartext warning and certificate-validation guard
+
+### 13.1 Behavior
+
+`dev.chatui.core.providers.assessBaseUrlSecurity` is a pure classifier for a
+Custom provider base URL. It returns one of:
+
+- `SecureHttps` for `https://` URLs, with no cleartext warning.
+- `AllowedLocalCleartext` for `http://` URLs whose host is approved by
+  `CleartextHostPolicy`, with the `CLEARTEXT_LOCAL_WARNING` copy.
+- `RefusedCleartext` for public `http://` hosts, invalid URLs, and non-http(s)
+  schemes, with the `CLEARTEXT_REFUSED_ERROR` copy.
+
+`ProviderService.createCustomProvider` refuses `RefusedCleartext` before any
+write, so a public cleartext provider cannot be created. The Custom provider
+form shows the warning or refusal copy live as the URL changes, and provider
+detail shows the same warning for a stored local-cleartext provider. The copy
+contains no key, header value, or URL query data.
+
+The classifier is DNS-free. A `.local` name is accepted by name and is resolved
+again by `CleartextPolicyInterceptor`, which refuses it if it resolves to a
+public address. This keeps the UI responsive and preserves the M3-01.4 policy.
+
+### 13.2 Certificate-validation guard
+
+`AppModuleTest` now asserts that the shared production client:
+
+- has exactly the `CleartextPolicyInterceptor` and no network interceptors;
+- uses OkHttp's default `OkHostnameVerifier`;
+- has a non-null default `sslSocketFactory`;
+- has no `sslSocketFactory`, `hostnameVerifier`, `trustManager`,
+  `networkInterceptors`, `.interceptors(`, or `HttpLoggingInterceptor` in the
+  `provideOkHttpClient()` source.
+
+No trust-all manager, hostname-verifier override, or logging interceptor was
+added.
+
+### 13.3 Automated tests
+
+| Test | Result | What it proves |
+| --- | --- | --- |
+| `BaseUrlSecurityTest.https is secure and has no cleartext warning` | Pass | HTTPS is classified as secure. |
+| `BaseUrlSecurityTest.approved local http hosts produce a warning` | Pass | Loopback, emulator, RFC1918, and `.local` HTTP hosts warn. |
+| `BaseUrlSecurityTest.public cleartext is refused with actionable copy` | Pass | Public HTTP hosts are refused with the error copy. |
+| `BaseUrlSecurityTest.invalid and non-http schemes are refused` | Pass | Invalid and non-http input is refused. |
+| `BaseUrlSecurityTest.warning and error copy contain no secrets` | Pass | Copy contains no key or auth material. |
+| `ProviderServiceTest.createCustomProvider refuses public cleartext with actionable copy` | Pass | Creation is refused before any write. |
+| `ProviderServiceTest.createCustomProvider accepts approved local cleartext` | Pass | Approved local HTTP providers can still be created. |
+| `ProviderListViewModelTest.custom form warns for approved local cleartext` | Pass | The form exposes the warning. |
+| `ProviderListViewModelTest.custom form refuses public cleartext` | Pass | The form exposes the refusal copy. |
+| `ProviderListViewModelTest.custom form shows no cleartext warning for https` | Pass | HTTPS produces no warning. |
+| `ProviderListScreenTest.shows the local cleartext warning and refusal copy` | Pass | The warning is rendered in the Custom form. |
+| `ProviderListScreenTest.shows the refused cleartext copy` | Pass | The refusal copy is rendered in the Custom form. |
+| `ProviderDetailScreenTest.shows the local cleartext warning for a custom provider` | Pass | The warning is rendered in provider detail. |
+| `AppModuleTest.provides a shared HTTP client with only the cleartext policy interceptor` | Pass | Default hostname verifier and SSL socket factory remain in effect. |
+| `AppModuleTest.shared HTTP client source has no custom trust manager or logging interceptor` | Pass | The client source has no validation bypass or logging interceptor. |
+
+### 13.4 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-lint` | `BUILD SUCCESSFUL`; 439 actionable tasks. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 813 tests, 0 failures, 0 errors, 0 skipped. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-assemble` | `BUILD SUCCESSFUL`; debug APK produced. |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | `BUILD SUCCESSFUL`; 8 tests, 0 failures, 0 errors, 2 skipped (manual restart/backup phases). |
+
+The 14 new JVM/Robolectric tests account for the increase from 799 to 813.

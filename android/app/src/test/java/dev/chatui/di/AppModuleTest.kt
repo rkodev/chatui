@@ -20,6 +20,7 @@ import dev.chatui.core.providers.ModelService
 import dev.chatui.core.providers.ProviderGateway
 import dev.chatui.core.providers.ProviderService
 import io.mockk.mockk
+import java.io.File
 import java.time.ZoneOffset
 import java.util.Base64
 import javax.inject.Singleton
@@ -87,6 +88,34 @@ class AppModuleTest {
         assertThat(client.interceptors).hasSize(1)
         assertThat(client.interceptors[0]).isInstanceOf(CleartextPolicyInterceptor::class.java)
         assertThat(client.networkInterceptors).isEmpty()
+        assertThat(client.hostnameVerifier.javaClass.name)
+            .isEqualTo("okhttp3.internal.tls.OkHostnameVerifier")
+        assertThat(client.sslSocketFactory).isNotNull()
+    }
+
+    @Test
+    fun `shared HTTP client source has no custom trust manager or logging interceptor`() {
+        val source = appModuleSource()
+        val body = source
+            .substringAfter("fun provideOkHttpClient()")
+            .substringBefore("@Provides")
+
+        assertThat(body).contains("addInterceptor(CleartextPolicyInterceptor())")
+        assertThat(body).doesNotContain("sslSocketFactory")
+        assertThat(body).doesNotContain("hostnameVerifier")
+        assertThat(body).doesNotContain("trustManager")
+        assertThat(body).doesNotContain("networkInterceptors")
+        assertThat(body).doesNotContain(".interceptors(")
+        assertThat(body).doesNotContain("HttpLoggingInterceptor")
+        assertThat(body).doesNotContain("logging-interceptor")
+    }
+
+    private fun appModuleSource(): String {
+        val candidates = listOf(
+            File("src/main/java/dev/chatui/di/AppModule.kt"),
+            File("android/app/src/main/java/dev/chatui/di/AppModule.kt"),
+        )
+        return candidates.first { it.isFile }.readText()
     }
 
     @Test

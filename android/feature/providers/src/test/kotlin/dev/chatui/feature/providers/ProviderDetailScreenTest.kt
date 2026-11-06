@@ -159,6 +159,41 @@ class ProviderDetailScreenTest {
     }
 
     @Test
+    fun `shows the local cleartext warning for a custom provider`() {
+        val custom = testProvider(
+            label = "My server",
+            presetId = "custom",
+        ).copy(baseUrl = "http://10.0.2.2:11434/v1")
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderDetailScreen(
+                    state = ProviderDetailUiState(
+                        provider = custom,
+                        loading = false,
+                        cleartextWarning = dev.chatui.core.providers.CLEARTEXT_LOCAL_WARNING,
+                    ),
+                    onNewKeyChanged = {},
+                    onRotateKey = {},
+                    onRemoveKey = {},
+                    onCancelRemove = {},
+                    onToggleEnabled = {},
+                    onValidate = {},
+                    onRefreshModels = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.CleartextWarning))
+        composeRule.onNodeWithTag(ProviderDetailTestTags.CleartextWarning)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(dev.chatui.core.providers.CLEARTEXT_LOCAL_WARNING)
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun `rotate and remove actions invoke callbacks`() {
         var rotateClicks = 0
         var removeClicks = 0

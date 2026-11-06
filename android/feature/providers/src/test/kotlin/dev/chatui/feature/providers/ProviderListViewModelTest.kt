@@ -110,6 +110,46 @@ class ProviderListViewModelTest {
     }
 
     @Test
+    fun `custom form warns for approved local cleartext`() = runTest(dispatcher) {
+        val viewModel = ProviderListViewModel(FakeProviderManagementService())
+        advanceUntilIdle()
+
+        viewModel.onCustomBaseUrlChanged("http://10.0.2.2:11434/v1")
+
+        val form = viewModel.state.value.customForm
+        assertThat(form.cleartextWarning).isEqualTo(
+            dev.chatui.core.providers.CLEARTEXT_LOCAL_WARNING,
+        )
+        assertThat(form.cleartextError).isNull()
+    }
+
+    @Test
+    fun `custom form refuses public cleartext`() = runTest(dispatcher) {
+        val viewModel = ProviderListViewModel(FakeProviderManagementService())
+        advanceUntilIdle()
+
+        viewModel.onCustomBaseUrlChanged("http://api.example.com/v1")
+
+        val form = viewModel.state.value.customForm
+        assertThat(form.cleartextWarning).isNull()
+        assertThat(form.cleartextError).isEqualTo(
+            dev.chatui.core.providers.CLEARTEXT_REFUSED_ERROR,
+        )
+    }
+
+    @Test
+    fun `custom form shows no cleartext warning for https`() = runTest(dispatcher) {
+        val viewModel = ProviderListViewModel(FakeProviderManagementService())
+        advanceUntilIdle()
+
+        viewModel.onCustomBaseUrlChanged("https://api.example.com/v1")
+
+        val form = viewModel.state.value.customForm
+        assertThat(form.cleartextWarning).isNull()
+        assertThat(form.cleartextError).isNull()
+    }
+
+    @Test
     fun `custom form shows service errors`() = runTest(dispatcher) {
         val service = FakeProviderManagementService()
         service.createError = dev.chatui.core.providers.ProviderServiceException(

@@ -36,6 +36,8 @@ object ProviderDetailTestTags {
     const val KeyPanel = "provider-detail-key"
     const val Preset = "provider-detail-preset"
     const val BaseUrl = "provider-detail-base-url"
+    const val CleartextWarning = "provider-detail-cleartext-warning"
+    const val CleartextError = "provider-detail-cleartext-error"
     const val AuthType = "provider-detail-auth-type"
     const val KeyLabel = "provider-detail-key-label"
     const val Usage = "provider-detail-usage"
@@ -150,7 +152,14 @@ private fun ProviderDetailContent(
         }
 
         if (provider != null) {
-            item { KeyPanel(provider, state.docsUrl) }
+            item {
+                KeyPanel(
+                    provider = provider,
+                    docsUrl = state.docsUrl,
+                    cleartextWarning = state.cleartextWarning,
+                    cleartextError = state.cleartextError,
+                )
+            }
             item {
                 ProviderControls(
                     state = state,
@@ -184,7 +193,12 @@ private fun ProviderDetailContent(
 }
 
 @Composable
-private fun KeyPanel(provider: dev.chatui.core.model.Provider, docsUrl: String?) {
+private fun KeyPanel(
+    provider: dev.chatui.core.model.Provider,
+    docsUrl: String?,
+    cleartextWarning: String?,
+    cleartextError: String?,
+) {
     val dimens = LocalDimens.current
     val metadata = getProviderKeyMetadata(provider)
     val uriHandler = LocalUriHandler.current
@@ -210,6 +224,20 @@ private fun KeyPanel(provider: dev.chatui.core.model.Provider, docsUrl: String?)
                 text = "Base URL: ${provider.baseUrl}",
                 modifier = Modifier.testTag(ProviderDetailTestTags.BaseUrl),
             )
+            cleartextWarning?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.testTag(ProviderDetailTestTags.CleartextWarning),
+                )
+            }
+            cleartextError?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag(ProviderDetailTestTags.CleartextError),
+                )
+            }
             Text(
                 text = "Auth: ${provider.authType.name.lowercase().replace('_', '-')}",
                 modifier = Modifier.testTag(ProviderDetailTestTags.AuthType),
