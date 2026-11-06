@@ -61,7 +61,7 @@
 | 24 | [M3-05.2 Core Compose UI flows](M3-05.2-core-compose-flows.md) | Complete | M3-04.6, M3-03.4 | tests | M3-06.2, M3-06.3 |
 | 25 | [M3-05.3 Roborazzi screenshot suite](M3-05.3-roborazzi-screenshots.md) | Complete | M3-05.2 | tests | M3-05.4, M3-05.5 |
 | 26 | [M3-05.4 Platform edge-case regression tests](M3-05.4-edge-case-regressions.md) | Complete | M3-05.2, M3-02.2, M3-03.3 | tests | M3-05.3, M3-05.5 |
-| 27 | [M3-05.5 Large-conversation bounded composition](M3-05.5-large-conversation.md) | Not started | M3-05.2 | tests | M3-05.3, M3-05.4 |
+| 27 | [M3-05.5 Large-conversation bounded composition](M3-05.5-large-conversation.md) | Complete | M3-05.2 | tests | M3-05.3, M3-05.4 |
 | 28 | [M3-06.2 Signing and version policy](M3-06.2-signing-versioning.md) | Not started | M3-06.1, M3-00.2 | release | M3-05.* |
 | 29 | [M3-06.3 Baseline profile and startup benchmark](M3-06.3-baseline-profile.md) | Not started | M3-06.1, M3-03.4, M3-04.5 | release | no; shares app build file with M3-06.2 |
 | 30 | [M3-06.4 Release CI, artifacts, and developer targets](M3-06.4-release-ci-artifacts.md) | Not started | M3-06.1, M3-06.2, M3-06.3 | release | M3-05.* |
