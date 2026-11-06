@@ -475,6 +475,27 @@ describe('Gemini retry and cancellation', () => {
     expect(events.some((event) => event.type === 'text-delta')).toBe(true)
   })
 
+  it('classifies a browser CORS-shaped rejection as cors without retrying', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const events = await collect(
+      makeContext(fetchMock as unknown as typeof fetch),
+      baseRequest(),
+      { now: () => FIXED_NOW },
+    )
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const error = events.at(-1)
+    expect(error).toMatchObject({
+      type: 'error',
+      error: { code: 'cors', retryable: false },
+    })
+    if (error?.type === 'error') {
+      expect(error.error.message).toContain('Google Gemini')
+      expect(error.error.message).toContain('Android app')
+    }
+  })
+
   it('maps an already-aborted signal to cancelled without fetching', async () => {
     const fetchMock = vi.fn()
     const controller = new AbortController()

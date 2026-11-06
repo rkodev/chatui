@@ -44,6 +44,13 @@ export {
   toChatError,
   validateKey,
 } from './openaiCompatible'
+export {
+  browserOnlineStatus,
+  classifyNetworkFailure,
+  corsNetworkMessage,
+  isCorsShapedNetworkError,
+} from './networkError'
+export type { NetworkFailureKind, NetworkFailureOptions } from './networkError'
 export type {
   Attribution,
   ListModelsOptions,

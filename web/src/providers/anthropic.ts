@@ -19,6 +19,7 @@ import {
   type StreamEvent,
 } from './openaiCompatible'
 import type { CatalogResult, ModelInfo, ProviderKeyInfo } from './openrouterCatalog'
+import { classifyNetworkFailure, corsNetworkMessage } from './networkError'
 import { getOpenAICompatiblePreset } from './presets'
 import { RETRY_MAX_ATTEMPTS, retryDelayFor, sleep, type RetryPolicy } from './retry'
 import {
@@ -850,6 +851,16 @@ async function attemptStreamWithOptions(
   } catch (error) {
     if (signal.aborted) {
       throw cancelledError(context, error)
+    }
+
+    const failure = classifyNetworkFailure(error)
+
+    if (failure === 'cors') {
+      throw new ProviderRequestError('cors', corsNetworkMessage(preset.displayName), {
+        providerId: context.provider.id,
+        retryable: false,
+        cause: error,
+      })
     }
 
     throw new ProviderRequestError(

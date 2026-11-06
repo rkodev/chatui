@@ -25,6 +25,10 @@ import {
   type ModelInfo,
   type ProviderKeyInfo,
 } from './openrouterCatalog'
+import {
+  classifyNetworkFailure,
+  corsNetworkMessage,
+} from './networkError'
 import { RETRY_MAX_ATTEMPTS, retryDelayFor, sleep, type RetryPolicy } from './retry'
 import { SseAbortError, SseBufferOverflowError, SseTransportError, readSse } from './sse'
 
@@ -853,6 +857,16 @@ async function requestJson(
       })
     }
 
+    const failure = classifyNetworkFailure(error)
+
+    if (failure === 'cors') {
+      throw new ProviderRequestError('cors', corsNetworkMessage(preset.displayName), {
+        providerId: context.provider.id,
+        retryable: false,
+        cause: error,
+      })
+    }
+
     throw new ProviderRequestError('network', messages.network, {
       providerId: context.provider.id,
       retryable: true,
@@ -1339,6 +1353,16 @@ async function attemptStream(
   } catch (error) {
     if (signal.aborted) {
       throw cancelledError(context, preset, error)
+    }
+
+    const failure = classifyNetworkFailure(error)
+
+    if (failure === 'cors') {
+      throw new ProviderRequestError('cors', corsNetworkMessage(preset.displayName), {
+        providerId: context.provider.id,
+        retryable: false,
+        cause: error,
+      })
     }
 
     throw new ProviderRequestError('network', messages.network, {

@@ -1,4 +1,4 @@
-import type { ChatError, ChatErrorCode } from '../../domain'
+import type { ChatError } from '../../domain'
 
 export interface ChatErrorCopy {
   title: string
@@ -33,8 +33,8 @@ function detailsFor(error: ChatError): string | null {
   return parts.length > 0 ? parts.join('\n') : null
 }
 
-function copyForCode(code: ChatErrorCode): { title: string; message: string } {
-  switch (code) {
+function copyForCode(error: ChatError): { title: string; message: string } {
+  switch (error.code) {
     case 'auth':
       return {
         title: 'API key rejected',
@@ -77,8 +77,12 @@ function copyForCode(code: ChatErrorCode): { title: string; message: string } {
         message: 'The provider rejected the request. Check the model settings and try again.',
       }
     case 'network':
-    case 'cors':
       return { title: 'Could not reach the provider', message: CORS_MESSAGE }
+    case 'cors':
+      return {
+        title: 'Could not reach the provider',
+        message: error.message.trim() === '' ? CORS_MESSAGE : error.message,
+      }
     case 'timeout':
       return {
         title: 'Request timed out',
@@ -116,7 +120,7 @@ function copyForCode(code: ChatErrorCode): { title: string; message: string } {
  * the optional details disclosure.
  */
 export function describeChatError(error: ChatError): ChatErrorCopy {
-  const copy = copyForCode(error.code)
+  const copy = copyForCode(error)
 
   return {
     title: copy.title,

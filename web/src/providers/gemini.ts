@@ -19,6 +19,7 @@ import {
   type StreamChatOptions,
   type StreamEvent,
 } from './openaiCompatible'
+import { classifyNetworkFailure, corsNetworkMessage } from './networkError'
 import { RETRY_MAX_ATTEMPTS, retryDelayFor, sleep, type RetryPolicy } from './retry'
 import {
   SseAbortError,
@@ -813,6 +814,16 @@ async function attemptStreamWithOptions(
       throw cancelledError(context, error)
     }
 
+    const failure = classifyNetworkFailure(error)
+
+    if (failure === 'cors') {
+      throw new ProviderRequestError(
+        'cors',
+        corsNetworkMessage(context.preset?.displayName ?? 'Gemini'),
+        { providerId: context.provider.id, retryable: false, cause: error },
+      )
+    }
+
     throw new ProviderRequestError(
       'network',
       'Could not reach Gemini. Check your connection and base URL.',
@@ -912,6 +923,16 @@ async function fetchGeminiModels(
   } catch (error) {
     if (signal.aborted) {
       throw cancelledError(context, error)
+    }
+
+    const failure = classifyNetworkFailure(error)
+
+    if (failure === 'cors') {
+      throw new ProviderRequestError(
+        'cors',
+        corsNetworkMessage(context.preset?.displayName ?? 'Gemini'),
+        { providerId: context.provider.id, retryable: false, cause: error },
+      )
     }
 
     throw new ProviderRequestError(

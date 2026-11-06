@@ -430,6 +430,26 @@ describe('OpenAI-compatible retry policy', () => {
     expect(events.some((event) => event.type === 'text-delta')).toBe(true)
   })
 
+  it('classifies a browser CORS-shaped rejection as cors without retrying', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const events = await collect(makeContext(fetchMock as unknown as typeof fetch), baseRequest(), {
+      now: () => FIXED_NOW,
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const error = events.at(-1)
+    expect(error).toMatchObject({
+      type: 'error',
+      error: { code: 'cors', retryable: false },
+    })
+    if (error?.type === 'error') {
+      expect(error.error.message).toContain('OpenAI')
+      expect(error.error.message).toContain('Android app')
+      expect(error.error.message).toContain('self-hosted proxy')
+    }
+  })
+
   it('does not retry a network failure after the first token', async () => {
     const encoder = new TextEncoder()
     let step = 0

@@ -16,6 +16,7 @@ import {
   type StreamEvent,
 } from './openaiCompatible'
 import type { CatalogResult, ModelInfo, ProviderKeyInfo } from './openrouterCatalog'
+import { classifyNetworkFailure } from './networkError'
 import { getOpenAICompatiblePreset } from './presets'
 import { RETRY_MAX_ATTEMPTS, retryDelayFor, sleep, type RetryPolicy } from './retry'
 
@@ -1026,6 +1027,19 @@ async function attemptStreamWithOptions(
   } catch (error) {
     if (signal.aborted) {
       throw cancelledError(context, error)
+    }
+
+    const failure = classifyNetworkFailure(error)
+
+    if (failure === 'cors') {
+      throw new ProviderRequestError(
+        'cors',
+        'Could not reach Ollama. The browser blocked the request, which may be a ' +
+          'CORS restriction. Try the Android app, or start Ollama with OLLAMA_ORIGINS ' +
+          'set to this app origin, for example ' +
+          'OLLAMA_ORIGINS=http://localhost:5173 ollama serve.',
+        { providerId: context.provider.id, retryable: false, cause: error },
+      )
     }
 
     throw new ProviderRequestError('network', OLLAMA_ORIGINS_GUIDANCE, {
