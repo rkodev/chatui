@@ -9,6 +9,7 @@ import java.util.Locale
 
 /** Date buckets used by the conversation history list. */
 enum class ConversationGroupKey(val label: String) {
+    PINNED("Pinned"),
     TODAY("Today"),
     YESTERDAY("Yesterday"),
     PREVIOUS_7_DAYS("Previous 7 days"),
@@ -51,30 +52,50 @@ fun historyGroupForInstant(
 /**
  * Group conversations into the required date buckets.
  *
- * Groups are returned in display order and empty groups are omitted. Within a
- * group, conversations are newest-first by `lastMessageAt`. The input list is
- * not mutated.
+ * Pinned conversations are returned first in their own [ConversationGroupKey.PINNED]
+ * group, newest-first. Unpinned conversations are then grouped by date. Groups
+ * are returned in display order and empty groups are omitted. Within a group,
+ * conversations are newest-first by `lastMessageAt`. The input list is not
+ * mutated.
  */
 fun groupConversationsByDate(
     conversations: List<Conversation>,
     now: Instant,
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): List<ConversationGroup> {
-    val buckets = ConversationGroupKey.entries.associateWith { mutableListOf<Conversation>() }
+    val pinned = conversations
+        .filter { it.pinned }
+        .sortedByDescending { it.lastMessageAt }
+    val unpinned = conversations.filterNot { it.pinned }
+    val buckets = ConversationGroupKey.entries
+        .filterNot { it == ConversationGroupKey.PINNED }
+        .associateWith { mutableListOf<Conversation>() }
 
-    conversations.forEach { conversation ->
+    unpinned.forEach { conversation ->
         val key = historyGroupForInstant(conversation.lastMessageAt, now, zoneId)
         buckets.getValue(key).add(conversation)
     }
 
-    return ConversationGroupKey.entries.mapNotNull { key ->
-        val items = buckets.getValue(key).sortedByDescending { it.lastMessageAt }
-        if (items.isEmpty()) {
-            null
-        } else {
-            ConversationGroup(key = key, label = key.label, conversations = items)
-        }
+    val groups = mutableListOf<ConversationGroup>()
+
+    if (pinned.isNotEmpty()) {
+        groups += ConversationGroup(
+            key = ConversationGroupKey.PINNED,
+            label = ConversationGroupKey.PINNED.label,
+            conversations = pinned,
+        )
     }
+
+    ConversationGroupKey.entries
+        .filterNot { it == ConversationGroupKey.PINNED }
+        .forEach { key ->
+            val items = buckets.getValue(key).sortedByDescending { it.lastMessageAt }
+            if (items.isNotEmpty()) {
+                groups += ConversationGroup(key = key, label = key.label, conversations = items)
+            }
+        }
+
+    return groups
 }
 
 /**

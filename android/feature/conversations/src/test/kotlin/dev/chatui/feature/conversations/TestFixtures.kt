@@ -19,6 +19,7 @@ import java.time.Instant
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.JsonObject
 
 val TEST_NOW: Instant = Instant.parse("2026-11-03T12:00:00Z")
@@ -84,6 +85,7 @@ fun testConversation(
     id: String = "conversation-1",
     title: String = "Conversation",
     lastMessageAt: Instant = TEST_NOW,
+    pinned: Boolean = false,
     archived: Boolean = false,
 ): Conversation = Conversation(
     id = id,
@@ -93,7 +95,7 @@ fun testConversation(
     modelId = "model-1",
     modelLabel = "Model One",
     params = testChatParams(),
-    pinned = false,
+    pinned = pinned,
     archived = archived,
     temporary = false,
     createdAt = lastMessageAt,
@@ -169,15 +171,23 @@ class FakeConversationService : ConversationService {
     )
     var renameError: Throwable? = null
     var deleteError: Throwable? = null
+    var pinError: Throwable? = null
+    var archiveError: Throwable? = null
     var lastRenamed: Pair<String, String>? = null
     var lastDeleted: String? = null
+    var lastPinned: Pair<String, Boolean>? = null
+    var lastArchived: Pair<String, Boolean>? = null
     var lastActiveSet: String? = null
     var searchResults: List<ConversationSearchResult> = emptyList()
     var searchError: Throwable? = null
     var searchDelayMs: Long = 0
     val searchCalls = mutableListOf<String>()
 
-    override fun observeConversations(): Flow<List<Conversation>> = conversationsFlow
+    override fun observeConversations(): Flow<List<Conversation>> =
+        conversationsFlow.map { conversations -> conversations.filterNot { it.archived } }
+
+    override fun observeArchivedConversations(): Flow<List<Conversation>> =
+        conversationsFlow.map { conversations -> conversations.filter { it.archived } }
 
     override fun observeLastActiveConversationId(): Flow<String?> = activeFlow
 
@@ -208,6 +218,28 @@ class FakeConversationService : ConversationService {
         if (activeFlow.value == id) {
             activeFlow.value = null
         }
+    }
+
+    override suspend fun setPinned(id: String, pinned: Boolean): Conversation? {
+        pinError?.let { throw it }
+        lastPinned = id to pinned
+        val existing = conversationsFlow.value.firstOrNull { it.id == id } ?: return null
+        val updated = existing.copy(pinned = pinned)
+        conversationsFlow.value = conversationsFlow.value.map {
+            if (it.id == id) updated else it
+        }
+        return updated
+    }
+
+    override suspend fun setArchived(id: String, archived: Boolean): Conversation? {
+        archiveError?.let { throw it }
+        lastArchived = id to archived
+        val existing = conversationsFlow.value.firstOrNull { it.id == id } ?: return null
+        val updated = existing.copy(archived = archived)
+        conversationsFlow.value = conversationsFlow.value.map {
+            if (it.id == id) updated else it
+        }
+        return updated
     }
 
     override suspend fun setLastActiveConversation(id: String?) {

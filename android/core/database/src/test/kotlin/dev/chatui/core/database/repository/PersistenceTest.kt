@@ -10,6 +10,7 @@ import dev.chatui.core.model.MessageStatus
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -79,6 +80,28 @@ class PersistenceTest {
                     listOf(ContentPart.Text("second")),
                 )
                 .inOrder()
+        }
+    }
+
+    @Test
+    fun `pin and archive flags survive a database reopen`() = runTest {
+        withDatabase { db ->
+            val conversations = ConversationRepository(db.conversationDao(), clock)
+            conversations.create(RepositoryTestData.conversation(id = "active"))
+            conversations.create(RepositoryTestData.conversation(id = "archived"))
+            conversations.setPinned("active", true)
+            conversations.setArchived("archived", true)
+        }
+
+        withDatabase { db ->
+            val conversations = ConversationRepository(db.conversationDao(), clock)
+
+            assertThat(conversations.get("active")!!.pinned).isTrue()
+            assertThat(conversations.get("archived")!!.archived).isTrue()
+            assertThat(conversations.observeActive().first().map { it.id })
+                .containsExactly("active")
+            assertThat(conversations.observeArchived().first().map { it.id })
+                .containsExactly("archived")
         }
     }
 

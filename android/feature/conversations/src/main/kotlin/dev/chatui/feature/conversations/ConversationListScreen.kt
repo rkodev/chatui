@@ -58,6 +58,9 @@ object ConversationListTestTags {
     const val SearchEmpty = "conversation-search-empty"
     const val SearchError = "conversation-search-error"
     const val SearchRetry = "conversation-search-retry"
+    const val ArchivedToggle = "conversation-archived-toggle"
+    const val UndoBar = "conversation-undo-bar"
+    const val UndoButton = "conversation-undo-button"
 
     fun group(key: ConversationGroupKey): String =
         "conversation-group-${key.name.lowercase()}"
@@ -65,6 +68,10 @@ object ConversationListTestTags {
     fun item(id: String): String = "conversation-item-$id"
 
     fun actions(id: String): String = "conversation-actions-$id"
+
+    fun pin(id: String): String = "conversation-pin-$id"
+
+    fun archive(id: String): String = "conversation-archive-$id"
 
     fun rename(id: String): String = "conversation-rename-$id"
 
@@ -96,6 +103,10 @@ fun ConversationListScreen(
     onRetry: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onSearchRetry: () -> Unit,
+    onTogglePin: (Conversation) -> Unit = {},
+    onToggleArchive: (Conversation) -> Unit = {},
+    onViewChanged: (ConversationListView) -> Unit = {},
+    onUndoDelete: () -> Unit = {},
     modifier: Modifier = Modifier,
     now: Instant = Instant.now(),
     zoneId: ZoneId = ZoneId.systemDefault(),
@@ -104,6 +115,17 @@ fun ConversationListScreen(
     var renameTarget by remember { mutableStateOf<Conversation?>(null) }
     var renameValue by remember { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
+
+    val archived = state.view == ConversationListView.ARCHIVED
+    val groups = if (archived) state.archivedGroups else state.groups
+    val loading = if (archived) state.archivedLoading else state.loading
+    val error = if (archived) state.archivedError else state.error
+    val emptyText = if (archived) "No archived conversations." else "No conversations yet."
+    val loadingText = if (archived) {
+        "Loading archived conversations…"
+    } else {
+        "Loading conversations…"
+    }
 
     LazyColumn(
         modifier = modifier
@@ -119,10 +141,24 @@ fun ConversationListScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Chats",
+                    text = if (archived) "Archived" else "Chats",
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.weight(1f),
                 )
+                TextButton(
+                    onClick = {
+                        onViewChanged(
+                            if (archived) {
+                                ConversationListView.ACTIVE
+                            } else {
+                                ConversationListView.ARCHIVED
+                            },
+                        )
+                    },
+                    modifier = Modifier.testTag(ConversationListTestTags.ArchivedToggle),
+                ) {
+                    Text(if (archived) "Chats" else "Archived")
+                }
                 Button(
                     onClick = onNewChat,
                     modifier = Modifier.testTag(ConversationListTestTags.NewChat),
@@ -132,19 +168,44 @@ fun ConversationListScreen(
             }
         }
 
-        item {
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = onSearchQueryChanged,
-                label = { Text("Search conversations") },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ConversationListTestTags.SearchField),
-            )
+        state.pendingUndo?.let { target ->
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(ConversationListTestTags.UndoBar),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "“${target.title}” deleted",
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        onClick = onUndoDelete,
+                        modifier = Modifier.testTag(ConversationListTestTags.UndoButton),
+                    ) {
+                        Text("Undo")
+                    }
+                }
+            }
         }
 
-        state.error?.let { message ->
+        if (!archived) {
+            item {
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = onSearchQueryChanged,
+                    label = { Text("Search conversations") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(ConversationListTestTags.SearchField),
+                )
+            }
+        }
+
+        error?.let { message ->
             item {
                 Column(
                     modifier = Modifier.testTag(ConversationListTestTags.Error),
@@ -159,7 +220,7 @@ fun ConversationListScreen(
             }
         }
 
-        if (state.searchQuery.isNotBlank()) {
+        if (!archived && state.searchQuery.isNotBlank()) {
             val searchError = state.searchError
 
             when {
@@ -209,21 +270,21 @@ fun ConversationListScreen(
             }
         } else {
             when {
-                state.loading && state.groups.isEmpty() -> item {
+                loading && groups.isEmpty() -> item {
                     Text(
-                        text = "Loading conversations…",
+                        text = loadingText,
                         modifier = Modifier.testTag(ConversationListTestTags.Loading),
                     )
                 }
 
-                state.groups.isEmpty() -> item {
+                groups.isEmpty() -> item {
                     Text(
-                        text = "No conversations yet.",
+                        text = emptyText,
                         modifier = Modifier.testTag(ConversationListTestTags.Empty),
                     )
                 }
 
-                else -> state.groups.forEach { group ->
+                else -> groups.forEach { group ->
                     item(key = "group-${group.key.name}") {
                         Text(
                             text = group.label,
@@ -242,6 +303,8 @@ fun ConversationListScreen(
                             now = now,
                             zoneId = zoneId,
                             onSelect = { onSelect(conversation) },
+                            onTogglePin = { onTogglePin(conversation) },
+                            onToggleArchive = { onToggleArchive(conversation) },
                             onRename = {
                                 renameTarget = conversation
                                 renameValue = conversation.title
@@ -304,6 +367,10 @@ fun ConversationDrawer(
     onRetry: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onSearchRetry: () -> Unit,
+    onTogglePin: (Conversation) -> Unit = {},
+    onToggleArchive: (Conversation) -> Unit = {},
+    onViewChanged: (ConversationListView) -> Unit = {},
+    onUndoDelete: () -> Unit = {},
     modifier: Modifier = Modifier,
     now: Instant = Instant.now(),
     zoneId: ZoneId = ZoneId.systemDefault(),
@@ -327,6 +394,10 @@ fun ConversationDrawer(
                     onRetry = onRetry,
                     onSearchQueryChanged = onSearchQueryChanged,
                     onSearchRetry = onSearchRetry,
+                    onTogglePin = onTogglePin,
+                    onToggleArchive = onToggleArchive,
+                    onViewChanged = onViewChanged,
+                    onUndoDelete = onUndoDelete,
                     now = now,
                     zoneId = zoneId,
                 )
@@ -343,6 +414,8 @@ private fun ConversationRow(
     now: Instant,
     zoneId: ZoneId,
     onSelect: () -> Unit,
+    onTogglePin: () -> Unit,
+    onToggleArchive: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -401,6 +474,28 @@ private fun ConversationRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
                 ) {
+                    DropdownMenuItem(
+                        text = { Text(if (conversation.pinned) "Unpin" else "Pin") },
+                        onClick = {
+                            menuExpanded = false
+                            onTogglePin()
+                        },
+                        modifier = Modifier.testTag(
+                            ConversationListTestTags.pin(conversation.id),
+                        ),
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(if (conversation.archived) "Unarchive" else "Archive")
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onToggleArchive()
+                        },
+                        modifier = Modifier.testTag(
+                            ConversationListTestTags.archive(conversation.id),
+                        ),
+                    )
                     DropdownMenuItem(
                         text = { Text("Rename") },
                         onClick = {

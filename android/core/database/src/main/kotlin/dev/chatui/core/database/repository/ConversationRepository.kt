@@ -23,6 +23,9 @@ class ConversationRepository(
     fun observeActive(): Flow<List<Conversation>> =
         dao.observeActive().map { conversations -> conversations.map { it.toDomain() } }
 
+    fun observeArchived(): Flow<List<Conversation>> =
+        dao.observeArchived().map { conversations -> conversations.map { it.toDomain() } }
+
     suspend fun get(id: String): Conversation? = dao.getById(id)?.toDomain()
 
     /**

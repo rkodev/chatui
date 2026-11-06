@@ -24,6 +24,12 @@ abstract class ConversationDao {
     )
     abstract fun observeActive(): Flow<List<ConversationEntity>>
 
+    @Query(
+        "SELECT * FROM conversations WHERE archived = 1 " +
+            "ORDER BY pinned DESC, lastMessageAt DESC",
+    )
+    abstract fun observeArchived(): Flow<List<ConversationEntity>>
+
     @Query("SELECT * FROM conversations WHERE id = :id")
     abstract suspend fun getById(id: String): ConversationEntity?
 

@@ -286,4 +286,158 @@ class ConversationListViewModelTest {
         assertThat(viewModel.state.value.searchLoading).isFalse()
         assertThat(viewModel.state.value.searchError).isNull()
     }
+
+    @Test
+    fun `pin toggles and sorts pinned conversations first`() = runTest(dispatcher) {
+        val service = FakeConversationService()
+        val older = testConversation(
+            id = "older",
+            lastMessageAt = Instant.parse("2026-11-01T08:00:00Z"),
+        )
+        val newer = testConversation(
+            id = "newer",
+            lastMessageAt = Instant.parse("2026-11-03T08:00:00Z"),
+        )
+        service.conversationsFlow.value = listOf(older, newer)
+        val viewModel = ConversationListViewModel(service, clock, ZoneOffset.UTC)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.groups.flatMap { group ->
+            group.conversations.map { it.id }
+        }).containsExactly("newer", "older").inOrder()
+
+        viewModel.onTogglePin(older)
+        advanceUntilIdle()
+
+        assertThat(service.lastPinned).isEqualTo("older" to true)
+        assertThat(viewModel.state.value.groups.first().key)
+            .isEqualTo(ConversationGroupKey.PINNED)
+        assertThat(viewModel.state.value.groups.first().conversations.map { it.id })
+            .containsExactly("older")
+
+        viewModel.onTogglePin(older.copy(pinned = true))
+        advanceUntilIdle()
+
+        assertThat(service.lastPinned).isEqualTo("older" to false)
+        assertThat(viewModel.state.value.groups.none { it.key == ConversationGroupKey.PINNED })
+            .isTrue()
+    }
+
+    @Test
+    fun `archive view filters archived conversations and unarchive restores`() =
+        runTest(dispatcher) {
+            val service = FakeConversationService()
+            val active = testConversation(id = "active")
+            val archived = testConversation(id = "archived", archived = true)
+            service.conversationsFlow.value = listOf(active, archived)
+            val viewModel = ConversationListViewModel(service, clock, ZoneOffset.UTC)
+            advanceUntilIdle()
+
+            assertThat(viewModel.state.value.groups.flatMap { group ->
+                group.conversations.map { it.id }
+            }).containsExactly("active")
+
+            viewModel.onViewChanged(ConversationListView.ARCHIVED)
+            advanceUntilIdle()
+
+            assertThat(viewModel.state.value.view).isEqualTo(ConversationListView.ARCHIVED)
+            assertThat(viewModel.state.value.archivedGroups.flatMap { group ->
+                group.conversations.map { it.id }
+            }).containsExactly("archived")
+
+            viewModel.onToggleArchive(active)
+            advanceUntilIdle()
+
+            assertThat(service.lastArchived).isEqualTo("active" to true)
+            assertThat(viewModel.state.value.groups).isEmpty()
+            assertThat(viewModel.state.value.archivedGroups.flatMap { group ->
+                group.conversations.map { it.id }
+            }).containsExactly("active", "archived")
+
+            viewModel.onToggleArchive(archived)
+            advanceUntilIdle()
+
+            assertThat(service.lastArchived).isEqualTo("archived" to false)
+            assertThat(viewModel.state.value.archivedGroups.flatMap { group ->
+                group.conversations.map { it.id }
+            }).containsExactly("active")
+            assertThat(viewModel.state.value.groups.flatMap { group ->
+                group.conversations.map { it.id }
+            }).containsExactly("archived")
+        }
+
+    @Test
+    fun `delete is buffered for the undo window and commits afterwards`() = runTest(dispatcher) {
+        val service = FakeConversationService()
+        val conversation = testConversation(id = "conversation-1")
+        service.conversationsFlow.value = listOf(conversation)
+        val viewModel = ConversationListViewModel(service, clock, ZoneOffset.UTC)
+        advanceUntilIdle()
+
+        viewModel.onDeleteRequested(conversation)
+        assertThat(viewModel.state.value.pendingDelete).isEqualTo(conversation)
+        viewModel.onDeleteConfirmed()
+
+        assertThat(viewModel.state.value.pendingUndo).isEqualTo(conversation)
+        assertThat(viewModel.state.value.groups).isEmpty()
+        assertThat(service.lastDeleted).isNull()
+
+        runCurrent()
+        advanceTimeBy(ConversationListViewModel.UNDO_WINDOW_MS - 1)
+        runCurrent()
+        assertThat(service.lastDeleted).isNull()
+
+        advanceTimeBy(1)
+        runCurrent()
+
+        assertThat(service.lastDeleted).isEqualTo("conversation-1")
+        assertThat(viewModel.state.value.pendingUndo).isNull()
+    }
+
+    @Test
+    fun `undo restores a buffered delete without touching storage`() = runTest(dispatcher) {
+        val service = FakeConversationService()
+        val conversation = testConversation(id = "conversation-1")
+        service.conversationsFlow.value = listOf(conversation)
+        val viewModel = ConversationListViewModel(service, clock, ZoneOffset.UTC)
+        advanceUntilIdle()
+
+        viewModel.onDeleteRequested(conversation)
+        viewModel.onDeleteConfirmed()
+        runCurrent()
+        viewModel.onUndoDelete()
+        runCurrent()
+
+        assertThat(viewModel.state.value.pendingUndo).isNull()
+        assertThat(viewModel.state.value.groups.flatMap { group ->
+            group.conversations.map { it.id }
+        }).containsExactly("conversation-1")
+
+        advanceTimeBy(ConversationListViewModel.UNDO_WINDOW_MS)
+        runCurrent()
+
+        assertThat(service.lastDeleted).isNull()
+    }
+
+    @Test
+    fun `deleting the active conversation clears and undo restores the pointer`() =
+        runTest(dispatcher) {
+            val service = FakeConversationService()
+            val conversation = testConversation(id = "conversation-1")
+            service.conversationsFlow.value = listOf(conversation)
+            service.activeFlow.value = "conversation-1"
+            val viewModel = ConversationListViewModel(service, clock, ZoneOffset.UTC)
+            advanceUntilIdle()
+
+            viewModel.onDeleteRequested(conversation)
+            viewModel.onDeleteConfirmed()
+            runCurrent()
+
+            assertThat(service.activeFlow.value).isNull()
+
+            viewModel.onUndoDelete()
+            runCurrent()
+
+            assertThat(service.activeFlow.value).isEqualTo("conversation-1")
+        }
 }

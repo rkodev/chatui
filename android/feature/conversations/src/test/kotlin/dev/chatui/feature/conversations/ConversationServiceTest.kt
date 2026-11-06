@@ -222,6 +222,58 @@ class ConversationServiceTest {
     }
 
     @Test
+    fun `pin and archive persist and filter the active and archive views`() = runTest {
+        conversations.create(testConversation(id = "active"))
+        conversations.create(testConversation(id = "archived", archived = true))
+
+        service.setPinned("active", true)
+        service.setArchived("active", true)
+
+        assertThat(conversations.get("active")!!.pinned).isTrue()
+        assertThat(conversations.get("active")!!.archived).isTrue()
+        assertThat(service.observeConversations().first()).isEmpty()
+        assertThat(service.observeArchivedConversations().first().map { it.id })
+            .containsExactly("active", "archived")
+    }
+
+    @Test
+    fun `pinned conversations sort first in the active list`() = runTest {
+        conversations.create(
+            testConversation(
+                id = "older",
+                lastMessageAt = Instant.parse("2026-11-01T12:00:00Z"),
+            ),
+        )
+        conversations.create(
+            testConversation(
+                id = "newer",
+                lastMessageAt = Instant.parse("2026-11-02T12:00:00Z"),
+            ),
+        )
+
+        service.setPinned("older", true)
+
+        assertThat(service.observeConversations().first().map { it.id })
+            .containsExactly("older", "newer")
+            .inOrder()
+    }
+
+    @Test
+    fun `pin and archive reject missing conversations`() = runTest {
+        val pinError = runCatching { service.setPinned("missing", true) }.exceptionOrNull()
+        assertThat(pinError).isInstanceOf(ConversationServiceException::class.java)
+        assertThat((pinError as ConversationServiceException).code)
+            .isEqualTo(ConversationServiceErrorCode.NOT_FOUND)
+
+        val archiveError = runCatching {
+            service.setArchived("missing", true)
+        }.exceptionOrNull()
+        assertThat(archiveError).isInstanceOf(ConversationServiceException::class.java)
+        assertThat((archiveError as ConversationServiceException).code)
+            .isEqualTo(ConversationServiceErrorCode.NOT_FOUND)
+    }
+
+    @Test
     fun `search groups title and message matches by conversation`() = runTest {
         conversations.create(testConversation(id = "title", title = "Kotlin notes"))
         conversations.create(testConversation(id = "message", title = "Other"))

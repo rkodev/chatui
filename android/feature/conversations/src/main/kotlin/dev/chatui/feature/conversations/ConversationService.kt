@@ -19,6 +19,7 @@ import java.time.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -54,11 +55,35 @@ class ConversationServiceException(
 interface ConversationService {
     fun observeConversations(): Flow<List<Conversation>>
 
+    /**
+     * Observe archived conversations for the archive view.
+     *
+     * The default keeps lightweight test doubles source-compatible; the
+     * production implementation overrides it with the archived repository flow.
+     */
+    fun observeArchivedConversations(): Flow<List<Conversation>> = emptyFlow()
+
     fun observeLastActiveConversationId(): Flow<String?>
 
     suspend fun createConversation(title: String? = null): CreateConversationResult
 
     suspend fun renameConversation(id: String, title: String): Conversation
+
+    /**
+     * Pin or unpin a conversation.
+     *
+     * The default keeps lightweight test doubles source-compatible; the
+     * production implementation persists the flag and returns the updated row.
+     */
+    suspend fun setPinned(id: String, pinned: Boolean): Conversation? = null
+
+    /**
+     * Archive or unarchive a conversation.
+     *
+     * The default keeps lightweight test doubles source-compatible; the
+     * production implementation persists the flag and returns the updated row.
+     */
+    suspend fun setArchived(id: String, archived: Boolean): Conversation? = null
 
     suspend fun deleteConversation(id: String)
 
@@ -102,6 +127,9 @@ class DefaultConversationService @Inject constructor(
 
     override fun observeConversations(): Flow<List<Conversation>> =
         conversations.observeActive()
+
+    override fun observeArchivedConversations(): Flow<List<Conversation>> =
+        conversations.observeArchived()
 
     override fun observeLastActiveConversationId(): Flow<String?> =
         settings.settings.map { it.lastActiveConversationId }
@@ -177,6 +205,40 @@ class DefaultConversationService @Inject constructor(
         if (settings.current().lastActiveConversationId == id) {
             settings.setLastActiveConversation(null)
         }
+    }
+
+    override suspend fun setPinned(id: String, pinned: Boolean): Conversation {
+        if (!conversations.setPinned(id, pinned)) {
+            throw ConversationServiceException(
+                ConversationServiceErrorCode.NOT_FOUND,
+                "Conversation $id was not found.",
+                id,
+            )
+        }
+
+        return conversations.get(id)
+            ?: throw ConversationServiceException(
+                ConversationServiceErrorCode.NOT_FOUND,
+                "Conversation $id was not found.",
+                id,
+            )
+    }
+
+    override suspend fun setArchived(id: String, archived: Boolean): Conversation {
+        if (!conversations.setArchived(id, archived)) {
+            throw ConversationServiceException(
+                ConversationServiceErrorCode.NOT_FOUND,
+                "Conversation $id was not found.",
+                id,
+            )
+        }
+
+        return conversations.get(id)
+            ?: throw ConversationServiceException(
+                ConversationServiceErrorCode.NOT_FOUND,
+                "Conversation $id was not found.",
+                id,
+            )
     }
 
     override suspend fun setLastActiveConversation(id: String?) {

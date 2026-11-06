@@ -474,4 +474,159 @@ class ConversationListScreenTest {
 
         assertThat(selected).isEqualTo(conversation)
     }
+
+    @Test
+    fun `archive toggle switches the view`() {
+        var view: ConversationListView? = null
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(loading = false),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    onViewChanged = { view = it },
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.ArchivedToggle).performClick()
+
+        assertThat(view).isEqualTo(ConversationListView.ARCHIVED)
+    }
+
+    @Test
+    fun `archive view renders archived conversations and its empty state`() {
+        val archived = testConversation(
+            id = "archived-1",
+            title = "Archived chat",
+            archived = true,
+        )
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        view = ConversationListView.ARCHIVED,
+                        archivedGroups = listOf(
+                            ConversationGroup(
+                                key = ConversationGroupKey.TODAY,
+                                label = "Today",
+                                conversations = listOf(archived),
+                            ),
+                        ),
+                        loading = false,
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Archived chat").assertIsDisplayed()
+        composeRule.onNodeWithTag(ConversationListTestTags.group(ConversationGroupKey.TODAY))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(ConversationListTestTags.SearchField).assertDoesNotExist()
+    }
+
+    @Test
+    fun `pin and archive actions invoke their intents`() {
+        val conversation = testConversation(id = "conversation-1", title = "First chat")
+        var pinned: Conversation? = null
+        var archived: Conversation? = null
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        groups = listOf(
+                            ConversationGroup(
+                                key = ConversationGroupKey.TODAY,
+                                label = "Today",
+                                conversations = listOf(conversation),
+                            ),
+                        ),
+                        loading = false,
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    onTogglePin = { pinned = it },
+                    onToggleArchive = { archived = it },
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.actions("conversation-1"))
+            .performClick()
+        composeRule.onNodeWithTag(ConversationListTestTags.pin("conversation-1"))
+            .performClick()
+        assertThat(pinned).isEqualTo(conversation)
+
+        composeRule.onNodeWithTag(ConversationListTestTags.actions("conversation-1"))
+            .performClick()
+        composeRule.onNodeWithTag(ConversationListTestTags.archive("conversation-1"))
+            .performClick()
+        assertThat(archived).isEqualTo(conversation)
+    }
+
+    @Test
+    fun `undo bar restores a buffered delete`() {
+        val conversation = testConversation(id = "conversation-1", title = "First chat")
+        var undone = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        loading = false,
+                        pendingUndo = conversation,
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    onUndoDelete = { undone = true },
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.UndoBar).assertIsDisplayed()
+        composeRule.onNodeWithTag(ConversationListTestTags.UndoButton).performClick()
+
+        assertThat(undone).isTrue()
+    }
 }

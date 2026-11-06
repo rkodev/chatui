@@ -46,6 +46,16 @@ class ConversationDaoTest : DatabaseTestBase() {
     }
 
     @Test
+    fun `archived list contains only archived conversations`() = runTest {
+        dao.upsert(TestData.conversation(id = "active"))
+        dao.upsert(TestData.conversation(id = "archived", archived = true))
+
+        val ids = dao.observeArchived().first().map { it.id }
+
+        assertThat(ids).containsExactly("archived")
+    }
+
+    @Test
     fun `update title and flags`() = runTest {
         dao.upsert(TestData.conversation())
 
