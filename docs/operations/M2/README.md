@@ -67,7 +67,7 @@
 | 30 | [M2-07.1 Android conversation search](M2-07.1-android-search.md) | Complete | M2-06.5 | android | M2-07.2 no; conversation files shared |
 | 31 | [M2-07.2 Android pin, archive, and delete undo](M2-07.2-android-pin-archive-undo.md) | Complete | M2-07.1 | android | M2-04.2 |
 | 32 | [M2-07.3 Android export](M2-07.3-android-export.md) | Complete | M2-06.5 | android | M2-04.3 |
-| 33 | [M2-07.4 Android import](M2-07.4-android-import.md) | Not started | M2-07.3 | android | M2-04.4 |
+| 33 | [M2-07.4 Android import](M2-07.4-android-import.md) | Complete | M2-07.3 | android | M2-04.4 |
 | 34 | [M2-07.5 Android data controls and shell integration](M2-07.5-android-data-controls-shell.md) | Not started | M2-07.3, M2-07.4 | android | M2-04.5 |
 | 35 | [M2-08.1 Android provider adapter tests](M2-08.1-android-provider-tests.md) | Not started | M2-06.1, M2-06.2, M2-06.3 | android | none; M2-08.2 follows |
 | 36 | [M2-08.2 Android persistence, data, and critical-case tests](M2-08.2-android-persistence-data-tests.md) | Not started | M2-06.6, M2-07.3, M2-07.4, M2-07.5, M2-08.1 | android | M2-04.6 |
