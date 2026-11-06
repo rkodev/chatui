@@ -155,6 +155,52 @@ class SettingsDataStoreTest {
     }
 
     @Test
+    fun `drafts round trip and persist across data store instances`() = runTest {
+        val file = File(tempFolder.root, "drafts.preferences_pb")
+        val firstScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val first = SettingsDataStore(
+            PreferenceDataStoreFactory.create(scope = firstScope, produceFile = { file }),
+        )
+        first.setDrafts(mapOf("conversation-1" to "hello", "conversation-2" to "world"))
+        firstScope.cancel()
+        firstScope.coroutineContext[Job]?.join()
+
+        val secondScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val second = SettingsDataStore(
+            PreferenceDataStoreFactory.create(scope = secondScope, produceFile = { file }),
+        )
+        val loaded = second.drafts()
+        secondScope.cancel()
+
+        assertThat(loaded).containsExactly(
+            "conversation-1",
+            "hello",
+            "conversation-2",
+            "world",
+        )
+    }
+
+    @Test
+    fun `clearing drafts removes the persisted key`() = runTest {
+        store.setDrafts(mapOf("conversation-1" to "hello"))
+
+        store.setDrafts(emptyMap())
+
+        assertThat(store.drafts()).isEmpty()
+        assertThat(dataStore.data.first().asMap().keys.map { it.name })
+            .doesNotContain("drafts_json")
+    }
+
+    @Test
+    fun `corrupt drafts fall back to an empty map`() = runTest {
+        dataStore.edit { preferences ->
+            preferences[SettingsKeys.drafts] = "{not-json"
+        }
+
+        assertThat(store.drafts()).isEmpty()
+    }
+
+    @Test
     fun `settings keys contain no secret material`() = runTest {
         store.save(AndroidSettings())
 
