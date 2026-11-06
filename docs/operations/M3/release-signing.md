@@ -82,6 +82,47 @@ keystore file, password, or base64 value may be committed. `.gitignore` already
 excludes `*.jks`, `*.keystore`, `*.p12`, `*.pfx`, `*.key`, `*.pem`, and
 `secrets/`.
 
+## CI release workflow
+
+`.github/workflows/android-release.yml` builds and publishes signed release
+artifacts. It runs on a semantic version tag (`v*.*.*`) and on manual
+`workflow_dispatch`.
+
+- The job checks out full history so the git commit-count `versionCode` stays
+  monotonic, then runs `make contracts-check`, `make android-lint`,
+  `make android-test`, `make android-screenshot`, and
+  `./gradlew :app:assembleRelease :app:bundleRelease`.
+- It sets `RELEASE_SIGNING_REQUIRED=true` and reads the four signing secrets
+  listed above. A dedicated step fails the job with an actionable message when
+  any secret is missing; a debug key is never substituted.
+- It uploads the signed APK, signed AAB, `mapping.txt`, and a SHA-256
+  `checksums.txt` as workflow artifacts. Screenshot verification output and
+  connected-test reports are uploaded when produced.
+- On a tag it creates a GitHub Release with `gh release create` and attaches
+  only the signed APK, signed AAB, mapping, and checksums.
+- Manual runs may set `version_code` and `version_name` inputs. The optional
+  `run_connected_tests` input runs `make android-test-ui` on an emulator and
+  uploads the reports.
+
+The workflow never publishes to the Play Store and never attaches an unsigned
+APK.
+
+## Developer targets
+
+The M3 release commands are available as stable Make targets:
+
+| Target | Command |
+| --- | --- |
+| `make android-test-ui` | `./gradlew connectedDebugAndroidTest` |
+| `make android-screenshot` | `./gradlew :app:verifyRoborazziDebug` |
+| `make android-release` | `./gradlew :app:assembleRelease :app:bundleRelease` |
+| `make android-baseline-profile` | `./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest` |
+
+`make android-release` uses the same env-driven signing as the CI job. Without
+secrets it produces an unsigned APK; set `RELEASE_SIGNING_REQUIRED=true` to
+fail instead. The baseline-profile target uses the task name produced by the
+installed `androidx.baselineprofile` plugin version.
+
 ## Current availability
 
 As recorded in [`M3-decisions.md`](M3-decisions.md), CI signing secrets are not
