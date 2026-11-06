@@ -1,0 +1,133 @@
+# M3 Verification Evidence
+
+- Status: Baseline recorded 2026-11-06; M3 implementation not started.
+- Owner: M3-00.1 recorded the preflight environment and baseline.
+- Scope: Android M3 preflight, baseline commands, measurements, and environment blockers.
+- Source plan: [M3 Android Depth Implementation Plan](../M3-android-depth-implementation-plan.md)
+- Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
+
+This file is the shared evidence location for the M3 exit gate. Do not mark a
+row passed until the command or manual check has actually run. Record only
+status codes, headers, timestamps, test names, sizes, and conclusions. Never
+record an API key, a real prompt, a real conversation, signing material, or
+personal data.
+
+## 1. M2 entry criteria
+
+M2 closed on 2026-11-06. The final exit gate passed with no blocker; see
+[M2 verification](../M2/M2-verification.md) sections 10-13 and
+[`contracts/parity.md`](../../../contracts/parity.md).
+
+M2 baseline carried into M3:
+
+- Android JVM/Robolectric tests: 781 tests, 0 failures, 0 errors, 0 skipped.
+- Debug APK: 18,545,791 bytes at M2 close.
+- No device or emulator was used for M2 evidence.
+
+M2 deferrals that target M3 (from M2 verification section 11 and parity):
+
+| Item | M3 impact |
+| --- | --- |
+| Android local Ollama over cleartext HTTP | Needs a network security config; tracked by M3-01.4/M3-01.5. |
+| Android Anthropic and Gemini discovery without a key | Follow-up owner; target M3. |
+| Android math typesetting | Standalone math renders as bounded raw source; M3 depth item. |
+| Android device-level input and visual checks | Photo picker, SAF, clipboard paste, drag-and-drop, and visual screens need device evidence; M3-07.3. |
+| Web case 23 automated coverage | Web gap only; Android has an automated equivalent. Not M3 Android work. |
+| Live provider smoke and valid-key success | M4 release check. |
+| Local and Custom CORS | M4 release check. |
+
+## 2. Verification environment
+
+Recorded 2026-11-06 from the repository root.
+
+| Item | Value |
+| --- | --- |
+| Host | Linux x86_64, kernel 7.0.0-42-generic (Ubuntu) |
+| JDK | OpenJDK 21.0.9 (Temurin 21.0.9+10-LTS) |
+| Gradle | 9.8.1 (Kotlin 2.4.10) |
+| Android SDK | Present at `$HOME/Android/Sdk`; `ANDROID_HOME` and `ANDROID_SDK_ROOT` are unset |
+| Android platforms | android-28, 29, 30, 31, 33, 34, 35, 36, 37.0 |
+| Build tools | 34.0.0, 35.0.0, 36.0.0, 36.1.0 |
+| adb | Present at `$HOME/Android/Sdk/platform-tools/adb`; not on `PATH` |
+| emulator | Present at `$HOME/Android/Sdk/emulator/emulator`; not on `PATH` |
+| AVDs | `Medium_Phone_API_36.1`, `Medium_Tablet`, `Pixel`, `Pixel_9_Pro_XL`, `Small_Phone`, `Small_Phone_2`, `Wear_OS_Small_Round` |
+| Connected devices | None (`adb devices` listed no devices) |
+| Node.js | 22.21.1 (contract tooling) |
+
+Environment note: the Android Gradle build fails with `SDK location not found`
+unless `ANDROID_HOME` is set. The baseline commands below were run with
+`ANDROID_HOME=$HOME/Android/Sdk`. No `android/local.properties` was created and
+no repository file was changed to work around this.
+
+## 3. Baseline command results
+
+Commands ran from the repository root on 2026-11-06.
+
+| Command | Result | Bounded evidence |
+| --- | --- | --- |
+| `make contracts-check` | Pass | `Contract validation passed.` |
+| `make android-lint` | Pass | `BUILD SUCCESSFUL in 2m 46s`; 439 actionable tasks. |
+| `make android-test` | Pass | `BUILD SUCCESSFUL in 1m 44s`; 781 tests, 0 failures, 0 errors, 0 skipped. |
+| `make android-assemble` | Pass | `BUILD SUCCESSFUL in 12s`; debug APK produced. |
+
+`make contracts-check` first failed with `Cannot find package 'ajv'` because the
+contract tooling dependencies were not installed. `make contracts-install`
+installed them (`scripts/node_modules`, gitignored), and the check then passed.
+This is an environment setup step, not a product failure.
+
+## 4. Baseline measurements
+
+| Measurement | Value | Source |
+| --- | --- | --- |
+| Android unit tests | 781 tests, 0 failures, 0 errors, 0 skipped | Aggregated `android/**/build/test-results/*/*.xml` after `make android-test` |
+| Debug APK size | 18,693,445 bytes | `ls -l android/app/build/outputs/apk/debug/app-debug.apk` |
+| M2 debug APK size | 18,545,791 bytes | M2 verification section 1 |
+
+The debug APK grew by 147,654 bytes since M2 close. It remains under the 20 MB
+debug budget noted in the M3 plan.
+
+## 5. Device and emulator availability
+
+| Check | Result |
+| --- | --- |
+| `command -v adb` | Not on `PATH`; binary present in the SDK |
+| `adb devices` | No devices attached |
+| `command -v emulator` | Not on `PATH`; binary present in the SDK |
+| `emulator -list-avds` | Seven AVDs listed, including phone and tablet images |
+
+No device is connected. Emulator binaries and AVDs are available but were not
+booted for this preflight. Device-dependent M3 tasks (M3-07.3 device matrix,
+case 26 process death, case 27 backup restore, and any instrumentation run) are
+not blocked by missing emulator images, but they still require a booted
+emulator or physical device at execution time.
+
+## 6. Release environment availability
+
+Recorded without printing any secret value.
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| CI signing secrets | unavailable | `.github/workflows/android.yml` has no signing configuration or secret references. |
+| Keystore path outside the repository | available | A `.jks` file exists outside the repository; it was not opened or verified as the release keystore. |
+| Baseline-profile / benchmark device or emulator | available | Emulator binary and AVDs are present; no device was booted. |
+
+## 7. Blockers and owners
+
+| Blocker | Impact | Owner / target |
+| --- | --- | --- |
+| `ANDROID_HOME` unset and SDK tools not on `PATH` | Android Gradle commands fail until the environment is configured. Workaround: set `ANDROID_HOME=$HOME/Android/Sdk`. | Developer environment; M3-00.2 or release CI setup |
+| No connected device or booted emulator | Device-level evidence cannot be produced yet. Emulator images exist, so this is a scheduling step, not a missing asset. | M3-07.3 device matrix owner |
+| CI signing secrets unavailable | Signed release builds and M3-06.2/M3-06.4 cannot be verified in CI yet. | M3-06.2 / M3-06.4 owner |
+| Release keystore not verified | A `.jks` exists outside the repository but its purpose and credentials are unverified. | M3-06.2 owner |
+
+No blocker prevents the M3 implementation tasks from starting. The signing and
+device items become blocking only for the release and device-evidence tasks
+that depend on them.
+
+## 8. Redaction review
+
+- No API key, prompt, conversation content, personal data, or signing material
+  is recorded in this file.
+- The keystore check records only that a path exists outside the repository; no
+  path, alias, or password is recorded.
+- Test names, sizes, and command output are non-sensitive.
