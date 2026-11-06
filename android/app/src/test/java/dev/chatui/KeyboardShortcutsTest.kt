@@ -106,6 +106,40 @@ class KeyboardShortcutsTest {
     }
 
     @Test
+    fun `an open overlay blocks every shortcut`() {
+        val recording = RecordingShortcutActions(overlay = true)
+        setShell(actions = recording.actions)
+
+        pressCtrl(Key.K)
+        pressCtrlShift(Key.O)
+        pressCtrlShift(Key.C)
+        pressAlt(Key.DirectionUp)
+        pressAlt(Key.DirectionDown)
+        composeRule.onNodeWithTag(ShellTestTags.Root).performKeyInput {
+            pressKey(Key.Escape)
+        }
+
+        assertThat(recording.search).isEqualTo(0)
+        assertThat(recording.newChat).isEqualTo(0)
+        assertThat(recording.copy).isEqualTo(0)
+        assertThat(recording.previous).isEqualTo(0)
+        assertThat(recording.next).isEqualTo(0)
+        assertThat(recording.stopOrClose).isEqualTo(0)
+    }
+
+    @Test
+    fun `text entry keys are never shell shortcuts`() {
+        val plain = ShortcutModifiers()
+
+        assertThat(shortcutFor(Key.Backspace, plain)).isNull()
+        assertThat(shortcutFor(Key.Spacebar, plain)).isNull()
+        assertThat(shortcutFor(Key.O, plain)).isNull()
+        assertThat(shortcutFor(Key.C, plain)).isNull()
+        assertThat(shortcutFor(Key.K, ShortcutModifiers(shift = true))).isNull()
+        assertThat(shortcutFor(Key.Enter, ShortcutModifiers(ctrl = true))).isNull()
+    }
+
+    @Test
     fun `escape stops an active stream before closing the drawer`() {
         val bridge = ChatShortcutState()
         var stops = 0

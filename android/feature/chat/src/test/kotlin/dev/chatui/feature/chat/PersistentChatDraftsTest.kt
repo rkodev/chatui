@@ -85,6 +85,41 @@ class PersistentChatDraftsTest {
     }
 
     @Test
+    fun `rewriting a draft refreshes its recency before eviction`() = runTest {
+        val persistence = FakeDraftPersistence()
+        val store = PersistentChatDrafts(
+            persistence = persistence,
+            scope = this,
+            debounceMs = 0,
+            maxDrafts = 2,
+        )
+
+        store.setDraft("conversation-1", "one")
+        store.setDraft("conversation-2", "two")
+        store.setDraft("conversation-1", "one updated")
+        store.setDraft("conversation-3", "three")
+        store.flush()
+
+        assertThat(store.draftFor("conversation-1")).isEqualTo("one updated")
+        assertThat(store.draftFor("conversation-2")).isEmpty()
+        assertThat(store.draftFor("conversation-3")).isEqualTo("three")
+    }
+
+    @Test
+    fun `setting an empty draft clears the entry`() = runTest {
+        val persistence = FakeDraftPersistence()
+        val store = PersistentChatDrafts(persistence, this, debounceMs = 0)
+        store.setDraft("conversation-1", "hello")
+        store.flush()
+
+        store.setDraft("conversation-1", "")
+        store.flush()
+
+        assertThat(store.draftFor("conversation-1")).isEmpty()
+        assertThat(persistence.stored).isEmpty()
+    }
+
+    @Test
     fun `exceeding the per-draft cap truncates safely`() = runTest {
         val persistence = FakeDraftPersistence()
         val store = PersistentChatDrafts(

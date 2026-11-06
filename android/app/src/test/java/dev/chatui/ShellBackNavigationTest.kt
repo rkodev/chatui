@@ -2,6 +2,8 @@ package dev.chatui
 
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -120,6 +122,35 @@ class ShellBackNavigationTest {
         }
 
         composeRule.onNodeWithTag(ShellTestTags.Sidebar).assertIsNotDisplayed()
+    }
+
+    @Test
+    fun `back closes a dialog before the drawer`() {
+        var showDialog by mutableStateOf(false)
+        setShell(
+            overlay = {
+                if (showDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDialog = false },
+                        confirmButton = {},
+                        text = { Text("Confirm") },
+                    )
+                }
+            },
+        )
+
+        composeRule.onNodeWithTag(ShellTestTags.MenuButton).performClick()
+        composeRule.onNodeWithTag(ShellTestTags.Sidebar).assertIsDisplayed()
+
+        composeRule.runOnIdle { showDialog = true }
+        composeRule.waitForIdle()
+        val dialog = ShadowDialog.getShownDialogs().last { it.isShowing } as ComponentDialog
+
+        composeRule.runOnIdle { dialog.onBackPressedDispatcher.onBackPressed() }
+        composeRule.waitForIdle()
+
+        assertThat(showDialog).isFalse()
+        composeRule.onNodeWithTag(ShellTestTags.Sidebar).assertIsDisplayed()
     }
 
     @Test
