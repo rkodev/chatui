@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.SecureScreen
 
 /** Test tags exposed by the onboarding screen. */
 object OnboardingTestTags {
@@ -73,6 +74,47 @@ object OnboardingTestTags {
  */
 @Composable
 fun OnboardingScreen(
+    state: OnboardingUiState,
+    onApiKeyChanged: (String) -> Unit,
+    onLabelChanged: (String) -> Unit,
+    onProviderSelected: (String) -> Unit,
+    onContinue: () -> Unit,
+    onBack: () -> Unit,
+    onConnect: () -> Unit,
+    onRetryCatalog: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (state.step == OnboardingStep.KEY_ENTRY) {
+        SecureScreen {
+            OnboardingContent(
+                state = state,
+                onApiKeyChanged = onApiKeyChanged,
+                onLabelChanged = onLabelChanged,
+                onProviderSelected = onProviderSelected,
+                onContinue = onContinue,
+                onBack = onBack,
+                onConnect = onConnect,
+                onRetryCatalog = onRetryCatalog,
+                modifier = modifier,
+            )
+        }
+    } else {
+        OnboardingContent(
+            state = state,
+            onApiKeyChanged = onApiKeyChanged,
+            onLabelChanged = onLabelChanged,
+            onProviderSelected = onProviderSelected,
+            onContinue = onContinue,
+            onBack = onBack,
+            onConnect = onConnect,
+            onRetryCatalog = onRetryCatalog,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun OnboardingContent(
     state: OnboardingUiState,
     onApiKeyChanged: (String) -> Unit,
     onLabelChanged: (String) -> Unit,

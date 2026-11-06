@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.SecureScreen
 import dev.chatui.core.providers.getProviderKeyMetadata
 
 /** Test tags exposed by provider details. */
@@ -61,6 +62,35 @@ object ProviderDetailTestTags {
  */
 @Composable
 fun ProviderDetailScreen(
+    state: ProviderDetailUiState,
+    onNewKeyChanged: (String) -> Unit,
+    onRotateKey: () -> Unit,
+    onRemoveKey: () -> Unit,
+    onCancelRemove: () -> Unit,
+    onToggleEnabled: () -> Unit,
+    onValidate: () -> Unit,
+    onRefreshModels: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SecureScreen {
+        ProviderDetailContent(
+            state = state,
+            onNewKeyChanged = onNewKeyChanged,
+            onRotateKey = onRotateKey,
+            onRemoveKey = onRemoveKey,
+            onCancelRemove = onCancelRemove,
+            onToggleEnabled = onToggleEnabled,
+            onValidate = onValidate,
+            onRefreshModels = onRefreshModels,
+            onRetry = onRetry,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun ProviderDetailContent(
     state: ProviderDetailUiState,
     onNewKeyChanged: (String) -> Unit,
     onRotateKey: () -> Unit,

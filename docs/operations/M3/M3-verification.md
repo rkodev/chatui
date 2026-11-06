@@ -330,3 +330,77 @@ again.
   a synthetic sentinel cannot complete it. The seeded state is exactly the data
   that must not restore, so the backup-exclusion result is unaffected.
 - No manifest or XML rule was weakened to make a test pass.
+
+## 11. M3-01.3 FLAG_SECURE, key lifecycle, and logging audit
+
+Recorded 2026-11-06. Only synthetic test keys are referenced; no real key,
+header, prompt, or personal data is recorded here.
+
+### 11.1 SecureScreen and screen coverage
+
+- Added `dev.chatui.core.designsystem.SecureScreen`. It resolves the hosting
+  `Activity`/`Window` from `LocalView`, adds
+  `WindowManager.LayoutParams.FLAG_SECURE` in a `DisposableEffect`, and clears
+  the flag on dispose only when this composable added it. A window that was
+  already secure is left untouched.
+- `OnboardingScreen` wraps only the `KEY_ENTRY` step. The welcome/provider
+  picker step remains unsecured and usable.
+- `ProviderDetailScreen` wraps the whole detail surface, including the key
+  metadata panel, rotation field, and remove-key action.
+- No stored key is rendered. The detail screen shows only non-secret `/key`
+  metadata, and both key inputs use `PasswordVisualTransformation`.
+- No biometric or device-credential gate was added or claimed.
+
+### 11.2 Window-flag tests
+
+| Test | Result | What it proves |
+| --- | --- | --- |
+| `SecureScreenTest.adds flag secure while composed and removes it on dispose` | Pass | The flag is set while composed and cleared when the secure subtree leaves composition. |
+| `SecureScreenTest.does not clear a flag that the host already set` | Pass | Disposal does not clear a flag the composable did not add. |
+| `OnboardingScreenTest.key entry step sets flag secure` | Pass | The onboarding key-entry step sets `FLAG_SECURE`. |
+| `OnboardingScreenTest.welcome step does not set flag secure` | Pass | The welcome step stays usable and unsecured. |
+| `ProviderDetailScreenTest.provider detail sets flag secure` | Pass | Provider key detail/rotation sets `FLAG_SECURE`. |
+
+### 11.3 Key lifecycle regression
+
+Existing tests already cover the required lifecycle paths; no storage behavior
+was changed.
+
+| Path | Test | Result |
+| --- | --- | --- |
+| Provider key rotation | `ProviderServiceTest.rotateKey replaces the secret and clears key metadata` | Pass |
+| Remove key | `ProviderServiceTest.removeKey deletes the secret and clears key metadata` | Pass |
+| Forget one key | `SecretStoreTest.forget key deletes one secret` | Pass |
+| Forget all keys | `SecretStoreTest.forget all deletes every secret` | Pass |
+
+### 11.4 Logging audit
+
+Searched production sources under `android/**/src/main` for `Log.`, `println`,
+`printStackTrace`, `System.out`, `System.err`, `HttpLoggingInterceptor`,
+`addInterceptor`, and `loggingInterceptor`.
+
+- The only production log is `MainActivity.kt:46`,
+  `Log.w(TAG, "Startup recovery failed", error)`. The message is content-free
+  and the exception is a startup recovery failure, not a key or request header.
+- `AppModule.provideOkHttpClient()` installs no interceptors or network
+  interceptors. `AppModuleTest.provides a shared HTTP client without logging
+  interceptors` asserts both lists are empty.
+- No request/response body dump or debug logging interceptor exists.
+- Provider adapters route error text through `redactSecret` before building
+  `ProviderRequestException` messages, and `Redaction` covers authorization,
+  `x-api-key`, and `x-goog-api-key` headers plus bare bearer tokens.
+- No `println`, `printStackTrace`, `System.out`, or `System.err` appears in
+  production sources.
+
+Conclusion: no raw secret header or key value is logged, and no logging
+interceptor is installed.
+
+### 11.5 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 786 tests, 0 failures, 0 errors, 0 skipped. |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | `BUILD SUCCESSFUL`; 7 tests, 0 failures, 0 errors, 2 skipped (manual restart/backup phases). |
+
+The five new Robolectric tests account for the increase from the 781-test M2
+baseline to 786.

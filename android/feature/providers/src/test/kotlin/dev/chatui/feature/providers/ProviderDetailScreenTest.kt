@@ -1,5 +1,11 @@
 package dev.chatui.feature.providers
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.Window
+import android.view.WindowManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
@@ -88,6 +94,34 @@ class ProviderDetailScreenTest {
             .performScrollToNode(hasTestTag(ProviderDetailTestTags.ModelCount))
         composeRule.onNodeWithTag(ProviderDetailTestTags.ModelCount)
             .assertTextContains("3 models are cached for this provider.")
+    }
+
+    @Test
+    fun `provider detail sets flag secure`() {
+        lateinit var window: Window
+
+        composeRule.setContent {
+            window = LocalView.current.context.findActivity().window
+            ChatUiTheme {
+                ProviderDetailScreen(
+                    state = ProviderDetailUiState(
+                        provider = providerWithMetadata(),
+                        loading = false,
+                    ),
+                    onNewKeyChanged = {},
+                    onRotateKey = {},
+                    onRemoveKey = {},
+                    onCancelRemove = {},
+                    onToggleEnabled = {},
+                    onValidate = {},
+                    onRefreshModels = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertThat(window.isSecure()).isTrue()
     }
 
     @Test
@@ -216,4 +250,13 @@ class ProviderDetailScreenTest {
         composeRule.onNodeWithText("Retry").performClick()
         assertThat(retries).isEqualTo(1)
     }
+}
+
+private fun Window.isSecure(): Boolean =
+    attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
+
+private tailrec fun Context.findActivity(): Activity = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> error("No activity in context chain")
 }
