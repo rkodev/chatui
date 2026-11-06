@@ -22,6 +22,7 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,12 +43,18 @@ import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.Density
 import dev.chatui.core.model.Theme
+import dev.chatui.feature.chat.ChatDrafts
+import dev.chatui.feature.chat.ChatEntryPoint
 import dev.chatui.feature.chat.ChatShortcutState
 import dev.chatui.feature.chat.LocalChatShortcutState
 import dev.chatui.feature.conversations.ConversationEntryPoint
 import dev.chatui.feature.conversations.ConversationService
 import dev.chatui.feature.conversations.CreateConversationResult
+import dev.chatui.intent.ExternalIntentHandler
+import dev.chatui.intent.ExternalIntentOutcome
+import dev.chatui.intent.ExternalIntentRouter
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /** Test tags exposed by the shell for composition and navigation tests. */
@@ -79,13 +86,50 @@ fun ChatUiApp(
     settings: AndroidSettings,
     modifier: Modifier = Modifier,
     conversationService: ConversationService? = null,
+    externalIntentRouter: ExternalIntentRouter? = null,
+    chatDrafts: ChatDrafts? = null,
 ) {
     ChatUiTheme(themeMode = settings.theme, density = settings.density) {
         val navController = rememberNavController()
+        val service = conversationService ?: rememberConversationService()
+        val router = externalIntentRouter ?: remember { ExternalIntentRouter() }
+        val context = LocalContext.current
+        val draftsProvider: () -> ChatDrafts = {
+            chatDrafts ?: EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                ChatEntryPoint::class.java,
+            ).chatDependencies().drafts
+        }
+
+        // Collect after the NavController exists so a cold-start share can
+        // navigate as soon as the shell is ready. The action is consumed only
+        // after a conversation and its draft have been created.
+        LaunchedEffect(router, service, navController, settings.onboardingCompleted) {
+            router.pending.collect { action ->
+                if (action == null) return@collect
+
+                val handler = ExternalIntentHandler(
+                    router = router,
+                    conversationService = service,
+                    drafts = draftsProvider(),
+                )
+                when (val outcome = handler.handle(action, settings.onboardingCompleted)) {
+                    is ExternalIntentOutcome.NavigateToChat ->
+                        navController.navigateToShellRoute(outcome.route)
+
+                    ExternalIntentOutcome.OpenProviders ->
+                        navController.navigateToShellRoute(ShellDestination.Providers.route)
+
+                    ExternalIntentOutcome.OpenOnboarding ->
+                        navController.navigateToShellRoute(ShellDestination.Onboarding.route)
+                }
+            }
+        }
+
         ShellScaffold(
             navController = navController,
             startDestination = shellStartDestination(settings),
-            conversationService = conversationService,
+            conversationService = service,
             modifier = modifier.testTag(
                 ShellTestTags.appearance(settings.theme, settings.density),
             ),

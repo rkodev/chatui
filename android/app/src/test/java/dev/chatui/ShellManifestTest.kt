@@ -23,6 +23,14 @@ class ShellManifestTest {
     }
 
     @Test
+    fun `manifest accepts plain text shares on a single top activity`() {
+        assertThat(manifest).contains("android:launchMode=\"singleTop\"")
+        assertThat(manifest).contains("android.intent.action.SEND")
+        assertThat(manifest).contains("android.intent.category.DEFAULT")
+        assertThat(manifest).contains("android:mimeType=\"text/plain\"")
+    }
+
+    @Test
     fun `manifest references the network security config`() {
         assertThat(manifest)
             .contains("android:networkSecurityConfig=\"@xml/network_security_config\"")
