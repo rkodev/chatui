@@ -46,6 +46,21 @@ pub enum SecretError {
     /// The backend returned an error that is not otherwise classified.
     #[error("OS credential store error: {0}")]
     Backend(&'static str),
+    /// The encrypted-file fallback could not complete the operation.
+    ///
+    /// The message is a static category so that a passphrase, derived key,
+    /// salt, nonce, or ciphertext cannot leak through an error.
+    #[error("encrypted secret store error: {0}")]
+    Fallback(&'static str),
+    /// The OS credential store is unavailable and the caller has not chosen a
+    /// fallback backend.
+    ///
+    /// Callers must explicitly select the encrypted-file fallback or
+    /// session-only mode. There is no silent plaintext fallback.
+    #[error(
+        "the OS credential store is unavailable; choose the encrypted-file fallback or session-only mode"
+    )]
+    FallbackRequired,
 }
 
 /// A stable, non-secret identifier for one stored secret.
