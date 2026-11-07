@@ -10,3 +10,11 @@ members = [
   "apps/desktop",
   "tests/conformance",
 ]
+
+# Release-profile skeleton. Final tuning, symbol artifacts, and packaging are
+# owned by M3.5-11.1 and M3.5-11.2.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

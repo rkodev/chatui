@@ -40,7 +40,7 @@
 | 2 | [M3.5-00.2 Scope, decisions, and release enablement](M3.5-00.2-decisions-enablement.md) | Complete | M3.5-00.1 | preflight | none; blocks implementation choices |
 | 3 | [M3.5-01.1 Cargo workspace, toolchain, and crate skeletons](M3.5-01.1-workspace-toolchain.md) | Complete | M3.5-00.2 | workspace | none; unblocks all implementation |
 | 4 | [M3.5-01.2 UI framework spike and decision](M3.5-01.2-ui-framework-spike.md) | Complete | M3.5-00.2, M3.5-01.1 | workspace | yes, with M3.5-02.1 |
-| 5 | [M3.5-01.3 Developer tooling, dependency policy, and release profile](M3.5-01.3-tooling-deny-release-profile.md) | Not started | M3.5-01.1 | workspace | yes, with M3.5-01.2 and M3.5-02.1 |
+| 5 | [M3.5-01.3 Developer tooling, dependency policy, and release profile](M3.5-01.3-tooling-deny-release-profile.md) | Complete | M3.5-01.1 | workspace | yes, with M3.5-01.2 and M3.5-02.1 |
 | 6 | [M3.5-02.1 Domain entities, IDs, time, errors, and stream events](M3.5-02.1-domain-types.md) | Not started | M3.5-01.1 | domain | yes, with M3.5-01.2, M3.5-01.3, M3.5-04.1 |
 | 7 | [M3.5-02.2 Contract loading, schemas, export types, and app config](M3.5-02.2-contracts-export-types.md) | Not started | M3.5-02.1 | contracts | yes, with M3.5-03.1, M3.5-04.1, M3.5-05.1 |
 | 8 | [M3.5-02.3 Fixture harness and conformance scaffold](M3.5-02.3-fixture-harness.md) | Not started | M3.5-02.1, M3.5-02.2 | conformance | yes, with M3.5-03.1, M3.5-04.1, M3.5-05.1 |
