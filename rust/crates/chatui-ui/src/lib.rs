@@ -12,6 +12,7 @@ pub mod math;
 pub mod models;
 pub mod onboarding;
 pub mod providers;
+pub mod settings;
 pub mod shell;
 pub mod theme;
 pub mod tokens;
@@ -89,6 +90,17 @@ pub use providers::{
     ValidatedBaseUrl, cors_label, describe_provider_error, format_headers_text, format_rate_limit,
     format_usd, parse_headers_text, sync_window as sync_provider_window, validate_api_key,
     validate_auth_type, validate_base_url, validate_headers,
+};
+pub use settings::{
+    APP_NAME, APP_VERSION, AboutInfo, BackupPlaceholder, DOCS_URL, MAX_SYSTEM_PROMPT_CHARS,
+    MemoryProviderModelCatalog, MemorySettingsStore, ModelOption, ProviderModelCatalog,
+    ProviderOption, RepositorySettingsPersistence, SettingAvailability, SettingDescriptor,
+    SettingsController, SettingsError, SettingsErrorCopy, SettingsNavigation, SettingsPersistence,
+    SettingsRoute, SettingsService, SettingsStore as SettingsRepositoryStore, SettingsViewModel,
+    SettingsWindow, density_from_index, density_index, describe_settings_error,
+    font_size_from_index, font_size_index, reasoning_from_index, reasoning_index,
+    send_key_from_index, send_key_index, sync_window as sync_settings_window, theme_from_index,
+    theme_index,
 };
 pub use shell::{Breakpoint, Destination, LayoutMode, ShellController, ShellState, ShellWindow};
 pub use theme::{ReducedMotion, ResolvedTheme, ThemeSettings};

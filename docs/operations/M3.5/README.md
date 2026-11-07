@@ -72,7 +72,7 @@
 | 34 | [M3.5-09.3 Composer, drafts, attachments, paste, and drag-and-drop](M3.5-09.3-composer-attachments.md) | Complete | M3.5-09.1, M3.5-03.3 | ui | yes, with M3.5-09.2 and M3.5-09.5 |
 | 35 | [M3.5-09.4 Markdown, code highlighting, math fallback, and safe content](M3.5-09.4-markdown-rendering.md) | Complete | M3.5-09.2 | ui | yes, with M3.5-09.3 and M3.5-09.5 |
 | 36 | [M3.5-09.5 Conversation history, search, pin, archive, and rename](M3.5-09.5-conversations-search.md) | Complete | M3.5-09.1, M3.5-03.2 | ui | yes, with M3.5-09.3 and M3.5-09.4 |
-| 37 | [M3.5-10.1 Settings screens and behavior wiring](M3.5-10.1-settings.md) | Not started | M3.5-08.1, M3.5-09.1 | ui | yes, with M3.5-10.3 |
+| 37 | [M3.5-10.1 Settings screens and behavior wiring](M3.5-10.1-settings.md) | Complete | M3.5-08.1, M3.5-09.1 | ui | yes, with M3.5-10.3 |
 | 38 | [M3.5-10.2 Data controls and export/import UI](M3.5-10.2-data-export-import-ui.md) | Not started | M3.5-10.1, M3.5-03.4 | ui | yes, with M3.5-10.3 |
 | 39 | [M3.5-10.3 Native menus, shortcuts, window state, dialogs, and deep links](M3.5-10.3-desktop-integration.md) | Not started | M3.5-08.1, M3.5-09.1, M3.5-09.3 | desktop | yes, with M3.5-10.1 and M3.5-10.2 |
 | 40 | [M3.5-10.4 Accessibility evidence and screen-reader smoke tests](M3.5-10.4-accessibility-evidence.md) | Not started | M3.5-09.1, M3.5-09.2, M3.5-09.3, M3.5-09.4, M3.5-09.5, M3.5-10.1, M3.5-10.2, M3.5-10.3 | evidence | none; final UI evidence |
