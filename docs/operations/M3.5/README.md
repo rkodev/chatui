@@ -45,7 +45,7 @@
 | 7 | [M3.5-02.2 Contract loading, schemas, export types, and app config](M3.5-02.2-contracts-export-types.md) | Complete | M3.5-02.1 | contracts | yes, with M3.5-03.1, M3.5-04.1, M3.5-05.1 |
 | 8 | [M3.5-02.3 Fixture harness and conformance scaffold](M3.5-02.3-fixture-harness.md) | Complete | M3.5-02.1, M3.5-02.2 | conformance | yes, with M3.5-03.1, M3.5-04.1, M3.5-05.1 |
 | 9 | [M3.5-03.1 SQLite connection, pragmas, and migrations](M3.5-03.1-sqlite-migrations.md) | Complete | M3.5-02.1, M3.5-02.2 | storage | yes, with M3.5-04.1, M3.5-05.1 |
-| 10 | [M3.5-03.2 Repositories, schema mapping, FTS5, and pagination](M3.5-03.2-repositories-fts.md) | Not started | M3.5-03.1 | storage | yes, with M3.5-03.3 |
+| 10 | [M3.5-03.2 Repositories, schema mapping, FTS5, and pagination](M3.5-03.2-repositories-fts.md) | Complete | M3.5-03.1 | storage | yes, with M3.5-03.3 |
 | 11 | [M3.5-03.3 Content-addressed attachments and startup recovery](M3.5-03.3-attachments-recovery.md) | Not started | M3.5-03.1, M3.5-02.1 | storage | yes, with M3.5-03.2 |
 | 12 | [M3.5-03.4 Export and import service](M3.5-03.4-export-import.md) | Not started | M3.5-03.2, M3.5-03.3, M3.5-02.2 | storage | no; follows attachment store |
 | 13 | [M3.5-04.1 Keyring integration and secret-store abstraction](M3.5-04.1-keyring-store.md) | Not started | M3.5-01.1 | secrets | yes, with M3.5-02.* and M3.5-03.* |

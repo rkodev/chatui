@@ -39,11 +39,24 @@ use directories::ProjectDirs;
 use thiserror::Error;
 
 pub mod db;
+pub mod mappers;
+pub mod repositories;
+pub mod search;
 
 pub use db::{
     BUSY_TIMEOUT_MS, PragmaState, open_database, open_default_database, open_in_memory,
     read_pragmas, run_migrations, verify_fts5, verify_pragmas,
 };
+pub use repositories::{
+    AttachmentRepository, BackupConfigRepository, ConversationFilter, ConversationRepository,
+    MessagePage, MessageRepository, ModelRepository, ProviderRepository, SecretRecord,
+    SecretRepository, SettingRecord, SettingsRepository, SqliteAttachmentRepository,
+    SqliteBackupConfigRepository, SqliteConversationRepository, SqliteMessageRepository,
+    SqliteModelRepository, SqliteProviderRepository, SqliteSecretRepository,
+    SqliteSettingsRepository, SqliteSyncQueueRepository, SyncQueueEntry, SyncQueueRepository,
+    default_settings,
+};
+pub use search::{SearchHit, SearchOptions, SearchRepository, SqliteSearchRepository};
 
 /// Application directory name used for the platform app-data path.
 pub const APP_DIR_NAME: &str = "chatui";
@@ -72,6 +85,21 @@ pub enum StorageError {
     /// The linked SQLite build does not expose FTS5.
     #[error("the linked SQLite build does not expose FTS5: {0}")]
     Fts5Unavailable(String),
+    /// A database row could not be mapped to or from a domain value.
+    #[error("storage mapping error: {0}")]
+    Mapping(String),
+    /// A requested record does not exist.
+    #[error("record not found: {0}")]
+    NotFound(String),
+    /// A unique constraint was violated.
+    #[error("unique constraint violation: {0}")]
+    Conflict(String),
+    /// A caller supplied an invalid value.
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
+    /// JSON serialization or deserialization failed.
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 /// Returns the platform app-data directory for ChatUI.
