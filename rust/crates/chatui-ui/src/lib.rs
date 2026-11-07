@@ -4,6 +4,7 @@
 //! only for the shell component and the desktop entry point.
 
 pub mod accessibility;
+pub mod models;
 pub mod onboarding;
 pub mod providers;
 pub mod shell;
@@ -12,6 +13,16 @@ pub mod tokens;
 
 pub use accessibility::{
     AccessibleRole, FocusOrder, FocusRing, Focusable, Key, KeyboardAction, Modifiers,
+};
+pub use models::{
+    ManualModelForm, ModelAvailability, ModelDiscovery, ModelGroup, ModelListViewModel,
+    ModelManagementController, ModelManagementError, ModelManagementErrorCopy,
+    ModelManagementService, ModelManagementViewModel, ModelManagementWindow, ModelPickerViewModel,
+    ModelRepository, ModelRow, ProviderRepository, RefreshResult,
+    SettingsStore as ModelSettingsStore, build_model_groups, capability_chip_label,
+    describe_model_error, format_context_window, format_modalities, format_model_price,
+    format_price_per_million, is_free_model, model_availability, model_matches_query,
+    parse_capabilities, parse_context_window, source_label, sync_window as sync_model_window,
 };
 pub use onboarding::{
     CatalogLoad, CatalogSource, ConnectInput, ConnectResult, KeyValidator, ModelStore,
