@@ -69,7 +69,7 @@
 | 31 | [M3.5-08.4 Model management, discovery UI, and model picker](M3.5-08.4-model-management.md) | Complete | M3.5-08.2, M3.5-06.1, M3.5-07.4 | ui | yes, with M3.5-08.3 |
 | 32 | [M3.5-09.1 Chat runner, streaming state, send, stop, and regenerate](M3.5-09.1-chat-runner.md) | Complete | M3.5-08.3, M3.5-08.4, M3.5-06.4, M3.5-03.2 | ui | none; unblocks chat surfaces |
 | 33 | [M3.5-09.2 Windowed message list, pagination, and scroll anchoring](M3.5-09.2-message-list.md) | Complete | M3.5-09.1, M3.5-03.2 | ui | yes, with M3.5-09.3 and M3.5-09.5 |
-| 34 | [M3.5-09.3 Composer, drafts, attachments, paste, and drag-and-drop](M3.5-09.3-composer-attachments.md) | Not started | M3.5-09.1, M3.5-03.3 | ui | yes, with M3.5-09.2 and M3.5-09.5 |
+| 34 | [M3.5-09.3 Composer, drafts, attachments, paste, and drag-and-drop](M3.5-09.3-composer-attachments.md) | Complete | M3.5-09.1, M3.5-03.3 | ui | yes, with M3.5-09.2 and M3.5-09.5 |
 | 35 | [M3.5-09.4 Markdown, code highlighting, math fallback, and safe content](M3.5-09.4-markdown-rendering.md) | Not started | M3.5-09.2 | ui | yes, with M3.5-09.3 and M3.5-09.5 |
 | 36 | [M3.5-09.5 Conversation history, search, pin, archive, and rename](M3.5-09.5-conversations-search.md) | Not started | M3.5-09.1, M3.5-03.2 | ui | yes, with M3.5-09.3 and M3.5-09.4 |
 | 37 | [M3.5-10.1 Settings screens and behavior wiring](M3.5-10.1-settings.md) | Not started | M3.5-08.1, M3.5-09.1 | ui | yes, with M3.5-10.3 |

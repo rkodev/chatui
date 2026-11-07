@@ -944,8 +944,10 @@ dependencies = [
  "chatui-secrets",
  "chatui-storage",
  "i-slint-backend-testing",
+ "image",
  "serde_json",
  "slint",
+ "tempfile",
  "tokio",
 ]
 
@@ -2921,6 +2923,9 @@ checksum = "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104"
 dependencies = [
  "bytemuck",
  "byteorder-lite",
+ "color_quant",
+ "gif",
+ "image-webp",
  "moxcms",
  "num-traits",
  "png",
