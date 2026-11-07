@@ -7,6 +7,7 @@ pub mod accessibility;
 pub mod chat;
 pub mod code;
 pub mod conversations;
+pub mod data;
 pub mod markdown;
 pub mod math;
 pub mod models;
@@ -57,6 +58,15 @@ pub use conversations::{
     HistoryGroupKey, HistoryState, HistoryStatus, MAX_HISTORY_ROWS, MAX_SEARCH_LIMIT,
     MAX_SNIPPET_CHARS, format_conversation_timestamp, group_conversations, history_group_for_date,
     search_error,
+};
+pub use data::{
+    CLEAR_ALL_CONFIRMATION, ClearRequest, ClearSummary, ConversationOption, DataBackupPlaceholder,
+    DataController, DataError, DataErrorCopy, DataNavigation, DataOperation, DataSection,
+    DataService, DataViewModel, DataWindow, EXPORT_EXCLUDES, EXPORT_INCLUDES, EXPORT_WARNING,
+    ExportArtifact, ExportDocumentation, ExportFormat, ExportRequest, ExportSummary, ImportMode,
+    ImportRequest, ImportSummaryView, KeyRowView, MemoryAttachment, MemoryData, MemoryDataService,
+    ProviderKeySummary, RemoveKeyRequest, StorageUsage, StorageUsageEntry, USAGE_NOTE,
+    UsageRowView, describe_data_error, format_bytes, sync_window as sync_data_window,
 };
 pub use markdown::{
     Block, ImageRef, Inline, LinkAction, LinkRef, RenderOptions, RenderedMarkdown, TableRow,
