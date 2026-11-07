@@ -5,6 +5,7 @@
 
 pub mod accessibility;
 pub mod onboarding;
+pub mod providers;
 pub mod shell;
 pub mod theme;
 pub mod tokens;
@@ -17,6 +18,17 @@ pub use onboarding::{
     OnboardingController, OnboardingError, OnboardingErrorCopy, OnboardingRoute, OnboardingService,
     OnboardingServiceLike, OnboardingStep, OnboardingViewModel, OnboardingWindow, ProviderStore,
     SettingsStore, describe_catalog_error, describe_onboarding_error, sync_window,
+};
+pub use providers::{
+    ConfirmationAction, ConversationStore, CustomProviderForm, ModelStore as ProviderModelStore,
+    PendingConfirmation, ProviderDetailViewModel, ProviderKeyMetadata, ProviderKeyValidator,
+    ProviderListEntry, ProviderListViewModel, ProviderManagementController,
+    ProviderManagementError, ProviderManagementErrorCopy, ProviderManagementService,
+    ProviderManagementViewModel, ProviderManagementWindow,
+    ProviderStore as ProviderManagementStore, SettingsStore as ProviderSettingsStore,
+    ValidatedBaseUrl, cors_label, describe_provider_error, format_headers_text, format_rate_limit,
+    format_usd, parse_headers_text, sync_window as sync_provider_window, validate_api_key,
+    validate_auth_type, validate_base_url, validate_headers,
 };
 pub use shell::{Breakpoint, Destination, LayoutMode, ShellController, ShellState, ShellWindow};
 pub use theme::{ReducedMotion, ResolvedTheme, ThemeSettings};
