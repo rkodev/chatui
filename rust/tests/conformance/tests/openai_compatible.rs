@@ -207,6 +207,7 @@ fn registry_enables_openai_compatible_presets() {
             ModelDiscoveryFormat::Openrouter
                 | ModelDiscoveryFormat::Openai
                 | ModelDiscoveryFormat::Anthropic
+                | ModelDiscoveryFormat::Gemini
         );
         assert_eq!(
             adapter.is_supported(),
@@ -237,15 +238,13 @@ fn registry_enables_openai_compatible_presets() {
         );
     }
 
-    for id in ["google", "ollama"] {
-        assert!(
-            !registry
-                .adapter(id)
-                .unwrap_or_else(|| panic!("missing adapter {id}"))
-                .is_supported(),
-            "{id} must remain unsupported"
-        );
-    }
+    assert!(
+        !registry
+            .adapter("ollama")
+            .unwrap_or_else(|| panic!("missing adapter ollama"))
+            .is_supported(),
+        "ollama must remain unsupported"
+    );
 }
 
 #[test]

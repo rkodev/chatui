@@ -7,6 +7,7 @@ pub mod adapter;
 pub mod anthropic;
 pub mod cancel;
 pub mod error;
+pub mod gemini;
 pub mod http;
 pub mod ndjson;
 pub mod openai_catalog;
@@ -37,6 +38,14 @@ pub use anthropic::{
 };
 pub use cancel::{Cancellation, CancellationToken};
 pub use error::{NetworkError, NetworkErrorKind, is_retryable_status, parse_retry_after};
+pub use gemini::{
+    GEMINI_EXTRA_NAMESPACE, GEMINI_PROVIDER_ID, GeminiAdapter, GeminiStreamDecoder,
+    build_body as build_gemini_body, build_chat_url as build_gemini_chat_url,
+    build_headers as build_gemini_headers, map_finish_reason as map_gemini_finish_reason,
+    map_http_error as map_gemini_http_error, map_model as map_gemini_model,
+    map_models as map_gemini_models, map_stream_error as map_gemini_stream_error,
+    prepare_request as prepare_gemini_request,
+};
 pub use http::{
     CONNECT_TIMEOUT, HttpClient, MAX_REDIRECTS, POOL_IDLE_TIMEOUT, POOL_MAX_IDLE_PER_HOST,
     PreparedRequest, SecretHeader, TCP_KEEPALIVE, USER_AGENT, build_http_client, redirect_policy,

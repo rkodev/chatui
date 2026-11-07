@@ -199,15 +199,13 @@ fn registry_enables_anthropic() {
     assert_eq!(adapter.preset_id(), "anthropic");
     assert_eq!(adapter.kind(), chatui_domain::ProviderKind::Anthropic);
 
-    for id in ["google", "ollama"] {
-        assert!(
-            !registry
-                .adapter(id)
-                .unwrap_or_else(|| panic!("missing adapter {id}"))
-                .is_supported(),
-            "{id} must remain unsupported"
-        );
-    }
+    assert!(
+        !registry
+            .adapter("ollama")
+            .unwrap_or_else(|| panic!("missing adapter ollama"))
+            .is_supported(),
+        "ollama must remain unsupported"
+    );
 }
 
 #[test]

@@ -6,9 +6,10 @@
 //! secrets. Everything they need is passed in through [`ProviderContext`].
 //!
 //! M3.5-06.4 implements OpenRouter only. M3.5-07.1 adds the preset-driven
-//! OpenAI-compatible adapter, and M3.5-07.2 adds the native Anthropic adapter.
-//! Every other contract preset gets an [`UnsupportedAdapter`] that returns a
-//! clear error until its own task lands.
+//! OpenAI-compatible adapter, M3.5-07.2 adds the native Anthropic adapter, and
+//! M3.5-07.3 adds the native Google Gemini adapter. Every other contract preset
+//! gets an [`UnsupportedAdapter`] that returns a clear error until its own task
+//! lands.
 
 #![allow(clippy::result_large_err)]
 
@@ -19,6 +20,7 @@ use chatui_domain::{ChatError, ChatErrorCode, ProviderKind, StreamEvent, Timesta
 use tokio_util::sync::CancellationToken;
 
 use crate::anthropic::AnthropicAdapter;
+use crate::gemini::GeminiAdapter;
 use crate::http::HttpClient;
 use crate::openrouter::catalog::{CatalogModel, list_models};
 use crate::openrouter::key::{OpenRouterError, ProviderKeyInfo, validate_key};
@@ -165,6 +167,8 @@ pub enum ProviderAdapter {
     OpenAiCompatible(OpenAiCompatibleAdapter),
     /// The native Anthropic Messages adapter.
     Anthropic(AnthropicAdapter),
+    /// The native Google Gemini adapter.
+    Gemini(GeminiAdapter),
     /// A contract preset that is not implemented yet.
     Unsupported(UnsupportedAdapter),
 }
@@ -175,6 +179,7 @@ impl ProviderAdapter {
         match self {
             Self::OpenRouter(_) | Self::OpenAiCompatible(_) => ProviderKind::OpenaiCompatible,
             Self::Anthropic(_) => ProviderKind::Anthropic,
+            Self::Gemini(_) => ProviderKind::GoogleGemini,
             Self::Unsupported(adapter) => adapter.kind,
         }
     }
@@ -185,6 +190,7 @@ impl ProviderAdapter {
             Self::OpenRouter(_) => "openrouter",
             Self::OpenAiCompatible(adapter) => adapter.preset_id(),
             Self::Anthropic(adapter) => adapter.preset_id(),
+            Self::Gemini(adapter) => adapter.preset_id(),
             Self::Unsupported(adapter) => adapter.preset_id(),
         }
     }
@@ -193,7 +199,7 @@ impl ProviderAdapter {
     pub fn is_supported(&self) -> bool {
         matches!(
             self,
-            Self::OpenRouter(_) | Self::OpenAiCompatible(_) | Self::Anthropic(_)
+            Self::OpenRouter(_) | Self::OpenAiCompatible(_) | Self::Anthropic(_) | Self::Gemini(_)
         )
     }
 
@@ -221,6 +227,7 @@ impl ProviderAdapter {
                 crate::openai_compatible::validate_key(client, ctx, cancel).await
             }
             Self::Anthropic(_) => crate::anthropic::validate_key(client, ctx, cancel).await,
+            Self::Gemini(_) => crate::gemini::validate_key(client, ctx, cancel).await,
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
     }
@@ -247,6 +254,7 @@ impl ProviderAdapter {
                 crate::openai_compatible::list_models(client, ctx, cancel).await
             }
             Self::Anthropic(_) => crate::anthropic::list_models(client, ctx, cancel).await,
+            Self::Gemini(_) => crate::gemini::list_models(client, ctx, cancel).await,
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
     }
@@ -275,6 +283,9 @@ impl ProviderAdapter {
             ),
             Self::Anthropic(_) => {
                 crate::anthropic::prepare_request(ctx, request, supported_parameters, attachments)
+            }
+            Self::Gemini(_) => {
+                crate::gemini::prepare_request(ctx, request, supported_parameters, attachments)
             }
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
@@ -318,6 +329,18 @@ impl ProviderAdapter {
             }
             Self::Anthropic(_) => {
                 crate::anthropic::stream_chat(
+                    client,
+                    ctx,
+                    request,
+                    supported_parameters,
+                    attachments,
+                    cancel,
+                    on_event,
+                )
+                .await
+            }
+            Self::Gemini(_) => {
+                crate::gemini::stream_chat(
                     client,
                     ctx,
                     request,
