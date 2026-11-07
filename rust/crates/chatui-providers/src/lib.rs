@@ -10,7 +10,10 @@ pub mod ndjson;
 pub mod openrouter {
     pub mod cache;
     pub mod catalog;
+    pub mod errors;
     pub mod key;
+    pub mod request;
+    pub mod stream;
 }
 pub mod retry;
 pub mod sse;
@@ -33,7 +36,19 @@ pub use openrouter::catalog::{
     CatalogModel, dedupe_by_canonical_slug, list_models, map_model, map_models,
     multiply_decimal_by_million, usd_amount, usd_per_million,
 };
+pub use openrouter::errors::{
+    OPENROUTER_PROVIDER_ID, map_error_object, map_http_error, map_stream_error,
+};
 pub use openrouter::key::{OpenRouterError, ProviderKeyInfo, map_key, validate_key};
+pub use openrouter::request::{
+    DefaultModelCandidate, DefaultModelSelection, NormalizedChatMessage, NormalizedChatRequest,
+    PreparedChatRequest, ResolvedAttachment, attribution_headers, build_body, build_request,
+    select_default_model,
+};
+pub use openrouter::stream::{
+    StreamDecoder, StreamSummary, map_finish_reason, map_usage, stream_chat,
+    stream_chat_completions,
+};
 pub use retry::{
     AttemptFailure, AttemptOutcome, DEFAULT_INACTIVITY_TIMEOUT, InactivityWatchdog, PartialOutput,
     RETRY_BASE_DELAY, RETRY_JITTER_RATIO, RETRY_MAX_ATTEMPTS, RETRY_MAX_DELAY, RetryError,
