@@ -937,13 +937,16 @@ dependencies = [
 name = "chatui-ui"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chatui-contracts",
  "chatui-domain",
  "chatui-providers",
  "chatui-secrets",
+ "chatui-storage",
  "i-slint-backend-testing",
  "serde_json",
  "slint",
+ "tokio",
 ]
 
 [[package]]

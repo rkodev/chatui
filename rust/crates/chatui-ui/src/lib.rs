@@ -4,6 +4,7 @@
 //! only for the shell component and the desktop entry point.
 
 pub mod accessibility;
+pub mod chat;
 pub mod models;
 pub mod onboarding;
 pub mod providers;
@@ -13,6 +14,13 @@ pub mod tokens;
 
 pub use accessibility::{
     AccessibleRole, FocusOrder, FocusRing, Focusable, Key, KeyboardAction, Modifiers,
+};
+pub use chat::{
+    ChatErrorCopy, ChatRunInput, ChatRunResult, ChatRunner, ChatRunnerOptions, ChatSendFailure,
+    ChatSendFailureReason, ChatSendResult, ChatService, ChatServiceError, ChatStreamAdapter, Clock,
+    IdGenerator, MemoryStreamingStore, ProviderChatAdapter, RegenerateInput, RetryInput,
+    RunRequest, RunnerState, StreamingState, StreamingStore, SystemClock, build_chat_request,
+    can_retry, describe_chat_error, has_partial_output, reduce_stream,
 };
 pub use models::{
     ManualModelForm, ModelAvailability, ModelDiscovery, ModelGroup, ModelListViewModel,
