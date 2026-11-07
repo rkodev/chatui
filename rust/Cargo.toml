@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/chatui-domain",
+  "crates/chatui-contracts",
+  "crates/chatui-providers",
+  "crates/chatui-storage",
+  "crates/chatui-secrets",
+  "crates/chatui-ui",
+  "apps/desktop",
+  "tests/conformance",
+]
