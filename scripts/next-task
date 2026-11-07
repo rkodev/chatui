@@ -33,10 +33,10 @@ STATUS_ALIASES = {
 }
 
 TASK_ID_HEADING_RE = re.compile(
-    r"^#\s+([A-Za-z][A-Za-z0-9]*-[0-9][A-Za-z0-9._-]*)\b", re.MULTILINE
+    r"^#\s+([A-Za-z][A-Za-z0-9.]*-[0-9][A-Za-z0-9._-]*)\b", re.MULTILINE
 )
 TASK_ID_RE = re.compile(
-    r"^(?P<prefix>[A-Za-z][A-Za-z0-9]*)-(?P<body>[0-9][A-Za-z0-9._-]*)$"
+    r"^(?P<prefix>[A-Za-z][A-Za-z0-9.]*)-(?P<body>[0-9][A-Za-z0-9._-]*)$"
 )
 RANGE_SEPARATOR_RE = re.compile(r"\s*[\u2013\u2014]\s*")
 DEPENDENCY_SEPARATOR_RE = re.compile(r"[,;]")
