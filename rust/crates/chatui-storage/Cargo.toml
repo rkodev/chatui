@@ -6,6 +6,8 @@ publish = false
 
 [dependencies]
 async-trait = "0.1"
+base64 = "0.22"
+chatui-contracts = { path = "../chatui-contracts" }
 chatui-domain = { path = "../chatui-domain" }
 directories = "6"
 hex = "0.4"

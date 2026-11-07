@@ -65,6 +65,14 @@ pub trait MessageRepository: Send + Sync {
     /// This is intended for export/import and tests. UI code must use the
     /// bounded page methods instead.
     async fn list_all(&self, conversation_id: &str) -> Result<Vec<Message>, StorageError>;
+    /// Return every message in a conversation, including soft-deleted rows.
+    ///
+    /// This is intended for export and tests. UI code must use the bounded page
+    /// methods instead.
+    async fn list_all_including_deleted(
+        &self,
+        conversation_id: &str,
+    ) -> Result<Vec<Message>, StorageError>;
     /// Return every non-deleted message with the given status.
     ///
     /// Startup recovery uses this to find messages left in `streaming`.
@@ -413,6 +421,24 @@ impl MessageRepository for SqliteMessageRepository {
         rows.into_iter().map(MessageRow::into_domain).collect()
     }
 
+    async fn list_all_including_deleted(
+        &self,
+        conversation_id: &str,
+    ) -> Result<Vec<Message>, StorageError> {
+        let query = format!(
+            "SELECT {SELECT_COLUMNS} FROM messages \
+             WHERE conversation_id = ? \
+             ORDER BY sequence ASC, id ASC"
+        );
+
+        let rows = sqlx::query_as::<_, MessageRow>(&query)
+            .bind(conversation_id)
+            .fetch_all(&self.pool)
+            .await?;
+
+        rows.into_iter().map(MessageRow::into_domain).collect()
+    }
+
     async fn list_by_status(&self, status: MessageStatus) -> Result<Vec<Message>, StorageError> {
         let status = match serde_json::to_value(status)? {
             serde_json::Value::String(text) => text,
@@ -472,7 +498,7 @@ async fn insert_row(
     Ok(())
 }
 
-async fn refresh_conversation_stats(
+pub(crate) async fn refresh_conversation_stats(
     connection: &mut SqliteConnection,
     conversation_id: &str,
 ) -> Result<(), StorageError> {

@@ -41,6 +41,8 @@ use thiserror::Error;
 
 pub mod attachments;
 pub mod db;
+pub mod export;
+pub mod import;
 pub mod mappers;
 pub mod paths;
 pub mod recovery;
@@ -51,6 +53,12 @@ pub use attachments::{AttachmentLease, AttachmentService, AttachmentStore, sha25
 pub use db::{
     BUSY_TIMEOUT_MS, PragmaState, open_database, open_default_database, open_in_memory,
     read_pragmas, run_migrations, verify_fts5, verify_pragmas,
+};
+pub use export::{EXPORT_PLAINTEXT_WARNING, ExportOptions, ExportService, encode_export};
+pub use import::{
+    ImportError, ImportMode, ImportOptions, ImportService, ImportSummary,
+    MAX_IMPORT_ATTACHMENT_BYTES, MAX_IMPORT_ATTACHMENT_NAME_LENGTH, MAX_IMPORT_BYTES,
+    validate_import_archive,
 };
 pub use paths::{
     ATTACHMENTS_DIR_NAME, STORAGE_KEY_LEN, attachment_path, attachments_dir, is_valid_storage_key,

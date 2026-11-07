@@ -26,6 +26,10 @@ pub trait AttachmentRepository: Send + Sync {
     async fn list_by_sha256(&self, sha256: &str) -> Result<Vec<Attachment>, StorageError>;
     /// List a bounded page of attachments.
     async fn list_all(&self, limit: u32) -> Result<Vec<Attachment>, StorageError>;
+    /// List every attachment ordered by creation time then ID.
+    ///
+    /// This is intended for export and tests. UI code must use bounded queries.
+    async fn list_all_unbounded(&self) -> Result<Vec<Attachment>, StorageError>;
     /// List every distinct storage key referenced by metadata.
     async fn list_storage_keys(&self) -> Result<Vec<String>, StorageError>;
     /// Delete one attachment metadata row.
@@ -160,6 +164,16 @@ impl AttachmentRepository for SqliteAttachmentRepository {
         );
         let rows = sqlx::query_as::<_, AttachmentRow>(&query)
             .bind(limit)
+            .fetch_all(&self.pool)
+            .await?;
+
+        rows.into_iter().map(AttachmentRow::into_domain).collect()
+    }
+
+    async fn list_all_unbounded(&self) -> Result<Vec<Attachment>, StorageError> {
+        let query =
+            format!("SELECT {SELECT_COLUMNS} FROM attachments ORDER BY created_at ASC, id ASC");
+        let rows = sqlx::query_as::<_, AttachmentRow>(&query)
             .fetch_all(&self.pool)
             .await?;
 

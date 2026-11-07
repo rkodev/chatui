@@ -33,6 +33,13 @@ pub trait ConversationRepository: Send + Sync {
     async fn get(&self, id: &str) -> Result<Option<Conversation>, StorageError>;
     /// List conversations with pin/archive filters.
     async fn list(&self, filter: &ConversationFilter) -> Result<Vec<Conversation>, StorageError>;
+    /// Return every conversation ordered by creation time then ID.
+    ///
+    /// This is intended for export and tests. UI code must use [`list`] with
+    /// filters and a bounded limit.
+    ///
+    /// [`list`]: ConversationRepository::list
+    async fn list_all(&self) -> Result<Vec<Conversation>, StorageError>;
     /// Delete a conversation, its messages, attachments, and FTS rows.
     async fn delete(&self, id: &str) -> Result<bool, StorageError>;
     /// Set the pinned flag.
@@ -211,6 +218,16 @@ impl ConversationRepository for SqliteConversationRepository {
             .bind(archived)
             .bind(archived)
             .bind(limit)
+            .fetch_all(&self.pool)
+            .await?;
+
+        rows.into_iter().map(ConversationRow::into_domain).collect()
+    }
+
+    async fn list_all(&self) -> Result<Vec<Conversation>, StorageError> {
+        let query =
+            format!("SELECT {SELECT_COLUMNS} FROM conversations ORDER BY created_at ASC, id ASC");
+        let rows = sqlx::query_as::<_, ConversationRow>(&query)
             .fetch_all(&self.pool)
             .await?;
 
