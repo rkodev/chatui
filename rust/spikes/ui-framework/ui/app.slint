@@ -1,0 +1,71 @@
+import { Button, LineEdit, ListView, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    title: "ChatUI UI Framework Spike";
+    width: 720px;
+    height: 520px;
+
+    in-out property <string> status: "Ready";
+    in-out property <[string]> items: ["Alpha", "Beta", "Gamma"];
+
+    callback send(string);
+    callback pick-file();
+
+    MenuBar {
+        Menu {
+            title: "File";
+            MenuItem {
+                title: "Open...";
+                activated => { root.pick-file(); }
+            }
+            MenuItem {
+                title: "Quit";
+                activated => { root.status = "Quit requested"; }
+            }
+        }
+        Menu {
+            title: "Help";
+            MenuItem {
+                title: "About";
+                activated => { root.status = "ChatUI UI framework spike"; }
+            }
+        }
+    }
+
+    VerticalBox {
+        padding: 12px;
+        spacing: 8px;
+
+        HorizontalBox {
+            spacing: 8px;
+
+            input := LineEdit {
+                placeholder-text: "Type a message";
+                edited(text) => { root.status = "Typed: " + text; }
+            }
+
+            Button {
+                text: "Send";
+                clicked => { root.send(input.text); }
+            }
+
+            Button {
+                text: "Pick file...";
+                clicked => { root.pick-file(); }
+            }
+        }
+
+        ListView {
+            for item in root.items: Text {
+                text: item;
+                height: 32px;
+                vertical-alignment: center;
+            }
+        }
+
+        Text {
+            text: root.status;
+            wrap: word-wrap;
+        }
+    }
+}

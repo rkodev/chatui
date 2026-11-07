@@ -1,0 +1,16 @@
+[package]
+name = "chatui-ui-framework-spike"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Detached on purpose: this spike is evidence for M3.5-01.2 and must never be a
+# member of the main rust/ workspace.
+[workspace]
+
+[dependencies]
+slint = "1.18.1"
+rfd = { version = "0.16.0", default-features = false, features = ["gtk3"] }
+
+[build-dependencies]
+slint-build = "1.18.1"
