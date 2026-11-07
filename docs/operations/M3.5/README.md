@@ -48,7 +48,7 @@
 | 10 | [M3.5-03.2 Repositories, schema mapping, FTS5, and pagination](M3.5-03.2-repositories-fts.md) | Complete | M3.5-03.1 | storage | yes, with M3.5-03.3 |
 | 11 | [M3.5-03.3 Content-addressed attachments and startup recovery](M3.5-03.3-attachments-recovery.md) | Complete | M3.5-03.1, M3.5-02.1 | storage | yes, with M3.5-03.2 |
 | 12 | [M3.5-03.4 Export and import service](M3.5-03.4-export-import.md) | Complete | M3.5-03.2, M3.5-03.3, M3.5-02.2 | storage | no; follows attachment store |
-| 13 | [M3.5-04.1 Keyring integration and secret-store abstraction](M3.5-04.1-keyring-store.md) | Not started | M3.5-01.1 | secrets | yes, with M3.5-02.* and M3.5-03.* |
+| 13 | [M3.5-04.1 Keyring integration and secret-store abstraction](M3.5-04.1-keyring-store.md) | Complete | M3.5-01.1 | secrets | yes, with M3.5-02.* and M3.5-03.* |
 | 14 | [M3.5-04.2 Encrypted fallback, session mode, and key lifecycle](M3.5-04.2-encrypted-fallback-lifecycle.md) | Not started | M3.5-04.1 | secrets | yes, with M3.5-03.* and M3.5-05.* |
 | 15 | [M3.5-04.3 Redaction, zeroization, and backup exclusion](M3.5-04.3-redaction-zeroize-backup.md) | Not started | M3.5-04.1, M3.5-04.2, M3.5-00.2 | secrets | yes, with M3.5-05.* |
 | 16 | [M3.5-05.1 Shared HTTP client, URL policy, and connection handling](M3.5-05.1-http-client-cleartext.md) | Not started | M3.5-02.1, M3.5-02.2 | networking | yes, with M3.5-03.* and M3.5-04.* |

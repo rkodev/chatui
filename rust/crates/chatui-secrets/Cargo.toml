@@ -3,3 +3,13 @@ name = "chatui-secrets"
 version = "0.1.0"
 edition = "2024"
 publish = false
+
+[dependencies]
+keyring = { version = "3.6", default-features = false, features = [
+  "apple-native",
+  "crypto-rust",
+  "sync-secret-service",
+  "windows-native",
+] }
+thiserror = "2"
+zeroize = "1"
