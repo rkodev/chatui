@@ -7,8 +7,10 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.chatui.core.model.Provider
 import dev.chatui.core.model.ProviderAuthType
+import dev.chatui.core.providers.BaseUrlSecurity
 import dev.chatui.core.providers.CreateCustomProviderInput
 import dev.chatui.core.providers.CreatePresetProviderInput
+import dev.chatui.core.providers.assessBaseUrlSecurity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +32,8 @@ data class CustomProviderFormState(
     val apiKey: String = "",
     val headers: List<CustomHeaderField> = emptyList(),
     val error: String? = null,
+    val cleartextWarning: String? = null,
+    val cleartextError: String? = null,
 )
 
 /** Editable state for creating a provider from an enabled preset. */
@@ -178,7 +182,23 @@ class ProviderListViewModel(
     }
 
     fun onCustomBaseUrlChanged(value: String) {
-        updateCustomForm { it.copy(baseUrl = value, error = null) }
+        val trimmed = value.trim()
+        val assessment = assessBaseUrlSecurity(trimmed)
+        val isHttp = trimmed.startsWith("http://", ignoreCase = true)
+
+        updateCustomForm {
+            it.copy(
+                baseUrl = value,
+                error = null,
+                cleartextWarning = (assessment as? BaseUrlSecurity.AllowedLocalCleartext)
+                    ?.warning,
+                cleartextError = if (isHttp) {
+                    (assessment as? BaseUrlSecurity.RefusedCleartext)?.error
+                } else {
+                    null
+                },
+            )
+        }
     }
 
     fun onCustomAuthTypeChanged(value: ProviderAuthType) {

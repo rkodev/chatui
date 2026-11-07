@@ -7,6 +7,7 @@ RUST_DIR := rust
 .PHONY: help contracts-install contracts-check \
 	web-install web-dev web-lint web-typecheck web-test web-build web-e2e \
 	android-test android-lint android-assemble \
+	android-test-ui android-screenshot android-release android-baseline-profile \
 	rust-check rust-lint rust-test rust-build rust-run \
 	format clean
 
@@ -36,6 +37,10 @@ help:
 		'  make android-test        Run Android unit tests' \
 		'  make android-lint        Run Android lint' \
 		'  make android-assemble    Assemble the debug APK' \
+		'  make android-test-ui     Run connected instrumentation tests on a device/emulator' \
+		'  make android-screenshot  Verify Roborazzi screenshot goldens' \
+		'  make android-release     Build the release APK and AAB (signing from env)' \
+		'  make android-baseline-profile  Generate the baseline profile on a device/emulator' \
 		'' \
 		'Rust (optional):' \
 		'  make rust-check          Type-check the Rust workspace' \
@@ -97,6 +102,22 @@ android-lint:
 android-assemble:
 	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	cd $(ANDROID_DIR) && ./gradlew assembleDebug
+
+android-test-ui:
+	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/milestones/M0-foundations.md).)
+	cd $(ANDROID_DIR) && ./gradlew connectedDebugAndroidTest
+
+android-screenshot:
+	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/milestones/M0-foundations.md).)
+	cd $(ANDROID_DIR) && ./gradlew :app:verifyRoborazziDebug
+
+android-release:
+	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/milestones/M0-foundations.md).)
+	cd $(ANDROID_DIR) && ./gradlew :app:assembleRelease :app:bundleRelease
+
+android-baseline-profile:
+	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/milestones/M0-foundations.md).)
+	cd $(ANDROID_DIR) && ./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest
 
 rust-check:
 	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)

@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 
 /** Preference keys used by [SettingsDataStore]. */
 internal object SettingsKeys {
@@ -36,6 +38,7 @@ internal object SettingsKeys {
     val loadRemoteImages = booleanPreferencesKey("load_remote_images")
     val lastActiveConversationId = stringPreferencesKey("last_active_conversation_id")
     val onboardingCompleted = booleanPreferencesKey("onboarding_completed")
+    val drafts = stringPreferencesKey("drafts_json")
 }
 
 /**
@@ -101,7 +104,47 @@ class SettingsDataStore(
     suspend fun setOnboardingCompleted(completed: Boolean) =
         update { it.copy(onboardingCompleted = completed) }
 
+    /**
+     * Reads the persisted per-conversation composer drafts.
+     *
+     * Drafts are non-secret UI text and live under their own key so that
+     * [save] and [update] never rewrite or drop them. Corrupt or unreadable
+     * values fall back to an empty map.
+     */
+    suspend fun drafts(): Map<String, String> {
+        val raw = dataStore.data
+            .catch { throwable ->
+                if (throwable is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw throwable
+                }
+            }
+            .first()[SettingsKeys.drafts] ?: return emptyMap()
+        return try {
+            ChatUiJson.decodeFromString(DRAFTS_SERIALIZER, raw)
+        } catch (_: SerializationException) {
+            emptyMap()
+        } catch (_: IllegalArgumentException) {
+            emptyMap()
+        }
+    }
+
+    /** Replaces the persisted per-conversation composer drafts. */
+    suspend fun setDrafts(drafts: Map<String, String>) {
+        dataStore.edit { preferences ->
+            if (drafts.isEmpty()) {
+                preferences.remove(SettingsKeys.drafts)
+            } else {
+                preferences[SettingsKeys.drafts] =
+                    ChatUiJson.encodeToString(DRAFTS_SERIALIZER, drafts)
+            }
+        }
+    }
+
     companion object {
+        private val DRAFTS_SERIALIZER = MapSerializer(String.serializer(), String.serializer())
+
         /** DataStore file name; the file lives under `files/datastore/`. */
         const val DATASTORE_FILE_NAME: String = "settings"
 

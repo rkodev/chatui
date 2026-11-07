@@ -89,7 +89,9 @@ object ChatModule {
         ),
         adapter = adapter,
         settings = settings,
-        drafts = InMemoryChatDrafts(),
+        drafts = PersistentChatDrafts.create(
+            persistence = SettingsChatDraftPersistence(settings),
+        ),
         clock = clock,
         attachmentStore = attachmentStore,
         attachmentRoot = context.filesDir,

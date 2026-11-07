@@ -11,10 +11,15 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.test.withKeyDown
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.input.key.Key
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.Attachment
@@ -235,6 +240,86 @@ class ChatComposerTest {
 
         composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentWarning).assertIsDisplayed()
         composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentError).assertIsDisplayed()
+    }
+
+    @Test
+    fun `typing normal characters updates the draft without sending`() {
+        var sends = 0
+        var draft by mutableStateOf("")
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    draft = draft,
+                    onDraftChange = { draft = it },
+                    onSend = { sends += 1 },
+                    onStop = {},
+                    sendKey = SendKey.ENTER,
+                    enabled = true,
+                    streaming = false,
+                    sending = false,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.Input).performTextInput("Hello")
+
+        assertThat(draft).isEqualTo("Hello")
+        assertThat(sends).isEqualTo(0)
+    }
+
+    @Test
+    fun `ctrl enter sends in mod-enter mode`() {
+        var sends = 0
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    draft = "Hello",
+                    onDraftChange = {},
+                    onSend = { sends += 1 },
+                    onStop = {},
+                    sendKey = SendKey.MOD_ENTER,
+                    enabled = true,
+                    streaming = false,
+                    sending = false,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.Input).requestFocus()
+        composeRule.onNodeWithTag(ChatComposerTestTags.Input).performKeyInput {
+            withKeyDown(Key.CtrlLeft) { pressKey(Key.Enter) }
+        }
+
+        assertThat(sends).isEqualTo(1)
+    }
+
+    @Test
+    fun `plain enter does not send in mod-enter mode`() {
+        var sends = 0
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    draft = "Hello",
+                    onDraftChange = {},
+                    onSend = { sends += 1 },
+                    onStop = {},
+                    sendKey = SendKey.MOD_ENTER,
+                    enabled = true,
+                    streaming = false,
+                    sending = false,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.Input).requestFocus()
+        composeRule.onNodeWithTag(ChatComposerTestTags.Input).performKeyInput {
+            pressKey(Key.Enter)
+        }
+
+        assertThat(sends).isEqualTo(0)
     }
 
     private fun attachment(): Attachment = Attachment(

@@ -1,5 +1,6 @@
 package dev.chatui
 
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -7,7 +8,6 @@ import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.model.Conversation
 import dev.chatui.core.model.Density
 import dev.chatui.core.model.Theme
-import dev.chatui.feature.conversations.ConversationListTestTags
 import dev.chatui.feature.conversations.ConversationService
 import dev.chatui.feature.conversations.CreateConversationResult
 import dev.chatui.shell.ChatUiApp
@@ -42,7 +42,21 @@ class ShellThemeTest {
         composeRule.onNodeWithTag(
             ShellTestTags.appearance(Theme.DARK, Density.COMPACT),
         ).assertExists()
-        composeRule.onNodeWithTag(ConversationListTestTags.Screen).assertIsDisplayed()
+        composeRule.onNodeWithTag(ShellTestTags.ConversationsPlaceholder)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `compact shell menu button has an accessible name`() {
+        composeRule.setContent {
+            ChatUiApp(
+                settings = AndroidSettings(onboardingCompleted = true),
+                conversationService = EmptyConversationService(),
+            )
+        }
+
+        composeRule.onNodeWithTag(ShellTestTags.MenuButton)
+            .assertContentDescriptionEquals("Open navigation")
     }
 }
 

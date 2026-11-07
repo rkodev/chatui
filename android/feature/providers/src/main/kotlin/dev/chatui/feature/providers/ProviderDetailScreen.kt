@@ -18,12 +18,19 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.SecureScreen
 import dev.chatui.core.providers.getProviderKeyMetadata
 
 /** Test tags exposed by provider details. */
@@ -35,6 +42,8 @@ object ProviderDetailTestTags {
     const val KeyPanel = "provider-detail-key"
     const val Preset = "provider-detail-preset"
     const val BaseUrl = "provider-detail-base-url"
+    const val CleartextWarning = "provider-detail-cleartext-warning"
+    const val CleartextError = "provider-detail-cleartext-error"
     const val AuthType = "provider-detail-auth-type"
     const val KeyLabel = "provider-detail-key-label"
     const val Usage = "provider-detail-usage"
@@ -43,6 +52,7 @@ object ProviderDetailTestTags {
     const val RateLimit = "provider-detail-rate-limit"
     const val Cors = "provider-detail-cors"
     const val DocsLink = "provider-detail-docs"
+    const val DocsError = "provider-detail-docs-error"
     const val EnabledToggle = "provider-detail-enabled"
     const val ValidateButton = "provider-detail-validate"
     const val RefreshModels = "provider-detail-refresh-models"
@@ -70,6 +80,38 @@ fun ProviderDetailScreen(
     onValidate: () -> Unit,
     onRefreshModels: () -> Unit,
     onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    documentationLauncher: DocumentationLauncher = LocalDocumentationLauncher.current,
+) {
+    SecureScreen {
+        ProviderDetailContent(
+            state = state,
+            onNewKeyChanged = onNewKeyChanged,
+            onRotateKey = onRotateKey,
+            onRemoveKey = onRemoveKey,
+            onCancelRemove = onCancelRemove,
+            onToggleEnabled = onToggleEnabled,
+            onValidate = onValidate,
+            onRefreshModels = onRefreshModels,
+            onRetry = onRetry,
+            documentationLauncher = documentationLauncher,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun ProviderDetailContent(
+    state: ProviderDetailUiState,
+    onNewKeyChanged: (String) -> Unit,
+    onRotateKey: () -> Unit,
+    onRemoveKey: () -> Unit,
+    onCancelRemove: () -> Unit,
+    onToggleEnabled: () -> Unit,
+    onValidate: () -> Unit,
+    onRefreshModels: () -> Unit,
+    onRetry: () -> Unit,
+    documentationLauncher: DocumentationLauncher,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
@@ -120,7 +162,15 @@ fun ProviderDetailScreen(
         }
 
         if (provider != null) {
-            item { KeyPanel(provider, state.docsUrl) }
+            item {
+                KeyPanel(
+                    provider = provider,
+                    docsUrl = state.docsUrl,
+                    cleartextWarning = state.cleartextWarning,
+                    cleartextError = state.cleartextError,
+                    documentationLauncher = documentationLauncher,
+                )
+            }
             item {
                 ProviderControls(
                     state = state,
@@ -154,10 +204,17 @@ fun ProviderDetailScreen(
 }
 
 @Composable
-private fun KeyPanel(provider: dev.chatui.core.model.Provider, docsUrl: String?) {
+private fun KeyPanel(
+    provider: dev.chatui.core.model.Provider,
+    docsUrl: String?,
+    cleartextWarning: String?,
+    cleartextError: String?,
+    documentationLauncher: DocumentationLauncher,
+) {
     val dimens = LocalDimens.current
     val metadata = getProviderKeyMetadata(provider)
-    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    var docsError by remember(docsUrl) { mutableStateOf<String?>(null) }
 
     Card(
         modifier = Modifier
@@ -180,6 +237,20 @@ private fun KeyPanel(provider: dev.chatui.core.model.Provider, docsUrl: String?)
                 text = "Base URL: ${provider.baseUrl}",
                 modifier = Modifier.testTag(ProviderDetailTestTags.BaseUrl),
             )
+            cleartextWarning?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.testTag(ProviderDetailTestTags.CleartextWarning),
+                )
+            }
+            cleartextError?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag(ProviderDetailTestTags.CleartextError),
+                )
+            }
             Text(
                 text = "Auth: ${provider.authType.name.lowercase().replace('_', '-')}",
                 modifier = Modifier.testTag(ProviderDetailTestTags.AuthType),
@@ -218,10 +289,27 @@ private fun KeyPanel(provider: dev.chatui.core.model.Provider, docsUrl: String?)
             }
             if (docsUrl != null) {
                 TextButton(
-                    onClick = { uriHandler.openUri(docsUrl) },
-                    modifier = Modifier.testTag(ProviderDetailTestTags.DocsLink),
+                    onClick = {
+                        docsError = when (val result = documentationLauncher.open(context, docsUrl)) {
+                            is DocumentationOpenResult.Failed -> result.reason
+                            is DocumentationOpenResult.Refused -> result.reason
+                            else -> null
+                        }
+                    },
+                    modifier = Modifier
+                        .testTag(ProviderDetailTestTags.DocsLink)
+                        .semantics {
+                            contentDescription = "Open ${provider.label} documentation"
+                        },
                 ) {
                     Text("${provider.label} documentation")
+                }
+                docsError?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(ProviderDetailTestTags.DocsError),
+                    )
                 }
             }
         }

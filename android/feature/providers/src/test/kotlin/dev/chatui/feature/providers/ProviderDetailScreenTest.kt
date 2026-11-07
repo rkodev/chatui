@@ -1,5 +1,11 @@
 package dev.chatui.feature.providers
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.Window
+import android.view.WindowManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
@@ -91,6 +97,34 @@ class ProviderDetailScreenTest {
     }
 
     @Test
+    fun `provider detail sets flag secure`() {
+        lateinit var window: Window
+
+        composeRule.setContent {
+            window = LocalView.current.context.findActivity().window
+            ChatUiTheme {
+                ProviderDetailScreen(
+                    state = ProviderDetailUiState(
+                        provider = providerWithMetadata(),
+                        loading = false,
+                    ),
+                    onNewKeyChanged = {},
+                    onRotateKey = {},
+                    onRemoveKey = {},
+                    onCancelRemove = {},
+                    onToggleEnabled = {},
+                    onValidate = {},
+                    onRefreshModels = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertThat(window.isSecure()).isTrue()
+    }
+
+    @Test
     fun `shows preset, base URL, and auth for a custom provider`() {
         val custom = testProvider(
             label = "My server",
@@ -122,6 +156,41 @@ class ProviderDetailScreenTest {
             .assertTextContains("Base URL: https://api.example.com/v1")
         composeRule.onNodeWithTag(ProviderDetailTestTags.AuthType)
             .assertTextContains("Auth: bearer")
+    }
+
+    @Test
+    fun `shows the local cleartext warning for a custom provider`() {
+        val custom = testProvider(
+            label = "My server",
+            presetId = "custom",
+        ).copy(baseUrl = "http://10.0.2.2:11434/v1")
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderDetailScreen(
+                    state = ProviderDetailUiState(
+                        provider = custom,
+                        loading = false,
+                        cleartextWarning = dev.chatui.core.providers.CLEARTEXT_LOCAL_WARNING,
+                    ),
+                    onNewKeyChanged = {},
+                    onRotateKey = {},
+                    onRemoveKey = {},
+                    onCancelRemove = {},
+                    onToggleEnabled = {},
+                    onValidate = {},
+                    onRefreshModels = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.CleartextWarning))
+        composeRule.onNodeWithTag(ProviderDetailTestTags.CleartextWarning)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(dev.chatui.core.providers.CLEARTEXT_LOCAL_WARNING)
+            .assertIsDisplayed()
     }
 
     @Test
@@ -190,6 +259,77 @@ class ProviderDetailScreenTest {
     }
 
     @Test
+    fun `documentation action passes the contract url to the launcher`() {
+        val opened = mutableListOf<String>()
+        val launcher = DocumentationLauncher { _, url ->
+            opened += url
+            DocumentationOpenResult.OpenedInCustomTab
+        }
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderDetailScreen(
+                    state = ProviderDetailUiState(
+                        provider = providerWithMetadata(),
+                        docsUrl = "https://openrouter.ai/docs",
+                        loading = false,
+                    ),
+                    onNewKeyChanged = {},
+                    onRotateKey = {},
+                    onRemoveKey = {},
+                    onCancelRemove = {},
+                    onToggleEnabled = {},
+                    onValidate = {},
+                    onRefreshModels = {},
+                    onRetry = {},
+                    documentationLauncher = launcher,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.DocsLink))
+        composeRule.onNodeWithTag(ProviderDetailTestTags.DocsLink).performClick()
+
+        assertThat(opened).containsExactly("https://openrouter.ai/docs")
+    }
+
+    @Test
+    fun `documentation failure shows a safe message`() {
+        val launcher = DocumentationLauncher { _, _ ->
+            DocumentationOpenResult.Failed("No browser is available to open this link.")
+        }
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderDetailScreen(
+                    state = ProviderDetailUiState(
+                        provider = providerWithMetadata(),
+                        docsUrl = "https://openrouter.ai/docs",
+                        loading = false,
+                    ),
+                    onNewKeyChanged = {},
+                    onRotateKey = {},
+                    onRemoveKey = {},
+                    onCancelRemove = {},
+                    onToggleEnabled = {},
+                    onValidate = {},
+                    onRefreshModels = {},
+                    onRetry = {},
+                    documentationLauncher = launcher,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.DocsLink))
+        composeRule.onNodeWithTag(ProviderDetailTestTags.DocsLink).performClick()
+
+        composeRule.onNodeWithTag(ProviderDetailTestTags.DocsError)
+            .assertTextContains("No browser is available to open this link.")
+    }
+
+    @Test
     fun `shows an error and retry action`() {
         var retries = 0
 
@@ -216,4 +356,13 @@ class ProviderDetailScreenTest {
         composeRule.onNodeWithText("Retry").performClick()
         assertThat(retries).isEqualTo(1)
     }
+}
+
+private fun Window.isSecure(): Boolean =
+    attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
+
+private tailrec fun Context.findActivity(): Activity = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> error("No activity in context chain")
 }

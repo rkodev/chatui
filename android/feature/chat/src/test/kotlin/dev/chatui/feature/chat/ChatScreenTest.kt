@@ -1,8 +1,14 @@
 package dev.chatui.feature.chat
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -10,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.ChatError
@@ -66,8 +73,10 @@ class ChatScreenTest {
         onEditLastUser: (dev.chatui.core.model.Message, String) -> Unit = { _, _ -> },
         onOpenProviders: () -> Unit = {},
         onOpenConversationSettings: () -> Unit = {},
+        onShareConversation: ((ConversationShareFormat) -> Unit)? = null,
         onConfirmSend: () -> Unit = {},
         onCancelSendConfirmation: () -> Unit = {},
+        imeInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
     ) {
         composeRule.setContent {
             ChatUiTheme {
@@ -83,9 +92,11 @@ class ChatScreenTest {
                     onEditLastUser = onEditLastUser,
                     onOpenProviders = onOpenProviders,
                     onOpenConversationSettings = onOpenConversationSettings,
+                    onShareConversation = onShareConversation,
                     onConfirmSend = onConfirmSend,
                     onCancelSendConfirmation = onCancelSendConfirmation,
                     zoneId = java.time.ZoneOffset.UTC,
+                    imeInsets = imeInsets,
                 )
             }
         }
@@ -104,6 +115,37 @@ class ChatScreenTest {
         composeRule.onNodeWithTag(ChatScreenTestTags.Empty).assertIsDisplayed()
         composeRule.onNodeWithText("Start the conversation").assertIsDisplayed()
         composeRule.onNodeWithTag(ChatComposerTestTags.Composer).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `composer stays above the ime inset`() {
+        screen(
+            state(),
+            imeInsets = WindowInsets(0.dp, 0.dp, 0.dp, 300.dp),
+        )
+
+        val composer = composeRule
+            .onNodeWithTag(ChatComposerTestTags.Composer)
+            .getUnclippedBoundsInRoot()
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.Composer).assertIsDisplayed()
+        // The screen is 891 dp tall; a 300 dp keyboard must leave the composer
+        // above the remaining 591 dp.
+        assertThat(composer.bottom.value).isAtMost(591f)
+        assertThat(composer.bottom.value).isAtLeast(580f)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `composer sits at the bottom when the keyboard is closed`() {
+        screen(state(), imeInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp))
+
+        val composer = composeRule
+            .onNodeWithTag(ChatComposerTestTags.Composer)
+            .getUnclippedBoundsInRoot()
+
+        assertThat(composer.bottom.value).isAtLeast(880f)
     }
 
     @Test
@@ -303,7 +345,29 @@ class ChatScreenTest {
         screen(state(announcement = "Response complete"))
 
         composeRule.onNodeWithTag(ChatScreenTestTags.Announcement)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.LiveRegion,
+                    LiveRegionMode.Polite,
+                ),
+            )
             .assertContentDescriptionEquals("Response complete")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `header and composer actions meet the 48 dp touch target`() {
+        screen(state(), onShareConversation = {})
+
+        listOf(
+            ChatScreenTestTags.Share,
+            ChatScreenTestTags.ConversationSettings,
+            ChatScreenTestTags.ModelChip,
+            ChatComposerTestTags.Send,
+        ).forEach { tag ->
+            val bounds = composeRule.onNodeWithTag(tag).getUnclippedBoundsInRoot()
+            assertThat((bounds.bottom - bounds.top).value).isAtLeast(48f)
+        }
     }
 
     @Test
@@ -314,6 +378,44 @@ class ChatScreenTest {
         composeRule.onNodeWithTag(ChatScreenTestTags.ConversationSettings).performClick()
 
         assertThat(opened).isEqualTo(1)
+    }
+
+    @Test
+    fun `share action offers text and markdown formats`() {
+        var selected: ConversationShareFormat? = null
+        screen(
+            state(messages = listOf(testMessage(text = "Hello"))),
+            onShareConversation = { selected = it },
+        )
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.Share).performClick()
+        composeRule.onNodeWithTag(ChatScreenTestTags.ShareText).performClick()
+
+        assertThat(selected).isEqualTo(ConversationShareFormat.TEXT)
+    }
+
+    @Test
+    fun `share action can select markdown`() {
+        var selected: ConversationShareFormat? = null
+        screen(
+            state(messages = listOf(testMessage(text = "Hello"))),
+            onShareConversation = { selected = it },
+        )
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.Share).performClick()
+        composeRule.onNodeWithTag(ChatScreenTestTags.ShareMarkdown).performClick()
+
+        assertThat(selected).isEqualTo(ConversationShareFormat.MARKDOWN)
+    }
+
+    @Test
+    fun `share action is hidden without a conversation`() {
+        screen(
+            ChatUiState(conversationId = null, conversation = null, loading = false),
+            onShareConversation = {},
+        )
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.Share).assertDoesNotExist()
     }
 
     @Test

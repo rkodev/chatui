@@ -5,6 +5,7 @@ import dev.chatui.core.database.DatabaseTestBase
 import dev.chatui.core.database.TestData
 import dev.chatui.core.database.repository.AttachmentRepository
 import dev.chatui.core.database.repository.MessageRepository
+import dev.chatui.core.model.Attachment
 import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.Message
@@ -185,6 +186,49 @@ class AttachmentServiceTest : DatabaseTestBase() {
         assertThat(storage.fileFor("attachments/orphan-hash").exists()).isFalse()
         assertThat(deleted).contains("attachments/orphan-hash")
     }
+
+    @Test
+    fun `startup cleanup removes orphan metadata and bytes but keeps referenced and new attachments`() =
+        kotlinx.coroutines.test.runTest {
+            db.conversationDao().upsert(TestData.conversation())
+            db.messageDao().insertMessage(TestData.message(id = "message-1", sequence = 1))
+
+            val orphan = service.addFiles(
+                listOf(AttachmentInput("orphan.txt", "text/plain", 6, "orphan".toByteArray())),
+            ).attachments.single()
+            val referenced = service.addFiles(
+                listOf(AttachmentInput("kept.txt", "text/plain", 4, "kept".toByteArray())),
+                messageId = "message-1",
+            ).attachments.single()
+            storage.put("orphan-bytes".toByteArray(), "orphan-bytes-hash")
+
+            val newAttachment = Attachment(
+                id = "new-attachment",
+                messageId = null,
+                kind = AttachmentKind.FILE,
+                mimeType = "text/plain",
+                name = "new.txt",
+                size = 3,
+                sha256 = "new-hash",
+                storageKey = "attachments/new-hash",
+                width = null,
+                height = null,
+                createdAt = now.plusSeconds(5),
+            )
+            repository.upsert(newAttachment)
+            storage.put("new".toByteArray(), "new-hash")
+
+            val deleted = service.cleanupOrphans(before = now.plusSeconds(1))
+
+            assertThat(repository.get(orphan.id)).isNull()
+            assertThat(storage.fileFor(orphan.storageKey).exists()).isFalse()
+            assertThat(storage.fileFor("attachments/orphan-bytes-hash").exists()).isFalse()
+            assertThat(repository.get(referenced.id)).isNotNull()
+            assertThat(storage.fileFor(referenced.storageKey).exists()).isTrue()
+            assertThat(repository.get(newAttachment.id)).isNotNull()
+            assertThat(storage.fileFor(newAttachment.storageKey).exists()).isTrue()
+            assertThat(deleted).contains("attachments/orphan-bytes-hash")
+        }
 
     @Test
     fun `deleteForMessages removes metadata and bytes for the given messages only`() =

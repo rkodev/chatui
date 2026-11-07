@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.multiplatform.markdown.renderer.m3)
     implementation(libs.highlights)
+    implementation(libs.coil.compose)
     implementation(libs.hilt.android)
 
     ksp(libs.hilt.compiler)

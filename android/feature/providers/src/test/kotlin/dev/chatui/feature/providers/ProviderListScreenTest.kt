@@ -217,6 +217,56 @@ class ProviderListScreenTest {
     }
 
     @Test
+    fun `shows the local cleartext warning and refusal copy`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state().copy(
+                        customForm = CustomProviderFormState(
+                            baseUrl = "http://10.0.2.2:11434/v1",
+                            cleartextWarning = dev.chatui.core.providers.CLEARTEXT_LOCAL_WARNING,
+                        ),
+                    ),
+                    onOpenProvider = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.CustomCleartextWarning))
+        composeRule.onNodeWithTag(ProviderListTestTags.CustomCleartextWarning)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(dev.chatui.core.providers.CLEARTEXT_LOCAL_WARNING)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `shows the refused cleartext copy`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state().copy(
+                        customForm = CustomProviderFormState(
+                            baseUrl = "http://api.example.com/v1",
+                            cleartextError = dev.chatui.core.providers.CLEARTEXT_REFUSED_ERROR,
+                        ),
+                    ),
+                    onOpenProvider = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderListTestTags.CustomCleartextError))
+        composeRule.onNodeWithTag(ProviderListTestTags.CustomCleartextError)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(dev.chatui.core.providers.CLEARTEXT_REFUSED_ERROR)
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun `manage action opens the provider`() {
         var opened: String? = null
 

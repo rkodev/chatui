@@ -7,13 +7,18 @@ import androidx.navigation.createGraph
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.datastore.settings.AndroidSettings
+import dev.chatui.intent.ExternalIntentAction
+import dev.chatui.intent.ExternalIntentRouter
 import dev.chatui.shell.ChatDestination
 import dev.chatui.shell.ProviderDestination
 import dev.chatui.shell.SettingsDestination
 import dev.chatui.shell.ShellDestination
+import dev.chatui.shell.resolveShellStartDestination
 import dev.chatui.shell.shellDestinations
 import dev.chatui.shell.shellStartDestination
 import dev.chatui.feature.settings.SettingsSection
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -96,12 +101,116 @@ class ShellNavigationTest {
     fun `completed onboarding restores the last active conversation`() {
         assertThat(
             shellStartDestination(
-                AndroidSettings(
-                    onboardingCompleted = true,
-                    lastActiveConversationId = "conversation-1",
-                ),
+                settings = AndroidSettings(onboardingCompleted = true),
+                lastActiveConversation = fakeConversation("conversation-1"),
             ),
         ).isEqualTo(ChatDestination.createRoute("conversation-1"))
+    }
+
+    @Test
+    fun `pending deep link takes precedence over last active restore`() {
+        assertThat(
+            shellStartDestination(
+                settings = AndroidSettings(onboardingCompleted = true),
+                lastActiveConversation = fakeConversation("conversation-1"),
+                hasPendingExternalIntent = true,
+            ),
+        ).isEqualTo(ShellDestination.Conversations.route)
+    }
+
+    @Test
+    fun `onboarding takes precedence over pending deep link and last active`() {
+        assertThat(
+            shellStartDestination(
+                settings = AndroidSettings(onboardingCompleted = false),
+                lastActiveConversation = fakeConversation("conversation-1"),
+                hasPendingExternalIntent = true,
+            ),
+        ).isEqualTo(ShellDestination.Onboarding.route)
+    }
+
+    @Test
+    fun `resolver restores an existing last active conversation`() = runTest {
+        val service = FakeConversationService(
+            conversations = listOf(fakeConversation("conversation-1")),
+        )
+        service.setLastActiveConversation("conversation-1")
+
+        val start = resolveShellStartDestination(
+            settings = AndroidSettings(onboardingCompleted = true),
+            conversationService = service,
+            hasPendingExternalIntent = false,
+        )
+
+        assertThat(start).isEqualTo(ChatDestination.createRoute("conversation-1"))
+    }
+
+    @Test
+    fun `resolver falls back to the list and clears a deleted last active pointer`() = runTest {
+        val service = FakeConversationService(conversations = emptyList())
+        service.setLastActiveConversation("deleted-conversation")
+
+        val start = resolveShellStartDestination(
+            settings = AndroidSettings(onboardingCompleted = true),
+            conversationService = service,
+            hasPendingExternalIntent = false,
+        )
+
+        assertThat(start).isEqualTo(ShellDestination.Conversations.route)
+        assertThat(service.observeLastActiveConversationId().first()).isNull()
+    }
+
+    @Test
+    fun `resolver keeps onboarding ahead of a pending deep link`() = runTest {
+        val service = FakeConversationService(
+            conversations = listOf(fakeConversation("conversation-1")),
+        )
+        service.setLastActiveConversation("conversation-1")
+
+        val start = resolveShellStartDestination(
+            settings = AndroidSettings(onboardingCompleted = false),
+            conversationService = service,
+            hasPendingExternalIntent = true,
+        )
+
+        assertThat(start).isEqualTo(ShellDestination.Onboarding.route)
+    }
+
+    @Test
+    fun `resolver prefers a pending deep link over last active restore`() = runTest {
+        val service = FakeConversationService(
+            conversations = listOf(fakeConversation("conversation-1")),
+        )
+        service.setLastActiveConversation("conversation-1")
+
+        val start = resolveShellStartDestination(
+            settings = AndroidSettings(onboardingCompleted = true),
+            conversationService = service,
+            hasPendingExternalIntent = true,
+        )
+
+        assertThat(start).isEqualTo(ShellDestination.Conversations.route)
+    }
+
+    @Test
+    fun `a consumed deep link does not override last active restore on recreation`() = runTest {
+        val router = ExternalIntentRouter()
+        val action = ExternalIntentAction.OpenChat("deep-link-conversation")
+        router.submit(action)
+        router.consume(action)
+
+        val service = FakeConversationService(
+            conversations = listOf(fakeConversation("conversation-1")),
+        )
+        service.setLastActiveConversation("conversation-1")
+
+        val start = resolveShellStartDestination(
+            settings = AndroidSettings(onboardingCompleted = true),
+            conversationService = service,
+            hasPendingExternalIntent = router.pending.value != null,
+        )
+
+        assertThat(start).isEqualTo(ChatDestination.createRoute("conversation-1"))
     }
 
     @Test

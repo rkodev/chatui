@@ -7,6 +7,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.chatui.core.database.ChatUiDatabase
+import dev.chatui.core.database.attachment.AttachmentService
 import dev.chatui.core.database.repository.ConversationRepository
 import dev.chatui.core.database.repository.MessageRepository
 import dev.chatui.core.database.repository.ModelRepository
@@ -17,6 +18,7 @@ import dev.chatui.core.datastore.secret.SecretCipher
 import dev.chatui.core.datastore.secret.SecretStore
 import dev.chatui.core.datastore.secret.TinkSecretCipher
 import dev.chatui.core.datastore.settings.SettingsDataStore
+import dev.chatui.core.network.CleartextPolicyInterceptor
 import dev.chatui.core.network.OpenRouterAdapter
 import dev.chatui.core.network.ProviderAdapter
 import dev.chatui.core.network.ProviderAdapterRegistry
@@ -26,7 +28,9 @@ import dev.chatui.core.providers.ModelService
 import dev.chatui.core.providers.ProviderGateway
 import dev.chatui.core.providers.ProviderService
 import dev.chatui.core.providers.RoutingProviderGateway
+import dev.chatui.startup.AttachmentCleanup
 import java.time.Clock
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 import okhttp3.OkHttpClient
@@ -75,9 +79,9 @@ object AppModule {
      * Shared HTTP client for JSON requests.
      *
      * Streaming uses a dedicated client inside [OpenRouterAdapter] with read
-     * and call timeouts disabled plus a 120 s inactivity watchdog. No logging
-     * interceptor is installed, so request headers and secrets are never
-     * written to logcat.
+     * and call timeouts disabled plus a 120 s inactivity watchdog. The only
+     * interceptor is the cleartext policy; no logging interceptor is installed,
+     * so request headers and secrets are never written to logcat.
      */
     @Provides
     @Singleton
@@ -85,6 +89,7 @@ object AppModule {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .callTimeout(60, TimeUnit.SECONDS)
+        .addInterceptor(CleartextPolicyInterceptor())
         .build()
 
     @Provides
@@ -131,6 +136,20 @@ object AppModule {
         messages: MessageRepository,
         clock: Clock,
     ): InterruptedMessageRecovery = StreamingRecoveryService(messages, clock)
+
+    /**
+     * Startup cleanup binding.
+     *
+     * Delegates to the shared [AttachmentService] so startup and chat use the
+     * same orphan rules and file-deletion logic.
+     */
+    @Provides
+    @Singleton
+    fun provideAttachmentCleanup(service: AttachmentService): AttachmentCleanup =
+        object : AttachmentCleanup {
+            override suspend fun cleanupOrphans(before: Instant): List<String> =
+                service.cleanupOrphans(before)
+        }
 
     @Provides
     @Singleton

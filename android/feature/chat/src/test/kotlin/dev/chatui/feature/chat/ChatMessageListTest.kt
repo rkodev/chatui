@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
+import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.MessageRole
 import dev.chatui.core.model.MessageStatus
 import java.time.Instant
@@ -105,6 +106,7 @@ class ChatMessageListTest {
         }
         composeRule.waitForIdle()
 
+        // Bounded threshold: fewer than 100 of the 10,000 rows may be composed.
         assertThat(composed.get()).isLessThan(100)
         composeRule.onNodeWithText("Message 9999", useUnmergedTree = true).assertExists()
     }
@@ -144,5 +146,72 @@ class ChatMessageListTest {
 
         composeRule.onNodeWithTag(ChatMessageTestTags.message("assistant-1"))
             .assertExists()
+    }
+
+    @Test
+    fun `duplicate-prone ids keep stable identity and do not collide with the streaming row`() {
+        // Identical text and sequence values make index- or content-based keys
+        // ambiguous; only the message id can identify each row.
+        val first = testMessage(
+            id = "message-a",
+            sequence = 1,
+            role = MessageRole.USER,
+            text = "Same text",
+        )
+        val second = testMessage(
+            id = "message-b",
+            sequence = 1,
+            role = MessageRole.USER,
+            text = "Same text",
+        )
+        val third = testMessage(
+            id = "message-c",
+            sequence = 1,
+            role = MessageRole.USER,
+            text = "Same text",
+        )
+        var messages by mutableStateOf(listOf(first, second, third))
+        var streaming by mutableStateOf<StreamingState?>(null)
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatMessageList(
+                    messages = messages,
+                    streaming = streaming,
+                    zoneId = java.time.ZoneOffset.UTC,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        listOf("message-a", "message-b", "message-c").forEach { id ->
+            composeRule.onNodeWithTag(ChatMessageTestTags.message(id)).assertExists()
+        }
+
+        // Update the middle row in place. The other two rows keep their ids and
+        // must not be reused for the changed content.
+        messages = listOf(
+            first,
+            second.copy(parts = listOf(ContentPart.Text("Updated middle"))),
+            third,
+        )
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(ChatMessageTestTags.message("message-a")).assertExists()
+        composeRule.onNodeWithTag(ChatMessageTestTags.message("message-b")).assertExists()
+        composeRule.onNodeWithTag(ChatMessageTestTags.message("message-c")).assertExists()
+        composeRule.onNodeWithText("Updated middle", useUnmergedTree = true).assertExists()
+
+        // A streaming row whose id matches a history id must replace that row
+        // rather than produce a duplicate LazyColumn key.
+        streaming = createStreamingState(
+            conversationId = "conversation-1",
+            messageId = "message-c",
+            startedAt = now,
+        ).copy(text = "Streaming")
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(ChatMessageListTestTags.Streaming).assertExists()
+        composeRule.onNodeWithTag(ChatMessageTestTags.message("message-c")).assertDoesNotExist()
     }
 }

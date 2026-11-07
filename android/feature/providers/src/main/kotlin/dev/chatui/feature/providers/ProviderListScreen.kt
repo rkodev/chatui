@@ -51,6 +51,8 @@ object ProviderListTestTags {
     const val CustomCreate = "provider-list-custom-create"
     const val CustomError = "provider-list-custom-error"
     const val CustomNotice = "provider-list-custom-notice"
+    const val CustomCleartextWarning = "provider-list-custom-cleartext-warning"
+    const val CustomCleartextError = "provider-list-custom-cleartext-error"
 
     fun provider(id: String): String = "provider-list-item-$id"
 
@@ -421,6 +423,22 @@ private fun CustomProviderForm(
                 .fillMaxWidth()
                 .testTag(ProviderListTestTags.CustomBaseUrl),
         )
+
+        form.cleartextWarning?.let { message ->
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.testTag(ProviderListTestTags.CustomCleartextWarning),
+            )
+        }
+
+        form.cleartextError?.let { message ->
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag(ProviderListTestTags.CustomCleartextError),
+            )
+        }
 
         Text(
             text = "Authentication",

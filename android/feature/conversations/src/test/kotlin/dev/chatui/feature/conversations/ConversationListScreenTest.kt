@@ -6,7 +6,9 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -144,6 +146,46 @@ class ConversationListScreenTest {
         }
 
         composeRule.onNodeWithTag(ConversationListTestTags.Empty).assertIsDisplayed()
+    }
+
+    @Test
+    fun `conversation actions button has an accessible name and 48 dp target`() {
+        val conversation = testConversation(id = "conversation-1", title = "First chat")
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        groups = listOf(
+                            ConversationGroup(
+                                key = ConversationGroupKey.TODAY,
+                                label = "Today",
+                                conversations = listOf(conversation),
+                            ),
+                        ),
+                        loading = false,
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        val actions = composeRule.onNodeWithTag(
+            ConversationListTestTags.actions("conversation-1"),
+        )
+        actions.assertContentDescriptionEquals("Conversation actions")
+        val bounds = actions.getUnclippedBoundsInRoot()
+        assertThat((bounds.bottom - bounds.top).value).isAtLeast(48f)
     }
 
     @Test

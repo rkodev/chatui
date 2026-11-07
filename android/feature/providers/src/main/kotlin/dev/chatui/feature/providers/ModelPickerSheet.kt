@@ -1,5 +1,6 @@
 package dev.chatui.feature.providers
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -72,6 +73,10 @@ fun ModelPickerSheet(
     title: String = "Choose a model",
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // The sheet is a separate window and normally consumes back itself. This
+    // fallback shares the same close function as onDismissRequest.
+    BackHandler(enabled = true) { onDismiss() }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

@@ -6,6 +6,7 @@ import com.google.common.truth.Truth.assertThat
 import dagger.Module
 import dagger.Provides
 import dev.chatui.core.database.ChatUiDatabase
+import dev.chatui.core.database.attachment.AttachmentService
 import dev.chatui.core.database.repository.ConversationRepository
 import dev.chatui.core.database.repository.MessageRepository
 import dev.chatui.core.database.repository.ModelRepository
@@ -14,14 +15,20 @@ import dev.chatui.core.database.recovery.StreamingRecoveryService
 import dev.chatui.core.datastore.secret.SecretCipher
 import dev.chatui.core.datastore.secret.SecretStore
 import dev.chatui.core.model.ProviderKind
+import dev.chatui.core.network.CleartextPolicyInterceptor
 import dev.chatui.core.network.ProviderRegistry
 import dev.chatui.core.providers.ModelService
 import dev.chatui.core.providers.ProviderGateway
 import dev.chatui.core.providers.ProviderService
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
+import java.io.File
+import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Base64
 import javax.inject.Singleton
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -77,14 +84,43 @@ class AppModuleTest {
     }
 
     @Test
-    fun `provides a shared HTTP client without logging interceptors`() {
+    fun `provides a shared HTTP client with only the cleartext policy interceptor`() {
         val client = AppModule.provideOkHttpClient()
 
         assertThat(client.connectTimeoutMillis).isEqualTo(30_000)
         assertThat(client.readTimeoutMillis).isEqualTo(30_000)
         assertThat(client.callTimeoutMillis).isEqualTo(60_000)
-        assertThat(client.interceptors).isEmpty()
+        assertThat(client.interceptors).hasSize(1)
+        assertThat(client.interceptors[0]).isInstanceOf(CleartextPolicyInterceptor::class.java)
         assertThat(client.networkInterceptors).isEmpty()
+        assertThat(client.hostnameVerifier.javaClass.name)
+            .isEqualTo("okhttp3.internal.tls.OkHostnameVerifier")
+        assertThat(client.sslSocketFactory).isNotNull()
+    }
+
+    @Test
+    fun `shared HTTP client source has no custom trust manager or logging interceptor`() {
+        val source = appModuleSource()
+        val body = source
+            .substringAfter("fun provideOkHttpClient()")
+            .substringBefore("@Provides")
+
+        assertThat(body).contains("addInterceptor(CleartextPolicyInterceptor())")
+        assertThat(body).doesNotContain("sslSocketFactory")
+        assertThat(body).doesNotContain("hostnameVerifier")
+        assertThat(body).doesNotContain("trustManager")
+        assertThat(body).doesNotContain("networkInterceptors")
+        assertThat(body).doesNotContain(".interceptors(")
+        assertThat(body).doesNotContain("HttpLoggingInterceptor")
+        assertThat(body).doesNotContain("logging-interceptor")
+    }
+
+    private fun appModuleSource(): String {
+        val candidates = listOf(
+            File("src/main/java/dev/chatui/di/AppModule.kt"),
+            File("android/app/src/main/java/dev/chatui/di/AppModule.kt"),
+        )
+        return candidates.first { it.isFile }.readText()
     }
 
     @Test
@@ -133,6 +169,18 @@ class AppModuleTest {
         )
 
         assertThat(recovery).isInstanceOf(StreamingRecoveryService::class.java)
+    }
+
+    @Test
+    fun `provides attachment cleanup backed by the attachment service`() = runTest {
+        val service = mockk<AttachmentService>()
+        val before = Instant.parse("2026-11-06T12:00:00Z")
+        coEvery { service.cleanupOrphans(before) } returns listOf("attachments/orphan")
+
+        val cleanup = AppModule.provideAttachmentCleanup(service)
+
+        assertThat(cleanup.cleanupOrphans(before)).containsExactly("attachments/orphan")
+        coVerify { service.cleanupOrphans(before) }
     }
 
     @Test

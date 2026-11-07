@@ -1,5 +1,6 @@
 package dev.chatui
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -14,6 +15,8 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import dev.chatui.core.datastore.settings.SettingsDataStore
+import dev.chatui.intent.ExternalIntentIntake
+import dev.chatui.intent.ExternalIntentRouter
 import dev.chatui.shell.ChatUiApp
 import dev.chatui.startup.AppStartup
 import javax.inject.Inject
@@ -28,9 +31,13 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var startup: AppStartup
 
+    @Inject
+    lateinit var externalIntentRouter: ExternalIntentRouter
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        handleExternalIntent(intent)
         enableEdgeToEdge()
         setContent {
             var startupComplete by remember { mutableStateOf(false) }
@@ -56,9 +63,25 @@ class MainActivity : ComponentActivity() {
             )
 
             if (startupComplete) {
-                settings?.let { loaded -> ChatUiApp(settings = loaded) }
+                settings?.let { loaded ->
+                    ChatUiApp(
+                        settings = loaded,
+                        externalIntentRouter = externalIntentRouter,
+                    )
+                }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleExternalIntent(intent)
+    }
+
+    private fun handleExternalIntent(intent: Intent?) {
+        val action = ExternalIntentIntake.actionFor(intent) ?: return
+        externalIntentRouter.submit(action)
     }
 
     private companion object {

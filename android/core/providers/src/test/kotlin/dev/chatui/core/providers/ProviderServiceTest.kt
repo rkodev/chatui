@@ -327,6 +327,37 @@ class ProviderServiceTest {
     }
 
     @Test
+    fun `createCustomProvider refuses public cleartext with actionable copy`() = runTest {
+        val error = runCatching {
+            service.createCustomProvider(
+                CreateCustomProviderInput(
+                    baseUrl = "http://api.example.com/v1",
+                    authType = ProviderAuthType.BEARER,
+                    apiKey = "sk",
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(ProviderServiceException::class.java)
+        assertThat((error as ProviderServiceException).code)
+            .isEqualTo(ProviderServiceErrorCode.INVALID_INPUT)
+        assertThat(error.message).isEqualTo(CLEARTEXT_REFUSED_ERROR)
+        assertThat(providerRepository.observeAll().first()).isEmpty()
+    }
+
+    @Test
+    fun `createCustomProvider accepts approved local cleartext`() = runTest {
+        val provider = service.createCustomProvider(
+            CreateCustomProviderInput(
+                baseUrl = "http://10.0.2.2:11434/v1",
+                authType = ProviderAuthType.NONE,
+            ),
+        )
+
+        assertThat(provider.baseUrl).isEqualTo("http://10.0.2.2:11434/v1")
+    }
+
+    @Test
     fun `createCustomProvider rejects query-key auth and missing keys`() = runTest {
         val queryKey = runCatching {
             service.createCustomProvider(

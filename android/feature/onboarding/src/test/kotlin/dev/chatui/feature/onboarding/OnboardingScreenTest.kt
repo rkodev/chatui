@@ -1,5 +1,11 @@
 package dev.chatui.feature.onboarding
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.Window
+import android.view.WindowManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -50,8 +56,38 @@ class OnboardingScreenTest {
         composeRule.onNodeWithText("Recommended").assertIsDisplayed()
         composeRule.onNodeWithTag(OnboardingTestTags.providerOption("openrouter"))
             .assertIsDisplayed()
+            .assertTextContains("OpenRouter")
         composeRule.onNodeWithTag(OnboardingTestTags.providerOption("openai"))
             .assertIsNotEnabled()
+    }
+
+    @Test
+    fun `provider picker forwards the selected provider`() {
+        var selected: String? = null
+
+        composeRule.setContent {
+            ChatUiTheme {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = { selected = it },
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.providerOption("openrouter"))
+            .performClick()
+
+        assertThat(selected).isEqualTo("openrouter")
     }
 
     @Test
@@ -185,6 +221,63 @@ class OnboardingScreenTest {
     }
 
     @Test
+    fun `key entry step sets flag secure`() {
+        lateinit var window: Window
+
+        composeRule.setContent {
+            window = LocalView.current.context.findActivity().window
+            ChatUiTheme {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.KEY_ENTRY,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertThat(window.isSecure()).isTrue()
+    }
+
+    @Test
+    fun `welcome step does not set flag secure`() {
+        lateinit var window: Window
+
+        composeRule.setContent {
+            window = LocalView.current.context.findActivity().window
+            ChatUiTheme {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertThat(window.isSecure()).isFalse()
+    }
+
+    @Test
     fun `connected state enables start chatting`() {
         composeRule.setContent {
             ChatUiTheme {
@@ -213,6 +306,15 @@ class OnboardingScreenTest {
             .performScrollToNode(hasTestTag(OnboardingTestTags.StartChattingButton))
         composeRule.onNodeWithTag(OnboardingTestTags.StartChattingButton).assertIsEnabled()
     }
+}
+
+private fun Window.isSecure(): Boolean =
+    attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
+
+private tailrec fun Context.findActivity(): Activity = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> error("No activity in context chain")
 }
 
 private fun providers(): List<ProviderOption> = listOf(

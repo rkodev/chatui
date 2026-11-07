@@ -1,6 +1,7 @@
 package dev.chatui.core.providers
 
 import dev.chatui.core.model.ProviderAuthType
+import dev.chatui.core.network.CleartextHostPolicy
 import java.net.URI
 import java.net.URISyntaxException
 
@@ -92,7 +93,79 @@ internal fun validateBaseUrl(value: String): String {
         throw invalidInput("Base URL must not include a query string or fragment.")
     }
 
+    val security = assessBaseUrlSecurity(trimmed)
+    if (security is BaseUrlSecurity.RefusedCleartext) {
+        throw invalidInput(security.error)
+    }
+
     return trimmed
+}
+
+/** User-visible copy for an approved local cleartext base URL. */
+const val CLEARTEXT_LOCAL_WARNING: String =
+    "This provider uses unencrypted HTTP to a local host. Traffic stays on your " +
+        "local network, but other devices on that network can read it. Use HTTPS " +
+        "if your server supports it."
+
+/** User-visible copy for a cleartext base URL that the policy refuses. */
+const val CLEARTEXT_REFUSED_ERROR: String =
+    "Cleartext HTTP is only allowed for local providers. Use HTTPS for this host, " +
+        "or use localhost, 127.0.0.1, ::1, 10.0.2.2, a .local name, or a private " +
+        "LAN address."
+
+/**
+ * Security assessment for a Custom provider base URL.
+ *
+ * The assessment is pure: it never resolves DNS and never reads a secret. A
+ * `.local` name is accepted by name here and is resolved again by the request
+ * interceptor, which refuses it if it resolves to a public address.
+ */
+sealed interface BaseUrlSecurity {
+    /** HTTPS base URL. No cleartext warning is shown. */
+    data class SecureHttps(val url: String) : BaseUrlSecurity
+
+    /** HTTP base URL for an approved local host. Show [warning] to the user. */
+    data class AllowedLocalCleartext(
+        val url: String,
+        val warning: String = CLEARTEXT_LOCAL_WARNING,
+    ) : BaseUrlSecurity
+
+    /** HTTP base URL for a non-approved host. Refuse with [error]. */
+    data class RefusedCleartext(
+        val url: String,
+        val error: String = CLEARTEXT_REFUSED_ERROR,
+    ) : BaseUrlSecurity
+}
+
+/**
+ * Classify [value] as secure HTTPS, allowed local cleartext, or refused
+ * cleartext.
+ *
+ * Invalid or non-http(s) input is reported as [BaseUrlSecurity.RefusedCleartext]
+ * so callers can show actionable copy without throwing on every keystroke.
+ */
+fun assessBaseUrlSecurity(value: String): BaseUrlSecurity {
+    val trimmed = value.trim()
+
+    val uri = try {
+        URI(trimmed)
+    } catch (_: URISyntaxException) {
+        return BaseUrlSecurity.RefusedCleartext(trimmed)
+    }
+
+    return when (uri.scheme?.lowercase()) {
+        "https" -> BaseUrlSecurity.SecureHttps(trimmed)
+        "http" -> {
+            val host = uri.host
+            if (!host.isNullOrBlank() && CleartextHostPolicy.isAllowedCleartextHost(host)) {
+                BaseUrlSecurity.AllowedLocalCleartext(trimmed)
+            } else {
+                BaseUrlSecurity.RefusedCleartext(trimmed)
+            }
+        }
+
+        else -> BaseUrlSecurity.RefusedCleartext(trimmed)
+    }
 }
 
 /** Validate the auth style accepted by a Custom provider. */

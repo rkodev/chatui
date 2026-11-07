@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.chatui.core.model.Provider
+import dev.chatui.core.providers.BaseUrlSecurity
+import dev.chatui.core.providers.assessBaseUrlSecurity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +35,8 @@ data class ProviderDetailUiState(
     val notice: String? = null,
     val newKey: String = "",
     val confirmRemove: Boolean = false,
+    val cleartextWarning: String? = null,
+    val cleartextError: String? = null,
 )
 
 /**
@@ -166,6 +170,7 @@ class ProviderDetailViewModel(
             try {
                 val provider = service.getProvider(providerId)
                 val models = if (provider != null) service.listModels(provider.id) else emptyList()
+                val security = provider?.let { assessBaseUrlSecurity(it.baseUrl) }
                 _state.update {
                     it.copy(
                         provider = provider,
@@ -173,6 +178,9 @@ class ProviderDetailViewModel(
                         docsUrl = provider?.let { service.docsUrl(it.presetId) },
                         loading = false,
                         error = if (provider == null) "Provider not found." else null,
+                        cleartextWarning = (security as? BaseUrlSecurity.AllowedLocalCleartext)
+                            ?.warning,
+                        cleartextError = (security as? BaseUrlSecurity.RefusedCleartext)?.error,
                     )
                 }
             } catch (error: CancellationException) {
