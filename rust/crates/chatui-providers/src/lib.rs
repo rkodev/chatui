@@ -8,6 +8,8 @@ pub mod cancel;
 pub mod error;
 pub mod http;
 pub mod ndjson;
+pub mod openai_catalog;
+pub mod openai_compatible;
 pub mod openrouter {
     pub mod cache;
     pub mod catalog;
@@ -21,7 +23,10 @@ pub mod retry;
 pub mod sse;
 pub mod url_policy;
 
-pub use adapter::{OpenRouterAdapter, ProviderAdapter, ProviderContext, UnsupportedAdapter};
+pub use adapter::{
+    OpenAiCompatibleAdapter, OpenRouterAdapter, ProviderAdapter, ProviderContext,
+    UnsupportedAdapter,
+};
 pub use cancel::{Cancellation, CancellationToken};
 pub use error::{NetworkError, NetworkErrorKind, is_retryable_status, parse_retry_after};
 pub use http::{
@@ -30,6 +35,16 @@ pub use http::{
     same_origin,
 };
 pub use ndjson::{DEFAULT_MAX_NDJSON_BUFFER_BYTES, NdjsonError, read_ndjson};
+pub use openai_catalog::{
+    CatalogDefaults, OpenAiCatalogError, anthropic_catalog_defaults, defaults_for_preset,
+    google_catalog_defaults, map_model as map_openai_model, map_models as map_openai_models,
+    openai_catalog_defaults,
+};
+pub use openai_compatible::{
+    ExtraMode, OpenAiCompatiblePreset, build_body as build_openai_compatible_body,
+    default_message as openai_compatible_default_message, network_error_to_chat_error,
+    prepare_request as prepare_openai_compatible_request,
+};
 pub use openrouter::cache::{
     CATALOG_CACHE_VERSION, CATALOG_DIR_NAME, CacheError, CatalogCache, CatalogResult,
     CatalogSnapshot, FileCatalogCache, MemoryCatalogCache, OPENROUTER_CATALOG_TTL_SECONDS,
@@ -40,7 +55,8 @@ pub use openrouter::catalog::{
     multiply_decimal_by_million, usd_amount, usd_per_million,
 };
 pub use openrouter::errors::{
-    OPENROUTER_PROVIDER_ID, map_error_object, map_http_error, map_stream_error,
+    OPENROUTER_PROVIDER_ID, map_error_object, map_error_object_for, map_http_error,
+    map_http_error_for, map_stream_error, map_stream_error_for,
 };
 pub use openrouter::key::{OpenRouterError, ProviderKeyInfo, map_key, validate_key};
 pub use openrouter::request::{
@@ -49,10 +65,10 @@ pub use openrouter::request::{
     select_default_model,
 };
 pub use openrouter::stream::{
-    StreamDecoder, StreamSummary, map_finish_reason, map_usage, stream_chat,
-    stream_chat_completions,
+    ReasoningStyle, StreamConfig, StreamDecoder, StreamSummary, map_finish_reason, map_usage,
+    stream_chat, stream_chat_completions, stream_chat_with,
 };
-pub use registry::{IMPLEMENTED_PRESET_IDS, ProviderRegistry, RegistryError, create_adapter};
+pub use registry::{ProviderRegistry, RegistryError, create_adapter, is_implemented_preset};
 pub use retry::{
     AttemptFailure, AttemptOutcome, DEFAULT_INACTIVITY_TIMEOUT, InactivityWatchdog, PartialOutput,
     RETRY_BASE_DELAY, RETRY_JITTER_RATIO, RETRY_MAX_ATTEMPTS, RETRY_MAX_DELAY, RetryError,

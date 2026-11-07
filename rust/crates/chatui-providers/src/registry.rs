@@ -10,14 +10,28 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use chatui_contracts::{
-    AppConfig, ProviderCatalog, ProviderCatalogError, ProviderPreset, provider_catalog,
+    AppConfig, ModelDiscoveryFormat, ProviderCatalog, ProviderCatalogError, ProviderPreset,
+    provider_catalog,
 };
 use chatui_domain::ProviderAuthType;
 
-use crate::adapter::{OpenRouterAdapter, ProviderAdapter, ProviderContext, UnsupportedAdapter};
+use crate::adapter::{
+    OpenAiCompatibleAdapter, OpenRouterAdapter, ProviderAdapter, ProviderContext,
+    UnsupportedAdapter,
+};
 
-/// The only preset with an implemented adapter in M3.5-06.4.
-pub const IMPLEMENTED_PRESET_IDS: &[&str] = &["openrouter"];
+/// Return whether a contract preset has an implemented adapter.
+///
+/// Enablement is driven by the discovery format, not by a hardcoded provider
+/// name. OpenRouter keeps its reference adapter; every OpenAI-format preset uses
+/// the shared OpenAI-compatible transport. Anthropic, Gemini, and Ollama
+/// discovery formats remain unsupported until their own tasks land.
+pub fn is_implemented_preset(preset: &ProviderPreset) -> bool {
+    matches!(
+        preset.model_discovery.format,
+        ModelDiscoveryFormat::Openrouter | ModelDiscoveryFormat::Openai
+    )
+}
 
 /// Errors returned while building or querying the registry.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -152,10 +166,12 @@ pub fn create_adapter(preset_id: &str) -> Result<ProviderAdapter, RegistryError>
 }
 
 fn adapter_for(preset: &ProviderPreset) -> ProviderAdapter {
-    if IMPLEMENTED_PRESET_IDS.contains(&preset.id.as_str()) {
-        ProviderAdapter::OpenRouter(OpenRouterAdapter)
-    } else {
-        ProviderAdapter::Unsupported(UnsupportedAdapter::new(preset.id.clone(), preset.kind))
+    match preset.model_discovery.format {
+        ModelDiscoveryFormat::Openrouter => ProviderAdapter::OpenRouter(OpenRouterAdapter),
+        ModelDiscoveryFormat::Openai => {
+            ProviderAdapter::OpenAiCompatible(OpenAiCompatibleAdapter::new(preset.id.clone()))
+        }
+        _ => ProviderAdapter::Unsupported(UnsupportedAdapter::new(preset.id.clone(), preset.kind)),
     }
 }
 
@@ -252,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn only_openrouter_is_supported() {
+    fn openai_compatible_presets_are_supported() {
         let registry = ProviderRegistry::load().expect("registry loads");
 
         assert!(
@@ -261,18 +277,25 @@ mod tests {
                 .expect("openrouter adapter")
                 .is_supported()
         );
-        for preset in registry
-            .presets()
-            .iter()
-            .filter(|preset| preset.id != "openrouter")
-        {
-            assert!(
-                !registry
-                    .adapter(&preset.id)
-                    .expect("adapter exists")
-                    .is_supported(),
-                "{} must be unsupported",
+
+        for preset in registry.presets() {
+            let adapter = registry.adapter(&preset.id).expect("adapter exists");
+            let expected = matches!(
+                preset.model_discovery.format,
+                ModelDiscoveryFormat::Openrouter | ModelDiscoveryFormat::Openai
+            );
+            assert_eq!(
+                adapter.is_supported(),
+                expected,
+                "{} support does not match its discovery format",
                 preset.id
+            );
+        }
+
+        for id in ["anthropic", "google", "ollama"] {
+            assert!(
+                !registry.adapter(id).expect("adapter exists").is_supported(),
+                "{id} must remain unsupported"
             );
         }
     }

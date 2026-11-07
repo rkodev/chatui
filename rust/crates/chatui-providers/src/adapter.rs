@@ -89,6 +89,29 @@ impl ProviderContext {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct OpenRouterAdapter;
 
+/// The preset-driven OpenAI-compatible adapter.
+///
+/// The adapter stores only the preset ID. Every request reads the contract
+/// preset from [`ProviderContext`], so no provider metadata is duplicated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenAiCompatibleAdapter {
+    preset_id: String,
+}
+
+impl OpenAiCompatibleAdapter {
+    /// Build an adapter for a contract preset ID.
+    pub fn new(preset_id: impl Into<String>) -> Self {
+        Self {
+            preset_id: preset_id.into(),
+        }
+    }
+
+    /// Return the preset ID.
+    pub fn preset_id(&self) -> &str {
+        &self.preset_id
+    }
+}
+
 /// A placeholder adapter for a contract preset that is not implemented yet.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnsupportedAdapter {
@@ -135,6 +158,8 @@ impl UnsupportedAdapter {
 pub enum ProviderAdapter {
     /// OpenRouter, the reference adapter.
     OpenRouter(OpenRouterAdapter),
+    /// A preset-driven OpenAI-compatible adapter.
+    OpenAiCompatible(OpenAiCompatibleAdapter),
     /// A contract preset that is not implemented yet.
     Unsupported(UnsupportedAdapter),
 }
@@ -143,7 +168,7 @@ impl ProviderAdapter {
     /// Return the provider kind.
     pub fn kind(&self) -> ProviderKind {
         match self {
-            Self::OpenRouter(_) => ProviderKind::OpenaiCompatible,
+            Self::OpenRouter(_) | Self::OpenAiCompatible(_) => ProviderKind::OpenaiCompatible,
             Self::Unsupported(adapter) => adapter.kind,
         }
     }
@@ -152,13 +177,14 @@ impl ProviderAdapter {
     pub fn preset_id(&self) -> &str {
         match self {
             Self::OpenRouter(_) => "openrouter",
+            Self::OpenAiCompatible(adapter) => adapter.preset_id(),
             Self::Unsupported(adapter) => adapter.preset_id(),
         }
     }
 
     /// Return whether this adapter is implemented.
     pub fn is_supported(&self) -> bool {
-        matches!(self, Self::OpenRouter(_))
+        matches!(self, Self::OpenRouter(_) | Self::OpenAiCompatible(_))
     }
 
     /// Validate the key with `GET /key`.
@@ -180,6 +206,9 @@ impl ProviderAdapter {
                     }
                     _ = cancel.cancelled() => Err(cancelled_error(ctx.preset_id())),
                 }
+            }
+            Self::OpenAiCompatible(_) => {
+                crate::openai_compatible::validate_key(client, ctx, cancel).await
             }
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
@@ -203,6 +232,9 @@ impl ProviderAdapter {
                     _ = cancel.cancelled() => Err(cancelled_error(ctx.preset_id())),
                 }
             }
+            Self::OpenAiCompatible(_) => {
+                crate::openai_compatible::list_models(client, ctx, cancel).await
+            }
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
     }
@@ -223,6 +255,12 @@ impl ProviderAdapter {
                 body: build_body(request, supported_parameters, attachments)?,
                 headers: ctx.headers.clone(),
             }),
+            Self::OpenAiCompatible(_) => crate::openai_compatible::prepare_request(
+                ctx,
+                request,
+                supported_parameters,
+                attachments,
+            ),
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
     }
@@ -248,9 +286,19 @@ impl ProviderAdapter {
                 let key = ctx.require_key()?;
                 let prepared =
                     self.prepare_request(ctx, request, supported_parameters, attachments)?;
-                stream_chat_completions(client, &ctx.base_url, key, &prepared, cancel, |event| {
-                    on_event(event)
-                })
+                stream_chat_completions(client, &ctx.base_url, key, &prepared, cancel, on_event)
+                    .await
+            }
+            Self::OpenAiCompatible(_) => {
+                crate::openai_compatible::stream_chat(
+                    client,
+                    ctx,
+                    request,
+                    supported_parameters,
+                    attachments,
+                    cancel,
+                    on_event,
+                )
                 .await
             }
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
@@ -375,6 +423,11 @@ mod tests {
         assert_eq!(adapter.kind(), ProviderKind::OpenaiCompatible);
         assert_eq!(adapter.preset_id(), "openrouter");
         assert!(adapter.is_supported());
+
+        let compatible = ProviderAdapter::OpenAiCompatible(OpenAiCompatibleAdapter::new("openai"));
+        assert_eq!(compatible.kind(), ProviderKind::OpenaiCompatible);
+        assert_eq!(compatible.preset_id(), "openai");
+        assert!(compatible.is_supported());
 
         let unsupported = ProviderAdapter::Unsupported(UnsupportedAdapter::new(
             "anthropic",

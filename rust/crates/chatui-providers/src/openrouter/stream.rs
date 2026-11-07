@@ -36,11 +36,36 @@ use tokio_util::sync::CancellationToken;
 use crate::error::{NetworkError, NetworkErrorKind, parse_retry_after};
 use crate::http::{HttpClient, SecretHeader};
 use crate::openrouter::catalog::usd_amount;
-use crate::openrouter::errors::{OPENROUTER_PROVIDER_ID, map_http_error, map_stream_error};
+use crate::openrouter::errors::{
+    OPENROUTER_PROVIDER_ID, default_message, map_http_error_for, map_stream_error_for,
+};
 use crate::openrouter::request::PreparedChatRequest;
 use crate::retry::PartialOutput;
 use crate::sse::{DEFAULT_MAX_SSE_BUFFER_BYTES, SseError, read_sse};
 use crate::url_policy::join_url;
+
+/// How a provider expresses reasoning deltas.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReasoningStyle {
+    /// OpenRouter: prefer `reasoning_details`, then `reasoning`, and deduplicate
+    /// repeated or incremental reasoning text.
+    OpenRouter,
+    /// OpenAI-compatible: accept `reasoning_content` or `reasoning` and emit
+    /// each delta as-is.
+    OpenAi,
+}
+
+/// Per-request streaming configuration.
+pub struct StreamConfig<'a> {
+    /// Provider ID copied onto normalized errors.
+    pub provider_id: &'a str,
+    /// Reasoning field style.
+    pub reasoning_style: ReasoningStyle,
+    /// Optional secret authorization header.
+    pub auth: Option<SecretHeader>,
+    /// Provider-neutral fallback message for an HTTP status.
+    pub default_message: fn(Option<u16>) -> String,
+}
 
 /// The normalized result of one OpenRouter stream.
 #[derive(Debug, Clone, PartialEq)]
@@ -109,6 +134,9 @@ pub struct StreamDecoder {
     partial_output: PartialOutput,
     started_at: Instant,
     first_token_at: Option<Instant>,
+    reasoning_style: ReasoningStyle,
+    provider_id: String,
+    default_message: fn(Option<u16>) -> String,
 }
 
 impl Default for StreamDecoder {
@@ -120,6 +148,26 @@ impl Default for StreamDecoder {
 impl StreamDecoder {
     /// Create a decoder with no events seen.
     pub fn new() -> Self {
+        Self::with_reasoning_style(ReasoningStyle::OpenRouter)
+    }
+
+    /// Create a decoder with an explicit reasoning style.
+    pub fn with_reasoning_style(reasoning_style: ReasoningStyle) -> Self {
+        Self::with_provider(OPENROUTER_PROVIDER_ID, reasoning_style)
+    }
+
+    /// Create a decoder for a specific provider and reasoning style.
+    pub fn with_provider(provider_id: &str, reasoning_style: ReasoningStyle) -> Self {
+        Self::with_config(provider_id, reasoning_style, default_message)
+    }
+
+    /// Create a decoder for a specific provider, reasoning style, and fallback
+    /// message function.
+    pub fn with_config(
+        provider_id: &str,
+        reasoning_style: ReasoningStyle,
+        default_message: fn(Option<u16>) -> String,
+    ) -> Self {
         Self {
             started: false,
             done: false,
@@ -132,6 +180,9 @@ impl StreamDecoder {
             partial_output: PartialOutput::none(),
             started_at: Instant::now(),
             first_token_at: None,
+            reasoning_style,
+            provider_id: provider_id.to_owned(),
+            default_message,
         }
     }
 
@@ -159,9 +210,10 @@ impl StreamDecoder {
         let value: Value = match serde_json::from_str(data) {
             Ok(value) => value,
             Err(error) => {
-                self.set_error(parse_error(format!(
-                    "The provider stream contained invalid JSON: {error}"
-                )));
+                self.set_error(parse_error(
+                    &self.provider_id,
+                    format!("The provider stream contained invalid JSON: {error}"),
+                ));
                 events.push(StreamEvent::Error {
                     error: self.error.clone().expect("error was just set"),
                 });
@@ -177,7 +229,12 @@ impl StreamDecoder {
         }
 
         if value.get("error").is_some() {
-            let error = map_stream_error(&value, self.response_id.clone());
+            let error = map_stream_error_for(
+                &self.provider_id,
+                &value,
+                self.response_id.clone(),
+                self.default_message,
+            );
             self.error = Some(error.clone());
             events.push(StreamEvent::Error { error });
             return events;
@@ -199,13 +256,18 @@ impl StreamDecoder {
                     }
                 }
 
-                if let Some(candidate) = reasoning_text(delta)
-                    && let Some(text) = self.dedup_reasoning(&candidate)
-                {
-                    self.reasoning.push_str(&text);
-                    self.partial_output.mark_reasoning();
-                    self.mark_first_token();
-                    events.push(StreamEvent::ReasoningDelta { text });
+                if let Some(candidate) = reasoning_text(delta) {
+                    let text = match self.reasoning_style {
+                        ReasoningStyle::OpenRouter => self.dedup_reasoning(&candidate),
+                        ReasoningStyle::OpenAi => (!candidate.is_empty()).then_some(candidate),
+                    };
+
+                    if let Some(text) = text {
+                        self.reasoning.push_str(&text);
+                        self.partial_output.mark_reasoning();
+                        self.mark_first_token();
+                        events.push(StreamEvent::ReasoningDelta { text });
+                    }
                 }
             }
 
@@ -250,12 +312,14 @@ impl StreamDecoder {
             partial_output,
             started_at,
             first_token_at,
+            provider_id,
             ..
         } = self;
 
         let mut error = error;
         if error.is_none() && finish_reason.is_none() && !done {
             error = Some(parse_error(
+                &provider_id,
                 "The provider stream ended before a finish event.",
             ));
         }
@@ -320,19 +384,51 @@ pub async fn stream_chat<F>(
     body: &Value,
     headers: &BTreeMap<String, String>,
     cancel: &CancellationToken,
+    on_event: F,
+) -> Result<StreamSummary, ChatError>
+where
+    F: FnMut(StreamEvent) + Send,
+{
+    let authorization = SecretHeader::new(AUTHORIZATION, &format!("Bearer {api_key}"))
+        .map_err(|error| error.to_chat_error(Some(OPENROUTER_PROVIDER_ID.to_owned())))?;
+    let config = StreamConfig {
+        provider_id: OPENROUTER_PROVIDER_ID,
+        reasoning_style: ReasoningStyle::OpenRouter,
+        auth: Some(authorization),
+        default_message,
+    };
+
+    stream_chat_with(client, url, body, headers, config, cancel, on_event).await
+}
+
+/// Send a chat request with an explicit provider configuration.
+///
+/// This is the shared transport used by every OpenAI-compatible preset. The
+/// caller supplies the provider ID, reasoning style, optional secret header,
+/// and provider-neutral fallback message.
+pub async fn stream_chat_with<F>(
+    client: &HttpClient,
+    url: &Url,
+    body: &Value,
+    headers: &BTreeMap<String, String>,
+    config: StreamConfig<'_>,
+    cancel: &CancellationToken,
     mut on_event: F,
 ) -> Result<StreamSummary, ChatError>
 where
     F: FnMut(StreamEvent) + Send,
 {
     let prepared = client.prepare(Method::POST, url).map_err(|error| {
-        invalid_request_error(format!("The OpenRouter chat URL is invalid: {error}"))
+        invalid_request_error(
+            config.provider_id,
+            format!("The provider chat URL is invalid: {error}"),
+        )
     })?;
     let mut builder = prepared.into_builder().json(body);
 
-    let authorization = SecretHeader::new(AUTHORIZATION, &format!("Bearer {api_key}"))
-        .map_err(|error| error.to_chat_error(Some(OPENROUTER_PROVIDER_ID.to_owned())))?;
-    builder = authorization.apply(builder);
+    if let Some(authorization) = config.auth {
+        builder = authorization.apply(builder);
+    }
 
     for (name, value) in headers {
         builder = builder.header(name, value);
@@ -341,7 +437,7 @@ where
     let response = client
         .send(builder)
         .await
-        .map_err(|error| error.to_chat_error(Some(OPENROUTER_PROVIDER_ID.to_owned())))?;
+        .map_err(|error| error.to_chat_error(Some(config.provider_id.to_owned())))?;
 
     let status = response.status();
     if !status.is_success() {
@@ -357,17 +453,23 @@ where
             .ok()
             .and_then(|text| serde_json::from_str::<Value>(&text).ok());
 
-        return Err(map_http_error(
+        return Err(map_http_error_for(
+            config.provider_id,
             status.as_u16(),
             retry_after,
             body.as_ref(),
             request_id,
+            config.default_message,
         ));
     }
 
     let read_cancel = cancel.child_token();
     let cancel_for_closure = read_cancel.clone();
-    let mut decoder = StreamDecoder::new();
+    let mut decoder = StreamDecoder::with_config(
+        config.provider_id,
+        config.reasoning_style,
+        config.default_message,
+    );
 
     let read_result = read_sse(
         response.bytes_stream(),
@@ -388,7 +490,7 @@ where
         Ok(()) => {}
         Err(SseError::Cancelled) => {
             if !decoder.has_error() {
-                decoder.set_error(cancelled_error());
+                decoder.set_error(cancelled_error(config.provider_id));
             }
         }
         Err(SseError::Stream { message }) => {
@@ -397,19 +499,23 @@ where
                     NetworkErrorKind::Connection,
                     format!("The provider stream failed: {message}"),
                 );
-                decoder.set_error(error.to_chat_error(Some(OPENROUTER_PROVIDER_ID.to_owned())));
+                decoder.set_error(error.to_chat_error(Some(config.provider_id.to_owned())));
             }
         }
         Err(SseError::BufferOverflow { max_bytes }) => {
             if !decoder.has_error() {
-                decoder.set_error(parse_error(format!(
-                    "The provider stream exceeded the {max_bytes} byte buffer limit."
-                )));
+                decoder.set_error(parse_error(
+                    config.provider_id,
+                    format!("The provider stream exceeded the {max_bytes} byte buffer limit."),
+                ));
             }
         }
         Err(SseError::InvalidUtf8) => {
             if !decoder.has_error() {
-                decoder.set_error(parse_error("The provider stream contained invalid UTF-8."));
+                decoder.set_error(parse_error(
+                    config.provider_id,
+                    "The provider stream contained invalid UTF-8.",
+                ));
             }
         }
     }
@@ -433,7 +539,10 @@ where
     F: FnMut(StreamEvent) + Send,
 {
     let url = join_url(base_url, "chat/completions").map_err(|error| {
-        invalid_request_error(format!("The OpenRouter chat URL is invalid: {error}"))
+        invalid_request_error(
+            OPENROUTER_PROVIDER_ID,
+            format!("The OpenRouter chat URL is invalid: {error}"),
+        )
     })?;
 
     stream_chat(
@@ -517,6 +626,12 @@ fn reasoning_text(delta: &Value) -> Option<String> {
         .get("reasoning")
         .and_then(Value::as_str)
         .filter(|text| !text.is_empty())
+        .or_else(|| {
+            delta
+                .get("reasoning_content")
+                .and_then(Value::as_str)
+                .filter(|text| !text.is_empty())
+        })
         .map(str::to_owned)
 }
 
@@ -532,11 +647,11 @@ fn extract_request_id(headers: &HeaderMap) -> Option<String> {
     None
 }
 
-fn invalid_request_error(message: impl Into<String>) -> ChatError {
+fn invalid_request_error(provider_id: &str, message: impl Into<String>) -> ChatError {
     ChatError {
         code: ChatErrorCode::InvalidRequest,
         message: message.into(),
-        provider_id: Some(OPENROUTER_PROVIDER_ID.to_owned()),
+        provider_id: Some(provider_id.to_owned()),
         status: None,
         retryable: false,
         retry_after_seconds: None,
@@ -546,11 +661,11 @@ fn invalid_request_error(message: impl Into<String>) -> ChatError {
     }
 }
 
-fn cancelled_error() -> ChatError {
+fn cancelled_error(provider_id: &str) -> ChatError {
     ChatError {
         code: ChatErrorCode::Cancelled,
         message: "The request was cancelled.".to_owned(),
-        provider_id: Some(OPENROUTER_PROVIDER_ID.to_owned()),
+        provider_id: Some(provider_id.to_owned()),
         status: None,
         retryable: false,
         retry_after_seconds: None,
@@ -560,11 +675,11 @@ fn cancelled_error() -> ChatError {
     }
 }
 
-fn parse_error(message: impl Into<String>) -> ChatError {
+fn parse_error(provider_id: &str, message: impl Into<String>) -> ChatError {
     ChatError {
         code: ChatErrorCode::Parse,
         message: message.into(),
-        provider_id: Some(OPENROUTER_PROVIDER_ID.to_owned()),
+        provider_id: Some(provider_id.to_owned()),
         status: None,
         retryable: false,
         retry_after_seconds: None,

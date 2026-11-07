@@ -29,11 +29,45 @@ pub fn map_http_error(
     body: Option<&Value>,
     request_id: Option<String>,
 ) -> ChatError {
+    map_http_error_for(
+        OPENROUTER_PROVIDER_ID,
+        status,
+        retry_after_seconds,
+        body,
+        request_id,
+        default_message,
+    )
+}
+
+/// Map an HTTP error response for a specific provider.
+///
+/// `default_message` supplies the provider-neutral fallback when the envelope
+/// has no message. The provider ID is copied onto the normalized error.
+pub fn map_http_error_for(
+    provider_id: &str,
+    status: u16,
+    retry_after_seconds: Option<f64>,
+    body: Option<&Value>,
+    request_id: Option<String>,
+    default_message: fn(Option<u16>) -> String,
+) -> ChatError {
     match body.and_then(|body| body.get("error")) {
-        Some(error) => {
-            map_error_object(error, Some(status), retry_after_seconds, request_id, false)
-        }
-        None => default_error(status, retry_after_seconds, request_id),
+        Some(error) => map_error_object_for(
+            provider_id,
+            error,
+            Some(status),
+            retry_after_seconds,
+            request_id,
+            false,
+            default_message,
+        ),
+        None => default_error_for(
+            provider_id,
+            status,
+            retry_after_seconds,
+            request_id,
+            default_message,
+        ),
     }
 }
 
@@ -43,16 +77,40 @@ pub fn map_http_error(
 /// have emitted partial text or reasoning. The response ID from the `start`
 /// event is preserved as the request ID.
 pub fn map_stream_error(envelope: &Value, response_id: Option<String>) -> ChatError {
+    map_stream_error_for(
+        OPENROUTER_PROVIDER_ID,
+        envelope,
+        response_id,
+        default_message,
+    )
+}
+
+/// Map an in-stream error object for a specific provider.
+pub fn map_stream_error_for(
+    provider_id: &str,
+    envelope: &Value,
+    response_id: Option<String>,
+    default_message: fn(Option<u16>) -> String,
+) -> ChatError {
     match envelope.get("error") {
-        Some(error) => map_error_object(error, None, None, response_id, true),
-        None => default_error(200, None, response_id),
+        Some(error) => map_error_object_for(
+            provider_id,
+            error,
+            None,
+            None,
+            response_id,
+            true,
+            default_message,
+        ),
+        None => default_error_for(provider_id, 200, None, response_id, default_message),
     }
 }
 
 /// Map an OpenRouter error object to a normalized [`ChatError`].
 ///
 /// `http_status` is the response status for an HTTP error. For an in-stream
-/// error the status is taken from the envelope's numeric `code` field instead.
+/// error the status is taken from the envelope's numeric `code` field, then its
+/// `type` field, then the HTTP status.
 pub fn map_error_object(
     error: &Value,
     http_status: Option<u16>,
@@ -60,11 +118,33 @@ pub fn map_error_object(
     request_id: Option<String>,
     in_stream: bool,
 ) -> ChatError {
+    map_error_object_for(
+        OPENROUTER_PROVIDER_ID,
+        error,
+        http_status,
+        retry_after_seconds,
+        request_id,
+        in_stream,
+        default_message,
+    )
+}
+
+/// Map an error object for a specific provider.
+pub fn map_error_object_for(
+    provider_id: &str,
+    error: &Value,
+    http_status: Option<u16>,
+    retry_after_seconds: Option<f64>,
+    request_id: Option<String>,
+    in_stream: bool,
+    default_message: fn(Option<u16>) -> String,
+) -> ChatError {
     let status = error
         .get("code")
         .and_then(Value::as_u64)
         .and_then(|code| u16::try_from(code).ok())
-        .or(http_status);
+        .or(http_status)
+        .or_else(|| stream_status_from_type(error));
     let message = error
         .get("message")
         .and_then(Value::as_str)
@@ -81,12 +161,26 @@ pub fn map_error_object(
         })
     };
     let retryable = !in_stream && status.is_some_and(is_retryable_status);
-    let details = metadata.and_then(map_metadata);
+    let mut details = metadata.and_then(map_metadata);
+    if let Some(seconds) = retry_after_seconds {
+        let mut mapped = details
+            .and_then(|value| value.as_object().cloned())
+            .unwrap_or_default();
+        let value = if seconds.fract() == 0.0 && seconds >= 0.0 && seconds <= u64::MAX as f64 {
+            Value::from(seconds as u64)
+        } else {
+            Value::from(seconds)
+        };
+        mapped
+            .entry("retryAfterSeconds".to_owned())
+            .or_insert(value);
+        details = Some(Value::Object(mapped));
+    }
 
     ChatError {
         code: map_code(status, &message),
         message,
-        provider_id: Some(OPENROUTER_PROVIDER_ID.to_owned()),
+        provider_id: Some(provider_id.to_owned()),
         status,
         retryable,
         retry_after_seconds,
@@ -96,21 +190,35 @@ pub fn map_error_object(
     }
 }
 
-fn default_error(
+fn default_error_for(
+    provider_id: &str,
     status: u16,
     retry_after_seconds: Option<f64>,
     request_id: Option<String>,
+    default_message: fn(Option<u16>) -> String,
 ) -> ChatError {
     ChatError {
         code: map_code(Some(status), ""),
         message: default_message(Some(status)),
-        provider_id: Some(OPENROUTER_PROVIDER_ID.to_owned()),
+        provider_id: Some(provider_id.to_owned()),
         status: Some(status),
         retryable: is_retryable_status(status),
         retry_after_seconds,
         request_id,
         details: None,
         at: Timestamp::now(),
+    }
+}
+
+fn stream_status_from_type(error: &Value) -> Option<u16> {
+    match error.get("type").and_then(Value::as_str) {
+        Some("server_error") => Some(500),
+        Some("rate_limit_error") => Some(429),
+        Some("invalid_request_error") => Some(400),
+        Some("authentication_error") => Some(401),
+        Some("permission_error") => Some(403),
+        Some("not_found_error") => Some(404),
+        _ => None,
     }
 }
 
@@ -132,6 +240,8 @@ fn map_code(status: Option<u16>, message: &str) -> ChatErrorCode {
         Some(400) => {
             if is_context_length(message) {
                 ChatErrorCode::ContextLength
+            } else if is_content_filter(message) {
+                ChatErrorCode::ContentFilter
             } else {
                 ChatErrorCode::InvalidRequest
             }
@@ -141,7 +251,7 @@ fn map_code(status: Option<u16>, message: &str) -> ChatErrorCode {
     }
 }
 
-fn default_message(status: Option<u16>) -> String {
+pub(crate) fn default_message(status: Option<u16>) -> String {
     match status {
         Some(401) => "Authentication failed. Check your OpenRouter API key.".to_owned(),
         Some(402) => "Insufficient credits. Add more credits to continue.".to_owned(),
