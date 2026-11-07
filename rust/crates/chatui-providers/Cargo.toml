@@ -14,13 +14,13 @@ reqwest = { version = "0.12.24", default-features = false, features = [
   "stream",
 ] }
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "time"] }
+tokio = { version = "1", features = ["macros", "sync", "time"] }
 tokio-util = "0.7"
 url = "2"
 
 [dev-dependencies]
 chatui-conformance = { path = "../../tests/conformance" }
 futures-util = "0.3"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "time"] }
 tokio-util = "0.7"
 wiremock = "0.6"

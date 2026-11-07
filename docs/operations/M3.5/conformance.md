@@ -91,6 +91,62 @@ Run them with:
 cd rust && cargo nextest run -p chatui-conformance
 ```
 
+## Network test harness
+
+`rust/crates/chatui-providers/tests/network/harness.rs` is the reusable network
+harness for provider adapter tests. It has two parts:
+
+- `NetworkHarness` wraps a `wiremock` server. It mounts SSE bodies, keep-alive
+  comments, mid-stream error events, `Retry-After` responses, delayed
+  responses, and plain status errors. `received_requests()` returns the
+  recorded requests so a test can assert retry counts.
+- `ChunkedSseServer` is a small raw TCP server that writes a real
+  `Transfer-Encoding: chunked` SSE response. `wiremock` buffers a response
+  body, so this server is the only way to exercise chunk boundaries,
+  mid-stream connection failures, and cancellation while a stream is open.
+  `ChunkedSseServer::start_abrupt` closes the connection without the final
+  zero-length chunk to simulate a transport failure.
+
+| API | Purpose |
+| --- | --- |
+| `NetworkHarness::start()` | Start a mock server. |
+| `NetworkHarness::uri()` | Base URI for requests. |
+| `mount_sse(route, body)` | Raw SSE body. |
+| `mount_sse_events(route, events)` | One `data:` event per payload. |
+| `mount_keepalive_sse(route, events)` | Keep-alive comments between events. |
+| `mount_mid_stream_error(route, partial)` | Partial text followed by an error event. |
+| `mount_retry_after(route, status, seconds)` | Status response with `Retry-After`. |
+| `mount_delayed(route, delay)` | Delayed response for timeout tests. |
+| `mount_status(route, status)` | Plain status response. |
+| `received_requests()` | Recorded requests for retry-count assertions. |
+| `closed_port_uri()` | URI with no listener for connection-failure tests. |
+| `ChunkedSseServer::start(chunks)` | Chunked SSE response with a clean terminator. |
+| `ChunkedSseServer::start_abrupt(chunks)` | Chunked SSE response that drops mid-stream. |
+| `SseChunk::new(data)` / `.with_delay(delay)` | One chunk and its pre-write delay. |
+
+A provider test outside `tests/network/` includes the harness with:
+
+```rust
+#[path = "network/harness.rs"]
+mod harness;
+```
+
+The harness tests currently run as the `network` test target:
+
+- `harness_serves_chunked_sse`
+- `harness_serves_sse_events`
+- `harness_serves_keepalives`
+- `harness_serves_mid_stream_error_event`
+- `harness_reports_mid_stream_error`
+- `harness_honors_retry_after`
+- `harness_simulates_connection_failure`
+- `harness_simulates_timeout`
+- `cancellation_interrupts_stream_reads`
+- `watchdog_cancels_stalled_stream`
+- `retry_attempts_three_times_before_giving_up`
+- `retry_does_not_repeat_after_partial_output`
+- `retry_loop_uses_retry_after_from_failure`
+
 ## Adding a conformance case
 
 Shared vectors are the contract. Do not edit them to make an adapter pass.
