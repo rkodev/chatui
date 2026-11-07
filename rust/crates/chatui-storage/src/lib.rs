@@ -1,8 +1,9 @@
 //! SQLite storage foundation for the ChatUI desktop client.
 //!
-//! This crate owns the database connection lifecycle, pragmas, and versioned
-//! migrations. Repository APIs, attachment storage, and export/import arrive in
-//! later M3.5-03 tasks. UI and provider crates must never issue SQL directly.
+//! This crate owns the database connection lifecycle, pragmas, versioned
+//! migrations, repositories, content-addressed attachment storage, and startup
+//! recovery. Export/import arrives in a later M3.5-03 task. UI and provider
+//! crates must never issue SQL directly.
 //!
 //! # Database location
 //!
@@ -38,15 +39,24 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use thiserror::Error;
 
+pub mod attachments;
 pub mod db;
 pub mod mappers;
+pub mod paths;
+pub mod recovery;
 pub mod repositories;
 pub mod search;
 
+pub use attachments::{AttachmentLease, AttachmentService, AttachmentStore, sha256_hex};
 pub use db::{
     BUSY_TIMEOUT_MS, PragmaState, open_database, open_default_database, open_in_memory,
     read_pragmas, run_migrations, verify_fts5, verify_pragmas,
 };
+pub use paths::{
+    ATTACHMENTS_DIR_NAME, STORAGE_KEY_LEN, attachment_path, attachments_dir, is_valid_storage_key,
+    storage_key_for_sha256, validate_storage_key,
+};
+pub use recovery::{INTERRUPTION_NOTE, RecoveryFailure, RecoveryService, RecoverySummary};
 pub use repositories::{
     AttachmentRepository, BackupConfigRepository, ConversationFilter, ConversationRepository,
     MessagePage, MessageRepository, ModelRepository, ProviderRepository, SecretRecord,

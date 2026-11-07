@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use async_trait::async_trait;
-use chatui_domain::{Message, Timestamp};
+use chatui_domain::{Message, MessageStatus, Timestamp};
 use sqlx::SqlitePool;
 use sqlx::sqlite::SqliteConnection;
 
@@ -65,6 +65,10 @@ pub trait MessageRepository: Send + Sync {
     /// This is intended for export/import and tests. UI code must use the
     /// bounded page methods instead.
     async fn list_all(&self, conversation_id: &str) -> Result<Vec<Message>, StorageError>;
+    /// Return every non-deleted message with the given status.
+    ///
+    /// Startup recovery uses this to find messages left in `streaming`.
+    async fn list_by_status(&self, status: MessageStatus) -> Result<Vec<Message>, StorageError>;
 }
 
 /// SQLite-backed message repository.
@@ -403,6 +407,29 @@ impl MessageRepository for SqliteMessageRepository {
 
         let rows = sqlx::query_as::<_, MessageRow>(&query)
             .bind(conversation_id)
+            .fetch_all(&self.pool)
+            .await?;
+
+        rows.into_iter().map(MessageRow::into_domain).collect()
+    }
+
+    async fn list_by_status(&self, status: MessageStatus) -> Result<Vec<Message>, StorageError> {
+        let status = match serde_json::to_value(status)? {
+            serde_json::Value::String(text) => text,
+            other => {
+                return Err(StorageError::Mapping(format!(
+                    "expected a string message status, got {other}"
+                )));
+            }
+        };
+
+        let query = format!(
+            "SELECT {SELECT_COLUMNS} FROM messages \
+             WHERE status = ? AND deleted_at IS NULL \
+             ORDER BY conversation_id ASC, sequence ASC"
+        );
+        let rows = sqlx::query_as::<_, MessageRow>(&query)
+            .bind(status)
             .fetch_all(&self.pool)
             .await?;
 
