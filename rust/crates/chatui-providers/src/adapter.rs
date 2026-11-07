@@ -6,10 +6,10 @@
 //! secrets. Everything they need is passed in through [`ProviderContext`].
 //!
 //! M3.5-06.4 implements OpenRouter only. M3.5-07.1 adds the preset-driven
-//! OpenAI-compatible adapter, M3.5-07.2 adds the native Anthropic adapter, and
-//! M3.5-07.3 adds the native Google Gemini adapter. Every other contract preset
-//! gets an [`UnsupportedAdapter`] that returns a clear error until its own task
-//! lands.
+//! OpenAI-compatible adapter, M3.5-07.2 adds the native Anthropic adapter,
+//! M3.5-07.3 adds the native Google Gemini adapter, and M3.5-07.4 adds the
+//! native Ollama adapter. Every other contract preset gets an
+//! [`UnsupportedAdapter`] that returns a clear error until its own task lands.
 
 #![allow(clippy::result_large_err)]
 
@@ -22,6 +22,7 @@ use tokio_util::sync::CancellationToken;
 use crate::anthropic::AnthropicAdapter;
 use crate::gemini::GeminiAdapter;
 use crate::http::HttpClient;
+use crate::ollama::OllamaAdapter;
 use crate::openrouter::catalog::{CatalogModel, list_models};
 use crate::openrouter::key::{OpenRouterError, ProviderKeyInfo, validate_key};
 use crate::openrouter::request::{
@@ -169,6 +170,8 @@ pub enum ProviderAdapter {
     Anthropic(AnthropicAdapter),
     /// The native Google Gemini adapter.
     Gemini(GeminiAdapter),
+    /// The native Ollama adapter.
+    Ollama(OllamaAdapter),
     /// A contract preset that is not implemented yet.
     Unsupported(UnsupportedAdapter),
 }
@@ -180,6 +183,7 @@ impl ProviderAdapter {
             Self::OpenRouter(_) | Self::OpenAiCompatible(_) => ProviderKind::OpenaiCompatible,
             Self::Anthropic(_) => ProviderKind::Anthropic,
             Self::Gemini(_) => ProviderKind::GoogleGemini,
+            Self::Ollama(_) => ProviderKind::OpenaiCompatible,
             Self::Unsupported(adapter) => adapter.kind,
         }
     }
@@ -191,6 +195,7 @@ impl ProviderAdapter {
             Self::OpenAiCompatible(adapter) => adapter.preset_id(),
             Self::Anthropic(adapter) => adapter.preset_id(),
             Self::Gemini(adapter) => adapter.preset_id(),
+            Self::Ollama(adapter) => adapter.preset_id(),
             Self::Unsupported(adapter) => adapter.preset_id(),
         }
     }
@@ -199,7 +204,11 @@ impl ProviderAdapter {
     pub fn is_supported(&self) -> bool {
         matches!(
             self,
-            Self::OpenRouter(_) | Self::OpenAiCompatible(_) | Self::Anthropic(_) | Self::Gemini(_)
+            Self::OpenRouter(_)
+                | Self::OpenAiCompatible(_)
+                | Self::Anthropic(_)
+                | Self::Gemini(_)
+                | Self::Ollama(_)
         )
     }
 
@@ -228,6 +237,7 @@ impl ProviderAdapter {
             }
             Self::Anthropic(_) => crate::anthropic::validate_key(client, ctx, cancel).await,
             Self::Gemini(_) => crate::gemini::validate_key(client, ctx, cancel).await,
+            Self::Ollama(_) => crate::ollama::validate_key(client, ctx, cancel).await,
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
     }
@@ -255,6 +265,7 @@ impl ProviderAdapter {
             }
             Self::Anthropic(_) => crate::anthropic::list_models(client, ctx, cancel).await,
             Self::Gemini(_) => crate::gemini::list_models(client, ctx, cancel).await,
+            Self::Ollama(_) => crate::ollama::list_models(client, ctx, cancel).await,
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
     }
@@ -286,6 +297,9 @@ impl ProviderAdapter {
             }
             Self::Gemini(_) => {
                 crate::gemini::prepare_request(ctx, request, supported_parameters, attachments)
+            }
+            Self::Ollama(_) => {
+                crate::ollama::prepare_request(ctx, request, supported_parameters, attachments)
             }
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
@@ -341,6 +355,18 @@ impl ProviderAdapter {
             }
             Self::Gemini(_) => {
                 crate::gemini::stream_chat(
+                    client,
+                    ctx,
+                    request,
+                    supported_parameters,
+                    attachments,
+                    cancel,
+                    on_event,
+                )
+                .await
+            }
+            Self::Ollama(_) => {
+                crate::ollama::stream_chat(
                     client,
                     ctx,
                     request,
@@ -483,6 +509,11 @@ mod tests {
         assert_eq!(anthropic.kind(), ProviderKind::Anthropic);
         assert_eq!(anthropic.preset_id(), "anthropic");
         assert!(anthropic.is_supported());
+
+        let ollama = ProviderAdapter::Ollama(OllamaAdapter::new("ollama"));
+        assert_eq!(ollama.kind(), ProviderKind::OpenaiCompatible);
+        assert_eq!(ollama.preset_id(), "ollama");
+        assert!(ollama.is_supported());
 
         let unsupported = ProviderAdapter::Unsupported(UnsupportedAdapter::new(
             "google",

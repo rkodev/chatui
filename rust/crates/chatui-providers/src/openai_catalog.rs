@@ -10,24 +10,14 @@
 //! [`chatui_domain::Model`] shape. Callers assign local identity and timestamps
 //! with [`CatalogModel::to_model`].
 
-use std::collections::HashSet;
 use std::fmt;
 
 use chatui_contracts::ProviderPreset;
 use chatui_domain::{InputModality, ModelCapability, OutputModality, ProviderKind};
 use serde_json::Value;
 
+use crate::capabilities::infer_model_metadata;
 use crate::openrouter::catalog::CatalogModel;
-
-/// Capability order used by the shared contract vectors.
-const CAPABILITY_ORDER: [ModelCapability; 6] = [
-    ModelCapability::Text,
-    ModelCapability::Vision,
-    ModelCapability::Files,
-    ModelCapability::Tools,
-    ModelCapability::Reasoning,
-    ModelCapability::Streaming,
-];
 
 /// Defaults used when an OpenAI-compatible `/models` response omits metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,6 +81,16 @@ pub fn google_catalog_defaults() -> CatalogDefaults {
     }
 }
 
+/// Defaults for the Ollama preset.
+///
+/// Ollama's `/api/tags` response reports no capability metadata, so the shared
+/// text-only defaults apply. This is the same shape as the OpenAI defaults but
+/// is named separately so the Ollama discovery mapper does not depend on a
+/// provider-name branch.
+pub fn ollama_catalog_defaults() -> CatalogDefaults {
+    openai_catalog_defaults()
+}
+
 /// Return the capability-inference defaults for one contract preset.
 ///
 /// The defaults are selected by provider kind, not by a hardcoded provider
@@ -136,159 +136,6 @@ fn is_record(value: &Value) -> bool {
     value.is_object()
 }
 
-fn first_defined<'a>(values: &[Option<&'a Value>]) -> Option<&'a Value> {
-    values
-        .iter()
-        .flatten()
-        .copied()
-        .find(|value| !value.is_null())
-}
-
-fn input_modality(value: &str) -> Option<InputModality> {
-    match value {
-        "text" => Some(InputModality::Text),
-        "image" => Some(InputModality::Image),
-        "file" => Some(InputModality::File),
-        "audio" => Some(InputModality::Audio),
-        "video" => Some(InputModality::Video),
-        _ => None,
-    }
-}
-
-fn output_modality(value: &str) -> Option<OutputModality> {
-    match value {
-        "text" => Some(OutputModality::Text),
-        "image" => Some(OutputModality::Image),
-        "audio" => Some(OutputModality::Audio),
-        _ => None,
-    }
-}
-
-fn unique_input_modalities(value: Option<&Value>) -> Vec<InputModality> {
-    let Some(Value::Array(items)) = value else {
-        return Vec::new();
-    };
-
-    let mut seen = HashSet::new();
-    items
-        .iter()
-        .filter_map(Value::as_str)
-        .filter_map(input_modality)
-        .filter(|modality| seen.insert(*modality))
-        .collect()
-}
-
-fn unique_output_modalities(value: Option<&Value>) -> Vec<OutputModality> {
-    let Some(Value::Array(items)) = value else {
-        return Vec::new();
-    };
-
-    let mut seen = HashSet::new();
-    items
-        .iter()
-        .filter_map(Value::as_str)
-        .filter_map(output_modality)
-        .filter(|modality| seen.insert(*modality))
-        .collect()
-}
-
-fn unique_strings(value: Option<&Value>) -> Vec<String> {
-    let Some(Value::Array(items)) = value else {
-        return Vec::new();
-    };
-
-    let mut seen = HashSet::new();
-    items
-        .iter()
-        .filter_map(Value::as_str)
-        .filter(|item| seen.insert((*item).to_owned()))
-        .map(str::to_owned)
-        .collect()
-}
-
-fn ordered_capabilities(value: Option<&Value>) -> Vec<ModelCapability> {
-    let Some(Value::Array(items)) = value else {
-        return Vec::new();
-    };
-
-    let declared: HashSet<ModelCapability> = items
-        .iter()
-        .filter_map(Value::as_str)
-        .filter_map(|value| match value {
-            "text" => Some(ModelCapability::Text),
-            "vision" => Some(ModelCapability::Vision),
-            "files" => Some(ModelCapability::Files),
-            "tools" => Some(ModelCapability::Tools),
-            "reasoning" => Some(ModelCapability::Reasoning),
-            "streaming" => Some(ModelCapability::Streaming),
-            _ => None,
-        })
-        .collect();
-
-    CAPABILITY_ORDER
-        .iter()
-        .copied()
-        .filter(|capability| declared.contains(capability))
-        .collect()
-}
-
-fn infer_capabilities(
-    input_modalities: &[InputModality],
-    output_modalities: &[OutputModality],
-    supported_parameters: &[String],
-) -> Vec<ModelCapability> {
-    let mut capabilities = HashSet::new();
-
-    if input_modalities.contains(&InputModality::Text)
-        || output_modalities.contains(&OutputModality::Text)
-    {
-        capabilities.insert(ModelCapability::Text);
-    }
-
-    if input_modalities.contains(&InputModality::Image) {
-        capabilities.insert(ModelCapability::Vision);
-    }
-
-    if input_modalities.contains(&InputModality::File) {
-        capabilities.insert(ModelCapability::Files);
-    }
-
-    if supported_parameters
-        .iter()
-        .any(|parameter| parameter == "tools" || parameter == "tool_choice")
-    {
-        capabilities.insert(ModelCapability::Tools);
-    }
-
-    if supported_parameters
-        .iter()
-        .any(|parameter| parameter == "reasoning" || parameter == "include_reasoning")
-    {
-        capabilities.insert(ModelCapability::Reasoning);
-    }
-
-    if supported_parameters
-        .iter()
-        .any(|parameter| parameter == "stream")
-    {
-        capabilities.insert(ModelCapability::Streaming);
-    }
-
-    CAPABILITY_ORDER
-        .iter()
-        .copied()
-        .filter(|capability| capabilities.contains(capability))
-        .collect()
-}
-
-fn to_positive_integer(value: Option<&Value>) -> Option<u32> {
-    let number = value?.as_u64()?;
-    if number == 0 || number > u64::from(u32::MAX) {
-        return None;
-    }
-    u32::try_from(number).ok()
-}
-
 /// Map one OpenAI-compatible model entry.
 ///
 /// Raw provider values win. Missing modalities, capabilities, and supported
@@ -305,40 +152,7 @@ pub fn map_model(raw: &Value, defaults: &CatalogDefaults) -> Option<CatalogModel
         return None;
     }
 
-    let declared_input = unique_input_modalities(first_defined(&[
-        raw.get("inputModalities"),
-        raw.get("input_modalities"),
-    ]));
-    let declared_output = unique_output_modalities(first_defined(&[
-        raw.get("outputModalities"),
-        raw.get("output_modalities"),
-    ]));
-    let declared_parameters = unique_strings(first_defined(&[
-        raw.get("supportedParameters"),
-        raw.get("supported_parameters"),
-    ]));
-    let declared_capabilities = ordered_capabilities(raw.get("capabilities"));
-
-    let input_modalities = if declared_input.is_empty() {
-        defaults.input_modalities.clone()
-    } else {
-        declared_input
-    };
-    let output_modalities = if declared_output.is_empty() {
-        defaults.output_modalities.clone()
-    } else {
-        declared_output
-    };
-    let supported_parameters = if declared_parameters.is_empty() {
-        defaults.supported_parameters.clone()
-    } else {
-        declared_parameters
-    };
-    let capabilities = if declared_capabilities.is_empty() {
-        infer_capabilities(&input_modalities, &output_modalities, &supported_parameters)
-    } else {
-        declared_capabilities
-    };
+    let inferred = infer_model_metadata(raw, defaults);
 
     let label = raw
         .get("name")
@@ -353,21 +167,13 @@ pub fn map_model(raw: &Value, defaults: &CatalogDefaults) -> Option<CatalogModel
         remote_id: remote_id.to_owned(),
         canonical_slug: None,
         label,
-        context_window: to_positive_integer(first_defined(&[
-            raw.get("contextWindow"),
-            raw.get("context_window"),
-            raw.get("context_length"),
-        ])),
-        max_output_tokens: to_positive_integer(first_defined(&[
-            raw.get("maxOutputTokens"),
-            raw.get("max_output_tokens"),
-            raw.get("max_completion_tokens"),
-        ])),
-        capabilities,
+        context_window: inferred.context_window,
+        max_output_tokens: inferred.max_output_tokens,
+        capabilities: inferred.capabilities,
         pricing: None,
-        input_modalities,
-        output_modalities,
-        supported_parameters,
+        input_modalities: inferred.input_modalities,
+        output_modalities: inferred.output_modalities,
+        supported_parameters: inferred.supported_parameters,
         metadata: None,
         is_free: false,
         hidden: remote_id.to_ascii_lowercase().contains("embed"),

@@ -208,6 +208,7 @@ fn registry_enables_openai_compatible_presets() {
                 | ModelDiscoveryFormat::Openai
                 | ModelDiscoveryFormat::Anthropic
                 | ModelDiscoveryFormat::Gemini
+                | ModelDiscoveryFormat::OllamaTags
         );
         assert_eq!(
             adapter.is_supported(),
@@ -239,11 +240,11 @@ fn registry_enables_openai_compatible_presets() {
     }
 
     assert!(
-        !registry
+        registry
             .adapter("ollama")
             .unwrap_or_else(|| panic!("missing adapter ollama"))
             .is_supported(),
-        "ollama must remain unsupported"
+        "ollama must be supported"
     );
 }
 

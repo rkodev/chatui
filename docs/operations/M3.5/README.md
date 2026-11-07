@@ -62,7 +62,7 @@
 | 24 | [M3.5-07.1 OpenAI-compatible preset adapters](M3.5-07.1-openai-compatible-presets.md) | Complete | M3.5-06.4 | providers | none; unblocks native adapters |
 | 25 | [M3.5-07.2 Anthropic adapter](M3.5-07.2-anthropic-adapter.md) | Complete | M3.5-07.1 | providers | yes, with M3.5-07.3 and M3.5-07.4 |
 | 26 | [M3.5-07.3 Gemini adapter](M3.5-07.3-gemini-adapter.md) | Complete | M3.5-07.1 | providers | yes, with M3.5-07.2 and M3.5-07.4 |
-| 27 | [M3.5-07.4 Ollama adapter, discovery fallback, and capability inference](M3.5-07.4-ollama-discovery.md) | Not started | M3.5-07.1 | providers | yes, with M3.5-07.2 and M3.5-07.3 |
+| 27 | [M3.5-07.4 Ollama adapter, discovery fallback, and capability inference](M3.5-07.4-ollama-discovery.md) | Complete | M3.5-07.1 | providers | yes, with M3.5-07.2 and M3.5-07.3 |
 | 28 | [M3.5-08.1 Design tokens, theme, accessibility primitives, and responsive shell](M3.5-08.1-tokens-shell.md) | Not started | M3.5-01.2, M3.5-02.1 | ui | yes, with M3.5-03.*, M3.5-04.*, M3.5-05.*, M3.5-06.* |
 | 29 | [M3.5-08.2 Onboarding, key entry, connection test, and default model](M3.5-08.2-onboarding.md) | Not started | M3.5-08.1, M3.5-04.1, M3.5-06.1, M3.5-06.4 | ui | none; unblocks provider/model UI |
 | 30 | [M3.5-08.3 Provider management and key lifecycle UI](M3.5-08.3-provider-management.md) | Not started | M3.5-08.2, M3.5-04.2, M3.5-06.4 | ui | yes, with M3.5-08.4 |

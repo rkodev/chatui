@@ -6,10 +6,13 @@
 pub mod adapter;
 pub mod anthropic;
 pub mod cancel;
+pub mod capabilities;
+pub mod discovery;
 pub mod error;
 pub mod gemini;
 pub mod http;
 pub mod ndjson;
+pub mod ollama;
 pub mod openai_catalog;
 pub mod openai_compatible;
 pub mod openrouter {
@@ -37,6 +40,14 @@ pub use anthropic::{
     prepare_request as prepare_anthropic_request,
 };
 pub use cancel::{Cancellation, CancellationToken};
+pub use capabilities::{
+    CAPABILITY_ORDER, InferredModelMetadata, infer_capabilities, infer_model_metadata,
+    ordered_capabilities,
+};
+pub use discovery::{
+    FallbackCatalogEntry, FallbackSelection, fallback_model_ids_for, map_ollama_model,
+    map_ollama_tags, select_fallback_model,
+};
 pub use error::{NetworkError, NetworkErrorKind, is_retryable_status, parse_retry_after};
 pub use gemini::{
     GEMINI_EXTRA_NAMESPACE, GEMINI_PROVIDER_ID, GeminiAdapter, GeminiStreamDecoder,
@@ -52,10 +63,18 @@ pub use http::{
     same_origin,
 };
 pub use ndjson::{DEFAULT_MAX_NDJSON_BUFFER_BYTES, NdjsonError, read_ndjson};
+pub use ollama::{
+    OLLAMA_EXTRA_NAMESPACE, OLLAMA_PROVIDER_ID, OllamaAdapter, OllamaStreamDecoder,
+    OllamaTransport, build_body as build_ollama_body, build_chat_url as build_ollama_chat_url,
+    build_headers as build_ollama_headers, build_tags_url as build_ollama_tags_url,
+    map_finish_reason as map_ollama_finish_reason, map_http_error as map_ollama_http_error,
+    map_stream_error as map_ollama_stream_error, ollama_native_base_url,
+    prepare_request as prepare_ollama_request, select_transport as select_ollama_transport,
+};
 pub use openai_catalog::{
     CatalogDefaults, OpenAiCatalogError, anthropic_catalog_defaults, defaults_for_preset,
     google_catalog_defaults, map_model as map_openai_model, map_models as map_openai_models,
-    openai_catalog_defaults,
+    ollama_catalog_defaults, openai_catalog_defaults,
 };
 pub use openai_compatible::{
     ExtraMode, OpenAiCompatiblePreset, build_body as build_openai_compatible_body,

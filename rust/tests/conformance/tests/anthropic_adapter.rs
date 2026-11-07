@@ -200,11 +200,11 @@ fn registry_enables_anthropic() {
     assert_eq!(adapter.kind(), chatui_domain::ProviderKind::Anthropic);
 
     assert!(
-        !registry
+        registry
             .adapter("ollama")
             .unwrap_or_else(|| panic!("missing adapter ollama"))
             .is_supported(),
-        "ollama must remain unsupported"
+        "ollama must be supported"
     );
 }
 

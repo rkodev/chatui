@@ -4,8 +4,8 @@
 //! It never hardcodes provider metadata: every preset comes from the checked-in
 //! contract. OpenRouter is the reference adapter, OpenAI-format presets use the
 //! shared OpenAI-compatible transport, Anthropic uses the native Messages
-//! adapter, and Gemini uses the native generateContent adapter. Ollama gets an
-//! [`UnsupportedAdapter`] until its own task lands.
+//! adapter, Gemini uses the native generateContent adapter, and Ollama uses the
+//! native NDJSON adapter.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -18,18 +18,18 @@ use chatui_domain::ProviderAuthType;
 
 use crate::adapter::{
     OpenAiCompatibleAdapter, OpenRouterAdapter, ProviderAdapter, ProviderContext,
-    UnsupportedAdapter,
 };
 use crate::anthropic::AnthropicAdapter;
 use crate::gemini::GeminiAdapter;
+use crate::ollama::OllamaAdapter;
 
 /// Return whether a contract preset has an implemented adapter.
 ///
 /// Enablement is driven by the discovery format, not by a hardcoded provider
 /// name. OpenRouter keeps its reference adapter; every OpenAI-format preset uses
 /// the shared OpenAI-compatible transport; Anthropic uses the native Messages
-/// adapter; Gemini uses the native generateContent adapter. Ollama discovery
-/// remains unsupported until its own task lands.
+/// adapter; Gemini uses the native generateContent adapter; Ollama uses the
+/// native NDJSON adapter.
 pub fn is_implemented_preset(preset: &ProviderPreset) -> bool {
     matches!(
         preset.model_discovery.format,
@@ -37,6 +37,7 @@ pub fn is_implemented_preset(preset: &ProviderPreset) -> bool {
             | ModelDiscoveryFormat::Openai
             | ModelDiscoveryFormat::Anthropic
             | ModelDiscoveryFormat::Gemini
+            | ModelDiscoveryFormat::OllamaTags
     )
 }
 
@@ -184,7 +185,9 @@ fn adapter_for(preset: &ProviderPreset) -> ProviderAdapter {
         ModelDiscoveryFormat::Gemini => {
             ProviderAdapter::Gemini(GeminiAdapter::new(preset.id.clone()))
         }
-        _ => ProviderAdapter::Unsupported(UnsupportedAdapter::new(preset.id.clone(), preset.kind)),
+        ModelDiscoveryFormat::OllamaTags => {
+            ProviderAdapter::Ollama(OllamaAdapter::new(preset.id.clone()))
+        }
     }
 }
 
@@ -299,6 +302,7 @@ mod tests {
                     | ModelDiscoveryFormat::Openai
                     | ModelDiscoveryFormat::Anthropic
                     | ModelDiscoveryFormat::Gemini
+                    | ModelDiscoveryFormat::OllamaTags
             );
             assert_eq!(
                 adapter.is_supported(),
@@ -309,11 +313,11 @@ mod tests {
         }
 
         assert!(
-            !registry
+            registry
                 .adapter("ollama")
                 .expect("adapter exists")
                 .is_supported(),
-            "ollama must remain unsupported"
+            "ollama must be supported"
         );
     }
 

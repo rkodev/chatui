@@ -199,11 +199,11 @@ fn registry_enables_gemini() {
     assert_eq!(adapter.kind(), chatui_domain::ProviderKind::GoogleGemini);
 
     assert!(
-        !registry
+        registry
             .adapter("ollama")
             .expect("ollama adapter")
             .is_supported(),
-        "ollama must remain unsupported"
+        "ollama must be supported"
     );
 }
 

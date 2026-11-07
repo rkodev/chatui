@@ -18,7 +18,7 @@ use chatui_contracts::{AppConfig, provider_catalog};
 use chatui_domain::{
     ChatError, ChatErrorCode, ChatParams, ContentPart, MessageRole, ModelCapability, StreamEvent,
 };
-use chatui_providers::adapter::{ProviderAdapter, ProviderContext};
+use chatui_providers::adapter::{ProviderAdapter, ProviderContext, UnsupportedAdapter};
 use chatui_providers::cancel::CancellationToken;
 use chatui_providers::http::HttpClient;
 use chatui_providers::openrouter::request::{
@@ -265,6 +265,7 @@ fn registry_loads_every_contract_preset() {
                 | chatui_contracts::ModelDiscoveryFormat::Openai
                 | chatui_contracts::ModelDiscoveryFormat::Anthropic
                 | chatui_contracts::ModelDiscoveryFormat::Gemini
+                | chatui_contracts::ModelDiscoveryFormat::OllamaTags
         );
         assert_eq!(
             adapter.is_supported(),
@@ -274,11 +275,11 @@ fn registry_loads_every_contract_preset() {
         );
     }
     assert!(
-        !registry
+        registry
             .adapter("ollama")
             .expect("adapter exists")
             .is_supported(),
-        "ollama must remain unsupported"
+        "ollama must be supported"
     );
 }
 
@@ -323,11 +324,11 @@ fn create_adapter_rejects_unknown_presets() {
 
 #[tokio::test]
 async fn unsupported_presets_return_a_clear_error() {
-    let registry = ProviderRegistry::load().expect("registry loads");
-    let adapter = create_adapter("ollama").expect("ollama adapter");
-    let ctx = registry
-        .context("ollama", &app_config(), Some("sk-test".to_owned()))
-        .expect("context");
+    let adapter = ProviderAdapter::Unsupported(UnsupportedAdapter::new(
+        "test",
+        chatui_domain::ProviderKind::OpenaiCompatible,
+    ));
+    let ctx = openrouter_context("https://example.com/v1", None);
     let client = HttpClient::new().expect("client");
     let cancel = CancellationToken::new();
 
@@ -337,7 +338,7 @@ async fn unsupported_presets_return_a_clear_error() {
         .expect_err("unsupported preset");
     assert_eq!(error.code, ChatErrorCode::Unknown);
     assert!(error.message.contains("not supported"));
-    assert_eq!(error.provider_id.as_deref(), Some("ollama"));
+    assert_eq!(error.provider_id.as_deref(), Some("test"));
 }
 
 #[tokio::test]
