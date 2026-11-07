@@ -6,6 +6,7 @@
 pub mod accessibility;
 pub mod chat;
 pub mod code;
+pub mod conversations;
 pub mod markdown;
 pub mod math;
 pub mod models;
@@ -45,6 +46,16 @@ pub use chat::{
 pub use code::{
     CodeBlock, CodeBlockView, CodeWrap, HighlightSpan, HighlightedCode, SUPPORTED_LANGUAGES,
     THEME_NAME, highlight_code, normalize_language,
+};
+pub use conversations::{
+    ConversationFactory, ConversationHistory, ConversationNavigation, ConversationRoute,
+    ConversationSearchError, ConversationSearchHit, ConversationSearchResult,
+    ConversationSearchService, ConversationSearchState, DEFAULT_CONVERSATION_TITLE,
+    DEFAULT_HISTORY_PAGE_SIZE, DEFAULT_SEARCH_LIMIT, DEFAULT_UNDO_WINDOW,
+    DefaultConversationFactory, HISTORY_GROUP_ORDER, HistoryConfig, HistoryError, HistoryGroup,
+    HistoryGroupKey, HistoryState, HistoryStatus, MAX_HISTORY_ROWS, MAX_SEARCH_LIMIT,
+    MAX_SNIPPET_CHARS, format_conversation_timestamp, group_conversations, history_group_for_date,
+    search_error,
 };
 pub use markdown::{
     Block, ImageRef, Inline, LinkAction, LinkRef, RenderOptions, RenderedMarkdown, TableRow,
