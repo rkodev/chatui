@@ -13,7 +13,7 @@
 use std::fmt;
 
 use thiserror::Error;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Maximum accepted length of a secret ID.
 pub const MAX_SECRET_ID_LEN: usize = 128;
@@ -144,6 +144,11 @@ impl SecretValue {
         Self(Zeroizing::new(value.into()))
     }
 
+    /// Wrap a value that is already in a zeroizing buffer.
+    pub(crate) fn from_zeroizing(value: Zeroizing<String>) -> Self {
+        Self(value)
+    }
+
     /// Borrow the secret for the duration of a call.
     ///
     /// Callers must not copy the returned string into a long-lived buffer.
@@ -154,6 +159,12 @@ impl SecretValue {
     /// Return whether the secret is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+}
+
+impl Zeroize for SecretValue {
+    fn zeroize(&mut self) {
+        self.0.zeroize();
     }
 }
 
@@ -251,5 +262,13 @@ mod tests {
         let value = SecretValue::new("sk-test");
         assert_eq!(value.expose(), "sk-test");
         assert!(!value.is_empty());
+    }
+
+    #[test]
+    fn secret_value_can_be_zeroized_explicitly() {
+        let mut value = SecretValue::new("sk-test-not-a-real-key");
+        value.zeroize();
+        assert!(value.is_empty());
+        assert_eq!(value.expose(), "");
     }
 }

@@ -431,8 +431,11 @@ impl EncryptedFileStore {
 
         let mut secrets = BTreeMap::new();
         for (key, value) in raw {
+            // Wrap the plaintext value before validating the ID so an early
+            // return still zeroizes every remaining value on drop.
+            let value = Zeroizing::new(value);
             let id = SecretId::new(key).map_err(|_| SecretError::IndexCorrupt)?;
-            secrets.insert(id, SecretValue::new(value));
+            secrets.insert(id, SecretValue::from_zeroizing(value));
         }
         Ok(secrets)
     }
@@ -932,6 +935,26 @@ mod tests {
         };
         assert!(encrypted.explanation().contains("encrypted-file fallback"));
         assert!(FallbackChoice::SessionOnly.explanation().contains("memory"));
+    }
+
+    #[test]
+    fn fallback_choice_debug_redacts_the_passphrase() {
+        let choice = FallbackChoice::EncryptedFile {
+            path: PathBuf::from("secrets.enc"),
+            passphrase: passphrase("sk-test-not-a-real-key"),
+        };
+        let rendered = format!("{choice:?}");
+        assert!(!rendered.contains("sk-test-not-a-real-key"));
+        assert!(rendered.contains("SecretValue([REDACTED])"));
+    }
+
+    #[test]
+    fn encrypted_file_store_debug_omits_the_passphrase() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let store = store(&dir);
+        let rendered = format!("{store:?}");
+        assert!(!rendered.contains("correct horse battery staple"));
+        assert!(rendered.contains("EncryptedFileStore"));
     }
 
     #[test]

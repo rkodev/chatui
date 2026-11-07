@@ -2,8 +2,9 @@
 //!
 //! This crate owns the injectable [`SecretStore`] abstraction, the OS
 //! credential-store implementation, the explicit encrypted-file fallback, the
-//! session-only mode, and provider-key lifecycle operations. Redaction hooks
-//! and backup exclusion arrive in M3.5-04.3.
+//! session-only mode, provider-key lifecycle operations, log redaction, and the
+//! panic hook. Backup exclusion is documented in
+//! `docs/operations/M3.5/security.md`.
 //!
 //! # Backends
 //!
@@ -43,6 +44,8 @@
 pub mod encrypted_file;
 pub mod keyring_store;
 pub mod lifecycle;
+pub mod panic;
+pub mod redaction;
 pub mod session;
 pub mod store;
 
@@ -53,5 +56,10 @@ pub use encrypted_file::{
 };
 pub use keyring_store::{EntryFactory, KEYRING_SERVICE, KeyringStore, SystemEntryFactory};
 pub use lifecycle::KeyLifecycle;
+pub use panic::{install_panic_hook, install_panic_hook_with, install_panic_hook_with_reporter};
+pub use redaction::{
+    REDACTED, RedactingFormat, Redactor, SENSITIVE_HEADERS, filter_for, init_logging,
+    logging_filter,
+};
 pub use session::SessionStore;
 pub use store::{MAX_SECRET_ID_LEN, SecretError, SecretId, SecretStore, SecretValue};
