@@ -52,7 +52,7 @@
 | 14 | [M3.5-04.2 Encrypted fallback, session mode, and key lifecycle](M3.5-04.2-encrypted-fallback-lifecycle.md) | Complete | M3.5-04.1 | secrets | yes, with M3.5-03.* and M3.5-05.* |
 | 15 | [M3.5-04.3 Redaction, zeroization, and backup exclusion](M3.5-04.3-redaction-zeroize-backup.md) | Complete | M3.5-04.1, M3.5-04.2, M3.5-00.2 | secrets | yes, with M3.5-05.* |
 | 16 | [M3.5-05.1 Shared HTTP client, URL policy, and connection handling](M3.5-05.1-http-client-cleartext.md) | Complete | M3.5-02.1, M3.5-02.2 | networking | yes, with M3.5-03.* and M3.5-04.* |
-| 17 | [M3.5-05.2 Bounded SSE parser](M3.5-05.2-sse-parser.md) | Not started | M3.5-02.1, M3.5-02.3 | networking | yes, with M3.5-05.3 |
+| 17 | [M3.5-05.2 Bounded SSE parser](M3.5-05.2-sse-parser.md) | Complete | M3.5-02.1, M3.5-02.3 | networking | yes, with M3.5-05.3 |
 | 18 | [M3.5-05.3 Bounded NDJSON parser](M3.5-05.3-ndjson-parser.md) | Not started | M3.5-02.1, M3.5-02.3 | networking | yes, with M3.5-05.2 |
 | 19 | [M3.5-05.4 Retry policy, watchdog, cancellation, and network test harness](M3.5-05.4-retry-watchdog-harness.md) | Not started | M3.5-05.1, M3.5-05.2 | networking | yes, with M3.5-05.3 |
 | 20 | [M3.5-06.1 OpenRouter key validation and catalog cache](M3.5-06.1-openrouter-key-catalog.md) | Not started | M3.5-05.1, M3.5-02.2 | providers | yes, with M3.5-06.2 |

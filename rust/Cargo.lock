@@ -418,10 +418,13 @@ dependencies = [
 name = "chatui-providers"
 version = "0.1.0"
 dependencies = [
+ "chatui-conformance",
  "chatui-domain",
+ "futures-util",
  "reqwest",
  "thiserror",
  "tokio",
+ "tokio-util",
  "url",
  "wiremock",
 ]

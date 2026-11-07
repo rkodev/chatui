@@ -5,6 +5,7 @@
 
 pub mod error;
 pub mod http;
+pub mod sse;
 pub mod url_policy;
 
 pub use error::{NetworkError, NetworkErrorKind, is_retryable_status, parse_retry_after};
@@ -13,6 +14,7 @@ pub use http::{
     PreparedRequest, SecretHeader, TCP_KEEPALIVE, USER_AGENT, build_http_client, redirect_policy,
     same_origin,
 };
+pub use sse::{DEFAULT_MAX_SSE_BUFFER_BYTES, SseError, read_sse};
 pub use url_policy::{
     CLEARTEXT_WARNING, UrlPolicy, UrlPolicyError, classify_url, ensure_no_key_in_query,
     join_and_classify, join_url,
