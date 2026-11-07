@@ -937,8 +937,12 @@ dependencies = [
 name = "chatui-ui"
 version = "0.1.0"
 dependencies = [
+ "chatui-contracts",
  "chatui-domain",
+ "chatui-providers",
+ "chatui-secrets",
  "i-slint-backend-testing",
+ "serde_json",
  "slint",
 ]
 
