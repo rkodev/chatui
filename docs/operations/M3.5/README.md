@@ -36,7 +36,7 @@
 
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [M3.5-00.1 Preflight, baseline, and environment](M3.5-00.1-preflight-baseline.md) | Not started | none | preflight | none; blocks all |
+| 1 | [M3.5-00.1 Preflight, baseline, and environment](M3.5-00.1-preflight-baseline.md) | Complete | none | preflight | none; blocks all |
 | 2 | [M3.5-00.2 Scope, decisions, and release enablement](M3.5-00.2-decisions-enablement.md) | Not started | M3.5-00.1 | preflight | none; blocks implementation choices |
 | 3 | [M3.5-01.1 Cargo workspace, toolchain, and crate skeletons](M3.5-01.1-workspace-toolchain.md) | Not started | M3.5-00.2 | workspace | none; unblocks all implementation |
 | 4 | [M3.5-01.2 UI framework spike and decision](M3.5-01.2-ui-framework-spike.md) | Not started | M3.5-00.2, M3.5-01.1 | workspace | yes, with M3.5-02.1 |
