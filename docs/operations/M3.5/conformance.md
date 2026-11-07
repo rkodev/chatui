@@ -91,6 +91,114 @@ Run them with:
 cd rust && cargo nextest run -p chatui-conformance
 ```
 
+## Adapter surface and registry (M3.5-06.4)
+
+`chatui-providers` exposes one stable adapter surface in
+`src/adapter.rs` and one contract-backed registry in `src/registry.rs`.
+
+### Adapter surface
+
+`ProviderAdapter` is a small enum dispatch (`OpenRouter` or `Unsupported`)
+because the async methods would otherwise need boxed futures. It exposes:
+
+| Method | Purpose |
+| --- | --- |
+| `kind()` | Provider kind from the contract preset. |
+| `preset_id()` | Contract preset ID. |
+| `is_supported()` | Whether the adapter is implemented. |
+| `validate_key(client, ctx, cancel)` | `GET /key`; cancellation drops the request future. |
+| `list_models(client, ctx, cancel)` | Public `GET /models`; no key is sent. |
+| `prepare_request(ctx, request, supported_parameters, attachments)` | Provider body plus non-secret headers. |
+| `stream_chat(client, ctx, request, supported_parameters, attachments, cancel, on_event)` | Streams normalized `StreamEvent` values through a callback and returns a `StreamSummary`. |
+
+`ProviderContext` carries only the contract preset, resolved base URL, auth
+scheme, non-secret headers, and the resolved API key. It never carries
+settings, storage handles, or a secret store. `ProviderContext::new` combines
+the preset's `defaultHeaders` with its resolved `attributionHeaders`.
+
+`OpenRouterAdapter` is the only implemented adapter. Every other preset gets an
+`UnsupportedAdapter` whose methods return a clear `unknown` error with the
+message `Provider preset <id> is not supported yet.` until M3.5-07.*.
+
+### Registry behavior
+
+`ProviderRegistry::load()` reads `contracts/providers.json` through
+`chatui-contracts`. It:
+
+- loads every preset in contract order;
+- rejects duplicate IDs;
+- rejects presets missing `id`, `label`, `baseUrl`, `defaultModelId`,
+  `modelDiscovery.path`, the auth header/query field required by the auth
+  scheme, or a non-empty `keyValidation.path`;
+- maps `openrouter` to `OpenRouterAdapter` and every other preset to
+  `UnsupportedAdapter`;
+- exposes `presets()`, `get(id)`, `adapter(id)`, `default_preset()`,
+  `reference_preset()`, and `context(id, app_config, api_key)`.
+
+`create_adapter(preset_id)` is the free-function entry point. It returns
+`RegistryError::UnknownPreset` for an ID that is not in the contract.
+
+## OpenRouter conformance gate (M3.5-06.4)
+
+The OpenRouter adapter conformance suite lives in
+`rust/tests/conformance/tests/openrouter_adapter.rs`. It drives the adapter
+surface against the shared fixtures and mocks. It reuses the provider network
+harness for chunked-stream cancellation and abrupt-stream retry cases.
+
+### Test names
+
+- `registry_loads_every_contract_preset`
+- `registry_rejects_duplicate_ids`
+- `registry_rejects_missing_required_fields`
+- `create_adapter_rejects_unknown_presets`
+- `unsupported_presets_return_a_clear_error`
+- `validate_key_maps_the_shared_fixture`
+- `list_models_maps_the_shared_catalog`
+- `every_openrouter_stream_vector_matches_through_the_adapter`
+- `in_stream_error_preserves_partial_text_and_does_not_retry`
+- `every_openrouter_http_error_vector_matches_through_the_adapter`
+- `http_429_preserves_retry_after_and_is_retryable`
+- `http_402_is_not_retryable`
+- `http_503_is_retryable`
+- `every_openrouter_request_vector_matches_through_the_adapter`
+- `cancellation_before_first_token_returns_cancelled`
+- `cancellation_after_first_token_preserves_partial_text`
+- `retry_allowed_before_partial_output`
+- `retry_not_allowed_after_partial_output`
+
+### Section 7.4 checklist
+
+| Checklist item | Result | Evidence |
+| --- | --- | --- |
+| `GET /key` validates the key and exposes label, usage, limit, free-tier, and rate-limit metadata. | Pass | `validate_key_maps_the_shared_fixture`; provider `validate_key_sends_bearer_auth_and_maps_the_fixture` |
+| `GET /models` populates the catalog, including paid, free, vision, reasoning, and long-context models. | Pass | `list_models_maps_the_shared_catalog`; provider `maps_every_fixture_entry` |
+| Pricing strings are converted correctly and displayed per million tokens, with free models marked. | Adapter pass; display deferred | `converts_unusual_decimal_pricing_without_binary_float_artifacts`, `marks_a_zero_priced_free_model_and_preserves_the_suffix`, `multiplies_decimal_strings_by_one_million_exactly`. Display is owned by M3.5-08.4/M3.5-09.5. |
+| Context window, max output tokens, input/output modalities, and supported parameters are mapped. | Pass | `list_models_maps_the_shared_catalog`; provider `maps_a_paid_text_and_tool_model`, `infers_vision_and_file_capabilities_from_modalities`, `maps_a_long_context_model` |
+| Chat streams incrementally from `POST /chat/completions`. | Pass | `every_openrouter_stream_vector_matches_through_the_adapter`; provider `every_openrouter_stream_vector_matches` |
+| `: OPENROUTER PROCESSING` keep-alives and unknown SSE fields do not break parsing. | Pass | `every_openrouter_stream_vector_matches_through_the_adapter` (includes `openrouter-keepalive`); provider `keepalives_do_not_emit_blank_text` |
+| Reasoning content is normalized and displayed separately from the answer. | Adapter pass; display deferred | `every_openrouter_stream_vector_matches_through_the_adapter` (includes `openrouter-reasoning`); provider `reasoning_details_win_over_reasoning_without_duplication`, `incremental_reasoning_is_not_duplicated`. Display is owned by M3.5-09.4. |
+| Final usage and cost are persisted and visible. | Adapter pass; persistence/display deferred | `every_openrouter_stream_vector_matches_through_the_adapter` (includes `openrouter-usage`); provider `reported_usage_is_not_estimated`, `usage_cost_round_trips`. Persistence is owned by M3.5-09.1. |
+| `402`, `429`, `503`, context errors, and errors inside a 200 stream are handled. | Pass | `every_openrouter_http_error_vector_matches_through_the_adapter`, `http_429_preserves_retry_after_and_is_retryable`, `http_402_is_not_retryable`, `http_503_is_retryable`, `in_stream_error_preserves_partial_text_and_does_not_retry` |
+| Provider routing preferences serialize correctly and protected fields cannot be overridden. | Pass | `every_openrouter_request_vector_matches_through_the_adapter` (includes `openrouter-routing` and `openrouter-advanced-protected`); provider `routing_vector_serializes_curated_provider_controls`, `advanced_protected_vector_rejects_sorted_fields` |
+| Attribution headers are configurable and contain no user data. | Pass | `every_openrouter_request_vector_matches_through_the_adapter` (includes `openrouter-attribution`); provider `attribution_vector_uses_app_config`, `no_key_or_personal_data_in_headers_or_body` |
+| Browser-direct CORS behavior is verified, or the web release is explicitly blocked. | N/A for desktop | The Rust desktop client uses native HTTP, not browser CORS. Web evidence is owned by M1. |
+
+### Cancellation and retry rules
+
+| Rule | Result | Evidence |
+| --- | --- | --- |
+| Cancellation before the first token stops the stream and emits no text. | Pass | `cancellation_before_first_token_returns_cancelled` |
+| Cancellation after the first token preserves partial text. | Pass | `cancellation_after_first_token_preserves_partial_text` |
+| A retry is allowed only before any text or reasoning is emitted. | Pass | `retry_allowed_before_partial_output`, `retry_not_allowed_after_partial_output` |
+| In-stream errors are never retryable. | Pass | `in_stream_error_preserves_partial_text_and_does_not_retry` |
+| `429` and `503` are retryable; `402` is not. | Pass | `http_429_preserves_retry_after_and_is_retryable`, `http_503_is_retryable`, `http_402_is_not_retryable` |
+
+### Gate result
+
+The OpenRouter adapter gate passes for every adapter-level checklist item. The
+remaining display and persistence items are explicitly deferred to the UI and
+message-layer tasks named above; they are not claimed as complete here.
+
 ## Network test harness
 
 `rust/crates/chatui-providers/tests/network/harness.rs` is the reusable network

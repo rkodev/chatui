@@ -386,8 +386,11 @@ version = "0.1.0"
 dependencies = [
  "chatui-contracts",
  "chatui-domain",
+ "chatui-providers",
  "serde",
  "serde_json",
+ "tokio",
+ "wiremock",
 ]
 
 [[package]]

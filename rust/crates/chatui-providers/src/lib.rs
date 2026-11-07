@@ -3,6 +3,7 @@
 //! This crate owns the shared HTTP client, URL policy, and normalized network
 //! errors. Provider-specific request logic arrives in M3.5-06 and M3.5-07.
 
+pub mod adapter;
 pub mod cancel;
 pub mod error;
 pub mod http;
@@ -15,10 +16,12 @@ pub mod openrouter {
     pub mod request;
     pub mod stream;
 }
+pub mod registry;
 pub mod retry;
 pub mod sse;
 pub mod url_policy;
 
+pub use adapter::{OpenRouterAdapter, ProviderAdapter, ProviderContext, UnsupportedAdapter};
 pub use cancel::{Cancellation, CancellationToken};
 pub use error::{NetworkError, NetworkErrorKind, is_retryable_status, parse_retry_after};
 pub use http::{
@@ -49,6 +52,7 @@ pub use openrouter::stream::{
     StreamDecoder, StreamSummary, map_finish_reason, map_usage, stream_chat,
     stream_chat_completions,
 };
+pub use registry::{IMPLEMENTED_PRESET_IDS, ProviderRegistry, RegistryError, create_adapter};
 pub use retry::{
     AttemptFailure, AttemptOutcome, DEFAULT_INACTIVITY_TIMEOUT, InactivityWatchdog, PartialOutput,
     RETRY_BASE_DELAY, RETRY_JITTER_RATIO, RETRY_MAX_ATTEMPTS, RETRY_MAX_DELAY, RetryError,
