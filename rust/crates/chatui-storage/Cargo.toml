@@ -3,3 +3,17 @@ name = "chatui-storage"
 version = "0.1.0"
 edition = "2024"
 publish = false
+
+[dependencies]
+directories = "6"
+sqlx = { version = "0.8.6", default-features = false, features = [
+  "runtime-tokio",
+  "sqlite",
+  "migrate",
+  "macros",
+] }
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
