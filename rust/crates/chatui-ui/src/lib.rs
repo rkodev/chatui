@@ -5,12 +5,22 @@
 
 pub mod accessibility;
 pub mod chat;
+pub mod code;
+pub mod markdown;
+pub mod math;
 pub mod models;
 pub mod onboarding;
 pub mod providers;
 pub mod shell;
 pub mod theme;
 pub mod tokens;
+
+#[cfg(test)]
+mod code_tests;
+#[cfg(test)]
+mod markdown_tests;
+#[cfg(test)]
+mod math_tests;
 
 pub use accessibility::{
     AccessibleRole, FocusOrder, FocusRing, Focusable, Key, KeyboardAction, Modifiers,
@@ -32,6 +42,16 @@ pub use chat::{
     output_mime_type_for, process_image, reduce_stream, sanitize_file_name, scaled_dimensions,
     store_pending_attachment, sync_composer_window, validate_attachment_file,
 };
+pub use code::{
+    CodeBlock, CodeBlockView, CodeWrap, HighlightSpan, HighlightedCode, SUPPORTED_LANGUAGES,
+    THEME_NAME, highlight_code, normalize_language,
+};
+pub use markdown::{
+    Block, ImageRef, Inline, LinkAction, LinkRef, RenderOptions, RenderedMarkdown, TableRow,
+    close_incomplete_fence, render_markdown, render_markdown_default, sanitize_image_url,
+    sanitize_link_url,
+};
+pub use math::{MAX_MATH_SOURCE_CHARS, MathSource, is_math_language, math_fallback};
 pub use models::{
     ManualModelForm, ModelAvailability, ModelDiscovery, ModelGroup, ModelListViewModel,
     ModelManagementController, ModelManagementError, ModelManagementErrorCopy,
