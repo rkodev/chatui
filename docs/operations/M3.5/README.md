@@ -55,7 +55,7 @@
 | 17 | [M3.5-05.2 Bounded SSE parser](M3.5-05.2-sse-parser.md) | Complete | M3.5-02.1, M3.5-02.3 | networking | yes, with M3.5-05.3 |
 | 18 | [M3.5-05.3 Bounded NDJSON parser](M3.5-05.3-ndjson-parser.md) | Complete | M3.5-02.1, M3.5-02.3 | networking | yes, with M3.5-05.2 |
 | 19 | [M3.5-05.4 Retry policy, watchdog, cancellation, and network test harness](M3.5-05.4-retry-watchdog-harness.md) | Complete | M3.5-05.1, M3.5-05.2 | networking | yes, with M3.5-05.3 |
-| 20 | [M3.5-06.1 OpenRouter key validation and catalog cache](M3.5-06.1-openrouter-key-catalog.md) | Not started | M3.5-05.1, M3.5-02.2 | providers | yes, with M3.5-06.2 |
+| 20 | [M3.5-06.1 OpenRouter key validation and catalog cache](M3.5-06.1-openrouter-key-catalog.md) | Complete | M3.5-05.1, M3.5-02.2 | providers | yes, with M3.5-06.2 |
 | 21 | [M3.5-06.2 OpenRouter request serialization, routing, and protected fields](M3.5-06.2-openrouter-request-routing.md) | Not started | M3.5-02.1, M3.5-02.2, M3.5-05.1 | providers | yes, with M3.5-06.1 |
 | 22 | [M3.5-06.3 OpenRouter streaming, reasoning, usage, and errors](M3.5-06.3-openrouter-streaming-errors.md) | Not started | M3.5-05.1, M3.5-05.2, M3.5-05.4, M3.5-06.2 | providers | none; unblocks M3.5-06.4 |
 | 23 | [M3.5-06.4 Provider registry and OpenRouter conformance gate](M3.5-06.4-registry-conformance.md) | Not started | M3.5-06.1, M3.5-06.2, M3.5-06.3, M3.5-02.3 | providers | none; unblocks all other providers |

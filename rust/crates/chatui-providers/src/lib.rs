@@ -7,6 +7,11 @@ pub mod cancel;
 pub mod error;
 pub mod http;
 pub mod ndjson;
+pub mod openrouter {
+    pub mod cache;
+    pub mod catalog;
+    pub mod key;
+}
 pub mod retry;
 pub mod sse;
 pub mod url_policy;
@@ -19,6 +24,16 @@ pub use http::{
     same_origin,
 };
 pub use ndjson::{DEFAULT_MAX_NDJSON_BUFFER_BYTES, NdjsonError, read_ndjson};
+pub use openrouter::cache::{
+    CATALOG_CACHE_VERSION, CATALOG_DIR_NAME, CacheError, CatalogCache, CatalogResult,
+    CatalogSnapshot, FileCatalogCache, MemoryCatalogCache, OPENROUTER_CATALOG_TTL_SECONDS,
+    is_fresh, load_catalog, refresh_catalog,
+};
+pub use openrouter::catalog::{
+    CatalogModel, dedupe_by_canonical_slug, list_models, map_model, map_models,
+    multiply_decimal_by_million, usd_amount, usd_per_million,
+};
+pub use openrouter::key::{OpenRouterError, ProviderKeyInfo, map_key, validate_key};
 pub use retry::{
     AttemptFailure, AttemptOutcome, DEFAULT_INACTIVITY_TIMEOUT, InactivityWatchdog, PartialOutput,
     RETRY_BASE_DELAY, RETRY_JITTER_RATIO, RETRY_MAX_ATTEMPTS, RETRY_MAX_DELAY, RetryError,

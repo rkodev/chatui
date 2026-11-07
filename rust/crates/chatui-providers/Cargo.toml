@@ -6,6 +6,7 @@ publish = false
 
 [dependencies]
 chatui-domain = { path = "../chatui-domain" }
+directories = "6"
 futures-util = "0.3"
 reqwest = { version = "0.12.24", default-features = false, features = [
   "http2",
@@ -13,6 +14,8 @@ reqwest = { version = "0.12.24", default-features = false, features = [
   "rustls-tls",
   "stream",
 ] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "sync", "time"] }
 tokio-util = "0.7"
@@ -21,6 +24,7 @@ url = "2"
 [dev-dependencies]
 chatui-conformance = { path = "../../tests/conformance" }
 futures-util = "0.3"
+tempfile = "3"
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "time"] }
 tokio-util = "0.7"
 wiremock = "0.6"

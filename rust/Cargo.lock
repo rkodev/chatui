@@ -420,8 +420,12 @@ version = "0.1.0"
 dependencies = [
  "chatui-conformance",
  "chatui-domain",
+ "directories",
  "futures-util",
  "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
  "thiserror",
  "tokio",
  "tokio-util",
