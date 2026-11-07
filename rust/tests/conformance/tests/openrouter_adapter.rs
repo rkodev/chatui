@@ -263,6 +263,7 @@ fn registry_loads_every_contract_preset() {
             preset.model_discovery.format,
             chatui_contracts::ModelDiscoveryFormat::Openrouter
                 | chatui_contracts::ModelDiscoveryFormat::Openai
+                | chatui_contracts::ModelDiscoveryFormat::Anthropic
         );
         assert_eq!(
             adapter.is_supported(),
@@ -271,7 +272,7 @@ fn registry_loads_every_contract_preset() {
             preset.id
         );
     }
-    for id in ["anthropic", "google", "ollama"] {
+    for id in ["google", "ollama"] {
         assert!(
             !registry.adapter(id).expect("adapter exists").is_supported(),
             "{id} must remain unsupported"
@@ -321,9 +322,9 @@ fn create_adapter_rejects_unknown_presets() {
 #[tokio::test]
 async fn unsupported_presets_return_a_clear_error() {
     let registry = ProviderRegistry::load().expect("registry loads");
-    let adapter = create_adapter("anthropic").expect("anthropic adapter");
+    let adapter = create_adapter("google").expect("google adapter");
     let ctx = registry
-        .context("anthropic", &app_config(), Some("sk-test".to_owned()))
+        .context("google", &app_config(), Some("sk-test".to_owned()))
         .expect("context");
     let client = HttpClient::new().expect("client");
     let cancel = CancellationToken::new();
@@ -334,7 +335,7 @@ async fn unsupported_presets_return_a_clear_error() {
         .expect_err("unsupported preset");
     assert_eq!(error.code, ChatErrorCode::Unknown);
     assert!(error.message.contains("not supported"));
-    assert_eq!(error.provider_id.as_deref(), Some("anthropic"));
+    assert_eq!(error.provider_id.as_deref(), Some("google"));
 }
 
 #[tokio::test]

@@ -204,7 +204,9 @@ fn registry_enables_openai_compatible_presets() {
         let adapter = registry.adapter(&preset.id).expect("adapter exists");
         let expected = matches!(
             preset.model_discovery.format,
-            ModelDiscoveryFormat::Openrouter | ModelDiscoveryFormat::Openai
+            ModelDiscoveryFormat::Openrouter
+                | ModelDiscoveryFormat::Openai
+                | ModelDiscoveryFormat::Anthropic
         );
         assert_eq!(
             adapter.is_supported(),
@@ -235,7 +237,7 @@ fn registry_enables_openai_compatible_presets() {
         );
     }
 
-    for id in ["anthropic", "google", "ollama"] {
+    for id in ["google", "ollama"] {
         assert!(
             !registry
                 .adapter(id)

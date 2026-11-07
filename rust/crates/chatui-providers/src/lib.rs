@@ -4,6 +4,7 @@
 //! errors. Provider-specific request logic arrives in M3.5-06 and M3.5-07.
 
 pub mod adapter;
+pub mod anthropic;
 pub mod cancel;
 pub mod error;
 pub mod http;
@@ -26,6 +27,13 @@ pub mod url_policy;
 pub use adapter::{
     OpenAiCompatibleAdapter, OpenRouterAdapter, ProviderAdapter, ProviderContext,
     UnsupportedAdapter,
+};
+pub use anthropic::{
+    ANTHROPIC_PROVIDER_ID, ANTHROPIC_VERSION, AnthropicAdapter, AnthropicStreamDecoder,
+    BROWSER_ACCESS_HEADER, DEFAULT_MAX_TOKENS, build_body as build_anthropic_body,
+    build_headers as build_anthropic_headers, map_finish_reason as map_anthropic_finish_reason,
+    map_models as map_anthropic_models, map_stream_error as map_anthropic_stream_error,
+    prepare_request as prepare_anthropic_request,
 };
 pub use cancel::{Cancellation, CancellationToken};
 pub use error::{NetworkError, NetworkErrorKind, is_retryable_status, parse_retry_after};

@@ -5,8 +5,10 @@
 //! enum. Adapters never persist data, never read settings, and never log
 //! secrets. Everything they need is passed in through [`ProviderContext`].
 //!
-//! M3.5-06.4 implements OpenRouter only. Every other contract preset gets an
-//! [`UnsupportedAdapter`] that returns a clear error until M3.5-07.*.
+//! M3.5-06.4 implements OpenRouter only. M3.5-07.1 adds the preset-driven
+//! OpenAI-compatible adapter, and M3.5-07.2 adds the native Anthropic adapter.
+//! Every other contract preset gets an [`UnsupportedAdapter`] that returns a
+//! clear error until its own task lands.
 
 #![allow(clippy::result_large_err)]
 
@@ -16,6 +18,7 @@ use chatui_contracts::{AppConfig, ProviderAuth, ProviderPreset};
 use chatui_domain::{ChatError, ChatErrorCode, ProviderKind, StreamEvent, Timestamp};
 use tokio_util::sync::CancellationToken;
 
+use crate::anthropic::AnthropicAdapter;
 use crate::http::HttpClient;
 use crate::openrouter::catalog::{CatalogModel, list_models};
 use crate::openrouter::key::{OpenRouterError, ProviderKeyInfo, validate_key};
@@ -160,6 +163,8 @@ pub enum ProviderAdapter {
     OpenRouter(OpenRouterAdapter),
     /// A preset-driven OpenAI-compatible adapter.
     OpenAiCompatible(OpenAiCompatibleAdapter),
+    /// The native Anthropic Messages adapter.
+    Anthropic(AnthropicAdapter),
     /// A contract preset that is not implemented yet.
     Unsupported(UnsupportedAdapter),
 }
@@ -169,6 +174,7 @@ impl ProviderAdapter {
     pub fn kind(&self) -> ProviderKind {
         match self {
             Self::OpenRouter(_) | Self::OpenAiCompatible(_) => ProviderKind::OpenaiCompatible,
+            Self::Anthropic(_) => ProviderKind::Anthropic,
             Self::Unsupported(adapter) => adapter.kind,
         }
     }
@@ -178,13 +184,17 @@ impl ProviderAdapter {
         match self {
             Self::OpenRouter(_) => "openrouter",
             Self::OpenAiCompatible(adapter) => adapter.preset_id(),
+            Self::Anthropic(adapter) => adapter.preset_id(),
             Self::Unsupported(adapter) => adapter.preset_id(),
         }
     }
 
     /// Return whether this adapter is implemented.
     pub fn is_supported(&self) -> bool {
-        matches!(self, Self::OpenRouter(_) | Self::OpenAiCompatible(_))
+        matches!(
+            self,
+            Self::OpenRouter(_) | Self::OpenAiCompatible(_) | Self::Anthropic(_)
+        )
     }
 
     /// Validate the key with `GET /key`.
@@ -210,6 +220,7 @@ impl ProviderAdapter {
             Self::OpenAiCompatible(_) => {
                 crate::openai_compatible::validate_key(client, ctx, cancel).await
             }
+            Self::Anthropic(_) => crate::anthropic::validate_key(client, ctx, cancel).await,
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
     }
@@ -235,6 +246,7 @@ impl ProviderAdapter {
             Self::OpenAiCompatible(_) => {
                 crate::openai_compatible::list_models(client, ctx, cancel).await
             }
+            Self::Anthropic(_) => crate::anthropic::list_models(client, ctx, cancel).await,
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
     }
@@ -261,6 +273,9 @@ impl ProviderAdapter {
                 supported_parameters,
                 attachments,
             ),
+            Self::Anthropic(_) => {
+                crate::anthropic::prepare_request(ctx, request, supported_parameters, attachments)
+            }
             Self::Unsupported(adapter) => Err(adapter.unsupported_error()),
         }
     }
@@ -291,6 +306,18 @@ impl ProviderAdapter {
             }
             Self::OpenAiCompatible(_) => {
                 crate::openai_compatible::stream_chat(
+                    client,
+                    ctx,
+                    request,
+                    supported_parameters,
+                    attachments,
+                    cancel,
+                    on_event,
+                )
+                .await
+            }
+            Self::Anthropic(_) => {
+                crate::anthropic::stream_chat(
                     client,
                     ctx,
                     request,
@@ -429,12 +456,17 @@ mod tests {
         assert_eq!(compatible.preset_id(), "openai");
         assert!(compatible.is_supported());
 
+        let anthropic = ProviderAdapter::Anthropic(AnthropicAdapter::new("anthropic"));
+        assert_eq!(anthropic.kind(), ProviderKind::Anthropic);
+        assert_eq!(anthropic.preset_id(), "anthropic");
+        assert!(anthropic.is_supported());
+
         let unsupported = ProviderAdapter::Unsupported(UnsupportedAdapter::new(
-            "anthropic",
-            ProviderKind::Anthropic,
+            "google",
+            ProviderKind::GoogleGemini,
         ));
-        assert_eq!(unsupported.kind(), ProviderKind::Anthropic);
-        assert_eq!(unsupported.preset_id(), "anthropic");
+        assert_eq!(unsupported.kind(), ProviderKind::GoogleGemini);
+        assert_eq!(unsupported.preset_id(), "google");
         assert!(!unsupported.is_supported());
     }
 }

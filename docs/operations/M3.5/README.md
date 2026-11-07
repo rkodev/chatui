@@ -60,7 +60,7 @@
 | 22 | [M3.5-06.3 OpenRouter streaming, reasoning, usage, and errors](M3.5-06.3-openrouter-streaming-errors.md) | Complete | M3.5-05.1, M3.5-05.2, M3.5-05.4, M3.5-06.2 | providers | none; unblocks M3.5-06.4 |
 | 23 | [M3.5-06.4 Provider registry and OpenRouter conformance gate](M3.5-06.4-registry-conformance.md) | Complete | M3.5-06.1, M3.5-06.2, M3.5-06.3, M3.5-02.3 | providers | none; unblocks all other providers |
 | 24 | [M3.5-07.1 OpenAI-compatible preset adapters](M3.5-07.1-openai-compatible-presets.md) | Complete | M3.5-06.4 | providers | none; unblocks native adapters |
-| 25 | [M3.5-07.2 Anthropic adapter](M3.5-07.2-anthropic-adapter.md) | Not started | M3.5-07.1 | providers | yes, with M3.5-07.3 and M3.5-07.4 |
+| 25 | [M3.5-07.2 Anthropic adapter](M3.5-07.2-anthropic-adapter.md) | Complete | M3.5-07.1 | providers | yes, with M3.5-07.3 and M3.5-07.4 |
 | 26 | [M3.5-07.3 Gemini adapter](M3.5-07.3-gemini-adapter.md) | Not started | M3.5-07.1 | providers | yes, with M3.5-07.2 and M3.5-07.4 |
 | 27 | [M3.5-07.4 Ollama adapter, discovery fallback, and capability inference](M3.5-07.4-ollama-discovery.md) | Not started | M3.5-07.1 | providers | yes, with M3.5-07.2 and M3.5-07.3 |
 | 28 | [M3.5-08.1 Design tokens, theme, accessibility primitives, and responsive shell](M3.5-08.1-tokens-shell.md) | Not started | M3.5-01.2, M3.5-02.1 | ui | yes, with M3.5-03.*, M3.5-04.*, M3.5-05.*, M3.5-06.* |
