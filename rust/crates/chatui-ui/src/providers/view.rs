@@ -23,7 +23,7 @@ use crate::providers::state::{
 use crate::providers::validation::{parse_headers_text, validate_base_url};
 
 slint::slint! {
-    import { Button, CheckBox, ComboBox, LineEdit, ScrollView } from "std-widgets.slint";
+    import { Button, CheckBox, ComboBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
 
     export struct ProviderRow {
         id: string,
@@ -75,6 +75,15 @@ slint::slint! {
 
         in-out property <string> rotate-key-input: "";
         in property <string> confirm-label: "";
+        in property <bool> dark: false;
+
+        background: root.dark ? #0f1115 : #ffffff;
+        init => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
+        changed dark => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
 
         callback add-provider();
         callback select-provider(string);
@@ -115,7 +124,7 @@ slint::slint! {
                 }
 
                 if (!root.error-title.is-empty) : Rectangle {
-                    background: #fde8e8;
+                    background: root.dark ? #3b1d1d : #fde8e8;
                     border-radius: 8px;
                     VerticalLayout {
                         padding: 8px;
@@ -130,7 +139,7 @@ slint::slint! {
                             accessible-live-region: assertive;
                             wrap: word-wrap;
                         }
-                        if (!root.error-details.is-empty) : Text { text: root.error-details; wrap: word-wrap; color: #666666; }
+                        if (!root.error-details.is-empty) : Text { text: root.error-details; wrap: word-wrap; color: root.dark ? #9ca3af : #5f6368; }
                     }
                 }
 
@@ -138,14 +147,14 @@ slint::slint! {
                     VerticalLayout {
                         for entry in root.providers : Rectangle {
                             height: 64px;
-                            background: #f7f7f7;
+                            background: root.dark ? #171a21 : #f7f7f8;
                             border-radius: 8px;
                             HorizontalLayout {
                                 padding: 8px;
                                 spacing: 8px;
                                 VerticalLayout {
                                     Text { text: entry.label; font-weight: 600; }
-                                    Text { text: entry.meta; color: #666666; wrap: word-wrap; }
+                                    Text { text: entry.meta; color: root.dark ? #9ca3af : #5f6368; wrap: word-wrap; }
                                 }
                                 Button {
                                     text: "Open";
@@ -160,9 +169,9 @@ slint::slint! {
             if (root.detail-visible) : VerticalLayout {
                 spacing: 8px;
                 Text { text: root.detail-label; font-size: 22px; font-weight: 600; }
-                Text { text: root.detail-preset + " · " + root.detail-status; color: #666666; }
+                Text { text: root.detail-preset + " · " + root.detail-status; color: root.dark ? #9ca3af : #5f6368; }
                 Text { text: root.detail-base-url; wrap: word-wrap; }
-                if (!root.detail-cleartext-warning.is-empty) : Text { text: root.detail-cleartext-warning; color: #b45309; wrap: word-wrap; }
+                if (!root.detail-cleartext-warning.is-empty) : Text { text: root.detail-cleartext-warning; color: root.dark ? #fbbf24 : #b45309; wrap: word-wrap; }
                 if (!root.detail-docs-url.is-empty) : Text { text: "Docs: " + root.detail-docs-url; wrap: word-wrap; }
                 Text { text: "Key label: " + root.detail-key-label; }
                 Text { text: "Usage: " + root.detail-usage; }
@@ -184,7 +193,7 @@ slint::slint! {
                     Button { text: "Forget all keys"; clicked => { root.forget-all-keys(); } }
                     Button { text: "Delete provider"; clicked => { root.delete-provider(); } }
                 }
-                if (!root.confirm-label.is-empty) : Text { text: root.confirm-label; color: #b45309; wrap: word-wrap; }
+                if (!root.confirm-label.is-empty) : Text { text: root.confirm-label; color: root.dark ? #fbbf24 : #b45309; wrap: word-wrap; }
                 HorizontalLayout {
                     spacing: 8px;
                     LineEdit {
@@ -240,7 +249,7 @@ slint::slint! {
                     checked: root.form-test-connection;
                     toggled => { root.form-test-connection-changed(self.checked); }
                 }
-                if (!root.form-cleartext-warning.is-empty) : Text { text: root.form-cleartext-warning; color: #b45309; wrap: word-wrap; }
+                if (!root.form-cleartext-warning.is-empty) : Text { text: root.form-cleartext-warning; color: root.dark ? #fbbf24 : #b45309; wrap: word-wrap; }
                 if (!root.form-notice.is-empty) : Text {
                     text: root.form-notice;
                     accessible-live-region: polite;
@@ -248,7 +257,7 @@ slint::slint! {
                 }
                 if (!root.form-error.is-empty) : Text {
                     text: root.form-error;
-                    color: #b91c1c;
+                    color: root.dark ? #f87171 : #b91c1c;
                     accessible-live-region: assertive;
                     wrap: word-wrap;
                 }

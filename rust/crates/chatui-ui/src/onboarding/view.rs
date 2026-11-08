@@ -38,7 +38,7 @@ impl OnboardingRoute {
 }
 
 slint::slint! {
-    import { Button, CheckBox, LineEdit, ScrollView } from "std-widgets.slint";
+    import { Button, CheckBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
 
     export component OnboardingWindow inherits Window {
         title: "ChatUI onboarding";
@@ -64,6 +64,15 @@ slint::slint! {
         in property <bool> can-send: false;
         in property <bool> can-skip: false;
         in property <bool> onboarding-completed: false;
+        in property <bool> dark: false;
+
+        background: root.dark ? #0f1115 : #ffffff;
+        init => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
+        changed dark => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
 
         callback begin-key-entry();
         callback key-changed(string);
@@ -89,7 +98,7 @@ slint::slint! {
 
             Rectangle {
                 height: 48px;
-                background: #f2f2f2;
+                background: root.dark ? #171a21 : #f7f7f8;
                 border-radius: 8px;
 
                 HorizontalLayout {
@@ -103,7 +112,7 @@ slint::slint! {
 
                     if (root.recommended) : Text {
                         text: "Recommended";
-                        color: #1a7f37;
+                        color: root.dark ? #4ade80 : #166534;
                         vertical-alignment: center;
                     }
                 }
@@ -166,7 +175,7 @@ slint::slint! {
                 }
 
                 if (root.step == 3) : Rectangle {
-                    background: #fde8e8;
+                    background: root.dark ? #3b1d1d : #fde8e8;
                     border-radius: 8px;
 
                     VerticalLayout {
@@ -188,7 +197,7 @@ slint::slint! {
                         if (!root.error-details.is-empty) : Text {
                             text: root.error-details;
                             wrap: word-wrap;
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                         }
                     }
                 }

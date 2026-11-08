@@ -28,7 +28,7 @@ use crate::conversations::history::{ConversationHistory, HistoryState, HistorySt
 use crate::conversations::search::{ConversationSearchService, ConversationSearchState};
 
 slint::slint! {
-    import { Button, LineEdit, ScrollView } from "std-widgets.slint";
+    import { Button, LineEdit, Palette, ScrollView } from "std-widgets.slint";
 
     export struct HistoryRow {
         id: string,
@@ -68,6 +68,15 @@ slint::slint! {
         in property <[SearchRow]> search-results: [];
         in property <string> search-status: "";
         in property <bool> search-truncated: false;
+        in property <bool> dark: false;
+
+        background: root.dark ? #0f1115 : #ffffff;
+        init => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
+        changed dark => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
 
         callback new-chat();
         callback select-conversation(string);
@@ -129,7 +138,7 @@ slint::slint! {
 
             if (!root.search-status.is-empty) : Text {
                 text: root.search-status;
-                color: #666666;
+                color: root.dark ? #9ca3af : #5f6368;
                 wrap: word-wrap;
                 accessible-live-region: polite;
             }
@@ -161,7 +170,7 @@ slint::slint! {
 
                             Text {
                                 text: result.snippet;
-                                color: #666666;
+                                color: root.dark ? #9ca3af : #5f6368;
                                 font-size: 12px;
                                 wrap: word-wrap;
                             }
@@ -172,25 +181,25 @@ slint::slint! {
 
             if (!root.error.is-empty) : Text {
                 text: root.error;
-                color: #b91c1c;
+                color: root.dark ? #f87171 : #b91c1c;
                 wrap: word-wrap;
                 accessible-live-region: assertive;
             }
 
             if (root.loading) : Text {
                 text: "Loading conversations...";
-                color: #666666;
+                color: root.dark ? #9ca3af : #5f6368;
                 accessible-live-region: polite;
             }
 
             if (root.empty && !root.loading) : Text {
                 text: root.archived ? "No archived conversations." : "No conversations yet. Start a new chat.";
-                color: #666666;
+                color: root.dark ? #9ca3af : #5f6368;
                 wrap: word-wrap;
             }
 
             if (!root.pending-delete-title.is-empty) : Rectangle {
-                background: #fef3c7;
+                background: root.dark ? #3a2d12 : #fef3c7;
                 border-radius: 6px;
 
                 HorizontalLayout {
@@ -247,12 +256,12 @@ slint::slint! {
 
                     for row in root.rows : Rectangle {
                         height: row.is-header ? 24px : 44px;
-                        background: row.active ? #e5e7eb : transparent;
+                        background: row.active ? (root.dark ? #1f232b : #f7f7f8) : transparent;
                         border-radius: 6px;
 
                         if (row.is-header) : Text {
                             text: row.title;
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                             font-size: 12px;
                             vertical-alignment: center;
                             x: 8px;
@@ -276,21 +285,21 @@ slint::slint! {
 
                             if (row.draft) : Text {
                                 text: "Draft";
-                                color: #b45309;
+                                color: root.dark ? #fbbf24 : #b45309;
                                 font-size: 11px;
                                 vertical-alignment: center;
                             }
 
                             if (row.pinned) : Text {
                                 text: "Pinned";
-                                color: #666666;
+                                color: root.dark ? #9ca3af : #5f6368;
                                 font-size: 11px;
                                 vertical-alignment: center;
                             }
 
                             Text {
                                 text: row.timestamp;
-                                color: #666666;
+                                color: root.dark ? #9ca3af : #5f6368;
                                 font-size: 11px;
                                 vertical-alignment: center;
                             }
@@ -322,7 +331,7 @@ slint::slint! {
 
             if (!root.status.is-empty) : Text {
                 text: root.status;
-                color: #666666;
+                color: root.dark ? #9ca3af : #5f6368;
                 wrap: word-wrap;
                 accessible-live-region: polite;
             }

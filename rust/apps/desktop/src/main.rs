@@ -68,6 +68,7 @@ use chatui_ui::settings::{
     SettingsService, SettingsStore as SettingsStoreTrait,
 };
 use chatui_ui::shell::{Destination, ShellController, ShellState, ShellWindow, sync_window};
+use chatui_ui::theme::{ReducedMotion, ThemeSettings};
 use slint::{ComponentFactory, ComponentHandle, ModelRc, VecModel};
 
 use clipboard::{ClipboardKind, ClipboardPayload, ClipboardService, NativeClipboard, copy_payload};
@@ -157,9 +158,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         Err(error) => return show_startup_error(&error, smoke),
     };
 
+    state.theme = ThemeSettings::new(
+        services.settings.theme,
+        services.settings.density,
+        services.settings.chat_font_size,
+        ReducedMotion::System,
+    );
+
+    let onboarding_dark = state.resolved_theme().is_dark();
     let mut onboarding_complete = services.settings.onboarding_completed;
     if !onboarding_complete && !smoke {
-        match run_onboarding(&services) {
+        match run_onboarding(&services, onboarding_dark) {
             Ok(true) => {
                 onboarding_complete = true;
                 services.settings = match services.runtime.settings_store().load() {
@@ -171,6 +180,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             Err(error) => return show_startup_error(&error, smoke),
         }
     }
+
+    state.theme = ThemeSettings::new(
+        services.settings.theme,
+        services.settings.density,
+        services.settings.chat_font_size,
+        ReducedMotion::System,
+    );
 
     let controller = ShellController::new(state)?;
     if let Some(saved) = saved {
@@ -485,13 +501,14 @@ impl DesktopServices {
     }
 }
 
-fn run_onboarding(services: &DesktopServices) -> Result<bool, StartupError> {
+fn run_onboarding(services: &DesktopServices, dark: bool) -> Result<bool, StartupError> {
     let preset = provider_catalog()
         .get("openrouter")
         .cloned()
         .ok_or_else(|| StartupError::Message("The OpenRouter preset is missing.".to_owned()))?;
     let service = build_onboarding_service(&services.runtime, &preset, services.secrets.clone())?;
     let controller = OnboardingController::new(Arc::new(service), &preset)?;
+    controller.window().set_dark(dark);
 
     if controller.route() == OnboardingRoute::Shell {
         return Ok(true);
@@ -696,6 +713,33 @@ impl DesktopComposition {
         self.sync_controller(destination);
     }
 
+    fn feature_dark(&self) -> bool {
+        self.shell_state.borrow().resolved_theme().is_dark()
+    }
+
+    fn apply_theme_to_controllers(&self) {
+        let dark = self.feature_dark();
+
+        if let Some(chat) = self.chat.borrow().as_ref() {
+            chat.set_dark(dark);
+        }
+        if let Some(history) = self.history.borrow().as_ref() {
+            history.window().set_dark(dark);
+        }
+        if let Some(providers) = self.providers.borrow().as_ref() {
+            providers.window().set_dark(dark);
+        }
+        if let Some(settings) = self.settings.borrow().as_ref() {
+            settings.window().set_dark(dark);
+        }
+        if let Some(data) = self.data.borrow().as_ref() {
+            data.window().set_dark(dark);
+        }
+        if let Some(models) = self.models.borrow().as_ref() {
+            models.window().set_dark(dark);
+        }
+    }
+
     fn navigate(self: &Rc<Self>, window: &ShellWindow, destination: Destination) {
         self.shell_state.borrow_mut().navigate(destination);
         sync_window(window, &self.shell_state.borrow());
@@ -739,6 +783,7 @@ impl DesktopComposition {
                 window.set_chat_composer_factory(ComponentFactory::new(move |_| {
                     Some(composer.clone_strong())
                 }));
+                chat.set_dark(self.feature_dark());
                 self.wire_chat_handlers(&chat);
                 *self.chat.borrow_mut() = Some(chat);
             }
@@ -836,6 +881,7 @@ impl DesktopComposition {
         match self.build_history(window) {
             Ok(history) => {
                 let history = Rc::new(history);
+                history.window().set_dark(self.feature_dark());
                 let handle = history.window().clone_strong();
                 window.set_history_factory(ComponentFactory::new(move |_| {
                     Some(handle.clone_strong())
@@ -899,6 +945,7 @@ impl DesktopComposition {
         match self.build_providers() {
             Ok(providers) => {
                 let providers = Rc::new(providers);
+                providers.window().set_dark(self.feature_dark());
                 let handle = providers.window().clone_strong();
                 window.set_providers_factory(ComponentFactory::new(move |_| {
                     Some(handle.clone_strong())
@@ -939,6 +986,7 @@ impl DesktopComposition {
         match self.build_settings(window) {
             Ok(settings) => {
                 let settings = Rc::new(settings);
+                settings.window().set_dark(self.feature_dark());
                 let handle = settings.window().clone_strong();
                 window.set_settings_factory(ComponentFactory::new(move |_| {
                     Some(handle.clone_strong())
@@ -999,6 +1047,7 @@ impl DesktopComposition {
         match self.build_data() {
             Ok(data) => {
                 let data = Rc::new(data);
+                data.window().set_dark(self.feature_dark());
                 let handle = data.window().clone_strong();
                 window
                     .set_data_factory(ComponentFactory::new(move |_| Some(handle.clone_strong())));
@@ -1024,6 +1073,7 @@ impl DesktopComposition {
         match self.build_models() {
             Ok(models) => {
                 let models = Rc::new(models);
+                models.window().set_dark(self.feature_dark());
                 let handle = models.window().clone_strong();
                 window.set_models_factory(ComponentFactory::new(move |_| {
                     Some(handle.clone_strong())
@@ -1510,6 +1560,8 @@ impl DesktopComposition {
             chat.composer_window().set_send_key_hint(hint.into());
             chat.set_show_token_usage(current.show_token_usage);
         }
+
+        self.apply_theme_to_controllers();
     }
 
     fn flush_drafts(&self) {
@@ -1529,6 +1581,7 @@ impl DesktopComposition {
         state.system_reduced_motion = theme.reduced_motion;
         drop(state);
         sync_window(window, &self.shell_state.borrow());
+        self.apply_theme_to_controllers();
     }
 
     fn save_window_state(&self, window: &ShellWindow) {
@@ -1829,17 +1882,130 @@ mod tests {
         composition.poll_settings(shell.window());
         assert_eq!(composition.shell_state.borrow().theme.theme, Theme::Dark);
 
-        settings.window().invoke_send_key_changed(1);
-        composition.poll_settings(shell.window());
         let chat = composition
             .chat
             .borrow()
             .as_ref()
             .cloned()
             .expect("chat controller");
+        for destination in [
+            Destination::History,
+            Destination::Providers,
+            Destination::Settings,
+            Destination::Data,
+        ] {
+            composition.ensure_controller(shell.window(), destination);
+        }
+        composition.open_models(shell.window());
+        composition.poll_settings(shell.window());
+
+        assert!(settings.window().get_dark());
+        assert!(chat.messages_window().get_dark());
+        assert!(chat.composer_window().get_dark());
+        assert!(
+            composition
+                .history
+                .borrow()
+                .as_ref()
+                .expect("history")
+                .window()
+                .get_dark()
+        );
+        assert!(
+            composition
+                .providers
+                .borrow()
+                .as_ref()
+                .expect("providers")
+                .window()
+                .get_dark()
+        );
+        assert!(
+            composition
+                .data
+                .borrow()
+                .as_ref()
+                .expect("data")
+                .window()
+                .get_dark()
+        );
+        assert!(
+            composition
+                .models
+                .borrow()
+                .as_ref()
+                .expect("models")
+                .window()
+                .get_dark()
+        );
+
+        settings.window().invoke_send_key_changed(1);
+        composition.poll_settings(shell.window());
         assert_eq!(
             chat.composer_window().get_send_key_hint(),
             "Ctrl/Cmd+Enter to send, Enter for a new line"
+        );
+    }
+
+    #[test]
+    fn persisted_dark_theme_applies_to_initial_controllers() {
+        i_slint_backend_testing::init_no_event_loop();
+        let directory = tempfile::tempdir().expect("create temporary directory");
+        let runtime =
+            ServiceRuntime::open_at(directory.path().join("chatui.sqlite3"), directory.path())
+                .expect("open runtime");
+        let mut settings = runtime.settings_store().load().expect("load settings");
+        settings.theme = Theme::Dark;
+        runtime
+            .settings_store()
+            .save(&settings)
+            .expect("save dark theme");
+
+        let services = DesktopServices {
+            runtime,
+            secrets: session_only_secret_store(),
+            settings: settings.clone(),
+            _profile: None,
+        };
+        let mut state = ShellState::new(1024.0);
+        state.theme = ThemeSettings::new(
+            settings.theme,
+            settings.density,
+            settings.chat_font_size,
+            ReducedMotion::System,
+        );
+        let shell = ShellController::new(state).expect("create shell");
+        let composition = Rc::new(
+            DesktopComposition::new(
+                services,
+                shell.state_handle(),
+                shell.window().as_weak(),
+                WindowStateController::new(Box::new(MemoryWindowStateStore::new())),
+                true,
+            )
+            .expect("create composition"),
+        );
+
+        composition.ensure_controller(shell.window(), Destination::Chat);
+        composition.ensure_controller(shell.window(), Destination::Settings);
+
+        assert!(
+            composition
+                .chat
+                .borrow()
+                .as_ref()
+                .expect("chat")
+                .messages_window()
+                .get_dark()
+        );
+        assert!(
+            composition
+                .settings
+                .borrow()
+                .as_ref()
+                .expect("settings")
+                .window()
+                .get_dark()
         );
     }
 

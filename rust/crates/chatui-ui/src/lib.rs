@@ -23,6 +23,8 @@ mod accessibility_tests;
 #[cfg(test)]
 mod code_tests;
 #[cfg(test)]
+mod feature_theme_tests;
+#[cfg(test)]
 mod markdown_tests;
 #[cfg(test)]
 mod math_tests;

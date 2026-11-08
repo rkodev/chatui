@@ -43,6 +43,8 @@ use crate::chat::service::{ChatSendFailure, ChatSendResult, ChatService, describ
 use crate::chat::state::{MemoryStreamingStore, StreamingState, StreamingStore};
 
 slint::slint! {
+    import { Palette } from "std-widgets.slint";
+
     export component ChatWindow inherits Window {
         title: "ChatUI chat";
         width: 900px;
@@ -56,19 +58,28 @@ slint::slint! {
         in property <bool> streaming: false;
         in property <string> announcement: "";
         in property <bool> announcement-assertive: false;
+        in property <bool> dark: false;
+
+        background: root.dark ? #0f1115 : #ffffff;
+        init => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
+        changed dark => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
 
         VerticalLayout {
             spacing: 8px;
 
             if (root.loading) : Text {
                 text: "Loading conversation…";
-                color: #666666;
+                color: root.dark ? #9ca3af : #5f6368;
                 accessible-live-region: polite;
             }
 
             if (!root.error.is-empty) : Text {
                 text: root.error;
-                color: #b91c1c;
+                color: root.dark ? #f87171 : #b91c1c;
                 wrap: word-wrap;
                 accessible-live-region: assertive;
             }
@@ -537,6 +548,7 @@ pub struct ChatController {
     message_list: Rc<RefCell<MessageListController>>,
     composer: Rc<RefCell<ComposerController>>,
     receiver: RefCell<Receiver<ChatEvent>>,
+    dark: Cell<bool>,
 }
 
 impl ChatController {
@@ -590,6 +602,7 @@ impl ChatController {
             message_list,
             composer,
             receiver: RefCell::new(receiver),
+            dark: Cell::new(false),
         };
 
         if let Some(conversation_id) = initial_conversation_id {
@@ -616,12 +629,20 @@ impl ChatController {
         self.message_list.borrow().set_show_token_usage(show);
     }
 
+    /// Apply the dark or light palette to the message list and composer.
+    pub fn set_dark(&self, dark: bool) {
+        self.dark.set(dark);
+        self.message_list.borrow().window().set_dark(dark);
+        self.composer.borrow().window().set_dark(dark);
+    }
+
     /// Create a standalone host that stacks the message list and composer.
     ///
     /// A host must use either this window or the shell's two containers, never
     /// both, because both embed the same controller handles.
     pub fn standalone_window(&self) -> Result<ChatWindow, slint::PlatformError> {
         let window = ChatWindow::new()?;
+        window.set_dark(self.dark.get());
         window.set_messages_factory(message_list_factory(self.message_list.borrow().window()));
         window.set_composer_factory(composer_factory(self.composer.borrow().window()));
         sync_window(&window, &self.state());
