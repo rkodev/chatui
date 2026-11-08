@@ -21,7 +21,7 @@ use crate::models::state::{
 };
 
 slint::slint! {
-    import { Button, CheckBox, LineEdit, ScrollView } from "std-widgets.slint";
+    import { Button, CheckBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
 
     export struct ModelListRow {
         id: string,
@@ -70,6 +70,15 @@ slint::slint! {
         in property <string> manual-context: "";
         in property <string> manual-capabilities: "text";
         in property <string> manual-error: "";
+        in property <bool> dark: false;
+
+        background: root.dark ? #0f1115 : #ffffff;
+        init => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
+        changed dark => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
 
         callback refresh();
         callback retry();
@@ -93,7 +102,7 @@ slint::slint! {
             HorizontalLayout {
                 spacing: 8px;
                 Text { text: "Models"; font-size: 22px; font-weight: 600; }
-                Text { text: root.provider-label; color: #666666; vertical-alignment: center; }
+                Text { text: root.provider-label; color: root.dark ? #9ca3af : #5f6368; vertical-alignment: center; }
                 Rectangle { horizontal-stretch: 1; }
                 CheckBox {
                     text: "Picker mode";
@@ -103,7 +112,7 @@ slint::slint! {
                 Button { text: "Refresh models"; clicked => { root.refresh(); } }
             }
 
-            Text { text: root.summary; color: #666666; }
+            Text { text: root.summary; color: root.dark ? #9ca3af : #5f6368; }
 
             LineEdit {
                 placeholder-text: "Search by name or model id";
@@ -119,7 +128,7 @@ slint::slint! {
             }
 
             if (!root.error-title.is-empty) : Rectangle {
-                background: #fde8e8;
+                background: root.dark ? #3b1d1d : #fde8e8;
                 border-radius: 8px;
                 VerticalLayout {
                     padding: 8px;
@@ -134,14 +143,14 @@ slint::slint! {
                         accessible-live-region: assertive;
                         wrap: word-wrap;
                     }
-                    if (!root.error-details.is-empty) : Text { text: root.error-details; wrap: word-wrap; color: #666666; }
+                    if (!root.error-details.is-empty) : Text { text: root.error-details; wrap: word-wrap; color: root.dark ? #9ca3af : #5f6368; }
                     Button { text: "Retry"; clicked => { root.retry(); } }
                 }
             }
 
             if (!root.availability-warning.is-empty) : Text {
                 text: root.availability-warning;
-                color: #b45309;
+                color: root.dark ? #fbbf24 : #b45309;
                 wrap: word-wrap;
             }
 
@@ -158,7 +167,7 @@ slint::slint! {
                             font-size: 16px;
                         }
                         Rectangle {
-                            background: row.is-default ? #eef6ff : #f7f7f7;
+                            background: row.is-default ? (root.dark ? #16324f : #e8f0fe) : (root.dark ? #171a21 : #f7f7f8);
                             border-radius: 8px;
                             VerticalLayout {
                                 padding: 8px;
@@ -167,12 +176,12 @@ slint::slint! {
                                     spacing: 8px;
                                     VerticalLayout {
                                         Text { text: row.label; font-weight: 600; }
-                                        Text { text: row.meta; color: #666666; wrap: word-wrap; }
+                                        Text { text: row.meta; color: root.dark ? #9ca3af : #5f6368; wrap: word-wrap; }
                                     }
                                     Rectangle { horizontal-stretch: 1; }
                                     if (!row.badges.is-empty) : Text {
                                         text: row.badges;
-                                        color: #1a7f37;
+                                        color: root.dark ? #4ade80 : #166534;
                                         vertical-alignment: center;
                                     }
                                     Button {
@@ -190,7 +199,7 @@ slint::slint! {
                                 }
                                 if (!row.chips.is-empty) : Text {
                                     text: row.chips;
-                                    color: #444444;
+                                    color: root.dark ? #c7cbd1 : #4a4a4a;
                                     wrap: word-wrap;
                                 }
                                 if (!row.docs-url.is-empty) : Text {
@@ -232,7 +241,7 @@ slint::slint! {
                 }
                 if (!root.manual-error.is-empty) : Text {
                     text: root.manual-error;
-                    color: #b91c1c;
+                    color: root.dark ? #f87171 : #b91c1c;
                     wrap: word-wrap;
                 }
                 HorizontalLayout {

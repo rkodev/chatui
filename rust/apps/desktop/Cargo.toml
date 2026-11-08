@@ -7,11 +7,15 @@ publish = false
 [dependencies]
 arboard = "3"
 base64 = "0.22"
+chatui-contracts = { version = "0.1.0", path = "../../crates/chatui-contracts" }
 chatui-domain = { version = "0.1.0", path = "../../crates/chatui-domain" }
+chatui-providers = { version = "0.1.0", path = "../../crates/chatui-providers" }
+chatui-secrets = { version = "0.1.0", path = "../../crates/chatui-secrets" }
 chatui-storage = { version = "0.1.0", path = "../../crates/chatui-storage" }
 chatui-ui = { version = "0.1.0", path = "../../crates/chatui-ui" }
 ed25519-dalek = "2.1"
 hex = "0.4"
+image = { version = "0.25", default-features = false, features = ["png"] }
 reqwest = { version = "0.12.24", default-features = false, features = [
   "blocking",
   "rustls-tls",
@@ -22,6 +26,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 slint = "1.18.1"
+sqlx = { version = "0.8.6", default-features = false, features = [
+  "runtime-tokio",
+  "sqlite",
+  "migrate",
+  "macros",
+] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
 url = "2"
 
 [dev-dependencies]

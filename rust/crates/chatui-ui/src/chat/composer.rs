@@ -508,7 +508,7 @@ fn build_parts(text: &str, attachments: &[PendingAttachment]) -> Vec<ContentPart
 }
 
 slint::slint! {
-    import { Button, ScrollView, TextEdit } from "std-widgets.slint";
+    import { Button, Palette, ScrollView, TextEdit } from "std-widgets.slint";
 
     export struct ComposerChip {
         id: string,
@@ -536,6 +536,15 @@ slint::slint! {
         in property <string> capability-warning: "";
         in property <string> attachment-error: "";
         in property <string> send-key-hint: "Enter to send";
+        in property <bool> dark: false;
+
+        background: root.dark ? #0f1115 : #ffffff;
+        init => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
+        changed dark => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
 
         callback text-changed(string);
         callback send();
@@ -550,34 +559,34 @@ slint::slint! {
 
             if (root.offline) : Text {
                 text: "You are offline. Sending is disabled.";
-                color: #b91c1c;
+                color: root.dark ? #f87171 : #b91c1c;
                 accessible-live-region: assertive;
                 wrap: word-wrap;
             }
 
             if (!root.capability-warning.is-empty) : Text {
                 text: root.capability-warning;
-                color: #b45309;
+                color: root.dark ? #fbbf24 : #b45309;
                 accessible-live-region: polite;
                 wrap: word-wrap;
             }
 
             if (!root.attachment-error.is-empty) : Text {
                 text: root.attachment-error;
-                color: #b91c1c;
+                color: root.dark ? #f87171 : #b91c1c;
                 accessible-live-region: assertive;
                 wrap: word-wrap;
             }
 
             for chip in root.chips : Rectangle {
                 height: 32px;
-                background: #f3f4f6;
+                background: root.dark ? #171a21 : #f3f4f6;
                 border-radius: 8px;
                 HorizontalLayout {
                     padding: 4px;
                     spacing: 8px;
                     Text { text: chip.name; vertical-alignment: center; }
-                    Text { text: chip.size-label; color: #666666; vertical-alignment: center; }
+                    Text { text: chip.size-label; color: root.dark ? #9ca3af : #5f6368; vertical-alignment: center; }
                     Rectangle { horizontal-stretch: 1; }
                     Button { text: "Remove"; clicked => { root.remove-attachment(chip.id); } }
                 }
@@ -611,7 +620,7 @@ slint::slint! {
                 Rectangle { horizontal-stretch: 1; }
                 Text {
                     text: root.send-key-hint;
-                    color: #666666;
+                    color: root.dark ? #9ca3af : #5f6368;
                     vertical-alignment: center;
                 }
                 if (root.streaming || root.sending) : Button {

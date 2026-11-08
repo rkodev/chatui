@@ -670,7 +670,7 @@ fn find_end(offsets: &[f32], value: f32) -> usize {
 }
 
 slint::slint! {
-    import { Button, ScrollView } from "std-widgets.slint";
+    import { Button, Palette, ScrollView } from "std-widgets.slint";
 
     export struct MessageListRow {
         id: string,
@@ -701,11 +701,12 @@ slint::slint! {
     component MessageRowView inherits Rectangle {
         in property <MessageListRow> message;
         in property <bool> show-actions: true;
+        in property <bool> dark: false;
         callback copy(string);
         callback regenerate(string);
         callback retry(string);
 
-        background: message.is-user ? #eef6ff : transparent;
+        background: message.is-user ? (root.dark ? #16324f : #e8f0fe) : transparent;
         border-radius: 8px;
 
         accessible-role: list-item;
@@ -719,12 +720,12 @@ slint::slint! {
                 spacing: 8px;
                 Text { text: message.role-label; font-weight: 600; }
                 Rectangle { horizontal-stretch: 1; }
-                Text { text: message.time; color: #666666; }
+                Text { text: message.time; color: root.dark ? #9ca3af : #5f6368; }
             }
 
             if (!message.reasoning.is-empty) : Text {
                 text: "Reasoning: " + message.reasoning;
-                color: #666666;
+                color: root.dark ? #9ca3af : #5f6368;
                 wrap: word-wrap;
             }
 
@@ -735,17 +736,17 @@ slint::slint! {
 
             if (message.show-typing) : Text {
                 text: "…";
-                color: #666666;
+                color: root.dark ? #9ca3af : #5f6368;
             }
 
             if (!message.status-label.is-empty) : Text {
                 text: message.status-label;
-                color: #b45309;
+                color: root.dark ? #fbbf24 : #b45309;
                 wrap: word-wrap;
             }
 
             if (!message.error-title.is-empty) : Rectangle {
-                background: #fde8e8;
+                background: root.dark ? #3b1d1d : #fde8e8;
                 border-radius: 8px;
                 VerticalLayout {
                     padding: 8px;
@@ -754,7 +755,7 @@ slint::slint! {
                     Text { text: message.error-message; wrap: word-wrap; }
                     if (!message.error-details.is-empty) : Text {
                         text: message.error-details;
-                        color: #666666;
+                        color: root.dark ? #9ca3af : #5f6368;
                         wrap: word-wrap;
                     }
                     if (message.can-retry) : Button {
@@ -782,7 +783,7 @@ slint::slint! {
 
             if (!message.meta.is-empty) : Text {
                 text: message.meta;
-                color: #666666;
+                color: root.dark ? #9ca3af : #5f6368;
                 wrap: word-wrap;
             }
         }
@@ -818,6 +819,15 @@ slint::slint! {
         in property <length> top-padding: 0px;
         in property <length> bottom-padding: 0px;
         in-out property <length> content-y: 0px;
+        in property <bool> dark: false;
+
+        background: root.dark ? #0f1115 : #ffffff;
+        init => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
+        changed dark => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
 
         callback load-older();
         callback retry();
@@ -840,7 +850,7 @@ slint::slint! {
             }
 
             if (root.error-visible) : Rectangle {
-                background: #fde8e8;
+                background: root.dark ? #3b1d1d : #fde8e8;
                 border-radius: 8px;
                 VerticalLayout {
                     padding: 8px;
@@ -849,7 +859,7 @@ slint::slint! {
                     Text { text: root.error-message; wrap: word-wrap; }
                     if (!root.error-details.is-empty) : Text {
                         text: root.error-details;
-                        color: #666666;
+                        color: root.dark ? #9ca3af : #5f6368;
                         wrap: word-wrap;
                     }
                     Button { text: "Retry"; clicked => { root.retry(); } }
@@ -858,15 +868,15 @@ slint::slint! {
 
             if (root.loading) : VerticalLayout {
                 spacing: 8px;
-                Text { text: "Loading messages…"; color: #666666; }
-                Rectangle { height: 16px; background: #eeeeee; border-radius: 4px; }
-                Rectangle { height: 16px; background: #eeeeee; border-radius: 4px; }
-                Rectangle { height: 16px; background: #eeeeee; border-radius: 4px; }
+                Text { text: "Loading messages…"; color: root.dark ? #9ca3af : #5f6368; }
+                Rectangle { height: 16px; background: root.dark ? #1f232b : #eeeeee; border-radius: 4px; }
+                Rectangle { height: 16px; background: root.dark ? #1f232b : #eeeeee; border-radius: 4px; }
+                Rectangle { height: 16px; background: root.dark ? #1f232b : #eeeeee; border-radius: 4px; }
             }
 
             if (root.empty && !root.loading) : Text {
                 text: root.empty-message;
-                color: #666666;
+                color: root.dark ? #9ca3af : #5f6368;
                 wrap: word-wrap;
             }
 
@@ -888,6 +898,7 @@ slint::slint! {
                     for item in root.rows : MessageRowView {
                         message: item;
                         show-actions: true;
+                        dark: root.dark;
                         copy(id) => { root.copy(id); }
                         regenerate(id) => { root.regenerate(id); }
                         retry(id) => { root.retry-message(id); }
@@ -898,6 +909,7 @@ slint::slint! {
                     if (root.streaming-visible) : MessageRowView {
                         message: root.streaming-row;
                         show-actions: false;
+                        dark: root.dark;
                         copy(id) => { root.copy(id); }
                         regenerate(id) => { root.regenerate(id); }
                         retry(id) => { root.retry-message(id); }

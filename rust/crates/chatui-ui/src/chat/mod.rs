@@ -14,6 +14,7 @@ pub mod message_list;
 pub mod runner;
 pub mod service;
 pub mod state;
+pub mod view;
 
 #[cfg(test)]
 mod attachment_tests;
@@ -65,4 +66,8 @@ pub use service::{
 pub use state::{
     Clock, MemoryStreamingStore, RunnerState, StreamingState, StreamingStore, SystemClock,
     reduce_stream,
+};
+pub use view::{
+    ChatController, ChatControllerDeps, ChatRuntime, ChatViewState, ChatWindow,
+    sync_window as sync_chat_window,
 };

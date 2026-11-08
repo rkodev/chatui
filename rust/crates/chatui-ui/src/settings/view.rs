@@ -26,7 +26,7 @@ use crate::settings::state::{
 use crate::shell::ShellState;
 
 slint::slint! {
-    import { Button, CheckBox, ComboBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
+    import { Button, CheckBox, ComboBox, LineEdit, Palette, ScrollView, TextEdit } from "std-widgets.slint";
 
     export struct SettingsNavItem {
         id: string,
@@ -36,11 +36,12 @@ slint::slint! {
     component SettingsSectionButton inherits Rectangle {
         in property <string> label;
         in property <bool> active;
+        in property <bool> dark: false;
         callback clicked;
         out property <bool> focus-visible: false;
 
         height: 36px;
-        background: root.active ? #e5e7eb : transparent;
+        background: root.active ? (root.dark ? #1f232b : #f7f7f8) : transparent;
         border-radius: 6px;
 
         accessible-role: button;
@@ -77,7 +78,7 @@ slint::slint! {
 
         if (root.focus-visible) : Rectangle {
             border-width: 2px;
-            border-color: #1a56db;
+            border-color: root.dark ? #60a5fa : #1a56db;
             border-radius: 6px;
             background: transparent;
         }
@@ -149,6 +150,16 @@ slint::slint! {
         callback open-models();
         callback open-data();
 
+        in property <bool> dark: false;
+
+        background: root.dark ? #0f1115 : #ffffff;
+        init => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
+        changed dark => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
+
         HorizontalLayout {
             padding: 16px;
             spacing: 16px;
@@ -166,6 +177,7 @@ slint::slint! {
                 for section[index] in root.sections : SettingsSectionButton {
                     label: section.label;
                     active: index == root.active-section;
+                    dark: root.dark;
                     clicked => { root.select-section(index); }
                 }
             }
@@ -180,7 +192,7 @@ slint::slint! {
                     }
 
                     if (!root.error-title.is-empty) : Rectangle {
-                        background: #fde8e8;
+                        background: root.dark ? #3b1d1d : #fde8e8;
                         border-radius: 8px;
 
                         VerticalLayout {
@@ -192,7 +204,7 @@ slint::slint! {
                             if (!root.error-details.is-empty) : Text {
                                 text: root.error-details;
                                 wrap: word-wrap;
-                                color: #666666;
+                                color: root.dark ? #9ca3af : #5f6368;
                             }
                         }
                     }
@@ -228,7 +240,7 @@ slint::slint! {
 
                         Text {
                             text: root.reduced-motion-text;
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                             wrap: word-wrap;
                         }
                     }
@@ -329,12 +341,12 @@ slint::slint! {
 
                         Text {
                             text: root.onboarding-status;
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                         }
 
                         Text {
                             text: root.remember-keys-text;
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                             wrap: word-wrap;
                         }
                     }
@@ -379,7 +391,7 @@ slint::slint! {
                         Text { text: root.backup-message; wrap: word-wrap; }
                         Text {
                             text: root.backup-detail;
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                             wrap: word-wrap;
                         }
                     }
@@ -388,7 +400,7 @@ slint::slint! {
                         spacing: 8px;
 
                         Text { text: root.about-title; font-size: 20px; font-weight: 600; }
-                        Text { text: root.about-version; color: #666666; }
+                        Text { text: root.about-version; color: root.dark ? #9ca3af : #5f6368; }
                         Text { text: root.about-body; wrap: word-wrap; }
                         for line in root.privacy-lines : Text {
                             text: "• " + line;

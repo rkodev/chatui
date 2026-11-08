@@ -23,6 +23,8 @@ mod accessibility_tests;
 #[cfg(test)]
 mod code_tests;
 #[cfg(test)]
+mod feature_theme_tests;
+#[cfg(test)]
 mod markdown_tests;
 #[cfg(test)]
 mod math_tests;
@@ -33,21 +35,22 @@ pub use accessibility::{
 };
 pub use chat::{
     AttachmentChip, AttachmentError, AttachmentFileInfo, AttachmentValidationCode,
-    AttachmentValidationError, ChatErrorCopy, ChatRunInput, ChatRunResult, ChatRunner,
-    ChatRunnerOptions, ChatSendFailure, ChatSendFailureReason, ChatSendResult, ChatService,
-    ChatServiceError, ChatStreamAdapter, Clock, ComposerController, ComposerKeyAction,
-    ComposerSend, ComposerState, DEFAULT_COMPOSER_LINE_HEIGHT, DRAFT_KEY_PREFIX, DraftPersistence,
-    DraftStore, IdGenerator, MAX_ANNOUNCEMENT_CHARS, MAX_COMPOSER_LINES, MAX_DRAFT_LENGTH,
-    MAX_DRAFTS, MAX_FILE_NAME_LENGTH, MAX_IMAGE_BYTES, MAX_IMAGE_EDGE, MAX_TEXT_BYTES,
-    MemoryDraftStore, MemoryStreamingStore, ModelCapabilities, OUTPUT_QUALITY, PendingAttachment,
+    AttachmentValidationError, ChatController, ChatControllerDeps, ChatErrorCopy, ChatRunInput,
+    ChatRunResult, ChatRunner, ChatRunnerOptions, ChatRuntime, ChatSendFailure,
+    ChatSendFailureReason, ChatSendResult, ChatService, ChatServiceError, ChatStreamAdapter,
+    ChatViewState, ChatWindow, Clock, ComposerController, ComposerKeyAction, ComposerSend,
+    ComposerState, DEFAULT_COMPOSER_LINE_HEIGHT, DRAFT_KEY_PREFIX, DraftPersistence, DraftStore,
+    IdGenerator, MAX_ANNOUNCEMENT_CHARS, MAX_COMPOSER_LINES, MAX_DRAFT_LENGTH, MAX_DRAFTS,
+    MAX_FILE_NAME_LENGTH, MAX_IMAGE_BYTES, MAX_IMAGE_EDGE, MAX_TEXT_BYTES, MemoryDraftStore,
+    MemoryStreamingStore, ModelCapabilities, OUTPUT_QUALITY, PendingAttachment,
     PersistentDraftStore, ProcessedImage, ProviderChatAdapter, RegenerateInput, RetryInput,
     RunRequest, RunnerState, SUPPORTED_IMAGE_MIME_TYPES, SUPPORTED_TEXT_EXTENSIONS,
     SUPPORTED_TEXT_MIME_TYPES, SettingsDraftPersistence, StreamingState, StreamingStore,
     SystemClock, ValidatedAttachmentFile, build_chat_request, can_retry, clipboard_images,
     describe_chat_error, dropped_files, file_extension, format_attachment_size, has_partial_output,
     initial_announcement, output_mime_type_for, process_image, reduce_stream, sanitize_file_name,
-    scaled_dimensions, store_pending_attachment, streaming_announcement, sync_composer_window,
-    validate_attachment_file,
+    scaled_dimensions, store_pending_attachment, streaming_announcement, sync_chat_window,
+    sync_composer_window, validate_attachment_file,
 };
 pub use code::{
     CodeBlock, CodeBlockView, CodeWrap, HighlightSpan, HighlightedCode, SUPPORTED_LANGUAGES,
@@ -58,10 +61,11 @@ pub use conversations::{
     ConversationSearchError, ConversationSearchHit, ConversationSearchResult,
     ConversationSearchService, ConversationSearchState, DEFAULT_CONVERSATION_TITLE,
     DEFAULT_HISTORY_PAGE_SIZE, DEFAULT_SEARCH_LIMIT, DEFAULT_UNDO_WINDOW,
-    DefaultConversationFactory, HISTORY_GROUP_ORDER, HistoryConfig, HistoryError, HistoryGroup,
-    HistoryGroupKey, HistoryState, HistoryStatus, MAX_HISTORY_ROWS, MAX_SEARCH_LIMIT,
-    MAX_SNIPPET_CHARS, format_conversation_timestamp, group_conversations, history_group_for_date,
-    search_error,
+    DefaultConversationFactory, HISTORY_GROUP_ORDER, HistoryConfig, HistoryController,
+    HistoryError, HistoryGroup, HistoryGroupKey, HistoryRow, HistoryRuntime, HistoryState,
+    HistoryStatus, HistoryViewState, HistoryWindow, MAX_HISTORY_ROWS, MAX_SEARCH_LIMIT,
+    MAX_SNIPPET_CHARS, RenameState, SearchRow, format_conversation_timestamp, group_conversations,
+    history_group_for_date, search_error, sync_history_window,
 };
 pub use data::{
     CLEAR_ALL_CONFIRMATION, ClearRequest, ClearSummary, ConversationOption, DataBackupPlaceholder,

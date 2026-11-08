@@ -20,6 +20,6 @@ tokio = { version = "1", features = ["sync", "time"] }
 url = "2"
 
 [dev-dependencies]
-i-slint-backend-testing = "1.18.1"
+i-slint-backend-testing = { version = "1.18.1", features = ["renderer-software"] }
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "test-util"] }

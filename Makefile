@@ -145,7 +145,7 @@ rust-build:
 
 rust-run:
 	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
-	cargo run --manifest-path $(RUST_DIR)/Cargo.toml
+	cargo run --manifest-path $(RUST_DIR)/Cargo.toml -p chatui-desktop --bin chatui-desktop
 
 rust-fmt:
 	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)

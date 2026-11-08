@@ -7,7 +7,8 @@
 //! * [`history`] for the sidebar view model, actions, delete undo, drafts, and
 //!   last-active restore;
 //! * [`factory`] for new-chat creation from the persisted defaults;
-//! * [`route`] for the conversation part of the shell navigation state.
+//! * [`route`] for the conversation part of the shell navigation state;
+//! * [`view`] for the Slint history sidebar and its async controller.
 //!
 //! The Slint shell binds to [`HistoryState`] and [`ConversationNavigation`] and
 //! calls the async methods on [`ConversationHistory`] and
@@ -18,6 +19,7 @@ pub mod grouping;
 pub mod history;
 pub mod route;
 pub mod search;
+pub mod view;
 
 #[cfg(test)]
 mod tests;
@@ -37,4 +39,8 @@ pub use search::{
     ConversationSearchError, ConversationSearchHit, ConversationSearchResult,
     ConversationSearchService, ConversationSearchState, DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT,
     MAX_SNIPPET_CHARS, search_error,
+};
+pub use view::{
+    HistoryController, HistoryRow, HistoryRuntime, HistoryViewState, HistoryWindow, RenameState,
+    SearchRow, sync_window as sync_history_window,
 };

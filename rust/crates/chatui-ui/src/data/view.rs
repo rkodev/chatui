@@ -19,7 +19,7 @@ use crate::data::state::{
 };
 
 slint::slint! {
-    import { Button, CheckBox, ComboBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
+    import { Button, CheckBox, ComboBox, LineEdit, Palette, ScrollView, TextEdit } from "std-widgets.slint";
 
     export struct DataNavItem {
         id: string,
@@ -42,11 +42,12 @@ slint::slint! {
     component DataSectionButton inherits Rectangle {
         in property <string> label;
         in property <bool> active;
+        in property <bool> dark: false;
         callback clicked;
         out property <bool> focus-visible: false;
 
         height: 36px;
-        background: root.active ? #e5e7eb : transparent;
+        background: root.active ? (root.dark ? #1f232b : #f7f7f8) : transparent;
         border-radius: 6px;
 
         accessible-role: button;
@@ -83,7 +84,7 @@ slint::slint! {
 
         if (root.focus-visible) : Rectangle {
             border-width: 2px;
-            border-color: #1a56db;
+            border-color: root.dark ? #60a5fa : #1a56db;
             border-radius: 6px;
             background: transparent;
         }
@@ -132,6 +133,15 @@ slint::slint! {
         in property <string> backup-message: "";
         in property <string> backup-detail: "";
         in property <string> backup-link-label: "";
+        in property <bool> dark: false;
+
+        background: root.dark ? #0f1115 : #ffffff;
+        init => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
+        changed dark => {
+            Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
+        }
 
         callback select-section(int);
         callback refresh-usage();
@@ -166,6 +176,7 @@ slint::slint! {
                 for section[index] in root.sections : DataSectionButton {
                     label: section.label;
                     active: index == root.active-section;
+                    dark: root.dark;
                     clicked => { root.select-section(index); }
                 }
             }
@@ -181,7 +192,7 @@ slint::slint! {
                     }
 
                     if (!root.error-title.is-empty) : Rectangle {
-                        background: #fde8e8;
+                        background: root.dark ? #3b1d1d : #fde8e8;
                         border-radius: 8px;
 
                         VerticalLayout {
@@ -201,20 +212,20 @@ slint::slint! {
                             if (!root.error-details.is-empty) : Text {
                                 text: root.error-details;
                                 wrap: word-wrap;
-                                color: #666666;
+                                color: root.dark ? #9ca3af : #5f6368;
                             }
                         }
                     }
 
                     if (!root.busy.is-empty) : Text {
                         text: root.busy;
-                        color: #666666;
+                        color: root.dark ? #9ca3af : #5f6368;
                         accessible-live-region: polite;
                     }
 
                     if (!root.status.is-empty) : Text {
                         text: root.status;
-                        color: #666666;
+                        color: root.dark ? #9ca3af : #5f6368;
                         accessible-live-region: polite;
                         wrap: word-wrap;
                     }
@@ -223,7 +234,7 @@ slint::slint! {
                         spacing: 8px;
 
                         Text { text: "Storage usage"; font-size: 20px; font-weight: 600; }
-                        Text { text: root.usage-note; color: #666666; wrap: word-wrap; }
+                        Text { text: root.usage-note; color: root.dark ? #9ca3af : #5f6368; wrap: word-wrap; }
 
                         HorizontalLayout {
                             spacing: 8px;
@@ -258,7 +269,7 @@ slint::slint! {
                         Text { text: "Export"; font-size: 20px; font-weight: 600; }
                         Text {
                             text: root.plaintext-warning;
-                            color: #b45309;
+                            color: root.dark ? #fbbf24 : #b45309;
                             wrap: word-wrap;
                         }
 
@@ -289,7 +300,7 @@ slint::slint! {
                         Text { text: "Conversation export"; font-weight: 600; }
                         if (root.conversations.length == 0) : Text {
                             text: "No conversations are stored yet.";
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                         }
                         if (root.conversations.length > 0) : VerticalLayout {
                             spacing: 8px;
@@ -318,7 +329,7 @@ slint::slint! {
 
                         if (!root.last-export.is-empty) : Text {
                             text: root.last-export;
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                             wrap: word-wrap;
                         }
                     }
@@ -329,7 +340,7 @@ slint::slint! {
                         Text { text: "Import"; font-size: 20px; font-weight: 600; }
                         Text {
                             text: "Only import chatui.export archives you trust. Imported content is never executed, and invalid archives leave local data unchanged.";
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                             wrap: word-wrap;
                         }
 
@@ -346,7 +357,7 @@ slint::slint! {
 
                             Text {
                                 text: "Replace deletes local conversations, messages, attachments, providers, models, and settings after you confirm.";
-                                color: #b45309;
+                                color: root.dark ? #fbbf24 : #b45309;
                                 wrap: word-wrap;
                             }
 
@@ -374,7 +385,7 @@ slint::slint! {
 
                         if (!root.last-import.is-empty) : Text {
                             text: root.last-import;
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                             wrap: word-wrap;
                         }
                     }
@@ -385,7 +396,7 @@ slint::slint! {
                         Text { text: "Clear all data"; font-size: 20px; font-weight: 600; }
                         Text {
                             text: "This permanently deletes conversations, messages, attachments, providers, models, and stored API keys from this device. Appearance and chat preferences are kept. This cannot be undone.";
-                            color: #b45309;
+                            color: root.dark ? #fbbf24 : #b45309;
                             wrap: word-wrap;
                         }
 
@@ -404,7 +415,7 @@ slint::slint! {
 
                         if (!root.last-clear.is-empty) : Text {
                             text: root.last-clear;
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                             wrap: word-wrap;
                         }
                     }
@@ -415,13 +426,13 @@ slint::slint! {
                         Text { text: "Stored API keys"; font-size: 20px; font-weight: 600; }
                         Text {
                             text: "Keys are stored separately from conversations and are never included in exports. Removing a key clears its cached metadata and disables sending until a new key is added.";
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                             wrap: word-wrap;
                         }
 
                         if (root.provider-keys.length == 0) : Text {
                             text: "No providers are configured.";
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                         }
 
                         for key in root.provider-keys : HorizontalLayout {
@@ -429,7 +440,7 @@ slint::slint! {
 
                             VerticalLayout {
                                 Text { text: key.label; font-weight: 600; }
-                                Text { text: key.detail; color: #666666; }
+                                Text { text: key.detail; color: root.dark ? #9ca3af : #5f6368; }
                             }
 
                             Button {
@@ -447,7 +458,7 @@ slint::slint! {
                         Text { text: root.backup-message; wrap: word-wrap; }
                         Text {
                             text: root.backup-detail;
-                            color: #666666;
+                            color: root.dark ? #9ca3af : #5f6368;
                             wrap: word-wrap;
                         }
                         Button {
