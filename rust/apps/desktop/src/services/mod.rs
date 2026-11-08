@@ -17,6 +17,7 @@ mod sync;
 
 pub mod data;
 pub mod models;
+pub mod onboarding;
 pub mod providers;
 pub mod settings;
 

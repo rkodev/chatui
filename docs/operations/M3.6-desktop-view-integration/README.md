@@ -53,7 +53,7 @@ the synchronous UI services. This milestone closes that integration gap.
 | 2 | [M3.6-02.1 SQLite runtime, secrets, and sync bridge](M3.6-02.1-sqlite-runtime-bridge.md) | Complete | none | adapters | yes, with M3.6-01.1 |
 | 3 | [M3.6-02.2 Settings, provider, and model adapters](M3.6-02.2-settings-provider-model-adapters.md) | Complete | M3.6-02.1 | adapters | no; needs the runtime |
 | 4 | [M3.6-02.3 Data service adapter](M3.6-02.3-data-service-adapter.md) | Complete | M3.6-02.1 | adapters | yes, with M3.6-02.2 and M3.6-02.4 |
-| 5 | [M3.6-02.4 Onboarding adapters](M3.6-02.4-onboarding-adapters.md) | Not started | M3.6-02.1, M3.6-02.2 | adapters | yes, with M3.6-02.3 |
+| 5 | [M3.6-02.4 Onboarding adapters](M3.6-02.4-onboarding-adapters.md) | Complete | M3.6-02.1, M3.6-02.2 | adapters | yes, with M3.6-02.3 |
 | 6 | [M3.6-03.1 Shell feature host](M3.6-03.1-shell-feature-host.md) | Not started | M3.6-01.1 | ui | yes, with M3.6-02.* |
 | 7 | [M3.6-04.1 History view and controller](M3.6-04.1-history-view.md) | Not started | M3.6-02.1, M3.6-03.1 | ui | yes, with M3.6-05.1 |
 | 8 | [M3.6-05.1 Chat view and controller](M3.6-05.1-chat-view.md) | Not started | M3.6-02.1, M3.6-03.1 | ui | yes, with M3.6-04.1 |
