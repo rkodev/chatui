@@ -5,7 +5,7 @@
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
 - Current parity: [contracts/parity.md](../../../contracts/parity.md)
 - Status: Not started
-- Last updated: 2026-11-07
+- Last updated: 2026-11-08
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
 - Scope: Rust desktop only: Windows, macOS, and Linux. M3.5a is core, contracts, storage, secrets, and OpenRouter. M3.5b is UI, desktop integration, packaging, and release evidence.
 
@@ -79,7 +79,7 @@
 | 41 | [M3.5-11.1 Release profile, symbols, and binary-size budget](M3.5-11.1-release-profile-size.md) | Complete | M3.5-01.3, M3.5-08.1 | release | yes, with M3.5-09.* and M3.5-10.* |
 | 42 | [M3.5-11.2 Cross-platform packaging and checksums](M3.5-11.2-packaging-checksums.md) | Complete | M3.5-11.1, M3.5-08.1 | release | yes, with M3.5-09.* and M3.5-10.* |
 | 43 | [M3.5-11.3 Auto-update manifests, signing, and verification](M3.5-11.3-updater-signing.md) | Complete | M3.5-11.2, M3.5-04.1 | release | yes, with M3.5-10.* |
-| 44 | [M3.5-11.4 Rust CI matrix and tag release workflow](M3.5-11.4-ci-release-workflow.md) | Not started | M3.5-11.2, M3.5-11.3 | release | none; needs updater and packaging |
+| 44 | [M3.5-11.4 Rust CI matrix and tag release workflow](M3.5-11.4-ci-release-workflow.md) | Complete | M3.5-11.2, M3.5-11.3 | release | none; needs updater and packaging |
 | 45 | [M3.5-11.5 Performance, cold start, and installer-size evidence](M3.5-11.5-performance-evidence.md) | Not started | M3.5-11.2, M3.5-11.4 | release | none; follows CI evidence |
 | 46 | [M3.5-12.1 Full conformance and critical-case evidence](M3.5-12.1-conformance-critical-cases.md) | Not started | all prior tasks | evidence | none; full gate |
 | 47 | [M3.5-12.2 Parity, release gate, and M3.5 verification report](M3.5-12.2-parity-release-verification.md) | Not started | M3.5-12.1 | evidence | none; final gate |
