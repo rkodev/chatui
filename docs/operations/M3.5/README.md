@@ -78,7 +78,7 @@
 | 40 | [M3.5-10.4 Accessibility evidence and screen-reader smoke tests](M3.5-10.4-accessibility-evidence.md) | Complete | M3.5-09.1, M3.5-09.2, M3.5-09.3, M3.5-09.4, M3.5-09.5, M3.5-10.1, M3.5-10.2, M3.5-10.3 | evidence | none; final UI evidence |
 | 41 | [M3.5-11.1 Release profile, symbols, and binary-size budget](M3.5-11.1-release-profile-size.md) | Complete | M3.5-01.3, M3.5-08.1 | release | yes, with M3.5-09.* and M3.5-10.* |
 | 42 | [M3.5-11.2 Cross-platform packaging and checksums](M3.5-11.2-packaging-checksums.md) | Complete | M3.5-11.1, M3.5-08.1 | release | yes, with M3.5-09.* and M3.5-10.* |
-| 43 | [M3.5-11.3 Auto-update manifests, signing, and verification](M3.5-11.3-updater-signing.md) | Not started | M3.5-11.2, M3.5-04.1 | release | yes, with M3.5-10.* |
+| 43 | [M3.5-11.3 Auto-update manifests, signing, and verification](M3.5-11.3-updater-signing.md) | Complete | M3.5-11.2, M3.5-04.1 | release | yes, with M3.5-10.* |
 | 44 | [M3.5-11.4 Rust CI matrix and tag release workflow](M3.5-11.4-ci-release-workflow.md) | Not started | M3.5-11.2, M3.5-11.3 | release | none; needs updater and packaging |
 | 45 | [M3.5-11.5 Performance, cold start, and installer-size evidence](M3.5-11.5-performance-evidence.md) | Not started | M3.5-11.2, M3.5-11.4 | release | none; follows CI evidence |
 | 46 | [M3.5-12.1 Full conformance and critical-case evidence](M3.5-12.1-conformance-critical-cases.md) | Not started | all prior tasks | evidence | none; full gate |

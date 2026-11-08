@@ -20,6 +20,7 @@ mod dialogs;
 mod menu;
 mod shortcuts;
 mod single_instance;
+mod updater;
 mod window_state;
 
 use std::cell::{Cell, RefCell};
