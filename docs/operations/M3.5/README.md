@@ -81,7 +81,7 @@
 | 43 | [M3.5-11.3 Auto-update manifests, signing, and verification](M3.5-11.3-updater-signing.md) | Complete | M3.5-11.2, M3.5-04.1 | release | yes, with M3.5-10.* |
 | 44 | [M3.5-11.4 Rust CI matrix and tag release workflow](M3.5-11.4-ci-release-workflow.md) | Complete | M3.5-11.2, M3.5-11.3 | release | none; needs updater and packaging |
 | 45 | [M3.5-11.5 Performance, cold start, and installer-size evidence](M3.5-11.5-performance-evidence.md) | Complete | M3.5-11.2, M3.5-11.4 | release | none; follows CI evidence |
-| 46 | [M3.5-12.1 Full conformance and critical-case evidence](M3.5-12.1-conformance-critical-cases.md) | Not started | all prior tasks | evidence | none; full gate |
+| 46 | [M3.5-12.1 Full conformance and critical-case evidence](M3.5-12.1-conformance-critical-cases.md) | Complete | all prior tasks | evidence | none; full gate |
 | 47 | [M3.5-12.2 Parity, release gate, and M3.5 verification report](M3.5-12.2-parity-release-verification.md) | Not started | M3.5-12.1 | evidence | none; final gate |
 
 ## Parallel execution groups

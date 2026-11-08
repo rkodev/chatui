@@ -886,8 +886,10 @@ dependencies = [
  "chatui-contracts",
  "chatui-domain",
  "chatui-providers",
+ "chatui-storage",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "wiremock",
 ]
