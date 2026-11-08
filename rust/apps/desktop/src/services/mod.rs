@@ -15,6 +15,10 @@ mod runtime;
 mod secrets;
 mod sync;
 
+pub mod models;
+pub mod providers;
+pub mod settings;
+
 pub use runtime::{ServiceRuntime, ServiceRuntimeError};
 pub use secrets::{
     SecretStoreError, default_secret_store, select_secret_store, session_only_secret_store,
