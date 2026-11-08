@@ -173,8 +173,8 @@ rust-ui-test:
 
 rust-package:
 	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
-	@echo "error: Rust packaging is not configured yet. M3.5-11.2 selects the packaging command; see docs/operations/M3.5/tooling.md." >&2
-	@exit 1
+	$(call require_file,$(RUST_DIR)/packaging/package.py,Desktop packaging pipeline is not present yet (see docs/operations/M3.5/packaging.md).)
+	python3 $(RUST_DIR)/packaging/package.py --clean
 
 format:
 	@if [ -f $(WEB_DIR)/package.json ]; then pnpm --dir $(WEB_DIR) exec prettier --write .; else echo "skip: web scaffold is not present"; fi
