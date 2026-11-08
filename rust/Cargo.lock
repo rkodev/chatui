@@ -919,6 +919,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "i-slint-backend-testing",
+ "image",
  "reqwest",
  "rfd",
  "semver",

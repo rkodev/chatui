@@ -611,6 +611,11 @@ impl ChatController {
         self.composer.borrow().window().clone_strong()
     }
 
+    /// Show or hide token usage in the message list metadata.
+    pub fn set_show_token_usage(&self, show: bool) {
+        self.message_list.borrow().set_show_token_usage(show);
+    }
+
     /// Create a standalone host that stacks the message list and composer.
     ///
     /// A host must use either this window or the shell's two containers, never
@@ -1396,6 +1401,50 @@ mod tests {
         assert_eq!(rows.row_count(), 2);
         assert_eq!(rows.row_data(0).expect("row").id.as_str(), "user-1");
         assert_eq!(rows.row_data(1).expect("row").id.as_str(), "assistant-1");
+    }
+
+    #[test]
+    fn token_usage_toggle_updates_message_rows() {
+        let adapter = Arc::new(FakeAdapter::new(
+            Vec::new(),
+            summary("", "", None, None, None),
+        ));
+        let harness = harness(adapter);
+        let mut response = message(
+            "assistant-1",
+            "conversation-1",
+            0,
+            MessageRole::Assistant,
+            "Hi",
+            MessageStatus::Complete,
+        );
+        response.usage = Some(Usage {
+            input_tokens: Some(3),
+            output_tokens: Some(5),
+            total_tokens: Some(8),
+            cost_usd: None,
+            estimated: false,
+        });
+        seed(&harness, &conversation("conversation-1"), &[response]);
+
+        harness.controller.open("conversation-1");
+        wait_for_rows(&harness.controller, 1);
+
+        let rows = harness.controller.messages_window().get_rows();
+        let meta = rows.row_data(0).expect("row").meta;
+        assert!(meta.contains("3 in"), "unexpected metadata: {meta}");
+
+        harness.controller.set_show_token_usage(false);
+
+        let rows = harness.controller.messages_window().get_rows();
+        let meta = rows.row_data(0).expect("row").meta;
+        assert!(!meta.contains("3 in"), "unexpected metadata: {meta}");
+
+        harness.controller.set_show_token_usage(true);
+
+        let rows = harness.controller.messages_window().get_rows();
+        let meta = rows.row_data(0).expect("row").meta;
+        assert!(meta.contains("3 in"), "unexpected metadata: {meta}");
     }
 
     #[test]

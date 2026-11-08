@@ -15,6 +15,7 @@ chatui-storage = { version = "0.1.0", path = "../../crates/chatui-storage" }
 chatui-ui = { version = "0.1.0", path = "../../crates/chatui-ui" }
 ed25519-dalek = "2.1"
 hex = "0.4"
+image = { version = "0.25", default-features = false, features = ["png"] }
 reqwest = { version = "0.12.24", default-features = false, features = [
   "blocking",
   "rustls-tls",
@@ -31,7 +32,7 @@ sqlx = { version = "0.8.6", default-features = false, features = [
   "migrate",
   "macros",
 ] }
-tokio = { version = "1", features = ["rt-multi-thread"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
 url = "2"
 
 [dev-dependencies]
