@@ -1,4 +1,4 @@
-# M3.6-01.1 embedding decision
+# M3.6 embedding decision
 
 - Task: `M3.6-01.1`
 - Slint version: `1.18.1` (workspace pin)
