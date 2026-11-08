@@ -557,6 +557,7 @@ slint::slint! {
     component MainContent inherits Rectangle {
         in property <string> title;
         in property <string> body;
+        in property <string> notice;
         in property <color> bg;
         in property <color> fg;
         in property <color> muted;
@@ -583,6 +584,14 @@ slint::slint! {
             Rectangle {
                 height: 1px;
                 background: root.border;
+            }
+
+            if (root.notice != "") : Text {
+                text: root.notice;
+                color: root.muted;
+                wrap: word-wrap;
+                font-size: root.chat.size;
+                height: root.chat.line-height;
             }
 
             Rectangle {
@@ -616,14 +625,124 @@ slint::slint! {
         in property <[string]> destinations: ["Chat", "History", "Providers", "Settings", "Data"];
         in property <string> page-title: "Chat";
         in property <string> page-body: "Chat placeholder";
+        in property <string> notice: "";
+        in-out property <bool> shortcuts-help-open: false;
+        in property <[string]> shortcut-lines: [];
         in property <bool> show-params-panel: false;
 
         callback navigate(int);
         callback toggle-sidebar();
         callback close-drawer();
         callback width-changed(length);
+        callback menu-command(string);
+        callback files-dropped(data-transfer);
 
         changed width => { root.width-changed(self.width); }
+
+        MenuBar {
+            Menu {
+                title: "File";
+                MenuItem {
+                    title: "New Chat";
+                    shortcut: @keys(Control + Shift + O);
+                    activated => { root.menu-command("new-chat"); }
+                }
+                MenuItem {
+                    title: "Attach File…";
+                    activated => { root.menu-command("attach-file"); }
+                }
+                MenuSeparator { }
+                MenuItem {
+                    title: "Export…";
+                    activated => { root.menu-command("export"); }
+                }
+                MenuItem {
+                    title: "Import…";
+                    activated => { root.menu-command("import"); }
+                }
+                MenuSeparator { }
+                MenuItem {
+                    title: "Quit";
+                    shortcut: @keys(Control + Q);
+                    activated => { root.menu-command("quit"); }
+                }
+            }
+            Menu {
+                title: "Edit";
+                MenuItem {
+                    title: "Search";
+                    shortcut: @keys(Control + K);
+                    activated => { root.menu-command("search"); }
+                }
+                MenuItem {
+                    title: "Copy Last Response";
+                    shortcut: @keys(Control + Shift + C);
+                    activated => { root.menu-command("copy-last-response"); }
+                }
+            }
+            Menu {
+                title: "View";
+                MenuItem {
+                    title: "Toggle Sidebar";
+                    activated => { root.menu-command("toggle-sidebar"); }
+                }
+                MenuItem {
+                    title: "Keyboard Shortcuts";
+                    shortcut: @keys(Control + Slash);
+                    activated => { root.menu-command("shortcuts-help"); }
+                }
+            }
+            Menu {
+                title: "Conversation";
+                MenuItem {
+                    title: "Previous Conversation";
+                    shortcut: @keys(Alt + UpArrow);
+                    activated => { root.menu-command("previous-conversation"); }
+                }
+                MenuItem {
+                    title: "Next Conversation";
+                    shortcut: @keys(Alt + DownArrow);
+                    activated => { root.menu-command("next-conversation"); }
+                }
+                MenuSeparator { }
+                MenuItem {
+                    title: "Stop";
+                    activated => { root.menu-command("stop-or-close"); }
+                }
+            }
+            Menu {
+                title: "Help";
+                MenuItem {
+                    title: "Keyboard Shortcuts";
+                    activated => { root.menu-command("shortcuts-help"); }
+                }
+                MenuItem {
+                    title: "Documentation";
+                    activated => { root.menu-command("open-docs"); }
+                }
+                MenuItem {
+                    title: "About ChatUI";
+                    activated => { root.menu-command("about"); }
+                }
+            }
+        }
+
+        FocusScope {
+            KeyBinding {
+                keys: @keys(Escape);
+                activated => { root.menu-command("stop-or-close"); }
+            }
+        }
+
+        DropArea {
+            width: 100%;
+            height: 100%;
+            can-drop(event) => { DragAction.copy }
+            dropped(event) => {
+                root.files-dropped(event.data);
+                return event.proposed-action;
+            }
+        }
 
         if root.sidebar-visible : HorizontalLayout {
             Sidebar {
@@ -646,6 +765,7 @@ slint::slint! {
             MainContent {
                 title: root.page-title;
                 body: root.page-body;
+                notice: root.notice;
                 bg: root.tokens.bg-canvas;
                 fg: root.tokens.fg-primary;
                 muted: root.tokens.fg-muted;
@@ -681,6 +801,7 @@ slint::slint! {
             MainContent {
                 title: root.page-title;
                 body: root.page-body;
+                notice: root.notice;
                 bg: root.tokens.bg-canvas;
                 fg: root.tokens.fg-primary;
                 muted: root.tokens.fg-muted;
@@ -714,6 +835,48 @@ slint::slint! {
                 reduced-motion: root.reduced-motion;
                 navigate(i) => { root.navigate(i); }
                 close-drawer => { root.close-drawer(); }
+            }
+        }
+
+        if root.shortcuts-help-open : Rectangle {
+            background: #00000066;
+            width: 100%;
+            height: 100%;
+
+            panel := Rectangle {
+                width: min(parent.width - 48px, 520px);
+                height: min(parent.height - 48px, 420px);
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                background: root.tokens.bg-surface-raised;
+                border-radius: root.tokens.radius-md;
+                border-width: 1px;
+                border-color: root.tokens.border-subtle;
+
+                VerticalLayout {
+                    padding: root.density.padding;
+                    spacing: root.density.gap;
+
+                    Text {
+                        text: "Keyboard shortcuts";
+                        color: root.tokens.fg-primary;
+                        font-size: 18px;
+                        font-weight: 600;
+                    }
+
+                    for line in root.shortcut-lines : Text {
+                        text: line;
+                        color: root.tokens.fg-secondary;
+                        font-size: 14px;
+                    }
+
+                    Rectangle { vertical-stretch: 1; }
+
+                    Button {
+                        text: "Close";
+                        clicked => { root.shortcuts-help-open = false; }
+                    }
+                }
             }
         }
     }
@@ -838,6 +1001,11 @@ impl ShellController {
     /// Borrow the current shell state.
     pub fn state(&self) -> std::cell::Ref<'_, ShellState> {
         self.state.borrow()
+    }
+
+    /// Clone the shared state handle for desktop integration callbacks.
+    pub fn state_handle(&self) -> Rc<RefCell<ShellState>> {
+        Rc::clone(&self.state)
     }
 
     /// Run the Slint event loop.
