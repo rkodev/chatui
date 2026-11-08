@@ -15,6 +15,7 @@ mod runtime;
 mod secrets;
 mod sync;
 
+pub mod data;
 pub mod models;
 pub mod providers;
 pub mod settings;
