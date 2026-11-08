@@ -58,10 +58,11 @@ pub use conversations::{
     ConversationSearchError, ConversationSearchHit, ConversationSearchResult,
     ConversationSearchService, ConversationSearchState, DEFAULT_CONVERSATION_TITLE,
     DEFAULT_HISTORY_PAGE_SIZE, DEFAULT_SEARCH_LIMIT, DEFAULT_UNDO_WINDOW,
-    DefaultConversationFactory, HISTORY_GROUP_ORDER, HistoryConfig, HistoryError, HistoryGroup,
-    HistoryGroupKey, HistoryState, HistoryStatus, MAX_HISTORY_ROWS, MAX_SEARCH_LIMIT,
-    MAX_SNIPPET_CHARS, format_conversation_timestamp, group_conversations, history_group_for_date,
-    search_error,
+    DefaultConversationFactory, HISTORY_GROUP_ORDER, HistoryConfig, HistoryController,
+    HistoryError, HistoryGroup, HistoryGroupKey, HistoryRow, HistoryRuntime, HistoryState,
+    HistoryStatus, HistoryViewState, HistoryWindow, MAX_HISTORY_ROWS, MAX_SEARCH_LIMIT,
+    MAX_SNIPPET_CHARS, RenameState, SearchRow, format_conversation_timestamp, group_conversations,
+    history_group_for_date, search_error, sync_history_window,
 };
 pub use data::{
     CLEAR_ALL_CONFIRMATION, ClearRequest, ClearSummary, ConversationOption, DataBackupPlaceholder,
