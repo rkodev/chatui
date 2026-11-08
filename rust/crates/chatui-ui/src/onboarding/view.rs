@@ -42,8 +42,8 @@ slint::slint! {
 
     export component OnboardingWindow inherits Window {
         title: "ChatUI onboarding";
-        width: 720px;
-        height: 640px;
+        preferred-width: 720px;
+        preferred-height: 640px;
 
         in property <int> step: 0;
         in property <string> preset-label: "OpenRouter";
