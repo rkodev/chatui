@@ -1,7 +1,7 @@
 # ChatUI Feature Parity
 
 - Source: [IMPLEMENTATION.md section 5.4](../docs/IMPLEMENTATION.md#54-parity-checklist)
-- Updated: 2026-11-06
+- Updated: 2026-11-08
 - Purpose: authoritative cross-client requirement and commitment table.
 
 | Feature | Web | Android | Rust |
@@ -32,6 +32,7 @@
 
 - OpenRouter is the first release blocker. These rows are release-blocking on every published client: OpenRouter first-run onboarding, key introspection, catalog/pricing/modalities, streaming/reasoning/usage/cost, and provider routing preferences.
 - The Rust column may be `Optional` until the Rust desktop client is enabled for release. Once enabled and published, Rust must meet the same contracts, conformance, parity, and security bar as web and Android. The Rust client is desktop-only for Windows, macOS, and Linux; it is not an Android, iOS, or WASM client.
+- Current Rust status (2026-11-08): `Optional` and deferred. The M3.5 preview implementation is not enabled for release; no Rust row is marked complete or required. See [Implementation status (M3.5)](#implementation-status-m35-2026-11-08).
 - No feature is complete at M0. Foundation-level persistence, routing placeholders, or design tokens do not satisfy a feature row.
 - This table records requirement and platform commitment, not current implementation status. Update it in the same change as any user-visible behavior change.
 - Allowed platform values are `Required`, `Required (release blocker)`, `Required when enabled`, `Required on desktop`, `Future`, `N/A`, and the platform-specific persistence descriptions shown above.
@@ -142,3 +143,54 @@ Not delivered in M2 (later milestones or recorded deferrals):
 - Live provider smoke and valid-key success for every cloud preset were not
   re-run; CORS evidence proves browser readability with placeholder
   credentials. Local and Custom CORS remain `unknown`.
+
+## Implementation status (M3.5, 2026-11-08)
+
+The Rust desktop client is **`Optional` and deferred** for the current release.
+The Product/release owner recorded `defer` in
+[M3.5-decisions.md](../docs/operations/M3.5/M3.5-decisions.md) (DEC-01). The
+commitment table above is unchanged: Rust rows remain `Required when enabled`,
+and no Rust row is marked complete or required. This section records the
+preview implementation and its evidence; it is not a release claim.
+
+Preview implementation delivered (not released):
+
+- Cargo workspace with domain, contracts, providers, storage, secrets, UI, and
+  desktop app crates; Slint UI shell; no WebView.
+- Contracts consumed from `contracts/` with `include_str!`; no duplicated
+  provider presets.
+- SQLite storage with migrations, FTS5 search, attachments, startup recovery,
+  and export/import.
+- OS credential-store integration plus explicit encrypted-file fallback,
+  session-only mode, redaction, and zeroization.
+- OpenRouter and OpenAI-compatible, Anthropic, Gemini, and Ollama adapters;
+  bounded SSE/NDJSON parsers; retry, cancellation, and watchdog behavior.
+- Onboarding, provider/model management, chat, composer, Markdown, search,
+  settings, data controls, desktop integration, and accessibility primitives.
+- Packaging for Linux `.deb`/`.tar.gz`, configured macOS `.app`/`.dmg` and
+  Windows `.zip`; signed update-manifest verification with pinned keys.
+- Rust CI matrix and tag release workflow; conformance suite and evidence.
+
+Evidence: [M3.5-verification.md](../docs/operations/M3.5/M3.5-verification.md),
+[conformance.md](../docs/operations/M3.5/conformance.md),
+[packaging.md](../docs/operations/M3.5/packaging.md),
+[update-signing.md](../docs/operations/M3.5/update-signing.md),
+[ci.md](../docs/operations/M3.5/ci.md),
+[performance.md](../docs/operations/M3.5/performance.md),
+[security.md](../docs/operations/M3.5/security.md), and
+[accessibility.md](../docs/operations/M3.5/accessibility.md).
+
+Not claimed or blocked:
+
+- No signed macOS or Windows artifact; no notarization (B-01 through B-04).
+- No production update-signing key; the pinned keys are development keys (B-05).
+- No macOS or Windows OS smoke or process-death run (B-01, B-02).
+- No Linux screen-reader pass; Orca is blocked in this environment.
+- No live provider smoke; conformance uses shared fixtures and mocks.
+- Section 15.2 cases 18 and 28 remain blocked (C-03, C-04).
+- `make rust-deny` and `make rust-audit` remain blocked by pre-existing
+  supply-chain issues (C-01, C-02).
+
+M4 does not depend on Rust while this decision stands. If the owner later
+records `proceed`, every required Rust row must meet the web/Android bar and the
+full section 10.12 release gate applies.

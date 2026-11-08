@@ -1,0 +1,387 @@
+name: Rust release
+
+"on":
+  push:
+    tags:
+      - "v*"
+      - "beta-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  verify:
+    name: Release gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libgtk-3-dev
+
+      - name: Read pinned toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          channel=$(sed -n 's/^channel = "\(.*\)"/\1/p' rust/rust-toolchain.toml)
+          if [ -z "$channel" ]; then
+            echo "::error::Could not read channel from rust/rust-toolchain.toml"
+            exit 1
+          fi
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          cache-on-failure: true
+
+      - name: Install cargo-nextest, cargo-deny, and cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest,cargo-deny@0.20.2,cargo-audit@0.22.2
+
+      - name: Check formatting
+        working-directory: rust
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        working-directory: rust
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        working-directory: rust
+        run: cargo nextest run --workspace
+
+      - name: Conformance
+        working-directory: rust
+        run: cargo nextest run -p chatui-conformance
+
+      - name: Dependency policy
+        working-directory: rust
+        run: cargo deny check
+
+      - name: Security advisories
+        working-directory: rust
+        run: cargo audit
+
+  build:
+    name: Package (${{ matrix.name }})
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            target: linux-x86_64
+            os_name: linux
+            arch: x86_64
+          # TODO: Re-enable macOS and Windows releases once their signing
+          # credentials and cross-platform support are ready.
+          # - name: macOS Apple Silicon
+          #   os: macos-14
+          #   target: macos-aarch64
+          #   os_name: macos
+          #   arch: aarch64
+          # - name: Windows x86_64
+          #   os: windows-latest
+          #   target: windows-x86_64
+          #   os_name: windows
+          #   arch: x86_64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Determine release channel
+        id: channel
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == beta-* ]]; then
+            echo "channel=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=stable" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify required signing credentials
+        shell: bash
+        env:
+          CHANNEL: ${{ steps.channel.outputs.channel }}
+          UPDATE_SIGNING_PRIVATE_KEY_STABLE: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY_STABLE }}
+          UPDATE_SIGNING_PRIVATE_KEY_BETA: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY_BETA }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_NOTARY_PROFILE: ${{ secrets.APPLE_NOTARY_PROFILE }}
+          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_NOTARY_TEAM_ID: ${{ secrets.APPLE_NOTARY_TEAM_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          missing=()
+          if [ "$CHANNEL" = "stable" ]; then
+            [ -n "$UPDATE_SIGNING_PRIVATE_KEY_STABLE" ] || missing+=("UPDATE_SIGNING_PRIVATE_KEY_STABLE")
+          else
+            [ -n "$UPDATE_SIGNING_PRIVATE_KEY_BETA" ] || missing+=("UPDATE_SIGNING_PRIVATE_KEY_BETA")
+          fi
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            [ -n "$APPLE_CERTIFICATE" ] || missing+=("APPLE_CERTIFICATE")
+            [ -n "$APPLE_CERTIFICATE_PASSWORD" ] || missing+=("APPLE_CERTIFICATE_PASSWORD")
+            [ -n "$APPLE_SIGNING_IDENTITY" ] || missing+=("APPLE_SIGNING_IDENTITY")
+            [ -n "$APPLE_NOTARY_PROFILE" ] || missing+=("APPLE_NOTARY_PROFILE")
+            [ -n "$APPLE_NOTARY_APPLE_ID" ] || missing+=("APPLE_NOTARY_APPLE_ID")
+            [ -n "$APPLE_NOTARY_TEAM_ID" ] || missing+=("APPLE_NOTARY_TEAM_ID")
+            [ -n "$APPLE_NOTARY_PASSWORD" ] || missing+=("APPLE_NOTARY_PASSWORD")
+          fi
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            [ -n "$WINDOWS_CERTIFICATE" ] || missing+=("WINDOWS_CERTIFICATE")
+            [ -n "$WINDOWS_CERTIFICATE_PASSWORD" ] || missing+=("WINDOWS_CERTIFICATE_PASSWORD")
+          fi
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing required release credentials: ${missing[*]}"
+            echo "The release job fails closed rather than publishing unsigned production artifacts."
+            exit 1
+          fi
+
+      - name: Read pinned toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          channel=$(sed -n 's/^channel = "\(.*\)"/\1/p' rust/rust-toolchain.toml)
+          if [ -z "$channel" ]; then
+            echo "::error::Could not read channel from rust/rust-toolchain.toml"
+            exit 1
+          fi
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+
+      - name: Cache Cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          cache-on-failure: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packaging dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev libfontconfig1-dev libgtk-3-dev
+
+      - name: Import Apple signing certificate
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          python -c "import base64, os, pathlib; pathlib.Path('certificate.p12').write_bytes(base64.b64decode(os.environ['APPLE_CERTIFICATE']))"
+          security delete-keychain build.keychain 2>/dev/null || true
+          security create-keychain -p actions build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p actions build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
+          rm certificate.p12
+
+      - name: Configure Apple notarization profile
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_NOTARY_PROFILE: ${{ secrets.APPLE_NOTARY_PROFILE }}
+          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_NOTARY_TEAM_ID: ${{ secrets.APPLE_NOTARY_TEAM_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+        run: |
+          xcrun notarytool store-credentials "$APPLE_NOTARY_PROFILE" \
+            --apple-id "$APPLE_NOTARY_APPLE_ID" \
+            --team-id "$APPLE_NOTARY_TEAM_ID" \
+            --password "$APPLE_NOTARY_PASSWORD"
+
+      - name: Build release workspace
+        working-directory: rust
+        run: cargo build --release --workspace --locked
+
+      - name: Sign Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP "certificate.pfx"
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe not found" }
+          & $signtool.FullName sign /f $certPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 "rust\target\release\chatui-desktop.exe"
+          if ($LASTEXITCODE -ne 0) { throw "signtool failed" }
+          Remove-Item $certPath
+
+      - name: Package artifacts
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_NOTARY_PROFILE: ${{ secrets.APPLE_NOTARY_PROFILE }}
+        run: |
+          python -c "import pathlib; [p.unlink() for p in pathlib.Path('rust/dist').glob('*') if p.is_file()]"
+          python rust/packaging/package.py --skip-build --target "${{ matrix.target }}"
+          python -c "import pathlib; p=pathlib.Path('rust/dist/SHA256SUMS'); p.rename(p.with_name('SHA256SUMS-${{ matrix.target }}'))"
+
+      - name: Sign update manifest
+        shell: bash
+        env:
+          CHANNEL: ${{ steps.channel.outputs.channel }}
+          TARGET: ${{ matrix.target }}
+          OS_NAME: ${{ matrix.os_name }}
+          ARCH: ${{ matrix.arch }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          UPDATE_SIGNING_PRIVATE_KEY_STABLE: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY_STABLE }}
+          UPDATE_SIGNING_PRIVATE_KEY_BETA: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY_BETA }}
+        run: |
+          python -m pip install --disable-pip-version-check cryptography
+          python - <<'PY'
+          import base64
+          import datetime
+          import json
+          import os
+          import pathlib
+          import tomllib
+
+          from cryptography.hazmat.primitives import serialization
+
+          channel = os.environ["CHANNEL"]
+          target = os.environ["TARGET"]
+          os_name = os.environ["OS_NAME"]
+          arch = os.environ["ARCH"]
+          tag = os.environ["TAG"]
+          repo = os.environ["REPO"]
+
+          dist = pathlib.Path("rust/dist")
+          version = tomllib.loads(
+              pathlib.Path("rust/apps/desktop/Cargo.toml").read_text(encoding="utf-8")
+          )["package"]["version"]
+
+          checksums = {}
+          for line in (dist / f"SHA256SUMS-{target}").read_text(encoding="utf-8").splitlines():
+              digest, name = line.split("  ", 1)
+              checksums[name] = digest
+
+          artifact_by_target = {
+              "linux-x86_64": f"ChatUI-{version}-linux-x86_64.tar.gz",
+              "macos-aarch64": f"ChatUI-{version}-macos-aarch64.dmg",
+              "windows-x86_64": f"ChatUI-{version}-windows-x86_64.zip",
+          }
+          artifact = artifact_by_target[target]
+          artifact_path = dist / artifact
+          payload = {
+              "schemaVersion": 1,
+              "appVersion": version,
+              "channel": channel,
+              "target": {"os": os_name, "arch": arch},
+              "artifact": {
+                  "url": f"https://github.com/{repo}/releases/download/{tag}/{artifact}",
+                  "sha256": checksums[artifact],
+                  "size": artifact_path.stat().st_size,
+              },
+              "publishedAt": datetime.datetime.now(datetime.timezone.utc).strftime(
+                  "%Y-%m-%dT%H:%M:%SZ"
+              ),
+          }
+          payload_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+          key_pem = os.environ[f"UPDATE_SIGNING_PRIVATE_KEY_{channel.upper()}"].encode()
+          private_key = serialization.load_pem_private_key(key_pem, password=None)
+          signature = private_key.sign(payload_bytes)
+          private_key.public_key().verify(signature, payload_bytes)
+          envelope = {
+              "schemaVersion": 1,
+              "payload": base64.b64encode(payload_bytes).decode(),
+              "signature": base64.b64encode(signature).decode(),
+          }
+          output = dist / "manifests" / f"update-{channel}-{target}.json"
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_text(json.dumps(envelope, indent=2) + "\n", encoding="utf-8")
+          print(f"Wrote {output}")
+          PY
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatui-${{ matrix.target }}
+          path: |
+            rust/dist/*.deb
+            rust/dist/*.tar.gz
+            rust/dist/*.zip
+            rust/dist/*.dmg
+            rust/dist/SHA256SUMS-*
+            rust/dist/manifests/update-*.json
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Combine checksums
+        shell: bash
+        run: |
+          cat dist/SHA256SUMS-* > dist/SHA256SUMS
+          echo "Release assets:"
+          find dist -maxdepth 2 -type f | sort
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ChatUI ${{ github.ref_name }}
+          prerelease: ${{ startsWith(github.ref_name, 'beta-') }}
+          fail_on_unmatched_files: false
+          files: |
+            dist/*.deb
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.dmg
+            dist/SHA256SUMS
+            dist/SHA256SUMS-*
+            dist/manifests/update-*.json

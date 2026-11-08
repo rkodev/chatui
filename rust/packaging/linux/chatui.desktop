@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=ChatUI
+GenericName=Chat Client
+Comment=Local-first, bring-your-own-key chat client for multiple model providers
+Exec=chatui-desktop %U
+Icon=chatui
+Terminal=false
+Categories=Network;Chat;Utility;
+Keywords=chat;llm;ai;openrouter;
+MimeType=x-scheme-handler/chatui;
+StartupNotify=true
+StartupWMClass=chatui-desktop

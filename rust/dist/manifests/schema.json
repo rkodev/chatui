@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rkodev/chatui/update-manifest.schema.json",
+  "title": "ChatUI signed update manifest",
+  "description": "Envelope for a signed desktop update manifest. The payload is base64-encoded UTF-8 JSON and the signature is a base64 Ed25519 signature over the exact payload bytes. The payload schema is in $defs.payload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "payload", "signature"],
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "description": "Envelope schema version."
+    },
+    "payload": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "description": "Base64 of the UTF-8 payload JSON. The signature covers these exact bytes."
+    },
+    "signature": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "description": "Base64 Ed25519 signature over the decoded payload bytes."
+    }
+  },
+  "$defs": {
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "appVersion",
+        "channel",
+        "target",
+        "artifact"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "appVersion": {
+          "type": "string",
+          "description": "Semantic version offered by this manifest."
+        },
+        "channel": {
+          "enum": ["stable", "beta"]
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["os", "arch"],
+          "properties": {
+            "os": {
+              "enum": ["linux", "macos", "windows"]
+            },
+            "arch": {
+              "enum": ["x86_64", "aarch64"]
+            }
+          }
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["url", "sha256", "size"],
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{64}$"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1073741824
+            }
+          }
+        },
+        "minimumSupportedVersion": {
+          "type": "string",
+          "description": "Oldest installed version that may apply this update."
+        },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Informational publication timestamp."
+        }
+      }
+    }
+  }
+}

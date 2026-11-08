@@ -153,6 +153,21 @@ class NextTaskTests(unittest.TestCase):
             self.assertEqual(result.stderr, "")
             self.assertNotEqual(Path(result.stdout.strip()).resolve(), second.resolve())
 
+    def test_supports_dotted_milestone_task_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            task_dir = Path(tmp)
+            first = write_task(task_dir, "M3.5-00.1", 1)
+            second = write_task(task_dir, "M3.5-00.2", 2, dependencies="M3.5-00.1")
+
+            result = run_next_task(task_dir)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(Path(result.stdout.strip()).resolve(), first.resolve())
+
+            mark_status(first, "Complete")
+            result = run_next_task(task_dir)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(Path(result.stdout.strip()).resolve(), second.resolve())
+
     def test_waits_for_incomplete_dependencies(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             task_dir = Path(tmp)

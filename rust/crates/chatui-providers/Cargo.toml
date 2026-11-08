@@ -1,0 +1,32 @@
+[package]
+name = "chatui-providers"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+base64 = "0.22"
+chatui-contracts = { version = "0.1.0", path = "../chatui-contracts" }
+chatui-domain = { version = "0.1.0", path = "../chatui-domain" }
+directories = "6"
+futures-util = "0.3"
+reqwest = { version = "0.12.24", default-features = false, features = [
+  "http2",
+  "json",
+  "rustls-tls",
+  "stream",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "sync", "time"] }
+tokio-util = "0.7"
+url = "2"
+
+[dev-dependencies]
+chatui-conformance = { version = "0.1.0", path = "../../tests/conformance" }
+futures-util = "0.3"
+tempfile = "3"
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "time"] }
+tokio-util = "0.7"
+wiremock = "0.6"

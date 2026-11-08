@@ -1,0 +1,43 @@
+# Desktop packaging configuration for ChatUI.
+#
+# Read by rust/packaging/package.py. The version is read from
+# rust/apps/desktop/Cargo.toml at build time so it cannot drift from the crate.
+# Artifacts are written to rust/dist/ and are never committed.
+
+[app]
+name = "chatui"
+display_name = "ChatUI"
+binary = "chatui-desktop"
+description = "Local-first, bring-your-own-key chat client for multiple model providers."
+# The repository has no LICENSE file yet. "Proprietary" is a placeholder that
+# does not grant a license; replace it when the project license is confirmed.
+license = "Proprietary"
+authors = ["ChatUI contributors"]
+homepage = "https://github.com/rkodev/chatui"
+identifier = "dev.chatui.ChatUI"
+maintainer = "ChatUI contributors <maintainers@chatui.invalid>"
+
+# Required formats per spec section 10.10:
+#   Windows: MSI or portable zip -> portable zip
+#   macOS:   signed/notarized DMG or app bundle -> app bundle + DMG
+#   Linux:   AppImage and/or .deb/.rpm -> .deb + portable tar.gz
+#
+# Only the host target is built locally. Cross-OS artifacts are produced on
+# their own runners in M3.5-11.4; see docs/operations/M3.5/packaging.md.
+
+[targets.linux-x86_64]
+formats = ["deb", "tar.gz"]
+deb_architecture = "amd64"
+
+[targets.linux-aarch64]
+formats = ["deb", "tar.gz"]
+deb_architecture = "arm64"
+
+[targets.macos-aarch64]
+formats = ["app", "dmg"]
+
+[targets.macos-x86_64]
+formats = ["app", "dmg"]
+
+[targets.windows-x86_64]
+formats = ["zip"]

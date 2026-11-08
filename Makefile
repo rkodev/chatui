@@ -9,6 +9,7 @@ RUST_DIR := rust
 	android-test android-lint android-assemble \
 	android-test-ui android-screenshot android-release android-baseline-profile \
 	rust-check rust-lint rust-test rust-build rust-run \
+	rust-fmt rust-nextest rust-deny rust-audit rust-conformance rust-ui-test rust-package \
 	format clean
 
 # Fail early with an actionable message instead of a confusing tool error.
@@ -48,6 +49,13 @@ help:
 		'  make rust-test           Run Rust tests' \
 		'  make rust-build          Build Rust release artifacts' \
 		'  make rust-run            Run the default Rust application' \
+		'  make rust-fmt            Check Rust formatting' \
+		'  make rust-nextest        Run the Rust workspace tests with cargo-nextest' \
+		'  make rust-deny           Check advisories, licenses, bans, and sources with cargo-deny' \
+		'  make rust-audit          Check dependencies for known vulnerabilities with cargo-audit' \
+		'  make rust-conformance    Run the chatui-conformance test package' \
+		'  make rust-ui-test        Run the chatui-ui test package' \
+		'  make rust-package        Run the desktop packaging command (configured in M3.5-11.2)' \
 		'' \
 		'Meta:' \
 		'  make format              Format web and Rust sources' \
@@ -138,6 +146,35 @@ rust-build:
 rust-run:
 	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
 	cargo run --manifest-path $(RUST_DIR)/Cargo.toml
+
+rust-fmt:
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
+	cd $(RUST_DIR) && cargo fmt --all --check
+
+rust-nextest:
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
+	cd $(RUST_DIR) && cargo nextest run --workspace
+
+rust-deny:
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
+	cd $(RUST_DIR) && cargo deny check
+
+rust-audit:
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
+	cd $(RUST_DIR) && cargo audit
+
+rust-conformance:
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
+	cd $(RUST_DIR) && cargo nextest run -p chatui-conformance
+
+rust-ui-test:
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
+	cd $(RUST_DIR) && cargo nextest run -p chatui-ui
+
+rust-package:
+	$(call require_file,$(RUST_DIR)/Cargo.toml,Rust workspace is not present yet (see docs/milestones/M3.5-rust-desktop.md).)
+	$(call require_file,$(RUST_DIR)/packaging/package.py,Desktop packaging pipeline is not present yet (see docs/operations/M3.5/packaging.md).)
+	python3 $(RUST_DIR)/packaging/package.py --clean
 
 format:
 	@if [ -f $(WEB_DIR)/package.json ]; then pnpm --dir $(WEB_DIR) exec prettier --write .; else echo "skip: web scaffold is not present"; fi

@@ -13,6 +13,12 @@ pnpm-debug.log*
 .vite/
 dist/
 web/dist/
+# Keep the signed update-manifest schema and examples; other dist output is
+# generated and ignored.
+!rust/dist/
+rust/dist/*
+!rust/dist/manifests/
+!rust/dist/manifests/**
 *.tsbuildinfo
 
 # Playwright

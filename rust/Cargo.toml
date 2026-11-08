@@ -1,0 +1,34 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/chatui-domain",
+  "crates/chatui-contracts",
+  "crates/chatui-providers",
+  "crates/chatui-storage",
+  "crates/chatui-secrets",
+  "crates/chatui-ui",
+  "apps/desktop",
+  "tests/conformance",
+]
+
+# Release profile: size and startup oriented. Thin LTO keeps build time
+# reasonable while still enabling cross-crate inlining; one codegen unit
+# maximizes optimization; symbols are stripped from the shipped binary.
+# `panic = "abort"` is compatible with the redacting panic hook and the Slint
+# shell (no unwinding-dependent crash reporting). See
+# docs/operations/M3.5/release-profile.md for the trade-offs and baseline.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
+# Debug-symbol artifact for symbolication. Inherits the release profile but
+# keeps DWARF debug info and does not strip symbols. Build it with:
+#   cargo build --profile release-debug -p chatui-desktop
+# The artifact is target/release-debug/chatui-desktop. It is never shipped;
+# keep it alongside the stripped release binary for crash symbolication.
+[profile.release-debug]
+inherits = "release"
+strip = "none"
+debug = "line-tables-only"
