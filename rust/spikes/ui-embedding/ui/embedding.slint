@@ -1,0 +1,65 @@
+// Spike for M3.6-01.1: prove that a feature `Window` component can be embedded
+// into a host `Window` through `ComponentContainer` + `ComponentFactory`.
+//
+// `ComponentContainer` and `component-factory` are experimental Slint builtins;
+// `build.rs` enables them for this detached crate only.
+
+import { Button } from "std-widgets.slint";
+
+// The embedded feature view. Its root is a `Window`, matching the existing
+// feature windows in `chatui-ui` (for example `ShellWindow`).
+export component EmbeddedWindow inherits Window {
+    in-out property <string> label: "Embedded";
+    in-out property <int> count: 0;
+
+    callback clicked();
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 4px;
+
+        Text {
+            text: root.label;
+        }
+
+        Text {
+            text: "Count: " + root.count;
+        }
+
+        Button {
+            text: "Increment " + root.label;
+            clicked => {
+                root.count += 1;
+                root.clicked();
+            }
+        }
+    }
+}
+
+// The host shell. Each `ComponentContainer` receives a `component-factory`
+// property that the Rust side fills with a factory returning the controller's
+// own handle.
+export component HostWindow inherits Window {
+    title: "ChatUI embedding spike";
+    width: 640px;
+    height: 360px;
+
+    in property <component-factory> left-factory;
+    in property <component-factory> right-factory;
+    in property <bool> show-left: true;
+    in property <bool> show-right: true;
+
+    HorizontalLayout {
+        spacing: 8px;
+
+        ComponentContainer {
+            visible: root.show-left;
+            component-factory: root.left-factory;
+        }
+
+        ComponentContainer {
+            visible: root.show-right;
+            component-factory: root.right-factory;
+        }
+    }
+}

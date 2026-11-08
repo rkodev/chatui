@@ -1,0 +1,18 @@
+[package]
+name = "chatui-ui-embedding-spike"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Detached on purpose: this spike is evidence for M3.6-01.1 and must never be a
+# member of the main rust/ workspace.
+[workspace]
+
+[dependencies]
+slint = "1.18.1"
+
+[dev-dependencies]
+i-slint-backend-testing = "1.18.1"
+
+[build-dependencies]
+slint-build = "1.18.1"
