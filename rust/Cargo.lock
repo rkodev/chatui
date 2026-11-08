@@ -911,6 +911,8 @@ dependencies = [
  "arboard",
  "base64 0.22.1",
  "chatui-domain",
+ "chatui-providers",
+ "chatui-secrets",
  "chatui-storage",
  "chatui-ui",
  "ed25519-dalek",
@@ -923,7 +925,9 @@ dependencies = [
  "serde_json",
  "sha2",
  "slint",
+ "sqlx",
  "tempfile",
+ "tokio",
  "url",
 ]
 

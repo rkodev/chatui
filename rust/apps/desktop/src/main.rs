@@ -18,6 +18,7 @@ mod clipboard;
 mod deep_link;
 mod dialogs;
 mod menu;
+mod services;
 mod shortcuts;
 mod single_instance;
 mod updater;

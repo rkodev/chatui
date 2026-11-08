@@ -50,7 +50,7 @@ the synchronous UI services. This milestone closes that integration gap.
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | [M3.6-01.1 Embedding spike and decision](M3.6-01.1-embedding-spike.md) | Complete | none | foundation | yes, with M3.6-02.1 |
-| 2 | [M3.6-02.1 SQLite runtime, secrets, and sync bridge](M3.6-02.1-sqlite-runtime-bridge.md) | Not started | none | adapters | yes, with M3.6-01.1 |
+| 2 | [M3.6-02.1 SQLite runtime, secrets, and sync bridge](M3.6-02.1-sqlite-runtime-bridge.md) | Complete | none | adapters | yes, with M3.6-01.1 |
 | 3 | [M3.6-02.2 Settings, provider, and model adapters](M3.6-02.2-settings-provider-model-adapters.md) | Not started | M3.6-02.1 | adapters | no; needs the runtime |
 | 4 | [M3.6-02.3 Data service adapter](M3.6-02.3-data-service-adapter.md) | Not started | M3.6-02.1 | adapters | yes, with M3.6-02.2 and M3.6-02.4 |
 | 5 | [M3.6-02.4 Onboarding adapters](M3.6-02.4-onboarding-adapters.md) | Not started | M3.6-02.1, M3.6-02.2 | adapters | yes, with M3.6-02.3 |
