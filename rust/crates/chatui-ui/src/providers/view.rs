@@ -108,7 +108,11 @@ slint::slint! {
                     clicked => { root.add-provider(); }
                 }
 
-                if (!root.notice.is-empty) : Text { text: root.notice; wrap: word-wrap; }
+                if (!root.notice.is-empty) : Text {
+                    text: root.notice;
+                    accessible-live-region: polite;
+                    wrap: word-wrap;
+                }
 
                 if (!root.error-title.is-empty) : Rectangle {
                     background: #fde8e8;
@@ -116,8 +120,16 @@ slint::slint! {
                     VerticalLayout {
                         padding: 8px;
                         spacing: 4px;
-                        Text { text: root.error-title; font-weight: 600; }
-                        Text { text: root.error-message; wrap: word-wrap; }
+                        Text {
+                            text: root.error-title;
+                            font-weight: 600;
+                            accessible-live-region: assertive;
+                        }
+                        Text {
+                            text: root.error-message;
+                            accessible-live-region: assertive;
+                            wrap: word-wrap;
+                        }
                         if (!root.error-details.is-empty) : Text { text: root.error-details; wrap: word-wrap; color: #666666; }
                     }
                 }
@@ -177,6 +189,7 @@ slint::slint! {
                     spacing: 8px;
                     LineEdit {
                         placeholder-text: "New API key";
+                        accessible-label: "New API key";
                         input-type: InputType.password;
                         text: root.rotate-key-input;
                         edited(text) => { root.rotate-key-input = text; }
@@ -189,12 +202,21 @@ slint::slint! {
                 spacing: 8px;
                 Text { text: root.form-title; font-size: 20px; font-weight: 600; }
                 Text { text: "Label (optional)"; }
-                LineEdit { text: root.form-label; edited(text) => { root.form-label-changed(text); } }
+                LineEdit {
+                    text: root.form-label;
+                    accessible-label: "Label";
+                    edited(text) => { root.form-label-changed(text); }
+                }
                 Text { text: "Base URL"; }
-                LineEdit { text: root.form-base-url; edited(text) => { root.form-base-url-changed(text); } }
+                LineEdit {
+                    text: root.form-base-url;
+                    accessible-label: "Base URL";
+                    edited(text) => { root.form-base-url-changed(text); }
+                }
                 Text { text: "Authentication"; }
                 ComboBox {
                     model: ["Bearer token", "x-api-key header", "No authentication"];
+                    accessible-label: "Authentication";
                     current-index: root.form-auth-index;
                     selected(value) => { root.form-auth-changed(value); }
                 }
@@ -202,20 +224,34 @@ slint::slint! {
                     Text { text: "API key"; }
                     LineEdit {
                         text: root.form-api-key;
+                        accessible-label: "API key";
                         input-type: InputType.password;
                         edited(text) => { root.form-api-key-changed(text); }
                     }
                 }
                 Text { text: "Non-secret headers (Name: value per line)"; }
-                LineEdit { text: root.form-headers; edited(text) => { root.form-headers-changed(text); } }
+                LineEdit {
+                    text: root.form-headers;
+                    accessible-label: "Non-secret headers";
+                    edited(text) => { root.form-headers-changed(text); }
+                }
                 CheckBox {
                     text: "Test connection before saving";
                     checked: root.form-test-connection;
                     toggled => { root.form-test-connection-changed(self.checked); }
                 }
                 if (!root.form-cleartext-warning.is-empty) : Text { text: root.form-cleartext-warning; color: #b45309; wrap: word-wrap; }
-                if (!root.form-notice.is-empty) : Text { text: root.form-notice; wrap: word-wrap; }
-                if (!root.form-error.is-empty) : Text { text: root.form-error; color: #b91c1c; wrap: word-wrap; }
+                if (!root.form-notice.is-empty) : Text {
+                    text: root.form-notice;
+                    accessible-live-region: polite;
+                    wrap: word-wrap;
+                }
+                if (!root.form-error.is-empty) : Text {
+                    text: root.form-error;
+                    color: #b91c1c;
+                    accessible-live-region: assertive;
+                    wrap: word-wrap;
+                }
                 HorizontalLayout {
                     spacing: 8px;
                     Button { text: "Save"; clicked => { root.save-provider(); } }

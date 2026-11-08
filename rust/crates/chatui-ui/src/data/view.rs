@@ -39,6 +39,56 @@ slint::slint! {
         has-key: bool,
     }
 
+    component DataSectionButton inherits Rectangle {
+        in property <string> label;
+        in property <bool> active;
+        callback clicked;
+        out property <bool> focus-visible: false;
+
+        height: 36px;
+        background: root.active ? #e5e7eb : transparent;
+        border-radius: 6px;
+
+        accessible-role: button;
+        accessible-label: root.label;
+        accessible-action-default => { root.clicked(); }
+
+        forward-focus: fs;
+
+        fs := FocusScope {
+            x: 0;
+            width: 0;
+            focus-changed-event(reason) => {
+                root.focus-visible = reason == FocusReason.tab-navigation;
+            }
+            key-pressed(event) => {
+                if (event.text == Key.Space || event.text == Key.Return) {
+                    root.clicked();
+                    return accept;
+                }
+                return reject;
+            }
+        }
+
+        Text {
+            x: 8px;
+            text: root.label;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+
+        TouchArea {
+            clicked => { root.clicked(); }
+        }
+
+        if (root.focus-visible) : Rectangle {
+            border-width: 2px;
+            border-color: #1a56db;
+            border-radius: 6px;
+            background: transparent;
+        }
+    }
+
     export component DataWindow inherits Window {
         title: "ChatUI data";
         width: 1000px;
@@ -113,20 +163,10 @@ slint::slint! {
                     font-weight: 600;
                 }
 
-                for section[index] in root.sections : Rectangle {
-                    height: 36px;
-                    background: index == root.active-section ? #e5e7eb : transparent;
-                    border-radius: 6px;
-
-                    Text {
-                        x: 8px;
-                        text: section.label;
-                        vertical-alignment: center;
-                    }
-
-                    TouchArea {
-                        clicked => { root.select-section(index); }
-                    }
+                for section[index] in root.sections : DataSectionButton {
+                    label: section.label;
+                    active: index == root.active-section;
+                    clicked => { root.select-section(index); }
                 }
             }
 
@@ -136,6 +176,7 @@ slint::slint! {
 
                     if (!root.notice.is-empty) : Text {
                         text: root.notice;
+                        accessible-live-region: polite;
                         wrap: word-wrap;
                     }
 
@@ -147,8 +188,16 @@ slint::slint! {
                             padding: 8px;
                             spacing: 4px;
 
-                            Text { text: root.error-title; font-weight: 600; }
-                            Text { text: root.error-message; wrap: word-wrap; }
+                            Text {
+                                text: root.error-title;
+                                font-weight: 600;
+                                accessible-live-region: assertive;
+                            }
+                            Text {
+                                text: root.error-message;
+                                accessible-live-region: assertive;
+                                wrap: word-wrap;
+                            }
                             if (!root.error-details.is-empty) : Text {
                                 text: root.error-details;
                                 wrap: word-wrap;
@@ -160,11 +209,13 @@ slint::slint! {
                     if (!root.busy.is-empty) : Text {
                         text: root.busy;
                         color: #666666;
+                        accessible-live-region: polite;
                     }
 
                     if (!root.status.is-empty) : Text {
                         text: root.status;
                         color: #666666;
+                        accessible-live-region: polite;
                         wrap: word-wrap;
                     }
 
@@ -245,6 +296,7 @@ slint::slint! {
 
                             ComboBox {
                                 model: root.conversations;
+                                accessible-label: "Conversation";
                                 current-index: root.selected-conversation-index;
                                 selected(value) => { root.conversation-changed(self.current-index); }
                             }
@@ -252,6 +304,7 @@ slint::slint! {
                             Text { text: "Format"; }
                             ComboBox {
                                 model: ["JSON", "Markdown"];
+                                accessible-label: "Export format";
                                 current-index: root.export-format-index;
                                 selected(value) => { root.export-format-changed(self.current-index); }
                             }
@@ -283,6 +336,7 @@ slint::slint! {
                         Text { text: "Import mode"; }
                         ComboBox {
                             model: ["Merge (default)", "Replace"];
+                            accessible-label: "Import mode";
                             current-index: root.import-mode-index;
                             selected(value) => { root.import-mode-changed(self.current-index); }
                         }
@@ -306,6 +360,7 @@ slint::slint! {
                         Text { text: "Archive JSON"; }
                         TextEdit {
                             text <=> root.import-text;
+                            accessible-label: "Archive JSON";
                             edited(text) => { root.import-text-changed(text); }
                             height: 140px;
                             wrap: word-wrap;
@@ -337,6 +392,7 @@ slint::slint! {
                         Text { text: "Type DELETE ALL DATA to confirm"; }
                         LineEdit {
                             text: root.clear-confirmation;
+                            accessible-label: "Type DELETE ALL DATA to confirm";
                             edited(text) => { root.clear-confirmation-changed(text); }
                         }
 
@@ -395,7 +451,7 @@ slint::slint! {
                             wrap: word-wrap;
                         }
                         Button {
-                            text: root.backup-link-label;
+                            text: root.backup-link-label == "" ? "Open backup" : root.backup-link-label;
                             clicked => { root.open-backup(); }
                         }
                     }

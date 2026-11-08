@@ -107,11 +107,16 @@ slint::slint! {
 
             LineEdit {
                 placeholder-text: "Search by name or model id";
+                accessible-label: "Search models";
                 text: root.search-query;
                 edited(text) => { root.search-changed(text); }
             }
 
-            if (!root.notice.is-empty) : Text { text: root.notice; wrap: word-wrap; }
+            if (!root.notice.is-empty) : Text {
+                text: root.notice;
+                accessible-live-region: polite;
+                wrap: word-wrap;
+            }
 
             if (!root.error-title.is-empty) : Rectangle {
                 background: #fde8e8;
@@ -119,8 +124,16 @@ slint::slint! {
                 VerticalLayout {
                     padding: 8px;
                     spacing: 4px;
-                    Text { text: root.error-title; font-weight: 600; }
-                    Text { text: root.error-message; wrap: word-wrap; }
+                    Text {
+                        text: root.error-title;
+                        font-weight: 600;
+                        accessible-live-region: assertive;
+                    }
+                    Text {
+                        text: root.error-message;
+                        accessible-live-region: assertive;
+                        wrap: word-wrap;
+                    }
                     if (!root.error-details.is-empty) : Text { text: root.error-details; wrap: word-wrap; color: #666666; }
                     Button { text: "Retry"; clicked => { root.retry(); } }
                 }
@@ -196,21 +209,25 @@ slint::slint! {
                 Text { text: "Model id"; }
                 LineEdit {
                     text: root.manual-remote-id;
+                    accessible-label: "Model id";
                     edited(text) => { root.manual-remote-id-changed(text); }
                 }
                 Text { text: "Label (optional)"; }
                 LineEdit {
                     text: root.manual-label;
+                    accessible-label: "Label";
                     edited(text) => { root.manual-label-changed(text); }
                 }
                 Text { text: "Context window (tokens, optional)"; }
                 LineEdit {
                     text: root.manual-context;
+                    accessible-label: "Context window";
                     edited(text) => { root.manual-context-changed(text); }
                 }
                 Text { text: "Capabilities (text, vision, files, tools, reasoning, streaming)"; }
                 LineEdit {
                     text: root.manual-capabilities;
+                    accessible-label: "Capabilities";
                     edited(text) => { root.manual-capabilities-changed(text); }
                 }
                 if (!root.manual-error.is-empty) : Text {

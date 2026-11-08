@@ -727,6 +727,31 @@ mod tests {
     }
 
     #[test]
+    fn focus_and_control_boundaries_meet_non_text_contrast() {
+        for tokens in [Tokens::light(), Tokens::dark()] {
+            for background in [
+                tokens.color_bg_canvas,
+                tokens.color_bg_surface,
+                tokens.color_bg_surface_raised,
+            ] {
+                let focus = tokens.focus_ring_color.contrast_ratio(background);
+                assert!(
+                    focus >= 3.0,
+                    "focus ring contrast {focus:.2} below 3.0 on {background:?}"
+                );
+            }
+
+            for background in [tokens.color_bg_canvas, tokens.color_bg_surface] {
+                let boundary = tokens.color_border_strong.contrast_ratio(background);
+                assert!(
+                    boundary >= 3.0,
+                    "control boundary contrast {boundary:.2} below 3.0 on {background:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn density_scales_match_the_web_contract() {
         let tokens = Tokens::light();
         let comfortable = DensityScale::comfortable(&tokens);

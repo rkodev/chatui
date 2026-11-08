@@ -551,18 +551,21 @@ slint::slint! {
             if (root.offline) : Text {
                 text: "You are offline. Sending is disabled.";
                 color: #b91c1c;
+                accessible-live-region: assertive;
                 wrap: word-wrap;
             }
 
             if (!root.capability-warning.is-empty) : Text {
                 text: root.capability-warning;
                 color: #b45309;
+                accessible-live-region: polite;
                 wrap: word-wrap;
             }
 
             if (!root.attachment-error.is-empty) : Text {
                 text: root.attachment-error;
                 color: #b91c1c;
+                accessible-live-region: assertive;
                 wrap: word-wrap;
             }
 
@@ -588,6 +591,7 @@ slint::slint! {
                 TextEdit {
                     width: parent.width;
                     height: root.editor-content-height;
+                    accessible-label: "Message";
                     text <=> root.text;
                     edited(text) => { root.text-changed(text); }
                     wrap: word-wrap;

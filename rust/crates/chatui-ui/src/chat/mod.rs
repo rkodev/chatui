@@ -5,6 +5,7 @@
 //! service ([`service`]). It uses the shared [`chatui_domain::StreamEvent`]
 //! model and never defines a second stream event type.
 
+pub mod announcement;
 pub mod attachments;
 pub mod composer;
 pub mod drafts;
@@ -25,6 +26,7 @@ mod message_list_tests;
 #[cfg(test)]
 mod tests;
 
+pub use announcement::{MAX_ANNOUNCEMENT_CHARS, initial_announcement, streaming_announcement};
 pub use attachments::{
     AttachmentError, AttachmentFileInfo, AttachmentValidationCode, AttachmentValidationError,
     MAX_FILE_NAME_LENGTH, MAX_IMAGE_BYTES, MAX_IMAGE_EDGE, MAX_TEXT_BYTES, OUTPUT_QUALITY,

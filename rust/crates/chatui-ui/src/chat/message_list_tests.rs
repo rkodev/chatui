@@ -447,6 +447,52 @@ fn slint_window_renders_windowed_rows_and_streaming_row() {
 }
 
 #[test]
+fn streaming_announcements_are_bounded_and_exposed_as_a_live_region() {
+    use i_slint_backend_testing::{AccessibleLiveness, AccessibleRole, ElementRoot};
+
+    i_slint_backend_testing::init_no_event_loop();
+
+    let state = MessageListState::new("conversation-1", MessageListConfig::default());
+    let controller = MessageListController::new(state).expect("message list window");
+    let window = controller.window();
+
+    let mut streaming = StreamingState::new("conversation-1", "stream-1", fixed());
+    streaming.started = true;
+    streaming.text = "Hello".to_owned();
+    controller.set_streaming(Some(streaming));
+    assert_eq!(window.get_announcement(), "Response started");
+    assert!(!window.get_announcement_assertive());
+
+    let mut streaming = controller.state().streaming().expect("streaming").clone();
+    streaming.text.push_str(" world");
+    controller.set_streaming(Some(streaming));
+    assert_eq!(
+        window.get_announcement(),
+        "Response started",
+        "token deltas must not change the announcement"
+    );
+
+    let mut streaming = controller.state().streaming().expect("streaming").clone();
+    streaming.done = true;
+    streaming.status = MessageStatus::Complete;
+    controller.set_streaming(Some(streaming));
+    assert_eq!(window.get_announcement(), "Response complete");
+
+    let announcement = window
+        .root_element()
+        .query_descendants()
+        .match_accessible_role(AccessibleRole::Text)
+        .find_all()
+        .into_iter()
+        .find(|element| element.accessible_label().as_deref() == Some("Response complete"))
+        .expect("announcement text node");
+    assert_eq!(
+        announcement.accessible_live_region(),
+        Some(AccessibleLiveness::Polite)
+    );
+}
+
+#[test]
 fn slint_window_shows_loading_empty_and_error_states() {
     i_slint_backend_testing::init_no_event_loop();
 

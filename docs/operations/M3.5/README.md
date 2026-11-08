@@ -75,7 +75,7 @@
 | 37 | [M3.5-10.1 Settings screens and behavior wiring](M3.5-10.1-settings.md) | Complete | M3.5-08.1, M3.5-09.1 | ui | yes, with M3.5-10.3 |
 | 38 | [M3.5-10.2 Data controls and export/import UI](M3.5-10.2-data-export-import-ui.md) | Complete | M3.5-10.1, M3.5-03.4 | ui | yes, with M3.5-10.3 |
 | 39 | [M3.5-10.3 Native menus, shortcuts, window state, dialogs, and deep links](M3.5-10.3-desktop-integration.md) | Complete | M3.5-08.1, M3.5-09.1, M3.5-09.3 | desktop | yes, with M3.5-10.1 and M3.5-10.2 |
-| 40 | [M3.5-10.4 Accessibility evidence and screen-reader smoke tests](M3.5-10.4-accessibility-evidence.md) | Not started | M3.5-09.1, M3.5-09.2, M3.5-09.3, M3.5-09.4, M3.5-09.5, M3.5-10.1, M3.5-10.2, M3.5-10.3 | evidence | none; final UI evidence |
+| 40 | [M3.5-10.4 Accessibility evidence and screen-reader smoke tests](M3.5-10.4-accessibility-evidence.md) | Complete | M3.5-09.1, M3.5-09.2, M3.5-09.3, M3.5-09.4, M3.5-09.5, M3.5-10.1, M3.5-10.2, M3.5-10.3 | evidence | none; final UI evidence |
 | 41 | [M3.5-11.1 Release profile, symbols, and binary-size budget](M3.5-11.1-release-profile-size.md) | Not started | M3.5-01.3, M3.5-08.1 | release | yes, with M3.5-09.* and M3.5-10.* |
 | 42 | [M3.5-11.2 Cross-platform packaging and checksums](M3.5-11.2-packaging-checksums.md) | Not started | M3.5-11.1, M3.5-08.1 | release | yes, with M3.5-09.* and M3.5-10.* |
 | 43 | [M3.5-11.3 Auto-update manifests, signing, and verification](M3.5-11.3-updater-signing.md) | Not started | M3.5-11.2, M3.5-04.1 | release | yes, with M3.5-10.* |

@@ -72,6 +72,46 @@ impl Focusable {
     }
 }
 
+/// Live-region politeness for screen-reader announcements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LiveRegionPoliteness {
+    /// Wait for the user to be idle before announcing.
+    Polite,
+    /// Interrupt the user immediately.
+    Assertive,
+}
+
+/// A bounded screen-reader announcement for a live region.
+///
+/// Spec section 11.11 requires announcements for response start, completion,
+/// and errors, but never for every streamed token. Callers should replace the
+/// live-region text with the latest announcement rather than appending.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Announcement {
+    /// Announcement text.
+    pub text: String,
+    /// Live-region politeness.
+    pub politeness: LiveRegionPoliteness,
+}
+
+impl Announcement {
+    /// Create a polite announcement.
+    pub fn polite(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            politeness: LiveRegionPoliteness::Polite,
+        }
+    }
+
+    /// Create an assertive announcement.
+    pub fn assertive(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            politeness: LiveRegionPoliteness::Assertive,
+        }
+    }
+}
+
 /// Keyboard keys used by the shell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Key {
@@ -419,6 +459,28 @@ mod tests {
             order.handle_key(Key::Escape, Modifiers::NONE),
             KeyboardAction::Dismiss
         );
+    }
+
+    #[test]
+    fn every_focusable_has_an_accessible_name() {
+        for item in order().items() {
+            assert!(
+                !item.label.trim().is_empty(),
+                "{} has no accessible name",
+                item.id
+            );
+        }
+    }
+
+    #[test]
+    fn announcements_carry_politeness() {
+        let polite = Announcement::polite("Response started");
+        assert_eq!(polite.text, "Response started");
+        assert_eq!(polite.politeness, LiveRegionPoliteness::Polite);
+
+        let assertive = Announcement::assertive("Response failed");
+        assert_eq!(assertive.text, "Response failed");
+        assert_eq!(assertive.politeness, LiveRegionPoliteness::Assertive);
     }
 
     #[test]

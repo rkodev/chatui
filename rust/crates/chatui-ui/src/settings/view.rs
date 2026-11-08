@@ -33,6 +33,56 @@ slint::slint! {
         label: string,
     }
 
+    component SettingsSectionButton inherits Rectangle {
+        in property <string> label;
+        in property <bool> active;
+        callback clicked;
+        out property <bool> focus-visible: false;
+
+        height: 36px;
+        background: root.active ? #e5e7eb : transparent;
+        border-radius: 6px;
+
+        accessible-role: button;
+        accessible-label: root.label;
+        accessible-action-default => { root.clicked(); }
+
+        forward-focus: fs;
+
+        fs := FocusScope {
+            x: 0;
+            width: 0;
+            focus-changed-event(reason) => {
+                root.focus-visible = reason == FocusReason.tab-navigation;
+            }
+            key-pressed(event) => {
+                if (event.text == Key.Space || event.text == Key.Return) {
+                    root.clicked();
+                    return accept;
+                }
+                return reject;
+            }
+        }
+
+        Text {
+            x: 8px;
+            text: root.label;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+
+        TouchArea {
+            clicked => { root.clicked(); }
+        }
+
+        if (root.focus-visible) : Rectangle {
+            border-width: 2px;
+            border-color: #1a56db;
+            border-radius: 6px;
+            background: transparent;
+        }
+    }
+
     export component SettingsWindow inherits Window {
         title: "ChatUI settings";
         width: 1000px;
@@ -113,20 +163,10 @@ slint::slint! {
                     font-weight: 600;
                 }
 
-                for section[index] in root.sections : Rectangle {
-                    height: 36px;
-                    background: index == root.active-section ? #e5e7eb : transparent;
-                    border-radius: 6px;
-
-                    Text {
-                        x: 8px;
-                        text: section.label;
-                        vertical-alignment: center;
-                    }
-
-                    TouchArea {
-                        clicked => { root.select-section(index); }
-                    }
+                for section[index] in root.sections : SettingsSectionButton {
+                    label: section.label;
+                    active: index == root.active-section;
+                    clicked => { root.select-section(index); }
                 }
             }
 
@@ -165,6 +205,7 @@ slint::slint! {
                         Text { text: "Theme"; }
                         ComboBox {
                             model: ["System", "Light", "Dark"];
+                            accessible-label: "Theme";
                             current-index: root.theme-index;
                             selected(value) => { root.theme-changed(self.current-index); }
                         }
@@ -172,6 +213,7 @@ slint::slint! {
                         Text { text: "Density"; }
                         ComboBox {
                             model: ["Comfortable", "Compact"];
+                            accessible-label: "Density";
                             current-index: root.density-index;
                             selected(value) => { root.density-changed(self.current-index); }
                         }
@@ -179,6 +221,7 @@ slint::slint! {
                         Text { text: "Chat font size"; }
                         ComboBox {
                             model: ["Small", "Medium", "Large"];
+                            accessible-label: "Chat font size";
                             current-index: root.font-size-index;
                             selected(value) => { root.font-size-changed(self.current-index); }
                         }
@@ -198,6 +241,7 @@ slint::slint! {
                         Text { text: "Send key"; }
                         ComboBox {
                             model: ["Enter sends, Shift+Enter adds a line", "Ctrl/Cmd+Enter sends, Enter adds a line"];
+                            accessible-label: "Send key";
                             current-index: root.send-key-index;
                             selected(value) => { root.send-key-changed(self.current-index); }
                         }
@@ -217,6 +261,7 @@ slint::slint! {
                         Text { text: "Default system prompt"; }
                         TextEdit {
                             text <=> root.default-system-prompt;
+                            accessible-label: "Default system prompt";
                             edited(text) => { root.default-system-prompt-changed(text); }
                             height: 80px;
                             wrap: word-wrap;
@@ -225,24 +270,28 @@ slint::slint! {
                         Text { text: "Temperature (0-2, blank for model default)"; }
                         LineEdit {
                             text: root.temperature;
+                            accessible-label: "Temperature";
                             edited(text) => { root.temperature-changed(text); }
                         }
 
                         Text { text: "Top P (0-1, blank for model default)"; }
                         LineEdit {
                             text: root.top-p;
+                            accessible-label: "Top P";
                             edited(text) => { root.top-p-changed(text); }
                         }
 
                         Text { text: "Max output tokens (blank for model default)"; }
                         LineEdit {
                             text: root.max-output-tokens;
+                            accessible-label: "Max output tokens";
                             edited(text) => { root.max-output-tokens-changed(text); }
                         }
 
                         Text { text: "Reasoning effort"; }
                         ComboBox {
                             model: ["Provider default", "Low", "Medium", "High"];
+                            accessible-label: "Reasoning effort";
                             current-index: root.reasoning-index;
                             selected(value) => { root.reasoning-changed(self.current-index); }
                         }
@@ -250,6 +299,7 @@ slint::slint! {
                         Text { text: "Stop sequences (one per line)"; }
                         TextEdit {
                             text <=> root.stop-sequences;
+                            accessible-label: "Stop sequences";
                             edited(text) => { root.stop-sequences-changed(text); }
                             height: 60px;
                             wrap: word-wrap;
@@ -264,6 +314,7 @@ slint::slint! {
                         Text { text: "Default provider"; }
                         ComboBox {
                             model: root.providers;
+                            accessible-label: "Default provider";
                             current-index: root.default-provider-index;
                             selected(value) => { root.default-provider-changed(self.current-index); }
                         }
@@ -271,6 +322,7 @@ slint::slint! {
                         Text { text: "Default model"; }
                         ComboBox {
                             model: root.models;
+                            accessible-label: "Default model";
                             current-index: root.default-model-index;
                             selected(value) => { root.default-model-changed(self.current-index); }
                         }

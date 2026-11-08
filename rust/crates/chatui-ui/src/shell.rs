@@ -518,6 +518,9 @@ slint::slint! {
         width: 280px;
         background: root.bg;
 
+        accessible-role: navigation;
+        accessible-label: "Navigation";
+
         VerticalLayout {
             padding: root.density.padding;
             spacing: root.density.gap;
@@ -568,6 +571,9 @@ slint::slint! {
         in property <bool> show-params-panel;
 
         background: root.bg;
+
+        accessible-role: main;
+        accessible-label: root.title;
 
         VerticalLayout {
             padding: root.density.padding;
@@ -1064,6 +1070,7 @@ mod tests {
     use super::*;
     use crate::theme::ReducedMotion;
     use chatui_domain::settings::{ChatFontSize, Density, Theme};
+    use i_slint_backend_testing::ElementRoot;
     use slint::Model;
 
     #[test]
@@ -1312,6 +1319,73 @@ mod tests {
         assert_eq!(window.get_density().control_height, 32.0);
         assert_eq!(window.get_chat().size, 18.0);
         assert!(window.get_reduced_motion());
+    }
+
+    #[test]
+    fn slint_window_exposes_accessible_names_for_navigation() {
+        i_slint_backend_testing::init_no_event_loop();
+
+        let state = ShellState::new(1024.0);
+        let controller = ShellController::new(state).expect("shell window");
+        let window = controller.window();
+
+        for destination in Destination::ALL {
+            let matches: Vec<_> = i_slint_backend_testing::ElementHandle::find_by_accessible_label(
+                window,
+                destination.accessible_label(),
+            )
+            .collect();
+            assert!(
+                !matches.is_empty(),
+                "{} has no accessible label",
+                destination.label()
+            );
+            assert!(matches.iter().any(|element| {
+                element.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Button)
+            }));
+        }
+    }
+
+    #[test]
+    fn slint_window_exposes_an_accessible_name_for_the_icon_only_menu_button() {
+        i_slint_backend_testing::init_no_event_loop();
+
+        let state = ShellState::new(500.0);
+        let controller = ShellController::new(state).expect("shell window");
+        let window = controller.window();
+
+        let matches: Vec<_> = i_slint_backend_testing::ElementHandle::find_by_accessible_label(
+            window,
+            "Toggle navigation",
+        )
+        .collect();
+        assert!(!matches.is_empty());
+        assert!(matches.iter().any(|element| {
+            element.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Button)
+        }));
+    }
+
+    #[test]
+    fn every_slint_button_has_an_accessible_name() {
+        i_slint_backend_testing::init_no_event_loop();
+
+        let state = ShellState::new(1024.0);
+        let controller = ShellController::new(state).expect("shell window");
+        let window = controller.window();
+
+        let buttons: Vec<_> = window
+            .root_element()
+            .query_descendants()
+            .match_accessible_role(i_slint_backend_testing::AccessibleRole::Button)
+            .find_all();
+        assert!(!buttons.is_empty());
+        for button in buttons {
+            let label = button.accessible_label().unwrap_or_default();
+            assert!(
+                !label.trim().is_empty(),
+                "button without an accessible name"
+            );
+        }
     }
 
     #[test]

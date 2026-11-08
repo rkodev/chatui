@@ -19,6 +19,8 @@ pub mod theme;
 pub mod tokens;
 
 #[cfg(test)]
+mod accessibility_tests;
+#[cfg(test)]
 mod code_tests;
 #[cfg(test)]
 mod markdown_tests;
@@ -26,7 +28,8 @@ mod markdown_tests;
 mod math_tests;
 
 pub use accessibility::{
-    AccessibleRole, FocusOrder, FocusRing, Focusable, Key, KeyboardAction, Modifiers,
+    AccessibleRole, Announcement, FocusOrder, FocusRing, Focusable, Key, KeyboardAction,
+    LiveRegionPoliteness, Modifiers,
 };
 pub use chat::{
     AttachmentChip, AttachmentError, AttachmentFileInfo, AttachmentValidationCode,
@@ -34,16 +37,17 @@ pub use chat::{
     ChatRunnerOptions, ChatSendFailure, ChatSendFailureReason, ChatSendResult, ChatService,
     ChatServiceError, ChatStreamAdapter, Clock, ComposerController, ComposerKeyAction,
     ComposerSend, ComposerState, DEFAULT_COMPOSER_LINE_HEIGHT, DRAFT_KEY_PREFIX, DraftPersistence,
-    DraftStore, IdGenerator, MAX_COMPOSER_LINES, MAX_DRAFT_LENGTH, MAX_DRAFTS,
-    MAX_FILE_NAME_LENGTH, MAX_IMAGE_BYTES, MAX_IMAGE_EDGE, MAX_TEXT_BYTES, MemoryDraftStore,
-    MemoryStreamingStore, ModelCapabilities, OUTPUT_QUALITY, PendingAttachment,
+    DraftStore, IdGenerator, MAX_ANNOUNCEMENT_CHARS, MAX_COMPOSER_LINES, MAX_DRAFT_LENGTH,
+    MAX_DRAFTS, MAX_FILE_NAME_LENGTH, MAX_IMAGE_BYTES, MAX_IMAGE_EDGE, MAX_TEXT_BYTES,
+    MemoryDraftStore, MemoryStreamingStore, ModelCapabilities, OUTPUT_QUALITY, PendingAttachment,
     PersistentDraftStore, ProcessedImage, ProviderChatAdapter, RegenerateInput, RetryInput,
     RunRequest, RunnerState, SUPPORTED_IMAGE_MIME_TYPES, SUPPORTED_TEXT_EXTENSIONS,
     SUPPORTED_TEXT_MIME_TYPES, SettingsDraftPersistence, StreamingState, StreamingStore,
     SystemClock, ValidatedAttachmentFile, build_chat_request, can_retry, clipboard_images,
     describe_chat_error, dropped_files, file_extension, format_attachment_size, has_partial_output,
-    output_mime_type_for, process_image, reduce_stream, sanitize_file_name, scaled_dimensions,
-    store_pending_attachment, sync_composer_window, validate_attachment_file,
+    initial_announcement, output_mime_type_for, process_image, reduce_stream, sanitize_file_name,
+    scaled_dimensions, store_pending_attachment, streaming_announcement, sync_composer_window,
+    validate_attachment_file,
 };
 pub use code::{
     CodeBlock, CodeBlockView, CodeWrap, HighlightSpan, HighlightedCode, SUPPORTED_LANGUAGES,

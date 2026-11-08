@@ -121,6 +121,7 @@ slint::slint! {
 
                 LineEdit {
                     input-type: InputType.password;
+                    accessible-label: "OpenRouter API key";
                     text: root.key-input;
                     edited(text) => { root.key-changed(text); }
                 }
@@ -134,6 +135,7 @@ slint::slint! {
 
                 LineEdit {
                     text: root.key-label;
+                    accessible-label: "Key label";
                     edited(text) => { root.label-changed(text); }
                 }
 
@@ -160,6 +162,7 @@ slint::slint! {
 
                 if (root.step == 2) : Text {
                     text: "Testing key…";
+                    accessible-live-region: polite;
                 }
 
                 if (root.step == 3) : Rectangle {
@@ -173,10 +176,12 @@ slint::slint! {
                         Text {
                             text: root.error-title;
                             font-weight: 600;
+                            accessible-live-region: assertive;
                         }
 
                         Text {
                             text: root.error-message;
+                            accessible-live-region: assertive;
                             wrap: word-wrap;
                         }
 
@@ -191,6 +196,7 @@ slint::slint! {
 
             if (root.step == 4) : Text {
                 text: "Loading the public model catalog…";
+                accessible-live-region: polite;
             }
 
             if (root.step == 5) : VerticalLayout {

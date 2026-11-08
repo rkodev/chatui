@@ -18,6 +18,8 @@ use chatui_domain::{Conversation, Message, MessageRole, MessageStatus};
 use chatui_storage::{MessagePage, MessageRepository, StorageError};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
+use crate::accessibility::Announcement;
+use crate::chat::announcement::{initial_announcement, streaming_announcement};
 use crate::chat::message_item::{MessageAction, MessageRow, MessageRowOptions, message_text};
 use crate::chat::runner::can_retry;
 use crate::chat::state::StreamingState;
@@ -114,6 +116,7 @@ pub struct MessageListState {
     error: Option<MessageListError>,
     pending_anchor: Option<f32>,
     streaming: Option<StreamingState>,
+    announcement: Option<Announcement>,
     show_token_usage: bool,
 }
 
@@ -135,6 +138,7 @@ impl MessageListState {
             error: None,
             pending_anchor: None,
             streaming: None,
+            announcement: None,
             show_token_usage: true,
         }
     }
@@ -306,7 +310,19 @@ impl MessageListState {
     }
 
     /// Set or clear the isolated streaming snapshot.
+    ///
+    /// The latest bounded live-region announcement is retained so screen
+    /// readers can read the last start, completion, cancellation, or error
+    /// message without hearing every token.
     pub fn set_streaming(&mut self, streaming: Option<StreamingState>) {
+        if let Some(announcement) = match (&self.streaming, &streaming) {
+            (Some(previous), Some(next)) => streaming_announcement(previous, next),
+            (None, Some(next)) => initial_announcement(next),
+            (Some(_), None) | (None, None) => None,
+        } {
+            self.announcement = Some(announcement);
+        }
+
         self.streaming = streaming;
 
         if self.near_bottom {
@@ -321,6 +337,11 @@ impl MessageListState {
     /// Clear the isolated streaming snapshot.
     pub fn clear_streaming(&mut self) {
         self.set_streaming(None);
+    }
+
+    /// Latest bounded live-region announcement, if any.
+    pub fn announcement(&self) -> Option<&Announcement> {
+        self.announcement.as_ref()
     }
 
     /// Show a list-level error.
@@ -687,6 +708,9 @@ slint::slint! {
         background: message.is-user ? #eef6ff : transparent;
         border-radius: 8px;
 
+        accessible-role: list-item;
+        accessible-label: message.role-label;
+
         VerticalLayout {
             padding: 8px;
             spacing: 4px;
@@ -785,6 +809,8 @@ slint::slint! {
         in property <bool> loading: false;
         in property <bool> empty: false;
         in property <string> empty-message: "No messages yet. Send a message to start the conversation.";
+        in property <string> announcement: "";
+        in property <bool> announcement-assertive: false;
         in property <bool> error-visible: false;
         in property <string> error-title: "";
         in property <string> error-message: "";
@@ -805,6 +831,13 @@ slint::slint! {
         VerticalLayout {
             padding: 12px;
             spacing: 8px;
+
+            if (root.announcement != "") : Text {
+                text: root.announcement;
+                height: 1px;
+                color: transparent;
+                accessible-live-region: root.announcement-assertive ? assertive : polite;
+            }
 
             if (root.error-visible) : Rectangle {
                 background: #fde8e8;
@@ -842,6 +875,7 @@ slint::slint! {
 
                 VerticalLayout {
                     spacing: 8px;
+                    accessible-role: list;
 
                     if (root.has-older || root.loading-older) : Button {
                         text: root.loading-older ? "Loading older messages…" : "Load older messages";
@@ -946,6 +980,16 @@ pub fn sync_window(window: &MessageListWindow, state: &MessageListState) {
     window.set_loading_older(state.loading_older());
     window.set_loading(state.is_loading());
     window.set_empty(state.is_empty());
+    window.set_announcement(
+        state
+            .announcement()
+            .map(|announcement| announcement.text.clone())
+            .unwrap_or_default()
+            .into(),
+    );
+    window.set_announcement_assertive(state.announcement().is_some_and(|announcement| {
+        announcement.politeness == crate::accessibility::LiveRegionPoliteness::Assertive
+    }));
     window.set_error_visible(state.error().is_some());
     window.set_error_title(
         state
@@ -1042,6 +1086,18 @@ impl MessageListController {
         } else {
             self.window.set_streaming_visible(false);
         }
+
+        self.window.set_announcement(
+            state
+                .announcement()
+                .map(|announcement| announcement.text.clone())
+                .unwrap_or_default()
+                .into(),
+        );
+        self.window
+            .set_announcement_assertive(state.announcement().is_some_and(|announcement| {
+                announcement.politeness == crate::accessibility::LiveRegionPoliteness::Assertive
+            }));
 
         let scroll_top = state.scroll_top();
 
