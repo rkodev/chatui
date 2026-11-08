@@ -58,7 +58,7 @@ the synchronous UI services. This milestone closes that integration gap.
 | 7 | [M3.6-04.1 History view and controller](M3.6-04.1-history-view.md) | Complete | M3.6-02.1, M3.6-03.1 | ui | yes, with M3.6-05.1 |
 | 8 | [M3.6-05.1 Chat view and controller](M3.6-05.1-chat-view.md) | Complete | M3.6-02.1, M3.6-03.1 | ui | yes, with M3.6-04.1 |
 | 9 | [M3.6-06.1 Desktop composition](M3.6-06.1-desktop-composition.md) | Complete | M3.6-02.2, M3.6-02.3, M3.6-02.4, M3.6-03.1, M3.6-04.1, M3.6-05.1 | desktop | no; integration task |
-| 10 | [M3.6-07.1 Verification and evidence](M3.6-07.1-verification.md) | Not started | M3.6-06.1 | evidence | none; final gate |
+| 10 | [M3.6-07.1 Verification and evidence](M3.6-07.1-verification.md) | Complete | M3.6-06.1 | evidence | none; final gate |
 
 ## Parallel execution groups
 
