@@ -152,17 +152,6 @@ impl Destination {
         }
     }
 
-    /// Placeholder body shown until the feature screen lands.
-    pub const fn placeholder(self) -> &'static str {
-        match self {
-            Self::Chat => "Chat placeholder. The chat surface arrives in M3.5-09.",
-            Self::History => "History placeholder. Conversation history arrives in M3.5-09.",
-            Self::Providers => "Providers placeholder. Provider management arrives in M3.5-08.",
-            Self::Settings => "Settings placeholder. Settings arrive in M3.5-10.",
-            Self::Data => "Data placeholder. Export and import arrive in M3.5-10.",
-        }
-    }
-
     /// Index in [`Destination::ALL`].
     pub const fn index(self) -> usize {
         match self {
@@ -559,7 +548,6 @@ slint::slint! {
 
     component MainContent inherits Rectangle {
         in property <string> title;
-        in property <string> body;
         in property <string> notice;
         in property <color> bg;
         in property <color> fg;
@@ -567,8 +555,18 @@ slint::slint! {
         in property <color> border;
         in property <DensityTokens> density;
         in property <ChatTokens> chat;
-        in property <length> content-max-width;
         in property <bool> show-params-panel;
+        in property <int> active-destination: 0;
+        in property <component-factory> chat-messages-factory;
+        in property <component-factory> chat-composer-factory;
+        in property <component-factory> history-factory;
+        in property <component-factory> providers-factory;
+        in property <component-factory> settings-factory;
+        in property <component-factory> data-factory;
+        in property <component-factory> models-factory;
+        in property <bool> show-models: false;
+
+        callback close-models;
 
         background: root.bg;
 
@@ -600,19 +598,96 @@ slint::slint! {
                 height: root.chat.line-height;
             }
 
-            Rectangle {
-                max-width: root.content-max-width;
-                Text {
+            content := Rectangle {
+                vertical-stretch: 1;
+
+                // Chat: message list stretches, composer keeps a bounded height.
+                if (root.active-destination == 0) : VerticalLayout {
+                    spacing: root.density.gap;
+
+                    ComponentContainer {
+                        vertical-stretch: 1;
+                        component-factory: root.chat-messages-factory;
+                    }
+
+                    ComponentContainer {
+                        height: 160px;
+                        component-factory: root.chat-composer-factory;
+                    }
+                }
+
+                if (root.active-destination == 1) : ComponentContainer {
                     width: parent.width;
-                    text: root.body;
-                    color: root.muted;
-                    wrap: word-wrap;
-                    font-size: root.chat.size;
-                    height: root.chat.line-height;
+                    height: parent.height;
+                    component-factory: root.history-factory;
+                }
+
+                if (root.active-destination == 2) : ComponentContainer {
+                    width: parent.width;
+                    height: parent.height;
+                    component-factory: root.providers-factory;
+                }
+
+                if (root.active-destination == 3) : ComponentContainer {
+                    width: parent.width;
+                    height: parent.height;
+                    component-factory: root.settings-factory;
+                }
+
+                if (root.active-destination == 4) : ComponentContainer {
+                    width: parent.width;
+                    height: parent.height;
+                    component-factory: root.data-factory;
+                }
+
+                // Models overlay. The factory returns the controller's own
+                // handle, so the embedded component stays usable across opens.
+                if (root.show-models) : Rectangle {
+                    width: parent.width;
+                    height: parent.height;
+                    background: #00000066;
+
+                    panel := Rectangle {
+                        width: min(parent.width - 48px, 720px);
+                        height: min(parent.height - 48px, 560px);
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        background: root.bg;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: root.border;
+
+                        VerticalLayout {
+                            padding: root.density.padding;
+                            spacing: root.density.gap;
+
+                            HorizontalLayout {
+                                spacing: root.density.gap;
+
+                                Text {
+                                    text: "Models";
+                                    color: root.fg;
+                                    font-size: 18px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                }
+
+                                Rectangle { horizontal-stretch: 1; }
+
+                                Button {
+                                    text: "Close models";
+                                    clicked => { root.close-models(); }
+                                }
+                            }
+
+                            ComponentContainer {
+                                vertical-stretch: 1;
+                                component-factory: root.models-factory;
+                            }
+                        }
+                    }
                 }
             }
-
-            Rectangle { vertical-stretch: 1; }
         }
     }
 
@@ -630,8 +705,15 @@ slint::slint! {
         in property <int> active-destination: 0;
         in property <[string]> destinations: ["Chat", "History", "Providers", "Settings", "Data"];
         in property <string> page-title: "Chat";
-        in property <string> page-body: "Chat placeholder";
         in property <string> notice: "";
+        in property <component-factory> chat-messages-factory;
+        in property <component-factory> chat-composer-factory;
+        in property <component-factory> history-factory;
+        in property <component-factory> providers-factory;
+        in property <component-factory> settings-factory;
+        in property <component-factory> data-factory;
+        in property <component-factory> models-factory;
+        in-out property <bool> show-models: false;
         in-out property <bool> shortcuts-help-open: false;
         in property <[string]> shortcut-lines: [];
         in property <bool> show-params-panel: false;
@@ -770,7 +852,6 @@ slint::slint! {
 
             MainContent {
                 title: root.page-title;
-                body: root.page-body;
                 notice: root.notice;
                 bg: root.tokens.bg-canvas;
                 fg: root.tokens.fg-primary;
@@ -778,8 +859,17 @@ slint::slint! {
                 border: root.tokens.border-subtle;
                 density: root.density;
                 chat: root.chat;
-                content-max-width: 768px;
                 show-params-panel: root.show-params-panel;
+                active-destination: root.active-destination;
+                chat-messages-factory: root.chat-messages-factory;
+                chat-composer-factory: root.chat-composer-factory;
+                history-factory: root.history-factory;
+                providers-factory: root.providers-factory;
+                settings-factory: root.settings-factory;
+                data-factory: root.data-factory;
+                models-factory: root.models-factory;
+                show-models: root.show-models;
+                close-models => { root.show-models = false; }
             }
         }
 
@@ -806,7 +896,6 @@ slint::slint! {
 
             MainContent {
                 title: root.page-title;
-                body: root.page-body;
                 notice: root.notice;
                 bg: root.tokens.bg-canvas;
                 fg: root.tokens.fg-primary;
@@ -814,8 +903,17 @@ slint::slint! {
                 border: root.tokens.border-subtle;
                 density: root.density;
                 chat: root.chat;
-                content-max-width: 768px;
                 show-params-panel: root.show-params-panel;
+                active-destination: root.active-destination;
+                chat-messages-factory: root.chat-messages-factory;
+                chat-composer-factory: root.chat-composer-factory;
+                history-factory: root.history-factory;
+                providers-factory: root.providers-factory;
+                settings-factory: root.settings-factory;
+                data-factory: root.data-factory;
+                models-factory: root.models-factory;
+                show-models: root.show-models;
+                close-models => { root.show-models = false; }
             }
         }
 
@@ -978,7 +1076,6 @@ pub fn sync_window(window: &ShellWindow, state: &ShellState) {
             .collect::<Vec<_>>(),
     )));
     window.set_page_title(state.active.label().into());
-    window.set_page_body(state.active.placeholder().into());
     window.set_show_params_panel(state.layout() == LayoutMode::PersistentSidebarWithPanel);
 }
 
@@ -1071,7 +1168,47 @@ mod tests {
     use crate::theme::ReducedMotion;
     use chatui_domain::settings::{ChatFontSize, Density, Theme};
     use i_slint_backend_testing::ElementRoot;
+    use slint::ComponentHandle;
     use slint::Model;
+
+    slint::slint! {
+        import { Button } from "std-widgets.slint";
+
+        export component TestFeatureWindow inherits Window {
+            in-out property <string> label: "Test feature";
+            callback clicked();
+
+            VerticalLayout {
+                padding: 8px;
+                spacing: 4px;
+
+                Text {
+                    text: root.label;
+                }
+
+                Button {
+                    text: "Test action";
+                    clicked => { root.clicked(); }
+                }
+            }
+        }
+    }
+
+    fn factory_for(window: &TestFeatureWindow) -> slint::ComponentFactory {
+        let handle = window.clone_strong();
+        slint::ComponentFactory::new(move |_context| Some(handle.clone_strong()))
+    }
+
+    fn accessible_labels(window: &ShellWindow) -> Vec<String> {
+        window
+            .root_element()
+            .query_descendants()
+            .find_all()
+            .into_iter()
+            .filter_map(|element| element.accessible_label())
+            .map(|label| label.to_string())
+            .collect()
+    }
 
     #[test]
     fn breakpoints_match_spec_11_9() {
@@ -1409,6 +1546,139 @@ mod tests {
         assert_eq!(
             window.get_tokens().fg_primary,
             Tokens::dark().color_fg_primary.to_slint()
+        );
+    }
+
+    #[test]
+    fn shell_embeds_a_factory_product_and_updates_it() {
+        i_slint_backend_testing::init_no_event_loop();
+
+        let window = ShellWindow::new().expect("shell window");
+        let feature = TestFeatureWindow::new().expect("test feature");
+        feature.set_label("Embedded feature".into());
+        window.set_chat_messages_factory(factory_for(&feature));
+
+        let labels = accessible_labels(&window);
+        assert!(
+            labels.iter().any(|label| label == "Embedded feature"),
+            "embedded feature missing from the shell tree: {labels:?}"
+        );
+
+        feature.set_label("Updated feature".into());
+        let labels = accessible_labels(&window);
+        assert!(
+            labels.iter().any(|label| label == "Updated feature"),
+            "setter did not update the embedded UI: {labels:?}"
+        );
+
+        let embedded_button = i_slint_backend_testing::ElementHandle::find_by_accessible_label(
+            &window,
+            "Test action",
+        )
+        .find(|element| {
+            element.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Button)
+        })
+        .expect("embedded button is missing from the shell accessibility tree");
+        assert!(
+            !embedded_button
+                .accessible_label()
+                .unwrap_or_default()
+                .trim()
+                .is_empty(),
+            "embedded button has no accessible name"
+        );
+    }
+
+    #[test]
+    fn destination_switching_keeps_embedded_handles_usable() {
+        i_slint_backend_testing::init_no_event_loop();
+
+        let window = ShellWindow::new().expect("shell window");
+        let chat = TestFeatureWindow::new().expect("chat feature");
+        let history = TestFeatureWindow::new().expect("history feature");
+        chat.set_label("Chat feature".into());
+        history.set_label("History feature".into());
+        window.set_chat_messages_factory(factory_for(&chat));
+        window.set_history_factory(factory_for(&history));
+
+        let labels = accessible_labels(&window);
+        assert!(
+            labels.iter().any(|label| label == "Chat feature"),
+            "chat not shown: {labels:?}"
+        );
+        assert!(
+            !labels.iter().any(|label| label == "History feature"),
+            "history shown while chat is active: {labels:?}"
+        );
+
+        window.set_active_destination(1);
+        let labels = accessible_labels(&window);
+        assert!(
+            labels.iter().any(|label| label == "History feature"),
+            "history not shown: {labels:?}"
+        );
+        assert!(
+            !labels.iter().any(|label| label == "Chat feature"),
+            "chat shown while history is active: {labels:?}"
+        );
+
+        // Handles stay usable while their containers are hidden.
+        chat.set_label("Chat updated".into());
+        history.set_label("History updated".into());
+
+        window.set_active_destination(0);
+        let labels = accessible_labels(&window);
+        assert!(
+            labels.iter().any(|label| label == "Chat updated"),
+            "chat handle lost after destination switching: {labels:?}"
+        );
+        assert!(
+            !labels.iter().any(|label| label == "History updated"),
+            "history shown while chat is active: {labels:?}"
+        );
+    }
+
+    #[test]
+    fn models_overlay_opens_and_closes() {
+        i_slint_backend_testing::init_no_event_loop();
+
+        let window = ShellWindow::new().expect("shell window");
+        let models = TestFeatureWindow::new().expect("models feature");
+        models.set_label("Models feature".into());
+        window.set_models_factory(factory_for(&models));
+
+        assert!(!window.get_show_models());
+        assert!(
+            !accessible_labels(&window)
+                .iter()
+                .any(|label| label == "Models feature")
+        );
+
+        window.set_show_models(true);
+        let labels = accessible_labels(&window);
+        assert!(
+            labels.iter().any(|label| label == "Models feature"),
+            "models overlay did not open: {labels:?}"
+        );
+
+        let close = i_slint_backend_testing::ElementHandle::find_by_accessible_label(
+            &window,
+            "Close models",
+        )
+        .find(|element| {
+            element.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Button)
+        })
+        .expect("close models button");
+        close.invoke_accessible_default_action();
+
+        assert!(
+            !window.get_show_models(),
+            "close action did not close the overlay"
+        );
+        assert!(
+            !accessible_labels(&window)
+                .iter()
+                .any(|label| label == "Models feature")
         );
     }
 }
