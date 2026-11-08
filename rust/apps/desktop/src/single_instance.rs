@@ -9,6 +9,7 @@
 //! backend reports [`SingleInstanceError::Unsupported`] so the caller can start
 //! normally and record the per-OS blocker.
 
+#[cfg(unix)]
 use std::path::PathBuf;
 use std::time::Duration;
 

@@ -171,7 +171,7 @@ fn platform_single_instance() -> PlatformSingleInstance {
     }
     #[cfg(not(unix))]
     {
-        PlatformSingleInstance
+        single_instance::NoopSingleInstance
     }
 }
 

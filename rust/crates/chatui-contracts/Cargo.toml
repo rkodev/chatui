@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-chatui-domain = { path = "../chatui-domain" }
+chatui-domain = { version = "0.1.0", path = "../chatui-domain" }
 jsonschema = { version = "0.60", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -6,8 +6,8 @@ publish = false
 
 [dependencies]
 base64 = "0.22"
-chatui-contracts = { path = "../chatui-contracts" }
-chatui-domain = { path = "../chatui-domain" }
+chatui-contracts = { version = "0.1.0", path = "../chatui-contracts" }
+chatui-domain = { version = "0.1.0", path = "../chatui-domain" }
 directories = "6"
 futures-util = "0.3"
 reqwest = { version = "0.12.24", default-features = false, features = [
@@ -24,7 +24,7 @@ tokio-util = "0.7"
 url = "2"
 
 [dev-dependencies]
-chatui-conformance = { path = "../../tests/conformance" }
+chatui-conformance = { version = "0.1.0", path = "../../tests/conformance" }
 futures-util = "0.3"
 tempfile = "3"
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "time"] }

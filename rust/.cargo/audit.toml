@@ -1,0 +1,11 @@
+# cargo-audit configuration for the Rust workspace.
+#
+# `cargo audit` inspects Cargo.lock, which includes optional dependencies that
+# are not part of the compiled graph. Keep exceptions narrow and documented.
+
+[advisories]
+# RUSTSEC-2023-0071 (Marvin Attack in `rsa`): no fixed upgrade exists. The
+# `rsa` crate is only reachable through the optional `sqlx-mysql` driver; the
+# desktop client enables only sqlx's `sqlite` feature, so `rsa` is never built
+# or linked. Revisit when sqlx updates or drops the dependency.
+ignore = ["RUSTSEC-2023-0071"]

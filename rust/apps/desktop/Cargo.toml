@@ -7,9 +7,9 @@ publish = false
 [dependencies]
 arboard = "3"
 base64 = "0.22"
-chatui-domain = { path = "../../crates/chatui-domain" }
-chatui-storage = { path = "../../crates/chatui-storage" }
-chatui-ui = { path = "../../crates/chatui-ui" }
+chatui-domain = { version = "0.1.0", path = "../../crates/chatui-domain" }
+chatui-storage = { version = "0.1.0", path = "../../crates/chatui-storage" }
+chatui-ui = { version = "0.1.0", path = "../../crates/chatui-ui" }
 ed25519-dalek = "2.1"
 hex = "0.4"
 reqwest = { version = "0.12.24", default-features = false, features = [

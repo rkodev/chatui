@@ -6,11 +6,11 @@ publish = false
 
 [dependencies]
 async-trait = "0.1"
-chatui-contracts = { path = "../chatui-contracts" }
-chatui-domain = { path = "../chatui-domain" }
-chatui-providers = { path = "../chatui-providers" }
-chatui-secrets = { path = "../chatui-secrets" }
-chatui-storage = { path = "../chatui-storage" }
+chatui-contracts = { version = "0.1.0", path = "../chatui-contracts" }
+chatui-domain = { version = "0.1.0", path = "../chatui-domain" }
+chatui-providers = { version = "0.1.0", path = "../chatui-providers" }
+chatui-secrets = { version = "0.1.0", path = "../chatui-secrets" }
+chatui-storage = { version = "0.1.0", path = "../chatui-storage" }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
 pulldown-cmark = { version = "0.13", default-features = false }
 serde_json = "1"
