@@ -693,8 +693,8 @@ slint::slint! {
 
     export component ShellWindow inherits Window {
         title: "ChatUI";
-        width: 1024px;
-        height: 720px;
+        preferred-width: 1024px;
+        preferred-height: 720px;
 
         in property <ThemeTokens> tokens;
         in property <DensityTokens> density;
