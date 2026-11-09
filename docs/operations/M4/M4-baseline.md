@@ -148,14 +148,15 @@ applicable for this release.
 | --- | --- | --- |
 | M1 exit gate met on web and Android | Pass | `docs/operations/M1/M1-verification.md` (2026-11-04). |
 | M2 exit gate met on web and Android | Pass | `docs/operations/M2/M2-verification.md` (2026-11-06). |
-| M3 exit gate met for Android release configuration and device evidence | **Fail** | `M3-07.3` (device matrix), `M3-07.4` (carryover closeout), and `M3-07.5` (parity/exit evidence) are `Not started`. Owner: M3 milestone owner. |
+| M3 exit gate met for Android release configuration and device evidence | Pass | `M3-07.3`, `M3-07.4`, and `M3-07.5` are `Complete`; M3 is `Complete`. Evidence: [M3-verification.md](../M3/M3-verification.md) section 24. |
 | Rust M3.5 exit gate met, if shipping | Pass (not applicable) | Rust is not shipping (DEC-M4-01); M3.5 DEC-01 is `defer`. |
 | `contracts/parity.md` current and every critical case has an owner | **Partial / Fail** | The table is current but has no owner/evidence column and critical cases 1-28 are not individually linked. Owner: `M4-06.1`. |
 
-The M3 exit-gate failure is a hard blocker for the M4 release gate. M4
-implementation tasks must not start until the M3 milestone owner closes
-`M3-07.3`, `M3-07.4`, and `M3-07.5`. The M4 milestone index status is updated
-to `Blocked` for this reason.
+The M3 exit-gate failure recorded at preflight was resolved on 2026-11-10 when
+`M3-07.3`, `M3-07.4`, and `M3-07.5` completed and the M3 milestone closed. The
+M4 milestone index is no longer blocked; `M4-01.1` and `M4-02.1` are ready to
+start. The remaining entry-criteria gap is the per-row parity evidence owned by
+`M4-06.1`.
 
 ## Redaction
 

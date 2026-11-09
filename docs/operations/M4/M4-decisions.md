@@ -114,6 +114,7 @@ math typesetting remains the documented raw-source fallback, not a new gap.
 
 ## Entry-criteria status
 
-See `M4-baseline.md` for the checklist and evidence. The M3 exit gate is not
-yet met (`M3-07.3`, `M3-07.4`, and `M3-07.5` are `Not started`), so M4
-implementation tasks must not start until the M3 milestone owner closes them.
+See `M4-baseline.md` for the checklist and evidence. The M3 exit gate was met
+on 2026-11-10 (`M3-07.3`, `M3-07.4`, and `M3-07.5` are `Complete`; M3 is
+`Complete`), so M4 implementation tasks may start. The per-row parity evidence
+remains with `M4-06.1`.
