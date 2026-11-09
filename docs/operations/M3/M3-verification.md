@@ -1,6 +1,6 @@
 # M3 Verification Evidence
 
-- Status: Baseline recorded 2026-11-06; M3 implementation in progress. Sections 9-22 record task evidence; section 22 records a release-blocking deep-link defect.
+- Status: Baseline recorded 2026-11-06; M3 implementation in progress. Sections 9-23 record task evidence; section 22 records a release-blocking deep-link defect and section 23 closes the M2 carryovers.
 - Owner: M3-00.1 recorded the preflight environment and baseline.
 - Scope: Android M3 preflight, baseline commands, measurements, and environment blockers.
 - Source plan: [M3 Android Depth Implementation Plan](../M3-android-depth-implementation-plan.md)
@@ -35,6 +35,10 @@ M2 deferrals that target M3 (from M2 verification section 11 and parity):
 | Web case 23 automated coverage | Web gap only; Android has an automated equivalent. Not M3 Android work. |
 | Live provider smoke and valid-key success | M4 release check. |
 | Local and Custom CORS | M4 release check. |
+
+Section 23 records the M3-07.4 closeout for these items: the local cleartext,
+Anthropic/Gemini discovery, math fallback, and device-input items are closed or
+explicitly deferred with an owner.
 
 ## 2. Verification environment
 
@@ -1273,3 +1277,118 @@ material is recorded in this section. Provider keys were the synthetic
 image was a generated gradient; the text file was one synthetic line. The
 device matrix records hardware/emulator identifiers and test outcomes only.
 
+
+## 23. M3-07.4 M2 carryover closeout
+
+Recorded 2026-11-10 on `m3_api34_phone` (Android 14 / API 34), debug build
+`0.1.0-dev`. Only synthetic keys, prompts, and local fixture data were used.
+
+### 23.1 Anthropic and Gemini keyed discovery
+
+`ModelService.refreshModels` now resolves the provider's stored `secretId`
+through `SecretStore` and passes the key in `ProviderContext` when the preset's
+`modelDiscovery.public` flag is false. Public catalogs (OpenRouter, Ollama, LM
+Studio, and llama.cpp) still receive no key, so first-run discovery remains
+keyless. A missing or unreadable key still falls through to the existing cached
+or fallback catalog instead of failing the refresh.
+
+| Test | Result | What it proves |
+| --- | --- | --- |
+| `ModelServiceTest.refreshModels passes the stored key for a key-protected catalog` | Pass | An Anthropic provider's stored key reaches the gateway context. |
+| `ModelServiceTest.refreshModels keeps public OpenRouter discovery keyless` | Pass | OpenRouter discovery still passes `apiKey = null`. |
+| `ModelServiceTest.refreshModels degrades when a key-protected catalog has no stored key` | Pass | A key-protected provider with no key degrades to the fallback catalog. |
+
+The existing degraded-refresh tests still pass, so cached and fallback behavior
+is unchanged.
+
+### 23.2 Onboarding copy
+
+The welcome copy no longer says non-OpenRouter providers are "coming later". It
+now reads: "OpenRouter is recommended for this preview. You can add other
+providers from Providers after setup." This matches M2 behavior, where the
+first-run flow is OpenRouter-first and other enabled presets are managed from
+the Providers screen.
+
+| Test | Result | What it proves |
+| --- | --- | --- |
+| `OnboardingScreenTest.welcome copy does not claim other providers are coming later` | Pass | The welcome surface contains the new copy and no "coming later" claim. |
+
+### 23.3 Local Ollama, LM Studio, and llama.cpp cleartext
+
+The M3-01.4 policy and device check already cover the emulator host loopback.
+This task re-ran the app-level Ollama check and added reachability checks for
+the other two local presets.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Ollama through the production adapter | Pass | `LocalProviderCleartextTest.localOllamaPresetReachesHostServer` passed on `m3_api34_phone` against `http://10.0.2.2:11434/v1`. |
+| LM Studio cleartext reachability | Pass | A disposable local server on host `127.0.0.1:1234` returned `HTTP/1.0 200 OK` with a JSON model list from the emulator at `10.0.2.2:1234`. |
+| llama.cpp cleartext reachability | Pass | A disposable local server on host `127.0.0.1:8080` returned `HTTP/1.0 200 OK` with a JSON model list from the emulator at `10.0.2.2:8080`. |
+
+The disposable servers were stopped after the check. The app-level Ollama test
+proves the production `CleartextPolicyInterceptor` and `OllamaAdapter` path; the
+LM Studio and llama.cpp checks prove the same loopback cleartext route is
+reachable. No trust-all manager or certificate bypass was added.
+
+### 23.4 Math fallback
+
+Math remains the documented safe fallback: standalone `$$` blocks and fenced
+`math`/`latex`/`tex` blocks render their exact source in a bounded block, inline
+`$...$` stays raw text, and no math typesetting library is bundled. The behavior
+is documented in `ChatMarkdown.kt` and covered by existing tests.
+
+| Test | Result |
+| --- | --- |
+| `ChatMarkdownTest.renders inline math as raw source without breaking the message` | Pass |
+| `ChatMarkdownTest.renders standalone block math as a raw-source block` | Pass |
+| `ChatMarkdownTest.renders fenced math as a raw-source block` | Pass |
+| `ChatMarkdownTest.keeps incomplete streaming math as raw text` | Pass |
+| `MarkdownSupportTest.splits standalone block math and leaves inline math as text` | Pass |
+| `MarkdownSupportTest.leaves unterminated block math and fenced code untouched` | Pass |
+
+No production code changed for this item.
+
+### 23.5 Attachment input evidence
+
+The device matrix in section 22.3 already records the attachment input paths.
+This task links that evidence instead of duplicating the tests.
+
+| Input path | Result | Evidence |
+| --- | --- | --- |
+| Photo picker | Pass on all six targets | Section 22.3, "Photo picker". |
+| SAF document picker | Pass on all six targets | Section 22.3, "SAF document picker". |
+| Clipboard image paste | Blocked | Section 22.3 and blocker B2. |
+| Drag-and-drop | Not available on emulators | Section 22.3 and gap G1. |
+
+### 23.6 Carryover closeout
+
+| M2 carryover | Status | Owner / evidence |
+| --- | --- | --- |
+| Android local Ollama over cleartext HTTP | Closed | M3-01.4 section 12.3 and section 23.3. |
+| Android Anthropic and Gemini discovery without a key | Closed | Section 23.1. |
+| Android math typesetting | Closed as the documented raw-source fallback | Section 23.4. |
+| Android device-level input and visual checks | Closed for photo picker and SAF; clipboard image paste deferred; drag-and-drop deferred | Section 22.3, B2, and G1. |
+| Web case 23 automated coverage | Deferred (web-only, not M3 Android work) | M4 polish or follow-up. |
+| Live provider smoke and valid-key success | Deferred to M4 release check | M4 release check. |
+| Local and Custom CORS | Deferred to M4 release check | M4 release check. |
+
+Clipboard image paste (B2) and drag-and-drop (G1) remain open verification
+items with owners in section 22.4. They are not claimed as passing.
+
+### 23.7 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-lint` | `BUILD SUCCESSFUL`; 439 actionable tasks. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 1001 aggregated tests, 0 failures, 0 errors, 0 skipped. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-assemble` | `BUILD SUCCESSFUL`; debug APK produced. |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | `BUILD SUCCESSFUL`; 10 tests, 0 failures, 0 errors, 2 skipped (manual restart/backup phases). |
+| `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.chatui.security.LocalProviderCleartextTest` | `BUILD SUCCESSFUL`; Ollama cleartext test passed. |
+
+The 4 new JVM/Robolectric tests account for the increase from 997 to 1001.
+
+### 23.8 Redaction
+
+No real API key, prompt, conversation content, personal data, or signing
+material is recorded in this section. The provider key was the synthetic
+`sk-test-secret-key`; the local servers returned synthetic model ids only.

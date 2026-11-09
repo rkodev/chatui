@@ -91,6 +91,7 @@ class DefaultOnboardingServiceTest {
         modelService = ModelService(
             providers = providerRepository,
             models = modelRepository,
+            secrets = secretStore,
             gateway = gateway,
             registry = registry,
             clock = clock,

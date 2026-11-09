@@ -62,6 +62,35 @@ class OnboardingScreenTest {
     }
 
     @Test
+    fun `welcome copy does not claim other providers are coming later`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("coming later", substring = true, ignoreCase = true)
+            .assertDoesNotExist()
+        composeRule.onNodeWithText(
+            "You can add other providers from Providers after setup.",
+            substring = true,
+        ).assertIsDisplayed()
+    }
+
+    @Test
     fun `provider picker forwards the selected provider`() {
         var selected: String? = null
 
@@ -330,6 +359,6 @@ private fun providers(): List<ProviderOption> = listOf(
         label = "OpenAI",
         enabled = false,
         recommended = false,
-        statusLabel = "Coming later",
+        statusLabel = "Unavailable",
     ),
 )
