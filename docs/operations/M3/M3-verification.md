@@ -1,6 +1,6 @@
 # M3 Verification Evidence
 
-- Status: Baseline recorded 2026-11-06; M3 implementation in progress. Sections 9-23 record task evidence; section 22 records a release-blocking deep-link defect and section 23 closes the M2 carryovers.
+- Status: Baseline recorded 2026-11-06; M3 complete 2026-11-10. Sections 9-23 record task evidence; section 22 records the device matrix and the fixed deep-link defect, section 23 closes the M2 carryovers, and section 24 records the final exit gate.
 - Owner: M3-00.1 recorded the preflight environment and baseline.
 - Scope: Android M3 preflight, baseline commands, measurements, and environment blockers.
 - Source plan: [M3 Android Depth Implementation Plan](../M3-android-depth-implementation-plan.md)
@@ -1199,15 +1199,18 @@ through the real `Refresh models` action.
 
 | Device / emulator | OS | Form factor | RAM | Build | Attachment picker | SAF | Clipboard image | Drag-and-drop | Share | Deep link | Process death | Backup restore | Result |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `m3_api26_phone` | Android 8.0.0 / API 26 | Phone 1080x2400 | AVD 2 GB | Debug | Pass (DocumentsUI image picker fallback) | Pass | Blocked (no URI on clipboard) | Not available | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
-| `m3_api31_phone` | Android 12 / API 31 | Phone 1080x2400 | AVD 2 GB | Debug | Pass (DocumentsUI fallback) | Pass | Blocked (no URI on clipboard) | Not available | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
-| `m3_api34_phone` | Android 14 / API 34 | Phone 1080x2400 | 2,534,120 kB | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
-| `Pixel_10_Pro` | Android 17 / API 37 | Phone 1280x2856 | AVD 2 GB | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
-| `m3_lowram34` | Android 14 / API 34 | Phone 1080x2400 | AVD 1 GB configured; 2,534,116 kB reported | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
-| `m3_tablet` | Android 17 / API 37 | Tablet 2560x1600 @ 320 dpi (1280x800 dp) | AVD 1907 MB | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available (no cross-app drag injection) | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
+| `m3_api26_phone` | Android 8.0.0 / API 26 | Phone 1080x2400 | AVD 2 GB | Debug | Pass (DocumentsUI image picker fallback) | Pass | Blocked (no URI on clipboard) | Not available | Pass | Pass (B1 fixed; re-verified) | Pass | Pass (`Backup is not allowed`) | Pass |
+| `m3_api31_phone` | Android 12 / API 31 | Phone 1080x2400 | AVD 2 GB | Debug | Pass (DocumentsUI fallback) | Pass | Blocked (no URI on clipboard) | Not available | Pass | Pass (B1 fixed; re-verified) | Pass | Pass (`Backup is not allowed`) | Pass |
+| `m3_api34_phone` | Android 14 / API 34 | Phone 1080x2400 | 2,534,120 kB | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available | Pass | Pass (B1 fixed; re-verified) | Pass | Pass (`Backup is not allowed`) | Pass |
+| `Pixel_10_Pro` | Android 17 / API 37 | Phone 1280x2856 | AVD 2 GB | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available | Pass | Pass (B1 fixed; re-verified) | Pass | Pass (`Backup is not allowed`) | Pass |
+| `m3_lowram34` | Android 14 / API 34 | Phone 1080x2400 | AVD 1 GB configured; 2,534,116 kB reported | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available | Pass | Pass (B1 fixed; re-verified) | Pass | Pass (`Backup is not allowed`) | Pass |
+| `m3_tablet` | Android 17 / API 37 | Tablet 2560x1600 @ 320 dpi (1280x800 dp) | AVD 1907 MB | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available (no cross-app drag injection) | Pass | Pass (B1 fixed; re-verified) | Pass | Pass (`Backup is not allowed`) | Pass |
 
-Every device row is **Fail** because a release-blocking deep-link defect
-reproduces on all six targets. No row is marked pass while that blocker remains.
+B1 was fixed on 2026-11-10. The cold-start deep link was re-run on all six
+targets and no longer crashes; a missing conversation renders the not-found
+state. The existing-conversation path was re-verified on `m3_api34_phone`.
+Every row is now **Pass** for the matrix items; B2 and G1 remain open
+verification items and are not hidden in the pass claim.
 
 ### 22.3 Item evidence
 
@@ -1220,7 +1223,7 @@ reproduces on all six targets. No row is marked pass while that blocker remains.
 | Clipboard image paste | Blocked on all six | The Paste control is present. No available emulator app places an image **URI** on the clipboard. Chrome `Copy image` produces a bitmap clip, and the URI-based `pasteImage` path does not attach it. See blocker B2. |
 | Drag-and-drop | Not available | The emulator does not expose a way to inject a cross-app `DragAndDropEvent` carrying `ClipData`; the drop target is present in the composer. Needs a physical tablet or ChromeOS. See gap G1. |
 | Share target | Pass on all six | `am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT ...` created a new conversation with the synthetic text pre-filled as the draft and left the existing draft untouched. |
-| Deep links | **Fail on all six** | A cold-start `chatui://chat/<uuidv7>` crashes the app with `IllegalArgumentException: Cannot navigate to chat/<id>. Navigation graph has not been set for NavController`. Rejected links (non-v7 ids) are correctly ignored. Warm delivery to a running app works. See blocker B1. |
+| Deep links | Pass on all six | A cold-start `chatui://chat/<uuidv7>` now opens the chat destination without crashing. A missing conversation renders `Conversation not found`; an existing conversation was re-verified on `m3_api34_phone`. Rejected links (non-v7 ids) are correctly ignored. Warm delivery to a running app works. B1 is closed. |
 | Predictive back / back ordering | Pass where applicable | Manifest keeps `android:enableOnBackInvokedCallback="true"`. Back from chat returns to the conversation list on API 26, 31, 34, and 37. API 26/31 have no predictive-back animation. The headless emulator cannot visually confirm the predictive-back preview on API 34/37. |
 | Keyboard shortcuts | Pass on API 34; partial on API 31 | API 34: `Ctrl+K` opened the drawer/search and `Ctrl+Shift+O` created and opened a new chat from the list. API 31: `Ctrl+Shift+O` worked; `Ctrl+K` was not observed through `adb input`. API 26 `input` has no `keycombination`, so shortcuts were not injected there. Unit/Compose tests remain the automated guard. |
 | Process death | Pass on all six | Backgrounded an active stream, ran `adb shell am kill --user 0 dev.chatui` until `pidof` was empty, relaunched, and saw the persisted synthetic prefix, `The app closed before this response finished. Partial content is preserved.`, `Response cancelled`, and `Regenerate`. See case 26 in section 16. |
@@ -1231,12 +1234,12 @@ reproduces on all six targets. No row is marked pass while that blocker remains.
 
 | ID | Severity | Issue | Owner | Next action |
 | --- | --- | --- | --- | --- |
-| B1 | **Release blocker** | Cold-start deep link to an existing conversation crashes at `ChatUiApp.kt:384` (`navigateToShellRoute`) because the pending intent is collected before the `NavController` has a graph. Reproduces on API 26, 31, 34, 37, low-RAM, and tablet. This contradicts the M3-04.3 claim that an unknown id renders the not-found screen. | Android shell/navigation owner (M3-02.2/M3-04.3 follow-up) | Set or attach the navigation graph before collecting/pending intents, or guard `navigate` until the graph is set. Add a cold-start deep-link regression test for an existing and a missing conversation. Do not close M3 until fixed and re-run on at least one phone and the tablet. |
+| B1 | **Closed** | Cold-start deep link to an existing conversation crashed at `ChatUiApp.kt:384` (`navigateToShellRoute`) because the pending intent was collected before the `NavController` had a graph. Fixed on 2026-11-10 by capturing the resolved start destination in the effect key and block, so the pending-intent collector cannot run until the shell has composed the `NavHost`. Re-verified on all six targets. | Android shell/navigation owner (M3-02.2/M3-04.3 follow-up) | Closed. Regression tests: `ColdStartDeepLinkTest` for an existing and a missing conversation. |
 | B2 | **High** | Clipboard image paste is not verified and appears URI-only: Chrome `Copy image` creates a bitmap clip and the Paste action attaches nothing. | Attachments/input owner (M3-07.4 or a new follow-up) | Add bitmap-clip support to `pasteImage` or test with an app that puts an image URI on the clipboard on a physical device. Record the supported sources in the product copy. |
 | G1 | Medium (verification gap) | Drag-and-drop was not exercised because the emulator cannot inject a cross-app drag with `ClipData`. | Physical tablet/ChromeOS owner (M3-07.5 or M4 device audit) | Run the drag check on a physical tablet or ChromeOS before claiming platform input parity. |
 
-The matrix must not be marked pass while B1 is open. B2 and G1 are recorded as
-open verification items; they are not hidden in a pass claim.
+B1 is closed. B2 and G1 remain open verification items; they are not hidden in
+the pass claim.
 
 ### 22.5 Limitations
 
@@ -1267,7 +1270,7 @@ open verification items; they are not hidden in a pass claim.
 | `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | Pass on the phone emulator (section 21 record). |
 | `adb shell bmgr backupnow dev.chatui` on each target | `Backup is not allowed` on all six. |
 | `adb shell am kill --user 0 dev.chatui` mid-stream on each target | `pidof` empty; relaunch showed partial content and the interruption notice on all six. |
-| `adb shell am start -W -a android.intent.action.VIEW -d chatui://chat/<id>` | Cold start crashed on all six. |
+| `adb shell am start -W -a android.intent.action.VIEW -d chatui://chat/<id>` | Pass on all six after the B1 fix; missing conversation rendered `Conversation not found`, existing conversation opened on `m3_api34_phone`. |
 
 ### 22.7 Redaction
 
@@ -1392,3 +1395,106 @@ The 4 new JVM/Robolectric tests account for the increase from 997 to 1001.
 No real API key, prompt, conversation content, personal data, or signing
 material is recorded in this section. The provider key was the synthetic
 `sk-test-secret-key`; the local servers returned synthetic model ids only.
+
+## 24. M3-07.5 Parity, regressions, and exit evidence
+
+Recorded 2026-11-10 on `m3_api34_phone` (Android 14 / API 34), debug build
+`0.1.0-dev`. Only synthetic data was used. This is the final M3 gate record.
+
+### 24.1 Exit decision
+
+**M3 exit gate is met.** Release blocker B1 from section 22.4 was fixed on
+2026-11-10. The pending-intent collector now captures the resolved start
+destination in its effect key and block, so it cannot navigate before the shell
+has composed the `NavHost` and set the navigation graph. The cold-start deep
+link was re-run on all six device-matrix targets with no crash; a missing
+conversation renders the not-found state, and an existing conversation was
+re-verified on `m3_api34_phone`. The milestone status table is updated to
+Complete.
+
+### 24.2 Gate command results
+
+| Command | Result | Bounded evidence |
+| --- | --- | --- |
+| `make contracts-check` | Pass | `Contract validation passed.` |
+| `make android-lint` | Pass | `BUILD SUCCESSFUL`; 439 actionable tasks. |
+| `make android-test` | Pass | `BUILD SUCCESSFUL`; 1003 aggregated tests, 0 failures, 0 errors, 0 skipped. |
+| `make android-assemble` | Pass | `BUILD SUCCESSFUL`; debug APK produced. |
+| `./gradlew :app:lintRelease :app:testDebugUnitTest :app:assembleRelease :app:bundleRelease` | Pass | `BUILD SUCCESSFUL`; release lint, unit tests, unsigned release APK, and release AAB produced. |
+| `./gradlew :app:connectedDebugAndroidTest` | Pass | `BUILD SUCCESSFUL`; 10 tests, 0 failures, 0 errors, 2 skipped (manual restart/backup phases). |
+| `./gradlew :app:verifyRoborazziDebug` | Pass after golden update | `BUILD SUCCESSFUL`; 4 onboarding goldens updated for the M3-07.4 copy change, then verified. |
+| `./gradlew :app:testDebugUnitTest --tests 'dev.chatui.ColdStartDeepLinkTest'` | Pass | 2 tests, 0 failures; cold-start deep link to an existing and a missing conversation. |
+| Cold-start deep-link device re-run on all six matrix targets | Pass | No `FATAL EXCEPTION` or `Navigation graph has not been set`; missing conversation rendered `Conversation not found`; existing conversation opened on `m3_api34_phone`. |
+
+The first `verifyRoborazziDebug` run failed on `onboardingPhone` and
+`onboardingTablet` because the M3-07.4 welcome-copy change was not reflected in
+the goldens. The four onboarding goldens (phone/tablet, light/dark) were
+regenerated with `:app:recordRoborazziDebug`; the verify run then passed. This
+is a test-fixture update, not a product regression.
+
+### 24.3 M1 and M2 Android regressions
+
+`make android-test` runs the full Android JVM/Robolectric suite, including the
+M1 and M2 provider, content, persistence, search, export/import, attachment, and
+settings tests. Result: 1003 tests, 0 failures, 0 errors, 0 skipped. No M1 or M2
+Android regression was found. The 2 new `ColdStartDeepLinkTest` cases bring the
+M3-07.4 count from 1001 to 1003.
+
+### 24.4 Cases 26 and 27
+
+| Case | Evidence | Result |
+| --- | --- | --- |
+| Case 26 process-death streaming recovery | Section 16 and [case-26-process-death.md](case-26-process-death.md) | Pass; partial content preserved, message marked cancelled, regenerate works. |
+| Case 27 backup exclusion | Section 10 | Pass; `Backup is not allowed` on the source and fresh targets, no sentinel in plaintext files. |
+
+### 24.5 Release artifacts, mapping, and measurements
+
+| Artifact | Bytes | SHA-256 |
+| --- | --- | --- |
+| Debug APK (`app-debug.apk`) | 18,827,705 | `f99cb553b061d70a16d924d9b754963004037abb4c459659021069a755fd18b6` |
+| Release APK, unsigned (`app-release-unsigned.apk`) | 2,894,958 | `abc1e1aeee3b369e345c2e1cd21fe206be787ae7bd4b674e2f7f410f1cae700e` |
+| Release AAB (`app-release.aab`) | 7,043,129 | `d3c7b3f83cc2808f945022adfb182cf66a4305795bcf97f2190940e6631417c8` |
+| R8 mapping (`mapping/release/mapping.txt`) | 59,491,325 | `9fbd936c3c0c7f4bbd8c33df711282c652127936b29ce38c341469b38213655a` |
+
+The signed release APK was not produced because CI signing secrets remain
+unavailable (M3-06.4). The unsigned release APK and AAB are the local build
+outputs. Startup median remains **990 ms** against the 1,500 ms budget, and the
+size budgets remain met (debug 17.96 MiB under 20 MB; release 2.77 MiB under
+15 MB) as recorded in section 20. No budget was missed.
+
+### 24.6 Screenshots
+
+`./gradlew :app:verifyRoborazziDebug` passes with the updated onboarding
+goldens. The screenshot suite covers onboarding, chat, model picker, provider
+list/detail, settings, data, and conversation list in light/dark and
+phone/tablet configurations, as recorded by M3-05.3.
+
+### 24.7 Accessibility and device matrix
+
+- Accessibility baseline and TalkBack: section 21.
+- Manual device matrix: section 22.
+- M2 carryover closeout: section 23.
+
+The device matrix is **Pass** after the B1 fix and the six-target deep-link
+re-run. Photo picker, SAF, share target, process death, backup exclusion,
+adaptive layout, IME insets, and back ordering passed on every target. Clipboard
+image paste (B2) and drag-and-drop (G1) remain open verification items.
+
+### 24.8 Residual risks and approved deferrals
+
+| Item | Status | Owner / target |
+| --- | --- | --- |
+| B1 cold-start deep-link crash | **Closed** | Fixed in `ChatUiApp.kt`; regression tests in `ColdStartDeepLinkTest`; re-verified on all six targets. |
+| B2 clipboard image paste is URI-only | Open high-severity verification item | Attachments/input owner (M3-07.4 follow-up or M4) |
+| G1 drag-and-drop not exercised | Open verification gap | Physical tablet/ChromeOS owner (M4 device audit) |
+| CI signing secrets unavailable | Open release blocker for signed artifacts | M3-06.2/M3-06.4 owner |
+| No physical device or ChromeOS hardware | Environment limitation | M4 device audit |
+| Math typesetting | Accepted safe fallback (raw source) | Documented in section 23.4 |
+| Predictive-back animation | Not visually confirmed on headless emulator | M4 device audit |
+
+### 24.9 Redaction
+
+No real API key, prompt, conversation content, personal data, or signing
+material is recorded in this section. The deep-link id is synthetic, the
+provider key is the synthetic `sk-test-secret-key`, and the artifacts are local
+build outputs.

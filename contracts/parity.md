@@ -1,7 +1,7 @@
 # ChatUI Feature Parity
 
 - Source: [IMPLEMENTATION.md section 5.4](../docs/IMPLEMENTATION.md#54-parity-checklist)
-- Updated: 2026-11-08
+- Updated: 2026-11-10
 - Purpose: authoritative cross-client requirement and commitment table.
 
 | Feature | Web | Android | Rust |
@@ -132,17 +132,73 @@ Not delivered in M2 (later milestones or recorded deferrals):
 - Rust desktop client (M3.5), backup/sync (M5), and managed hosting (M6).
 - Android math typesetting: standalone math blocks render as raw source, the
   documented safe fallback; inline math remains raw text.
-- Android local Ollama over cleartext HTTP needs a network security config that
-  is not yet in the app manifest. The adapter and guidance are present, and an
-  HTTPS endpoint works. Recorded as a deferral for M3.
-- Android Anthropic and Gemini model discovery currently runs without a key and
-  falls back to the shared fallback model lists; chat and key validation work.
-  Recorded as a deferral for a follow-up.
+- Android local Ollama over cleartext HTTP needed a network security config that
+  was not yet in the app manifest. Closed in M3; see the M3 status below.
+- Android Anthropic and Gemini model discovery ran without a key and fell back
+  to the shared fallback model lists. Closed in M3; see the M3 status below.
 - Web case 23 (10,000-message windowing) has a manual code check, not an
   automated web test; Android has an automated equivalent.
 - Live provider smoke and valid-key success for every cloud preset were not
   re-run; CORS evidence proves browser readability with placeholder
   credentials. Local and Custom CORS remain `unknown`.
+
+## Implementation status (M3, 2026-11-10)
+
+M3 adds Android platform depth on top of the M2 baseline. The commitment table
+above is unchanged. The M3 exit gate is met as of 2026-11-10; this section
+records implemented behavior, evidence, and known limitations.
+
+Implemented on Android:
+
+- Share target intake for `ACTION_SEND` text, creating a new conversation with
+  the shared text as a draft while preserving any existing draft.
+- `chatui://chat/<uuidv7>` deep-link parsing and validation, cold-start and warm
+  delivery to a running app, and a not-found state for a missing conversation.
+  The cold-start graph-timing defect (B1) is fixed and re-verified on all six
+  device-matrix targets.
+- Provider documentation opens in Chrome Custom Tabs.
+- Adaptive shell: permanent sidebar at >= 840 dp, modal drawer below, IME and
+  safe-drawing insets, predictive-back ordering, and hardware keyboard
+  shortcuts.
+- Lifecycle and drafts: configuration-change stream survival, persistent
+  drafts, last-active conversation restore, process-death recovery (case 26),
+  startup orphan-attachment cleanup, and documented background behavior.
+- Platform security: Android Keystore ciphertext-only proof, backup exclusion
+  (case 27), `FLAG_SECURE` on key entry and key detail, network security config
+  with a central cleartext allowlist, and the local-cleartext warning/refusal.
+- Tests and release configuration: Compose flow tests, Roborazzi goldens,
+  large-conversation bounded composition, edge-case regressions, R8
+  minification/keep rules, signing/version policy, baseline profile, CI
+  artifacts, and bounded image decode.
+
+M2 deferrals closed in M3:
+
+- Android local Ollama cleartext: closed by the network security config,
+  cleartext policy, and device check.
+- Android Anthropic and Gemini discovery: closed; non-public catalogs now use
+  the stored provider key, while OpenRouter and local presets stay keyless.
+- Android math typesetting: accepted as the documented raw-source fallback and
+  covered by tests.
+- Android device input: photo picker and SAF pass on the device matrix;
+  clipboard image paste (B2) and drag-and-drop (G1) remain open verification
+  items.
+
+Known limitations and open items:
+
+- **B2 (high):** clipboard image paste is URI-only; a bitmap clip from Chrome
+  is not attached.
+- **G1 (verification gap):** cross-app drag-and-drop was not exercised because
+  the headless emulator cannot inject a `ClipData` drag.
+- All device evidence is emulator evidence; no physical phone, tablet, or
+  ChromeOS hardware was available.
+- The signed release artifact is not produced in CI because signing secrets are
+  unavailable; local unsigned release APK/AAB builds pass.
+- Math typesetting remains the raw-source fallback, and predictive-back
+  animation was not visually confirmed on the headless emulator.
+
+Evidence: [M3-verification.md](../docs/operations/M3/M3-verification.md)
+sections 9-24, including cases 26 and 27, the device matrix, accessibility,
+performance, screenshots, and the final gate record.
 
 ## Implementation status (M3.5, 2026-11-08)
 

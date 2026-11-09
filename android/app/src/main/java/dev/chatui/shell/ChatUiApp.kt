@@ -118,17 +118,20 @@ fun ChatUiApp(
         }
 
         // Collect after the start destination is known so a cold-start share
-        // or deep link can navigate as soon as the shell is ready. The action
-        // is consumed only after a conversation and its draft have been
-        // created.
+        // or deep link can navigate as soon as the shell is ready. Capture the
+        // resolved destination in the effect key and block: the start-destination
+        // resolver runs in another effect during the same apply pass, and reading
+        // the live state here would let this effect navigate before the NavHost
+        // has composed and set its graph.
+        val resolvedStartDestination = startDestination
         LaunchedEffect(
             router,
             service,
             navController,
             settings.onboardingCompleted,
-            startDestination,
+            resolvedStartDestination,
         ) {
-            if (startDestination == null) return@LaunchedEffect
+            if (resolvedStartDestination == null) return@LaunchedEffect
 
             router.pending.collect { action ->
                 if (action == null) return@collect

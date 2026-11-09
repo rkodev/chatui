@@ -3,7 +3,7 @@
 - Source plan: [M3 Android Depth Implementation Plan](../M3-android-depth-implementation-plan.md)
 - Milestone: [M3 Android depth](../../milestones/M3-android-depth.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: Not started
+- Status: Complete
 - Last updated: 2026-11-10
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
 - Scope: Android only. M2 provider, attachment, settings, search, export/import, and data behavior is the baseline, not M3 implementation work.
@@ -70,7 +70,7 @@
 | 33 | [M3-07.2 Accessibility baseline and TalkBack](M3-07.2-accessibility.md) | Complete | M3-05.3, M3-03.4 | evidence | M3-07.1, M3-07.3, M3-07.4 |
 | 34 | [M3-07.3 Manual device matrix](M3-07.3-device-matrix.md) | Complete | M3-05.4, M3-06.4, M3-02.1, M3-02.2 | evidence | M3-07.1, M3-07.2, M3-07.4 |
 | 35 | [M3-07.4 M2 carryover closeout and platform input checks](M3-07.4-m2-carryover-closeout.md) | Complete | M3-01.5, M3-03.4, M3-05.4 | evidence | M3-07.1, M3-07.2, M3-07.3 |
-| 36 | [M3-07.5 Parity, regressions, and exit evidence](M3-07.5-parity-exit-evidence.md) | Not started | M3-01.1, M3-01.2, M3-01.3, M3-01.4, M3-01.5, M3-02.3, M3-07.1, M3-07.2, M3-07.3, M3-07.4 | evidence | none; final gate |
+| 36 | [M3-07.5 Parity, regressions, and exit evidence](M3-07.5-parity-exit-evidence.md) | Complete | M3-01.1, M3-01.2, M3-01.3, M3-01.4, M3-01.5, M3-02.3, M3-07.1, M3-07.2, M3-07.3, M3-07.4 | evidence | none; final gate |
 
 ## Parallel execution groups
 
