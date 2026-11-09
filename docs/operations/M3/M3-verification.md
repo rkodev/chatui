@@ -1,6 +1,6 @@
 # M3 Verification Evidence
 
-- Status: Baseline recorded 2026-11-06; M3 implementation in progress. Sections 9-16 record completed task evidence.
+- Status: Baseline recorded 2026-11-06; M3 implementation in progress. Sections 9-22 record task evidence; section 22 records a release-blocking deep-link defect.
 - Owner: M3-00.1 recorded the preflight environment and baseline.
 - Scope: Android M3 preflight, baseline commands, measurements, and environment blockers.
 - Source plan: [M3 Android Depth Implementation Plan](../M3-android-depth-implementation-plan.md)
@@ -1166,4 +1166,110 @@ The 4 new JVM/Robolectric tests account for the increase from 993 to 997.
 No API key, prompt, conversation content, personal data, or signing material is
 recorded in this section. The seeded provider key is the synthetic
 `m3-backup-sentinel-not-a-real-key` sentinel and the conversation is synthetic.
+
+## 22. M3-07.3 Manual device matrix
+
+Recorded 2026-11-10 across six emulators. Only synthetic providers, keys,
+prompts, conversations, and attachment bytes were used. Physical devices and
+ChromeOS hardware were not available; every result below is an emulator result
+and is labelled as such.
+
+### 22.1 Build and method
+
+| Item | Value |
+| --- | --- |
+| Build | Debug APK `android/app/build/outputs/apk/debug/app-debug.apk` |
+| Package | `dev.chatui` |
+| Version | `versionName 0.1.0-dev`, `versionCode 215` |
+| SDK | `minSdk 26`, `targetSdk 37`, `compileSdk 37` |
+| Release artifact | Not used. `app-release-unsigned.apk` cannot be installed; the signed release needs CI signing secrets that are still unavailable (M3-06.4). The task permits a debug build that differs only in signing/minification. |
+| Local provider | Host OpenAI-compatible SSE fixture on `127.0.0.1:8765`, reached with `adb reverse tcp:8765 tcp:8765`, configured as a Custom provider at `http://localhost:8765/v1` with a synthetic placeholder key. |
+| Data | Synthetic onboarding seed, synthetic prompts, synthetic `synthetic-NN` stream text, a generated gradient PNG, and a one-line text file. |
+
+Each emulator was booted headless with `-no-window -no-audio -no-boot-anim
+-gpu swiftshader_indirect -no-snapshot`. One emulator ran at a time. The
+provider was configured through the real Providers UI and models were refreshed
+through the real `Refresh models` action.
+
+### 22.2 Matrix
+
+| Device / emulator | OS | Form factor | RAM | Build | Attachment picker | SAF | Clipboard image | Drag-and-drop | Share | Deep link | Process death | Backup restore | Result |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `m3_api26_phone` | Android 8.0.0 / API 26 | Phone 1080x2400 | AVD 2 GB | Debug | Pass (DocumentsUI image picker fallback) | Pass | Blocked (no URI on clipboard) | Not available | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
+| `m3_api31_phone` | Android 12 / API 31 | Phone 1080x2400 | AVD 2 GB | Debug | Pass (DocumentsUI fallback) | Pass | Blocked (no URI on clipboard) | Not available | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
+| `m3_api34_phone` | Android 14 / API 34 | Phone 1080x2400 | 2,534,120 kB | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
+| `Pixel_10_Pro` | Android 17 / API 37 | Phone 1280x2856 | AVD 2 GB | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
+| `m3_lowram34` | Android 14 / API 34 | Phone 1080x2400 | AVD 1 GB configured; 2,534,116 kB reported | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
+| `m3_tablet` | Android 17 / API 37 | Tablet 2560x1600 @ 320 dpi (1280x800 dp) | AVD 1907 MB | Debug | Pass (system photo picker) | Pass | Blocked (no URI on clipboard) | Not available (no cross-app drag injection) | Pass | **Fail (cold-start crash)** | Pass | Pass (`Backup is not allowed`) | **Fail** |
+
+Every device row is **Fail** because a release-blocking deep-link defect
+reproduces on all six targets. No row is marked pass while that blocker remains.
+
+### 22.3 Item evidence
+
+| Item | Result | Evidence |
+| --- | --- | --- |
+| Onboarding and key entry | Pass on all six | The welcome step rendered the provider picker; the key-entry step rendered `Connect OpenRouter`, the masked key field, and `Connect`. Validated on API 26, 31, 34, 37, low-RAM, and tablet. No real key was entered. |
+| Chat send / stream / stop | Pass on all six | Each target sent a synthetic prompt to the local fixture, rendered streaming `synthetic-NN` text with a visible `Stop` button, and stopped with `Response cancelled. Partial content is preserved.` |
+| Photo picker | Pass on all six | API 34/37 and the tablet opened the system `PhotoPickerActivity`/photopicker and attached the selected image. API 26/31 fall back to the DocumentsUI image picker and also attached the image. The text-only model showed the expected image-capability warning. |
+| SAF document picker | Pass on all six | The picker accepted the supported `text/*` file (`matrix.txt`) and rejected the image, which matches the `OpenMultipleDocuments` mime filter. The file attached and could be removed. |
+| Clipboard image paste | Blocked on all six | The Paste control is present. No available emulator app places an image **URI** on the clipboard. Chrome `Copy image` produces a bitmap clip, and the URI-based `pasteImage` path does not attach it. See blocker B2. |
+| Drag-and-drop | Not available | The emulator does not expose a way to inject a cross-app `DragAndDropEvent` carrying `ClipData`; the drop target is present in the composer. Needs a physical tablet or ChromeOS. See gap G1. |
+| Share target | Pass on all six | `am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT ...` created a new conversation with the synthetic text pre-filled as the draft and left the existing draft untouched. |
+| Deep links | **Fail on all six** | A cold-start `chatui://chat/<uuidv7>` crashes the app with `IllegalArgumentException: Cannot navigate to chat/<id>. Navigation graph has not been set for NavController`. Rejected links (non-v7 ids) are correctly ignored. Warm delivery to a running app works. See blocker B1. |
+| Predictive back / back ordering | Pass where applicable | Manifest keeps `android:enableOnBackInvokedCallback="true"`. Back from chat returns to the conversation list on API 26, 31, 34, and 37. API 26/31 have no predictive-back animation. The headless emulator cannot visually confirm the predictive-back preview on API 34/37. |
+| Keyboard shortcuts | Pass on API 34; partial on API 31 | API 34: `Ctrl+K` opened the drawer/search and `Ctrl+Shift+O` created and opened a new chat from the list. API 31: `Ctrl+Shift+O` worked; `Ctrl+K` was not observed through `adb input`. API 26 `input` has no `keycombination`, so shortcuts were not injected there. Unit/Compose tests remain the automated guard. |
+| Process death | Pass on all six | Backgrounded an active stream, ran `adb shell am kill --user 0 dev.chatui` until `pidof` was empty, relaunched, and saw the persisted synthetic prefix, `The app closed before this response finished. Partial content is preserved.`, `Response cancelled`, and `Regenerate`. See case 26 in section 16. |
+| Backup exclusion | Pass on all six | `bmgr backupnow dev.chatui` returned `Package dev.chatui with result: Backup is not allowed` and `Backup finished with result: Success`. See case 27 in section 10. |
+| Adaptive layout and insets | Pass | Phone widths show the compact drawer with `Open navigation`; the tablet (1280x800 dp) shows the permanent sidebar with Chats, Archived, New chat, search, and the Conversations/Providers/Settings/Data/Backup destinations. Tapping the composer on every target raised it above the IME (`mInputShown=true`), proving IME insets are applied. |
+
+### 22.4 Release blockers and gaps
+
+| ID | Severity | Issue | Owner | Next action |
+| --- | --- | --- | --- | --- |
+| B1 | **Release blocker** | Cold-start deep link to an existing conversation crashes at `ChatUiApp.kt:384` (`navigateToShellRoute`) because the pending intent is collected before the `NavController` has a graph. Reproduces on API 26, 31, 34, 37, low-RAM, and tablet. This contradicts the M3-04.3 claim that an unknown id renders the not-found screen. | Android shell/navigation owner (M3-02.2/M3-04.3 follow-up) | Set or attach the navigation graph before collecting/pending intents, or guard `navigate` until the graph is set. Add a cold-start deep-link regression test for an existing and a missing conversation. Do not close M3 until fixed and re-run on at least one phone and the tablet. |
+| B2 | **High** | Clipboard image paste is not verified and appears URI-only: Chrome `Copy image` creates a bitmap clip and the Paste action attaches nothing. | Attachments/input owner (M3-07.4 or a new follow-up) | Add bitmap-clip support to `pasteImage` or test with an app that puts an image URI on the clipboard on a physical device. Record the supported sources in the product copy. |
+| G1 | Medium (verification gap) | Drag-and-drop was not exercised because the emulator cannot inject a cross-app drag with `ClipData`. | Physical tablet/ChromeOS owner (M3-07.5 or M4 device audit) | Run the drag check on a physical tablet or ChromeOS before claiming platform input parity. |
+
+The matrix must not be marked pass while B1 is open. B2 and G1 are recorded as
+open verification items; they are not hidden in a pass claim.
+
+### 22.5 Limitations
+
+- All results are emulator results. No physical phone, tablet, or ChromeOS
+  device was available. Results are not claimed to cover real hardware,
+  vendor skins, or real photo/document providers.
+- The low-RAM emulator is configured for 1 GB but the Android 14 image reports
+  about 2.5 GB `MemTotal`; it is the lowest-memory target available, not a true
+  1 GB device.
+- The photo pickers at API 26/31 use the DocumentsUI fallback rather than the
+  modern system photo picker.
+- Predictive-back animation and cross-app drag-and-drop cannot be observed on a
+  headless emulator.
+- The app was installed as the debug build because the signed release artifact
+  needs CI signing secrets that remain unavailable. The debug and release builds
+  differ only in signing/minification as permitted by the task.
+- Backup exclusion was exercised with the platform `bmgr` path on every target.
+  Device-to-device transfer was not repeated on each target; section 10 records
+  why the D2D transport was not available.
+
+### 22.6 Verification commands
+
+| Command | Result |
+| --- | --- |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-lint` | `BUILD SUCCESSFUL`; 439 actionable tasks. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-test` | `BUILD SUCCESSFUL`; 997 aggregated tests, 0 failures, 0 errors, 0 skipped. |
+| `ANDROID_HOME=$HOME/Android/Sdk make android-assemble` | `BUILD SUCCESSFUL`; debug APK produced. |
+| `cd android && ANDROID_HOME=$HOME/Android/Sdk ./gradlew :app:connectedDebugAndroidTest` | Pass on the phone emulator (section 21 record). |
+| `adb shell bmgr backupnow dev.chatui` on each target | `Backup is not allowed` on all six. |
+| `adb shell am kill --user 0 dev.chatui` mid-stream on each target | `pidof` empty; relaunch showed partial content and the interruption notice on all six. |
+| `adb shell am start -W -a android.intent.action.VIEW -d chatui://chat/<id>` | Cold start crashed on all six. |
+
+### 22.7 Redaction
+
+No API key, real prompt, conversation content, personal data, or signing
+material is recorded in this section. Provider keys were the synthetic
+`synthetic-placeholder-key`; prompts and streamed text were synthetic; the
+image was a generated gradient; the text file was one synthetic line. The
+device matrix records hardware/emulator identifiers and test outcomes only.
 
