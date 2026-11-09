@@ -48,7 +48,7 @@ If an entry criterion is not met, record it as a blocker in `M4-00.1`; do not si
 | --- | --- | --- | --- | --- | --- |
 | 1 | [M4-00.1 Release scope, decisions, and baseline preflight](M4-00.1-preflight-baseline.md) | Complete | none | preflight | none; blocks all |
 | 2 | [M4-01.1 Accessibility and UX polish across enabled clients](M4-01.1-accessibility-ux-polish.md) | Blocked | M4-00.1 | accessibility | M4-02.1 |
-| 3 | [M4-02.1 Web PWA, service worker, offline, and update flow](M4-02.1-web-pwa-offline.md) | Not started | M4-00.1 | pwa | M4-01.1 |
+| 3 | [M4-02.1 Web PWA, service worker, offline, and update flow](M4-02.1-web-pwa-offline.md) | Blocked | M4-00.1 | pwa | M4-01.1 |
 | 4 | [M4-03.1 Performance optimization and budget measurement](M4-03.1-performance-budgets.md) | Not started | M4-01.1, M4-02.1 | performance | M4-04.1 |
 | 5 | [M4-04.1 Web deployment artifacts, container, headers, and recipes](M4-04.1-web-deployment.md) | Not started | M4-02.1 | deployment | M4-03.1 |
 | 6 | [M4-05.1 CI/CD release pipelines, signing, artifacts, versioning, and notes](M4-05.1-cicd-release.md) | Not started | M4-03.1, M4-04.1 | release-engineering | none; needs measurement and deploy targets |
