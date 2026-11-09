@@ -2,8 +2,8 @@
 
 - Source plan: [M4 Polish and release](../../milestones/M4-polish-and-release.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: Planned
-- Last updated: 2026-11-09
+- Status: Blocked - M3 exit gate not met (`M3-07.3`, `M3-07.4`, `M3-07.5` are `Not started`); see [M4-baseline.md](M4-baseline.md)
+- Last updated: 2026-11-10
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete` and the milestone entry criteria are met.
 - Scope: verification, polish, packaging, deployment, and evidence for the phase 1 release. M4 does **not** add new product features.
 - Platform rule: web and Android are required. Rust desktop work is conditional on the release decision recorded in `M4-00.1`.
@@ -46,7 +46,7 @@ If an entry criterion is not met, record it as a blocker in `M4-00.1`; do not si
 
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [M4-00.1 Release scope, decisions, and baseline preflight](M4-00.1-preflight-baseline.md) | Not started | none | preflight | none; blocks all |
+| 1 | [M4-00.1 Release scope, decisions, and baseline preflight](M4-00.1-preflight-baseline.md) | Complete | none | preflight | none; blocks all |
 | 2 | [M4-01.1 Accessibility and UX polish across enabled clients](M4-01.1-accessibility-ux-polish.md) | Not started | M4-00.1 | accessibility | M4-02.1 |
 | 3 | [M4-02.1 Web PWA, service worker, offline, and update flow](M4-02.1-web-pwa-offline.md) | Not started | M4-00.1 | pwa | M4-01.1 |
 | 4 | [M4-03.1 Performance optimization and budget measurement](M4-03.1-performance-budgets.md) | Not started | M4-01.1, M4-02.1 | performance | M4-04.1 |
