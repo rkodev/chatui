@@ -5,10 +5,7 @@ import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import type { Plugin, ResolvedConfig } from 'vite'
 import { defineConfig } from 'vitest/config'
-import {
-  CACHE_NAME_PREFIX,
-  filterPrecacheEntries,
-} from './src/platform/pwa/cachePolicy.ts'
+import { CACHE_NAME_PREFIX, filterPrecacheEntries } from './src/platform/pwa/cachePolicy.ts'
 import { createServiceWorkerSource } from './src/platform/pwa/serviceWorkerSource.ts'
 
 // Provider presets are imported from the repository contracts tree, which sits
@@ -88,5 +85,12 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     restoreMocks: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.{test,spec}.{ts,tsx}', 'src/test/**', 'src/**/*.d.ts'],
+    },
   },
 })

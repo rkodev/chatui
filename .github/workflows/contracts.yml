@@ -1,10 +1,16 @@
 name: Contracts
 
+# The shared validator is the contract conformance gate for every enabled
+# client. It compiles the JSON Schemas, validates every fixture (including the
+# OpenRouter stream/error fixtures), checks the parity file, and fails on any
+# schema, fixture, or parity mismatch. Web and Android consume the same fixtures
+# in their own workflows; Rust is post-preview / parallel (DEC-M4-01).
 "on":
   pull_request:
   push:
     branches:
       - dev
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,5 +38,5 @@ jobs:
       - name: Install contract validator dependencies
         run: npm ci --prefix scripts
 
-      - name: Validate contracts
+      - name: Validate schemas, fixtures, and parity
         run: make contracts-check

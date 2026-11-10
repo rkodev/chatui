@@ -21,7 +21,7 @@ name: Android Release
         default: false
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: android-release-${{ github.ref }}
@@ -32,6 +32,8 @@ jobs:
     name: Signed release
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -104,7 +106,7 @@ jobs:
           ANDROID_VERSION_NAME: ${{ inputs.version_name }}
         run: |
           cd android
-          ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
+          ./gradlew --no-daemon :app:lintRelease :app:assembleRelease :app:bundleRelease
 
       - name: Generate SHA-256 checksums
         run: |
@@ -119,7 +121,12 @@ jobs:
             echo "::error::Release APK is unsigned; refusing to publish it."
             exit 1
           fi
-          sha256sum "$apk" "$aab" > android/app/build/outputs/checksums.txt
+          mapping="android/app/build/outputs/mapping/release/mapping.txt"
+          if [ ! -f "$mapping" ]; then
+            echo "::error::Expected a release mapping file at $mapping."
+            exit 1
+          fi
+          sha256sum "$apk" "$aab" "$mapping" > android/app/build/outputs/checksums.txt
           cat android/app/build/outputs/checksums.txt
 
       - name: Upload signed APK
@@ -197,6 +204,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.run_connected_tests
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
