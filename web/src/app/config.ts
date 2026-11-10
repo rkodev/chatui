@@ -137,8 +137,9 @@ export function validateConfigPresets(
 /**
  * Fetch and validate the public runtime configuration.
  *
- * The request uses a no-cache policy so a redeployed `config.json` is picked up
- * without relying on the browser cache. Any failure throws `ConfigError`.
+ * The request uses a `no-store` policy so a redeployed `config.json` is picked
+ * up without relying on the browser or service-worker cache. Any failure throws
+ * `ConfigError`.
  */
 export async function loadConfig(
   fetchImpl: FetchLike = fetch,
@@ -147,7 +148,7 @@ export async function loadConfig(
   let response: Response
 
   try {
-    response = await fetchImpl('/config.json', { cache: 'no-cache' })
+    response = await fetchImpl('/config.json', { cache: 'no-store' })
   } catch (error) {
     throw new ConfigError(
       'Could not load /config.json. Check that the file is deployed and reachable.',

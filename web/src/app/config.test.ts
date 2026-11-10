@@ -72,11 +72,11 @@ describe('configSchema', () => {
 })
 
 describe('loadConfig', () => {
-  it('loads and validates config with a no-cache request', async () => {
+  it('loads and validates config with a no-store request', async () => {
     const fetchMock = vi.fn<FetchLike>(async () => fakeResponse(validConfig))
 
     await expect(loadConfig(fetchMock)).resolves.toEqual(validConfig)
-    expect(fetchMock).toHaveBeenCalledWith('/config.json', { cache: 'no-cache' })
+    expect(fetchMock).toHaveBeenCalledWith('/config.json', { cache: 'no-store' })
   })
 
   it('throws ConfigError when the request fails', async () => {
