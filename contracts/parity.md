@@ -38,6 +38,79 @@
 - Allowed platform values are `Required`, `Required (release blocker)`, `Required when enabled`, `Required on desktop`, `Future`, `N/A`, and the platform-specific persistence descriptions shown above.
 - Release is blocked if a feature is marked complete on one platform and absent on another without an approved exception recorded here.
 
+## Release status (0.1.0, 2026-11-10)
+
+This section is the `M4-06.1` release audit. The commitment table above is
+unchanged. Web and Android are the enabled clients; Rust is `Optional`
+(post-preview / parallel) per `M4-decisions.md` DEC-M4-01. Approved exceptions:
+**none** (DEC-M4-07). Full evidence is in
+[M4-verification.md](../docs/operations/M4/M4-verification.md).
+
+- **BYOK onboarding** - Web: Complete (`onboardingService.test.ts`,
+  `OnboardingScreen.test.tsx`, `e2e/onboarding.spec.ts`); Android: Complete
+  (`DefaultOnboardingServiceTest`, `OnboardingViewModelTest`); Rust: Optional
+  (post-preview / parallel).
+- **OpenRouter first-run onboarding** - Web: Complete
+  (`onboardingService.test.ts`, `e2e/onboarding.spec.ts`); Android: Complete
+  (`DefaultOnboardingServiceTest`, `OnboardingViewModelTest`); Rust: Optional.
+- **OpenRouter key introspection (`/key`)** - Web: Complete
+  (`onboardingService.test.ts`, M1 CORS matrix); Android: Complete
+  (`DefaultOnboardingServiceTest`, `OpenRouterAdapterTest`); Rust: Optional.
+- **OpenRouter catalog, pricing, modalities** - Web: Complete
+  (`openrouterCatalog.test.ts`); Android: Complete (`OpenRouterCatalogTest`);
+  Rust: Optional.
+- **OpenRouter streaming, reasoning, usage/cost** - Web: Complete
+  (`openrouter.test.ts`, `ChatRunner.test.ts`); Android: Complete
+  (`OpenRouterStreamingTest`, `ChatRunnerTest`); Rust: Optional.
+- **OpenRouter provider routing preferences** - Web: Complete
+  (`routing.test.ts`); Android: Complete (`RoutingTest`); Rust: Optional.
+- **OpenAI-compatible streaming** - Web: Complete
+  (`openaiCompatible.test.ts`); Android: Complete
+  (`OpenAICompatibleTransportTest`, `ProviderConformanceTest` case 11); Rust:
+  Optional.
+- **Anthropic streaming** - Web: Complete (`anthropic.test.ts`); Android:
+  Complete (`AnthropicAdapterTest`, `ProviderConformanceTest` case 12); Rust:
+  Optional.
+- **Gemini streaming** - Web: Complete (`gemini.test.ts`); Android: Complete
+  (`GeminiAdapterTest`, `ProviderConformanceTest` case 13); Rust: Optional.
+- **Ollama local** - Web: Complete (`ollama.test.ts`); Android: Complete
+  (`OllamaAdapterTest`, `ProviderConformanceTest` case 14); Rust: Optional.
+- **Model discovery and switching** - Web: Complete (`modelService.test.ts`,
+  `ConversationModelControl.test.tsx`); Android: Complete
+  (`ModelPickerViewModelTest`, `ProviderManagementServiceTest`); Rust: Optional.
+- **Conversation persistence** - Web: Complete (`repositories.test.ts`,
+  `migrations.test.ts`); Android: Complete (`PersistenceTest`, `MigrationTest`);
+  Rust: Optional.
+- **Search** - Web: Complete (`useConversationSearch.test.tsx`); Android:
+  Complete (`ConversationSearchTest`, `MessageFtsTest`); Rust: Optional.
+- **Markdown + code + math** - Web: Complete (`MarkdownRenderer.test.tsx`,
+  `CodeBlock.test.tsx`); Android: Complete (`ChatMarkdownTest`,
+  `ChatCodeBlockTest`; math is the documented raw-source fallback); Rust:
+  Optional.
+- **Attachments** - Web: Complete (`attachmentService.test.ts`,
+  `attachmentSupport.test.ts`); Android: Complete (`AttachmentServiceTest`,
+  `AttachmentSupportTest`); Rust: Optional.
+- **Export/import** - Web: Complete (`exportService.test.ts`,
+  `importService.test.ts`, `e2e/data.spec.ts`); Android: Complete
+  (`ExportServiceTest`, `ImportServiceTest`); Rust: Optional.
+- **Backup/sync** - Web: Future (not a phase 1 row); Android: Future (not a
+  phase 1 row); Rust: Future (not a phase 1 row).
+- **PWA install** - Web: Complete (`register.test.ts`, `e2e/pwa.spec.ts`,
+  `evidence/pwa/README.md`); Android: N/A; Rust: N/A.
+- **Native share target** - Web: N/A; Android: Complete
+  (`ExternalIntentIntakeTest`, `ShareTextParserTest`, M3 device evidence); Rust:
+  Optional.
+- **Desktop packaging (installer/AppImage)** - Web: N/A; Android: N/A; Rust:
+  Optional (post-preview / parallel); M3.5 packaging evidence exists but is not
+  released.
+- **Auto-update** - Web: N/A; Android: N/A; Rust: Optional (post-preview /
+  parallel); M3.5 update-signing evidence exists but is not released.
+
+Known limitations recorded by the audit: web case 23 has a manual code check
+rather than an automated 10,000-message test; case 28 shows the `Retry-After`
+delay as static copy rather than a ticking countdown; Android math uses the
+documented raw-source fallback. None is a release blocker.
+
 ## Implementation status (M1, 2026-11-04)
 
 M1 delivers OpenRouter-only BYOK chat on web and Android. This section records

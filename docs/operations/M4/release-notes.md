@@ -65,12 +65,23 @@ change to another.
   the internal testing track.
 - **Local model servers:** Ollama and other localhost providers require the
   user's own local server; the app does not bundle a model runtime.
+- **Web 10,000-message scroll:** the windowing path has a manual code check, not
+  an automated 10,000-message web test. Android has an automated equivalent.
+- **Retry delay display:** a `429` with `Retry-After` schedules the retry and
+  shows the delay as static copy (`Retry after Ns`); there is no ticking
+  countdown.
+- **Signed Android artifacts:** the signed APK/AAB are produced by the tag
+  pipeline and require the four signing secrets. A local environment without
+  those secrets can only produce unsigned release builds.
 
 ## Release blockers
 
-No release blockers are recorded for `0.1.0` as of this task. The final
-`M4-06.1` parity and release gate must re-verify that this list is empty before
-the tag is published.
+No release blockers are recorded for `0.1.0`. The `M4-06.1` parity and release
+gate passed on 2026-11-10 with no approved exceptions; the full audit is in
+[`M4-verification.md`](M4-verification.md). The signed Android artifacts and the
+GHCR image are produced by the tag pipeline documented in
+[`release.md`](release.md); no artifact is claimed as produced by the audit
+environment.
 
 ## Artifacts
 

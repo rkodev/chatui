@@ -2,7 +2,7 @@
 
 - Source plan: [M4 Polish and release](../../milestones/M4-polish-and-release.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: In progress - `M4-01.1`, `M4-02.1`, `M4-03.1`, `M4-04.1`, and `M4-05.1` are complete; `M4-06.1` is ready to start
+- Status: Complete - all M4 tasks are complete; the phase 1 release gate passed on 2026-11-10
 - Last updated: 2026-11-10
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete` and the milestone entry criteria are met.
 - Scope: verification, polish, packaging, deployment, and evidence for the phase 1 release. M4 does **not** add new product features.
@@ -52,7 +52,7 @@ If an entry criterion is not met, record it as a blocker in `M4-00.1`; do not si
 | 4 | [M4-03.1 Performance optimization and budget measurement](M4-03.1-performance-budgets.md) | Complete | M4-01.1, M4-02.1 | performance | M4-04.1 |
 | 5 | [M4-04.1 Web deployment artifacts, container, headers, and recipes](M4-04.1-web-deployment.md) | Complete | M4-02.1 | deployment | M4-03.1 |
 | 6 | [M4-05.1 CI/CD release pipelines, signing, artifacts, versioning, and notes](M4-05.1-cicd-release.md) | Complete | M4-03.1, M4-04.1 | release-engineering | none; needs measurement and deploy targets |
-| 7 | [M4-06.1 Parity audit and phase 1 release gate](M4-06.1-parity-release-gate.md) | Not started | M4-01.1, M4-02.1, M4-03.1, M4-04.1, M4-05.1 | evidence | none; final gate |
+| 7 | [M4-06.1 Parity audit and phase 1 release gate](M4-06.1-parity-release-gate.md) | Complete | M4-01.1, M4-02.1, M4-03.1, M4-04.1, M4-05.1 | evidence | none; final gate |
 
 ## Conditional Rust work
 
