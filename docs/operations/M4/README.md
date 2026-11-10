@@ -2,7 +2,7 @@
 
 - Source plan: [M4 Polish and release](../../milestones/M4-polish-and-release.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: Not started - M3 exit gate met on 2026-11-10; `M4-01.1` and `M4-02.1` are ready to start
+- Status: In progress - `M4-01.1` is complete; `M4-02.1` is ready to start
 - Last updated: 2026-11-10
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete` and the milestone entry criteria are met.
 - Scope: verification, polish, packaging, deployment, and evidence for the phase 1 release. M4 does **not** add new product features.
@@ -47,7 +47,7 @@ If an entry criterion is not met, record it as a blocker in `M4-00.1`; do not si
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | [M4-00.1 Release scope, decisions, and baseline preflight](M4-00.1-preflight-baseline.md) | Complete | none | preflight | none; blocks all |
-| 2 | [M4-01.1 Accessibility and UX polish across enabled clients](M4-01.1-accessibility-ux-polish.md) | Not started | M4-00.1 | accessibility | M4-02.1 |
+| 2 | [M4-01.1 Accessibility and UX polish across enabled clients](M4-01.1-accessibility-ux-polish.md) | Complete | M4-00.1 | accessibility | M4-02.1 |
 | 3 | [M4-02.1 Web PWA, service worker, offline, and update flow](M4-02.1-web-pwa-offline.md) | Not started | M4-00.1 | pwa | M4-01.1 |
 | 4 | [M4-03.1 Performance optimization and budget measurement](M4-03.1-performance-budgets.md) | Not started | M4-01.1, M4-02.1 | performance | M4-04.1 |
 | 5 | [M4-04.1 Web deployment artifacts, container, headers, and recipes](M4-04.1-web-deployment.md) | Not started | M4-02.1 | deployment | M4-03.1 |

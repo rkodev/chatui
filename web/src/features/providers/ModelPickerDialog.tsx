@@ -34,6 +34,8 @@ export interface ModelPickerDialogProps {
   onManage?: () => void
   title?: string
   includeHidden?: boolean
+  /** Optional focus target restored when the dialog closes. */
+  onCloseAutoFocus?: (event: Event) => void
 }
 
 function errorMessage(cause: unknown): string {
@@ -92,6 +94,7 @@ export function ModelPickerDialog({
   onManage,
   title = 'Choose a model',
   includeHidden = false,
+  onCloseAutoFocus,
 }: ModelPickerDialogProps) {
   const [query, setQuery] = useState('')
   const [manualRemoteId, setManualRemoteId] = useState('')
@@ -153,7 +156,7 @@ export function ModelPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="model-picker">
+      <DialogContent className="model-picker" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>
           Search models, pin favourites, and review context, modalities, and price per

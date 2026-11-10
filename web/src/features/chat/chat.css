@@ -75,9 +75,12 @@
 
 .chat-screen__body {
   display: flex;
+  width: 100%;
+  max-width: 48rem;
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  margin-inline: auto;
 }
 
 .chat-screen__empty {
@@ -103,7 +106,10 @@
 }
 
 .chat-screen__composer {
+  width: 100%;
+  max-width: 48rem;
   min-height: var(--density-control-height);
+  margin-inline: auto;
 }
 
 .message-list {

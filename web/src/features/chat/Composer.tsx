@@ -139,6 +139,20 @@ export function Composer({ session }: ComposerProps) {
   }, [draft])
 
   useEffect(() => {
+    const handleStopRequest = () => {
+      if (isStreaming) {
+        void session.cancel()
+      }
+    }
+
+    window.addEventListener('chatui:stop-streaming', handleStopRequest)
+
+    return () => {
+      window.removeEventListener('chatui:stop-streaming', handleStopRequest)
+    }
+  }, [isStreaming, session])
+
+  useEffect(() => {
     if (previousConversationId.current === conversationId) {
       return
     }

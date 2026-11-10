@@ -86,6 +86,7 @@ function MessageItemComponent({
       className={`message message--${message.role}`}
       data-role={message.role}
       data-status={message.status}
+      data-message-text={text.join('\n\n')}
       aria-label={`${roleLabel} message`}
     >
       <header className="message__header">

@@ -67,6 +67,23 @@ describe('MessageItem', () => {
     expect(onRetry).toHaveBeenCalledWith(message)
   })
 
+  it('exposes response text for the copy-last-response shortcut', () => {
+    const message = createTestMessage({
+      role: 'assistant',
+      parts: [
+        { type: 'text', text: 'First paragraph' },
+        { type: 'text', text: 'Second paragraph' },
+      ],
+    })
+
+    render(<MessageItem message={message} showTokenUsage={false} />)
+
+    expect(screen.getByRole('article', { name: 'Assistant message' })).toHaveAttribute(
+      'data-message-text',
+      'First paragraph\n\nSecond paragraph',
+    )
+  })
+
   it('renders cancelled and interrupted states', () => {
     const cancelled = createTestMessage({ status: 'cancelled' })
     const { rerender } = render(<MessageItem message={cancelled} showTokenUsage={false} />)

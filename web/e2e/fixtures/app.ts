@@ -111,7 +111,7 @@ export async function deleteConversation(page: Page, title: string): Promise<voi
 }
 
 export async function newChat(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'New chat' }).click()
+  await page.getByRole('button', { name: 'New chat', exact: true }).click()
   await expect(page).toHaveURL(/\/chat\/[^/]+$/u)
 }
 
