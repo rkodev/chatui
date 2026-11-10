@@ -1,0 +1,16 @@
+# Cloudflare Pages headers
+#
+# Copy this file to the build output root as `_headers` (or configure the same
+# rules in the Pages dashboard). Cloudflare Pages applies every matching rule;
+# the more specific `/assets/*` rule overrides the shell cache policy.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cross-Origin-Opener-Policy: same-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
