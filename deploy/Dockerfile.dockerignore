@@ -1,0 +1,15 @@
+# Keep the build context small and deterministic. This file is associated with
+# deploy/Dockerfile, so it applies when building from the repository root.
+.git
+.gitignore
+**/node_modules
+**/.pnpm-store
+web/dist
+web/playwright-report
+web/test-results
+web/coverage
+android
+rust
+docs
+scripts
+*.md

@@ -5,7 +5,8 @@ ANDROID_DIR := android
 RUST_DIR := rust
 
 .PHONY: help contracts-install contracts-check \
-	web-install web-dev web-lint web-typecheck web-test web-build web-e2e \
+	web-install web-dev web-lint web-typecheck web-test web-test-coverage web-build web-e2e \
+	web-container release-check \
 	android-test android-lint android-assemble \
 	android-test-ui android-screenshot android-release android-baseline-profile \
 	rust-check rust-lint rust-test rust-build rust-run \
@@ -31,8 +32,10 @@ help:
 		'  make web-lint            Run ESLint' \
 		'  make web-typecheck       Run TypeScript checks' \
 		'  make web-test            Run unit and component tests' \
+		'  make web-test-coverage   Run unit tests with V8 coverage (writes web/coverage)' \
 		'  make web-build           Build the production web bundle' \
 		'  make web-e2e             Run Playwright end-to-end tests' \
+		'  make web-container       Build the static web container image locally' \
 		'' \
 		'Android:' \
 		'  make android-test        Run Android unit tests' \
@@ -56,6 +59,9 @@ help:
 		'  make rust-conformance    Run the chatui-conformance test package' \
 		'  make rust-ui-test        Run the chatui-ui test package' \
 		'  make rust-package        Run the desktop packaging command (configured in M3.5-11.2)' \
+		'' \
+		'Release:' \
+		'  make release-check       Run the required web and Android release gates locally' \
 		'' \
 		'Meta:' \
 		'  make format              Format web and Rust sources' \
@@ -91,6 +97,10 @@ web-test:
 	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	pnpm --dir $(WEB_DIR) test
 
+web-test-coverage:
+	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/milestones/M0-foundations.md).)
+	pnpm --dir $(WEB_DIR) exec vitest run --coverage
+
 web-build:
 	$(call require_file,$(WEB_DIR)/package.json,Web scaffold is not present yet (see docs/milestones/M0-foundations.md).)
 	pnpm --dir $(WEB_DIR) build
@@ -98,6 +108,13 @@ web-build:
 web-e2e:
 	$(call require_file,$(WEB_DIR)/package.json,Web end-to-end setup is not present yet (see docs/milestones/M2-providers-and-content.md).)
 	pnpm --dir $(WEB_DIR) exec playwright test
+
+web-container:
+	$(call require_file,deploy/Dockerfile,Web deployment container is not present yet (see docs/operations/M4/deployment.md).)
+	docker build -f deploy/Dockerfile -t chatui-web:local .
+
+release-check: contracts-check web-lint web-typecheck web-test-coverage web-build web-e2e android-lint android-test android-assemble
+	@echo "Required web and Android release gates passed. Rust desktop is post-preview / parallel and is not part of this release."
 
 android-test:
 	$(call require_file,$(ANDROID_DIR)/gradlew,Android scaffold is not present yet (see docs/milestones/M0-foundations.md).)

@@ -1,5 +1,9 @@
 name: Rust release
 
+# Rust desktop is post-preview / parallel for the phase 1 preview (DEC-M4-01).
+# This workflow is not a phase 1 release deliverable and its signing secrets are
+# not required for the web/Android 0.1.0 release. See
+# docs/operations/M4/release.md.
 "on":
   push:
     tags:

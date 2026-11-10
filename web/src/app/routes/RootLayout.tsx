@@ -1,12 +1,18 @@
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
+import { lazy, Suspense } from 'react'
 import { useSidebarStore } from '../stores'
 import { Button } from '../../ui/primitives'
-import {
-  ConversationHistoryProvider,
-  ConversationSidebarContainer,
-  conversationIdFromPathname,
-} from '../../features/conversations'
-import { SettingsProvider } from '../../features/settings'
+import { ConversationHistoryProvider } from '../../features/conversations/ConversationHistoryProvider'
+import { conversationIdFromPathname } from '../../features/conversations/routeConversationId'
+import { SettingsProvider } from '../../features/settings/SettingsProvider'
+
+// The history sidebar is not part of the first paint. Loading it on demand
+// keeps conversation list/search code out of the initial entry chunk.
+const ConversationSidebarContainer = lazy(() =>
+  import('../../features/conversations/ConversationSidebarContainer').then((module) => ({
+    default: module.ConversationSidebarContainer,
+  })),
+)
 
 function RootLayoutContent() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
@@ -35,7 +41,9 @@ function RootLayoutContent() {
         </div>
       </header>
       <div className="app-shell__body">
-        <ConversationSidebarContainer activeConversationId={activeConversationId} />
+        <Suspense fallback={null}>
+          <ConversationSidebarContainer activeConversationId={activeConversationId} />
+        </Suspense>
         <main className="app-shell__main">
           <Outlet />
         </main>

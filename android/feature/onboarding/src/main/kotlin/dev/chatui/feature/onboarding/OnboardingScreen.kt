@@ -194,8 +194,8 @@ private fun WelcomeSection() {
                 "stay on this device. Nothing is sent to a ChatUI server.",
         )
         Text(
-            text = "OpenRouter is recommended for this preview. Other providers " +
-                "are visible below but are coming later.",
+            text = "OpenRouter is recommended for this preview. You can add " +
+                "other providers from Providers after setup.",
         )
     }
 }

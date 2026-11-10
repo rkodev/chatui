@@ -352,7 +352,12 @@
   font-weight: 600;
 }
 
-@media (max-width: 768px) {
+/*
+ * Section 11.9 breakpoints: below 840 px the sidebar is a collapsible drawer
+ * (mobile < 600 px and compact desktop 600-839 px). At 840 px and above it is
+ * persistent.
+ */
+@media (max-width: 839px) {
   .app-shell__menu {
     display: inline-flex;
   }

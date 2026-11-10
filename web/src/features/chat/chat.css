@@ -75,9 +75,12 @@
 
 .chat-screen__body {
   display: flex;
+  width: 100%;
+  max-width: 48rem;
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  margin-inline: auto;
 }
 
 .chat-screen__empty {
@@ -103,7 +106,10 @@
 }
 
 .chat-screen__composer {
+  width: 100%;
+  max-width: 48rem;
   min-height: var(--density-control-height);
+  margin-inline: auto;
 }
 
 .message-list {
@@ -451,13 +457,20 @@
 }
 
 .markdown__image {
-  display: inline-block;
+  display: block;
+  width: min(100%, 40rem);
   max-width: 100%;
+  /* Reserve a stable box before the remote image loads. Images that declare
+     width/height override this with an exact inline aspect-ratio. */
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
 }
 
 .markdown__image img {
+  width: 100%;
+  height: 100%;
   max-width: 100%;
-  height: auto;
+  object-fit: contain;
   border-radius: var(--radius-md);
 }
 

@@ -3,26 +3,62 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router'
-import { ChatRoute, ConversationSettingsRoute } from '../features/chat'
-import { HomeRoute, OnboardingRoute } from '../features/onboarding'
-import {
-  AboutSettingsScreen,
-  AppearanceSettingsScreen,
-  BackupSettingsScreen,
-  ChatSettingsRoute,
-  DataSettingsScreen,
-  ModelsSettingsRoute,
-  SettingsLayout,
-} from '../features/settings'
+import { SettingsLayout } from '../features/settings/SettingsLayout'
 import { RootLayout } from './routes/RootLayout'
-import {
-  NotFoundPlaceholder,
-  SettingsProviderDetailPlaceholder,
-  SettingsProvidersPlaceholder,
-} from './routes/placeholders'
+import { NotFoundPlaceholder } from './routes/placeholders'
+
+// Route components are loaded on demand so the initial entry chunk only ships
+// the shell. Settings, provider management, onboarding, and the chat view each
+// live in their own chunk and are fetched when their route is first visited.
+const HomeRoute = lazyRouteComponent(
+  () => import('../features/onboarding/OnboardingRoute'),
+  'HomeRoute',
+)
+const OnboardingRoute = lazyRouteComponent(
+  () => import('../features/onboarding/OnboardingRoute'),
+  'OnboardingRoute',
+)
+const ChatRoute = lazyRouteComponent(() => import('../features/chat/ChatRoute'), 'ChatRoute')
+const ConversationSettingsRoute = lazyRouteComponent(
+  () => import('../features/chat/ConversationSettingsRoute'),
+  'ConversationSettingsRoute',
+)
+const AppearanceSettingsScreen = lazyRouteComponent(
+  () => import('../features/settings/AppearanceSettingsScreen'),
+  'AppearanceSettingsScreen',
+)
+const ChatSettingsRoute = lazyRouteComponent(
+  () => import('../features/settings/ChatSettingsScreen'),
+  'ChatSettingsRoute',
+)
+const ModelsSettingsRoute = lazyRouteComponent(
+  () => import('../features/settings/ModelsSettingsScreen'),
+  'ModelsSettingsRoute',
+)
+const DataSettingsScreen = lazyRouteComponent(
+  () => import('../features/settings/DataSettingsScreen'),
+  'DataSettingsScreen',
+)
+const BackupSettingsScreen = lazyRouteComponent(
+  () => import('../features/settings/BackupSettingsScreen'),
+  'BackupSettingsScreen',
+)
+const AboutSettingsScreen = lazyRouteComponent(
+  () => import('../features/settings/AboutSettingsScreen'),
+  'AboutSettingsScreen',
+)
+const ProvidersSettingsRoute = lazyRouteComponent(
+  () => import('../features/providers/ProviderRoutes'),
+  'ProvidersSettingsRoute',
+)
+const ProviderDetailRoute = lazyRouteComponent(
+  () => import('../features/providers/ProviderRoutes'),
+  'ProviderDetailRoute',
+)
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -81,7 +117,7 @@ const settingsProvidersRoute = createRoute({
 const settingsProvidersIndexRoute = createRoute({
   getParentRoute: () => settingsProvidersRoute,
   path: '/',
-  component: SettingsProvidersPlaceholder,
+  component: ProvidersSettingsRoute,
 })
 
 const settingsProviderNewRoute = createRoute({
@@ -93,7 +129,7 @@ const settingsProviderNewRoute = createRoute({
 const settingsProviderDetailRoute = createRoute({
   getParentRoute: () => settingsProvidersRoute,
   path: '$providerId',
-  component: SettingsProviderDetailPlaceholder,
+  component: ProviderDetailRoute,
 })
 
 const settingsModelsRoute = createRoute({

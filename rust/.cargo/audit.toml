@@ -8,4 +8,10 @@
 # `rsa` crate is only reachable through the optional `sqlx-mysql` driver; the
 # desktop client enables only sqlx's `sqlite` feature, so `rsa` is never built
 # or linked. Revisit when sqlx updates or drops the dependency.
-ignore = ["RUSTSEC-2023-0071"]
+#
+# RUSTSEC-2026-0459 (CVE-2026-119375, bundled SQLite page-cache disclosure):
+# sqlx 0.8.6 pins `libsqlite3-sys` to `0.30.x`, so the patched 0.39.x release
+# cannot be selected yet. Upstream has relaxed the bound on `main` (sqlx PR
+# #4502) but has not published a release. Remove this exception once a sqlx
+# release allows `libsqlite3-sys >=0.39.0`. Follow-up owner: dependency policy.
+ignore = ["RUSTSEC-2023-0071", "RUSTSEC-2026-0459"]

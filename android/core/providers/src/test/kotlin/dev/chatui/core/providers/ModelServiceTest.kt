@@ -64,6 +64,7 @@ class ModelServiceTest {
         service = ModelService(
             providers = providerRepository,
             models = modelRepository,
+            secrets = secretStore,
             gateway = gateway,
             registry = registry,
             clock = clock,
@@ -97,6 +98,40 @@ class ModelServiceTest {
         assertThat(stored.map { it.source }.toSet()).containsExactly(ModelSource.DISCOVERED)
         assertThat(stored.map { it.hidden }.toSet()).containsExactly(false)
         assertThat(stored.map { it.pinned }.toSet()).containsExactly(false)
+    }
+
+    @Test
+    fun `refreshModels passes the stored key for a key-protected catalog`() = runTest {
+        val provider = createPresetProvider("anthropic")
+        gateway.models = listOf(modelInfo("claude-sonnet-4-5"))
+
+        service.refreshModels(provider.id)
+
+        assertThat(gateway.lastContext?.apiKey).isEqualTo("sk-test-secret-key")
+        assertThat(gateway.lastContext?.provider?.id).isEqualTo(provider.id)
+    }
+
+    @Test
+    fun `refreshModels keeps public OpenRouter discovery keyless`() = runTest {
+        val provider = createProvider()
+        gateway.models = listOf(modelInfo("openrouter/auto"))
+
+        service.refreshModels(provider.id)
+
+        assertThat(gateway.lastContext?.apiKey).isNull()
+    }
+
+    @Test
+    fun `refreshModels degrades when a key-protected catalog has no stored key`() = runTest {
+        val provider = createPresetProvider("anthropic")
+        providerService.removeKey(provider.id)
+        gateway.listError = IllegalStateException("unauthorized")
+
+        val result = service.refreshModels(provider.id)
+
+        assertThat(gateway.lastContext?.apiKey).isNull()
+        assertThat(result.degraded).isTrue()
+        assertThat(result.refreshError).isInstanceOf(IllegalStateException::class.java)
     }
 
     @Test

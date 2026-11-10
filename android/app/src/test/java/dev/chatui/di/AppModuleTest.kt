@@ -210,6 +210,7 @@ class AppModuleTest {
             AppModule.provideModelService(
                 providers = providerRepository,
                 models = modelRepository,
+                secrets = secretStore,
                 gateway = gateway,
                 registry = registry,
                 clock = clock,

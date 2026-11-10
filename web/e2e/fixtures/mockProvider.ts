@@ -176,7 +176,7 @@ function sseEvent(payload: unknown): string {
 
 function successBody(scenario: Extract<ChatScenario, { type: 'success' }>): string {
   const text = scenario.text ?? 'Hello from the mock provider.'
-  const chunks = text.match(/.{1,8}/gu) ?? [text]
+  const chunks = text.match(/.{1,8}/gsu) ?? [text]
   const events: string[] = [': OPENROUTER PROCESSING\n\n']
 
   events.push(

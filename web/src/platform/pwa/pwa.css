@@ -1,0 +1,49 @@
+.pwa-update {
+  position: fixed;
+  inset-inline: 1rem;
+  bottom: 1rem;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  max-width: 40rem;
+  margin-inline: auto;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.75rem;
+  background: var(--color-bg-surface-raised);
+  color: var(--color-fg-primary);
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 18%);
+}
+
+.pwa-update__message {
+  margin: 0;
+  flex: 1 1 14rem;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.pwa-update__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pwa-update {
+    animation: pwa-update-enter var(--motion-duration-normal) var(--motion-easing-standard);
+  }
+}
+
+@keyframes pwa-update-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

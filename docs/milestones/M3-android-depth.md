@@ -1,6 +1,6 @@
 # M3 - Android depth
 
-- Status: Planned
+- Status: Complete
 - Target: 2 weeks
 - Depends on: M2
 - Blocks: M4

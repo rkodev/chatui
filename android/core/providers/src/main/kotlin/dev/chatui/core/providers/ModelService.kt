@@ -2,6 +2,7 @@ package dev.chatui.core.providers
 
 import dev.chatui.core.database.repository.ModelRepository
 import dev.chatui.core.database.repository.ProviderRepository
+import dev.chatui.core.datastore.secret.SecretStore
 import dev.chatui.core.model.Model
 import dev.chatui.core.model.ModelSource
 import dev.chatui.core.model.Provider
@@ -31,6 +32,7 @@ import kotlinx.serialization.json.put
 class ModelService(
     private val providers: ProviderRepository,
     private val models: ModelRepository,
+    private val secrets: SecretStore,
     private val gateway: ProviderGateway,
     private val registry: ProviderRegistry,
     private val clock: Clock = Clock.systemUTC(),
@@ -47,11 +49,19 @@ class ModelService(
     suspend fun refreshModels(providerId: String): RefreshModelsResult {
         val provider = requireProvider(providerId)
         val preset = registry.getPreset(provider.presetId)
-        // The OpenRouter catalog is public. Discovery must work before a key
-        // is validated, so the adapter receives no key.
+        // Public catalogs (OpenRouter and the local presets) must work before
+        // a key is validated, so they receive no key. Key-protected catalogs
+        // (Anthropic, Gemini, and the hosted OpenAI-compatible presets) use
+        // the stored key when one exists; a missing key still degrades to the
+        // cached or fallback catalog instead of failing the refresh.
+        val apiKey = if (preset?.modelDiscovery?.public == false) {
+            provider.secretId?.let { secrets.get(it) }
+        } else {
+            null
+        }
         val infos = try {
             gateway.listModels(
-                ProviderContext(provider, apiKey = null),
+                ProviderContext(provider, apiKey = apiKey),
                 forceRefresh = true,
             )
         } catch (error: CancellationException) {

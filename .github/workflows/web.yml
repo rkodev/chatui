@@ -5,19 +5,23 @@ name: Web
   push:
     branches:
       - dev
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: web-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a tag release halfway through publishing the container.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   web:
     name: Web gates
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -55,13 +59,24 @@ jobs:
         working-directory: web
         run: pnpm typecheck
 
-      - name: Test
+      - name: Test with coverage
         working-directory: web
-        run: pnpm test
+        run: pnpm exec vitest run --coverage
 
       - name: Build
         working-directory: web
         run: pnpm build
+
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+].*)?$ ]]; then
+            echo "::error::Release tag must be vMAJOR.MINOR.PATCH (got ${GITHUB_REF_NAME})."
+            exit 1
+          fi
+          echo "Release version: $version"
 
       - name: Install Playwright browsers
         working-directory: web
@@ -70,6 +85,15 @@ jobs:
       - name: End-to-end tests
         working-directory: web
         run: pnpm exec playwright test
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-coverage
+          path: web/coverage
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Upload Playwright report
         if: failure()
@@ -87,3 +111,52 @@ jobs:
           path: web/dist
           retention-days: 7
           if-no-files-found: error
+
+  container:
+    name: Publish web container
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set lowercase image name
+        id: image
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push container
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

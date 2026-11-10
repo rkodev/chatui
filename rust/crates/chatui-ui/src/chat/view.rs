@@ -1495,6 +1495,14 @@ mod tests {
             .invoke_text_changed("Hi".into());
         harness.controller.send();
         wait_for_rows(&harness.controller, 2);
+        wait_until(&harness.controller, |_| {
+            let rows = harness.controller.messages_window().get_rows();
+            rows.row_count() == 2
+                && rows
+                    .row_data(1)
+                    .is_some_and(|row| row.markdown.as_str() == "Hello")
+                && !harness.controller.is_streaming()
+        });
 
         let messages = harness
             .runtime

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { ProviderRegistryProvider } from '../providers'
+import { PwaUpdatePrompt } from '../platform/pwa/PwaUpdatePrompt'
+import { ProviderRegistryProvider } from '../providers/ProviderRegistryProvider'
 import { ToastProvider } from '../ui/primitives'
 import { ThemeProvider } from '../ui/theme'
 import { useConfig } from './config'
@@ -19,7 +20,10 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <ProviderRegistryProvider>
       <ThemeProvider initialTheme={config.defaultTheme}>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          {children}
+          <PwaUpdatePrompt />
+        </ToastProvider>
       </ThemeProvider>
     </ProviderRegistryProvider>
   )

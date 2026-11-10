@@ -184,12 +184,14 @@ object AppModule {
     fun provideModelService(
         providers: ProviderRepository,
         models: ModelRepository,
+        secrets: SecretStore,
         gateway: ProviderGateway,
         registry: ProviderRegistry,
         clock: Clock,
     ): ModelService = ModelService(
         providers = providers,
         models = models,
+        secrets = secrets,
         gateway = gateway,
         registry = registry,
         clock = clock,

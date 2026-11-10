@@ -1,5 +1,9 @@
 name: Rust
 
+# Rust desktop is post-preview / parallel for the phase 1 preview (DEC-M4-01).
+# This workflow is not a phase 1 release deliverable; see
+# docs/operations/M4/release.md. It remains available for the parallel Rust
+# track and for the scheduled supply-chain checks.
 "on":
   pull_request:
   push:

@@ -1,0 +1,36 @@
+:80 {
+	root * /srv
+	encode zstd gzip
+
+	# Security headers from spec sections 8.6, 12.2, and 14.1. The CSP keeps
+	# `script-src 'self'` (no inline scripts) and allows only the provider
+	# origins and localhost development endpoints in `connect-src`.
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Cross-Origin-Opener-Policy same-origin
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+	}
+
+	# Hashed build output is content-addressed and safe to cache forever.
+	@immutable path /assets/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	# Everything else is either the app shell, runtime config, the service
+	# worker, or a deep route that falls back to index.html. Serve it no-cache
+	# so a redeploy is picked up immediately.
+	@noCache not path /assets/*
+	header @noCache Cache-Control "no-cache"
+
+	# `route` preserves this order: answer /healthz before the SPA fallback
+	# rewrites unknown paths to index.html.
+	route {
+		# Static liveness endpoint. It does not touch the filesystem or providers.
+		respond /healthz 200
+
+		# SPA fallback: unknown paths are rewritten to index.html and then served.
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Conversation, Model, Provider } from '../../domain'
 import { ModelChip } from './ModelChip'
 import { ModelPickerDialog } from './ModelPickerDialog'
@@ -33,6 +33,7 @@ export function ConversationModelControl({
   const [models, setModels] = useState<Model[]>([])
   const [providers, setProviders] = useState<Provider[]>([])
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -166,12 +167,14 @@ export function ConversationModelControl({
 
   return (
     <div className="conversation-model-control">
-      <ModelChip
-        label={label}
-        provider={provider}
-        warning={availability.message}
-        onClick={() => setOpen(true)}
-      />
+      <div ref={triggerRef}>
+        <ModelChip
+          label={label}
+          provider={provider}
+          warning={availability.message}
+          onClick={() => setOpen(true)}
+        />
+      </div>
       {availability.message && (
         <p className="model-picker__warning" role="status">
           {availability.message}
@@ -194,6 +197,10 @@ export function ConversationModelControl({
         onAddManual={handleAddManual}
         onRefresh={handleRefresh}
         title="Choose a model for this conversation"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          triggerRef.current?.querySelector('button')?.focus()
+        }}
       />
     </div>
   )
