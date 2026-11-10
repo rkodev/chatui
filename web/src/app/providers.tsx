@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { PwaUpdatePrompt } from '../platform/pwa/PwaUpdatePrompt'
-import { ProviderRegistryProvider } from '../providers'
+import { ProviderRegistryProvider } from '../providers/ProviderRegistryProvider'
 import { ToastProvider } from '../ui/primitives'
 import { ThemeProvider } from '../ui/theme'
 import { useConfig } from './config'

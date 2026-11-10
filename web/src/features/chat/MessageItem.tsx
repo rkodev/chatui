@@ -1,13 +1,19 @@
-import { memo } from 'react'
+import { lazy, memo, Suspense } from 'react'
 import type { ContentPart, Message, MessageRole, Usage } from '../../domain'
 import { formatUsd } from '../providers/format'
 import { MessageAttachments } from '../attachments'
 import { Button } from '../../ui/primitives'
 import { describeChatError } from './chatErrorCopy'
-import { MarkdownRenderer } from './MarkdownRenderer'
 import { MessageActions } from './MessageActions'
 import { messageItemPropsEqual, type MessageItemProps } from './messageItemProps'
 import './chat.css'
+
+// Markdown parsing and sanitizing are only needed once a message has text.
+// Keeping the renderer in its own chunk means routes without messages (and the
+// initial shell) never download react-markdown, remark, or rehype.
+const MarkdownRenderer = lazy(() =>
+  import('./MarkdownRenderer').then((module) => ({ default: module.MarkdownRenderer })),
+)
 
 const ROLE_LABELS: Record<MessageRole, string> = {
   system: 'System',
@@ -109,12 +115,20 @@ function MessageItemComponent({
         )}
 
         {text.map((part, index) => (
-          <MarkdownRenderer
+          <Suspense
             key={index}
-            markdown={part}
-            className="message__markdown"
-            loadRemoteImages={loadRemoteImages}
-          />
+            fallback={
+              <div className="markdown message__markdown" data-markdown-pending="true">
+                {part}
+              </div>
+            }
+          >
+            <MarkdownRenderer
+              markdown={part}
+              className="message__markdown"
+              loadRemoteImages={loadRemoteImages}
+            />
+          </Suspense>
         ))}
 
         <MessageAttachments parts={message.parts} />

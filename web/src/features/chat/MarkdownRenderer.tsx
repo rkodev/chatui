@@ -55,13 +55,21 @@ interface MarkdownImageProps extends ComponentPropsWithoutRef<'img'>, ExtraProps
   loadRemoteImages: boolean
 }
 
-function MarkdownImage({ src, alt, loadRemoteImages, node, ...props }: MarkdownImageProps) {
+function MarkdownImage({
+  src,
+  alt,
+  loadRemoteImages,
+  node,
+  width,
+  height,
+  ...props
+}: MarkdownImageProps) {
   void node
-  void props
 
   const [loadedHere, setLoadedHere] = useState(false)
   const safe = sanitizeImageUrl(src)
   const label = alt?.trim() || 'Remote image'
+  const hasDimensions = width !== undefined && height !== undefined
 
   if (safe === null) {
     return (
@@ -78,6 +86,10 @@ function MarkdownImage({ src, alt, loadRemoteImages, node, ...props }: MarkdownI
         <img
           src={safe}
           alt={alt ?? ''}
+          width={width}
+          height={height}
+          {...props}
+          style={hasDimensions ? { aspectRatio: `${width} / ${height}` } : undefined}
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"

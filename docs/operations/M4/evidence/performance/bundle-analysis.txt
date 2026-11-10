@@ -1,0 +1,74 @@
+Initial JS (entry + modulepreload) for the production build
+
+  133353  assets/index-C6EeZYKY.js
+   27164  assets/registry-DSfYFtXY.js
+   19514  assets/matchContext-CejdEUJE.js
+    3383  assets/jsx-runtime-Wy9s6hX0.js
+    2134  assets/link-Bda8jVZz.js
+    1035  assets/useMatch-Bb7W5NtW.js
+
+TOTAL gzip bytes: 186583
+TOTAL KiB: 182.2
+
+All JS chunks (gzip bytes):
+  133353  assets/index-C6EeZYKY.js
+   76974  assets/katex-BhzyR5At.js
+   55579  assets/cpp-Cts1PyIS.js
+   54979  assets/MarkdownRenderer-DVXFroDs.js
+   29659  assets/core-b0x9ptbS.js
+   28724  assets/php-WKlfgaoc.js
+   27164  assets/registry-DSfYFtXY.js
+   20138  assets/engine-javascript-C30F4iNc.js
+   19514  assets/matchContext-CejdEUJE.js
+   16595  assets/jsx-D3KKoC5L.js
+   16500  assets/javascript-BzbQS41l.js
+   16495  assets/tsx-BOvsFOI6.js
+   16027  assets/typescript-j_1H8WHN.js
+   15329  assets/ChatRoute-B5mqQiLv.js
+   14865  assets/DataSettingsScreen-BI-HSTU2.js
+   14826  assets/swift-CyEgAFGc.js
+   12424  assets/css-BGIxQoYs.js
+   11973  assets/ruby-CRPDaofT.js
+   11956  assets/providers-DfERnN-s.js
+   11684  assets/html-DSw1lh5G.js
+   10834  assets/csharp-dmMxLVLW.js
+   10496  assets/c-SSSlmE39.js
+    9124  assets/python-gzcpVVnB.js
+    7470  assets/sql-CNu3Or2W.js
+    6081  assets/shellscript-CqHdAlCp.js
+    5635  assets/markdown-BYOwaDjH.js
+    5504  assets/ConversationSidebarContainer-JBlwSbZc.js
+    5170  assets/go-rLFTqkRN.js
+    4254  assets/java-BtIQNnN0.js
+    4153  assets/OnboardingRoute-CKWxIX4C.js
+    3383  assets/jsx-runtime-Wy9s6hX0.js
+    2753  assets/ConversationSettingsRoute-Doh5hpBr.js
+    2722  assets/rust-DpiIf5JO.js
+    2547  assets/github-dark-C-LZuMrd.js
+    2262  assets/yaml-DijMHRDA.js
+    2134  assets/link-Bda8jVZz.js
+    2124  assets/kotlin-DhhofPvG.js
+    1275  assets/toml-CcmNWLt0.js
+    1208  assets/xml-WY0zc4PG.js
+    1035  assets/useMatch-Bb7W5NtW.js
+     869  assets/AboutSettingsScreen-C7aNHfTI.js
+     769  assets/AppearanceSettingsScreen-BOpDNsvJ.js
+     768  assets/json-B88Oqtu5.js
+     687  assets/diff-woXpYk--.js
+     520  assets/BackupSettingsScreen-CVLqg6Zu.js
+     324  assets/conversations-DjJBw-wf.js
+      72  assets/bash-CVTB3cr6.js
+      72  assets/shellscript-CVTB3cr6.js
+      71  assets/javascript-CpIGwZ_Y.js
+      71  assets/typescript-Bb1J8qyy.js
+      65  assets/html-BCy9P6D2.js
+      65  assets/java-_ATy9zCa.js
+      65  assets/json-C3WlssX3.js
+      65  assets/yaml-DDA_XMNu.js
+      64  assets/cpp-DzjeI0uH.js
+      64  assets/css-DgaLhXQH.js
+      64  assets/jsx-C4yDKi0A.js
+      64  assets/sql-CfM2IJm3.js
+      64  assets/tsx-CGosfAUg.js
+      64  assets/xml-DuKfbPI6.js
+      62  assets/c-Cz4nF6n_.js

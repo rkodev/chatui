@@ -156,7 +156,7 @@ describe('MessageItem', () => {
       />,
     )
 
-    expect(screen.getByText('bold').tagName).toBe('STRONG')
+    expect((await screen.findByText('bold')).tagName).toBe('STRONG')
 
     await user.click(screen.getByRole('button', { name: 'Regenerate response' }))
 
@@ -186,18 +186,22 @@ describe('MessageItem', () => {
     expect(answer).not.toHaveTextContent('internal step one')
   })
 
-  it('passes the remote-image setting through to the Markdown renderer', () => {
+  it('passes the remote-image setting through to the Markdown renderer', async () => {
     const message = createTestMessage({
       role: 'assistant',
       parts: [{ type: 'text', text: '![Diagram](https://example.com/diagram.png)' }],
     })
     const { container, rerender } = render(<MessageItem message={message} showTokenUsage={false} />)
 
+    expect(await screen.findByText('Remote images are blocked.')).toBeInTheDocument()
     expect(container.querySelector('img')).toBeNull()
 
     rerender(<MessageItem message={message} showTokenUsage={false} loadRemoteImages />)
 
-    expect(container.querySelector('img')).toHaveAttribute('src', 'https://example.com/diagram.png')
+    expect(await screen.findByRole('img', { name: 'Diagram' })).toHaveAttribute(
+      'src',
+      'https://example.com/diagram.png',
+    )
   })
 
   it('invalidates memoization when the remote-image setting changes', () => {

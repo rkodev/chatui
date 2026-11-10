@@ -1,5 +1,4 @@
-import { createHighlighterCore, type HighlighterCore } from 'shiki/core'
-import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
+import type { HighlighterCore } from 'shiki/core'
 import type { LanguageRegistration } from 'shiki/types'
 
 /**
@@ -155,11 +154,18 @@ let highlighterPromise: Promise<HighlighterCore | null> | null = null
  */
 export function loadHighlighter(): Promise<HighlighterCore | null> {
   if (highlighterPromise === null) {
-    highlighterPromise = createHighlighterCore({
-      themes: [() => import('shiki/themes/github-dark.mjs')],
-      langs: [],
-      engine: createJavaScriptRegexEngine(),
-    }).catch(() => null)
+    highlighterPromise = Promise.all([
+      import('shiki/core'),
+      import('shiki/engine/javascript'),
+    ])
+      .then(([core, engine]) =>
+        core.createHighlighterCore({
+          themes: [() => import('shiki/themes/github-dark.mjs')],
+          langs: [],
+          engine: engine.createJavaScriptRegexEngine(),
+        }),
+      )
+      .catch(() => null)
   }
 
   return highlighterPromise

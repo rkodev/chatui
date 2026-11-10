@@ -30,21 +30,6 @@ export function ChatPlaceholder() {
   )
 }
 
-export {
-  ProviderDetailRoute as SettingsProviderDetailPlaceholder,
-  ProvidersSettingsRoute as SettingsProvidersPlaceholder,
-} from '../../features/providers'
-export { ModelsSettingsRoute as SettingsModelsPlaceholder } from '../../features/settings'
-
-export function SettingsProviderNewPlaceholder() {
-  return (
-    <RoutePlaceholder
-      title="New provider placeholder"
-      description="Provider onboarding arrives in M1."
-    />
-  )
-}
-
 export function NotFoundPlaceholder() {
   return (
     <section className="route-placeholder" role="alert">
