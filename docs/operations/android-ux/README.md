@@ -3,7 +3,7 @@
 - Source plan: [Android UI/UX Polish Implementation Plan](../android-ux-implementation-plan.md)
 - Source design review: [android-ux.md](../../android-ux.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: Not started
+- Status: In progress
 - Last updated: 2026-11-11
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
 - Scope: Android-only visual, interaction, motion, feedback, and perceived-performance polish. No new product features, provider protocols, backup/sync, or localization.
@@ -35,7 +35,7 @@
 
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [UX-00 Preflight, decisions, and baseline capture](UX-00-preflight-decisions-baseline.md) | Not started | none | preflight | none; blocks all |
+| 1 | [UX-00 Preflight, decisions, and baseline capture](UX-00-preflight-decisions-baseline.md) | Complete | none | preflight | none; blocks all |
 | 2 | [UX-01 Design-system foundation](UX-01-design-system-foundation.md) | Not started | UX-00 | foundation | none; blocks screens |
 | 3 | [UX-02 Shell and navigation](UX-02-shell-and-navigation.md) | Not started | UX-01 | shell | UX-06, UX-07 |
 | 4 | [UX-03 Chat experience](UX-03-chat-experience.md) | Not started | UX-01, UX-02 | chat | UX-04, UX-05 |

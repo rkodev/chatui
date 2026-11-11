@@ -2,7 +2,7 @@
 
 - Plan: [Android UI/UX Polish Implementation Plan](../android-ux-implementation-plan.md)
 - Design review: [android-ux.md](../../android-ux.md)
-- Status: Not started
+- Status: Complete
 - Order: 1
 - Depends on: none
 - Parallel-safe: no; blocks all implementation
@@ -69,11 +69,11 @@ compared against it. This task produces no production code.
 
 ## Acceptance criteria
 
-- [ ] Every decision in the deliverables list is recorded with a chosen option.
-- [ ] The baseline note records test status, goldens, APK sizes, and the
+- [x] Every decision in the deliverables list is recorded with a chosen option.
+- [x] The baseline note records test status, goldens, APK sizes, and the
       text-assertion inventory.
-- [ ] The text-glyph and token-bypass inventory is complete with file paths.
-- [ ] No production code is changed by this task.
+- [x] The text-glyph and token-bypass inventory is complete with file paths.
+- [x] No production code is changed by this task.
 
 ## Verification
 
@@ -91,23 +91,76 @@ find android/app/src/test/screenshots -type f | sort
 
 | Decision | Chosen option | Rationale | Date |
 | --- | --- | --- | --- |
-| Compact navigation | _TBD_ | _TBD_ | _TBD_ |
-| Dynamic color default | _TBD_ | _TBD_ | _TBD_ |
-| Haptics default | _TBD_ | _TBD_ | _TBD_ |
-| Font strategy | _TBD_ | _TBD_ | _TBD_ |
-| Primitives location | _TBD_ | _TBD_ | _TBD_ |
+| Compact navigation | Sidebar-only; no bottom bar | Preserves the M3-00.2 decision and avoids re-litigating navigation. The drawer remains the compact entry point, and the sidebar header gains a prominent New chat action. | 2026-11-11 |
+| Dynamic color default | Off; opt-in via a setting | Keeps the brand palette consistent by default while offering Material You to users who want it. Status colors stay fixed. | 2026-11-11 |
+| Haptics default | On, with a setting to disable | Adds tactile confirmation on send/copy/save/delete without forcing it on users who dislike haptics. | 2026-11-11 |
+| Font strategy | System font first | Avoids bundling a font and APK growth; the new type ramp uses weights, sizes, and tracking to achieve the Apple-like hierarchy. A custom font can be revisited later. | 2026-11-11 |
+| Primitives location | Keep in `core:designsystem` | Avoids a new Gradle module and keeps the design system as the single shared UI dependency. | 2026-11-11 |
 
 ## Baseline note
 
 | Item | Value | Method |
 | --- | --- | --- |
-| Test status | _TBD_ | `make android-lint && make android-test` |
-| Golden files | _TBD_ | `find android/app/src/test/screenshots -type f` |
-| Cold start | _TBD_ | _TBD_ |
-| Debug APK size | _TBD_ | _TBD_ |
-| Release APK size | _TBD_ | _TBD_ |
+| Test status | Pass. `make android-lint` and `make android-test` both `BUILD SUCCESSFUL`. | `make android-lint && make android-test` |
+| Golden files | 44 files: 11 screens × phone/tablet × light/dark. Screens: chat_empty, chat_error, chat_streaming, conversation_list, data_settings, expanded_shell, model_picker, onboarding, provider_detail, provider_list, settings_root. | `find android/app/src/test/screenshots -type f` |
+| Cold start | Not measured; no device/emulator attached. | Deferred to UX-11. |
+| Debug APK size | 18,734,358 bytes (~17.9 MiB) | `ls -l android/app/build/outputs/apk/debug/app-debug.apk` |
+| Release APK size | 2,894,958 bytes (~2.8 MiB), unsigned | `ls -l android/app/build/outputs/apk/release/app-release-unsigned.apk` |
+| Release AAB size | 7,043,129 bytes (~6.7 MiB) | `ls -l android/app/build/outputs/bundle/release/app-release.aab` |
+
+### Text-glyph icon inventory
+
+| File | Line | Glyph | Replacement |
+| --- | --- | --- | --- |
+| `android/app/src/main/java/dev/chatui/shell/ChatUiApp.kt` | 308 | `☰` | `Icons.Rounded.Menu` |
+| `android/app/src/main/java/dev/chatui/shell/ChatUiApp.kt` | 322 | `⌨` | `Icons.Rounded.Keyboard` |
+| `android/feature/conversations/.../ConversationListScreen.kt` | 488 | `⋯` | `Icons.Rounded.MoreHoriz` |
+
+### Token-bypass inventory
+
+178 matches of `padding(24.dp)`, `padding(8.dp)`, or
+`MaterialTheme.typography` in `android/feature` and `android/app`. Highest
+concentrations:
+
+| File | Matches |
+| --- | --- |
+| `feature/settings/SettingsScreens.kt` | 32 |
+| `feature/settings/DataSettingsScreen.kt` | 27 |
+| `feature/providers/ProviderListScreen.kt` | 17 |
+| `feature/providers/ModelPickerSheet.kt` | 15 |
+| `feature/onboarding/OnboardingScreen.kt` | 15 |
+| `feature/chat/ChatMessageItem.kt` | 11 |
+| `feature/providers/ConversationSettingsSheet.kt` | 10 |
+| `feature/chat/ChatScreen.kt` | 8 |
+| `feature/conversations/ConversationListScreen.kt` | 7 |
+| `feature/providers/ProviderDetailScreen.kt` | 6 |
+| `feature/chat/ChatComposer.kt` | 5 |
+
+### Text-assertion inventory
+
+103 matches of `onNodeWithText`, `assertTextEquals`, or `hasText` across 17
+files. The highest concentrations are `ChatMarkdownTest.kt` (26),
+`ProviderListScreenTest.kt` (9), `ChatMessageItemTest.kt` (9),
+`OnboardingScreenTest.kt` (8), `ConversationListScreenTest.kt` (8), and
+`ChatCodeBlockTest.kt` (8). These tests must be updated deliberately when
+visible copy or text buttons change; test tags and accessible names must be
+preserved.
 
 ## Handoff notes
 
-- Record anything UX-01 must know before changing tokens, especially tests that
-  will fail and must be updated in the same change.
+- UX-01 must update `DesignSystemTest` in the same change as the token retune;
+  it asserts exact ARGB, dp, and sp values.
+- UX-01 must add the icons dependency before any screen task replaces glyphs.
+- UX-02 through UX-07 must preserve test tags and accessible names; update only
+  text assertions that read visible copy.
+- UX-12 must regenerate all 44 goldens and review the diffs.
+- Cold start is unmeasured; UX-11 owns the first real measurement.
+
+## Completion record
+
+- Status: Complete on 2026-11-11.
+- Decisions recorded: sidebar-only compact navigation, dynamic color opt-in,
+  haptics on by default, system font, primitives in `core:designsystem`.
+- Baseline captured: lint and unit tests pass; 44 goldens; debug APK
+  18,734,358 bytes; release APK 2,894,958 bytes; AAB 7,043,129 bytes.
+- No production code was changed.
