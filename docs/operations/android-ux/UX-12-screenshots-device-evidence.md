@@ -4,7 +4,7 @@
 - Design review: [android-ux.md](../../android-ux.md)
 - Status: Not started
 - Order: 13
-- Depends on: UX-00 through UX-11
+- Depends on: UX-00 – UX-11
 - Parallel-safe: no; final gate
 - Owns: `android/app/src/test/screenshots/`, `docs/operations/android-ux/` evidence, device review notes
 - Read first: [android-ux.md](../../android-ux.md) sections 17-18; [implementation plan](../android-ux-implementation-plan.md) sections 7-8; `ScreenshotTest.kt`

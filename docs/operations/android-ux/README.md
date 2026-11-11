@@ -47,7 +47,7 @@
 | 10 | [UX-09 Motion and haptics tuning](UX-09-motion-and-haptics.md) | Not started | UX-02, UX-03, UX-04, UX-05, UX-06, UX-07 | motion | UX-10 |
 | 11 | [UX-10 Accessibility and dynamic type audit](UX-10-accessibility-dynamic-type.md) | Not started | UX-02, UX-03, UX-04, UX-05, UX-06, UX-07 | accessibility | UX-09 |
 | 12 | [UX-11 Performance and baseline profile](UX-11-performance-baseline-profile.md) | Not started | UX-03, UX-09 | performance | UX-12 |
-| 13 | [UX-12 Screenshot goldens, device review, and exit evidence](UX-12-screenshots-device-evidence.md) | Not started | UX-00 through UX-11 | evidence | none; final gate |
+| 13 | [UX-12 Screenshot goldens, device review, and exit evidence](UX-12-screenshots-device-evidence.md) | Not started | UX-00 – UX-11 | evidence | none; final gate |
 
 ## Parallel execution groups
 
@@ -66,14 +66,14 @@ The program is complete only when every task is `Complete` or explicitly cancell
 
 ## Task orchestration
 
-```bash
-# Foundation
-# UX-00 -> UX-01
+```text
+Foundation
+  UX-00 -> UX-01
 
-# Screens (after UX-01)
-# UX-02, UX-06, UX-07 in parallel
-# UX-03, UX-04, UX-05 in parallel after UX-02
+Screens (after UX-01)
+  UX-02, UX-06, UX-07 in parallel
+  UX-03, UX-04, UX-05 in parallel after UX-02
 
-# Cross-cutting
-# UX-08 -> UX-09 / UX-10 -> UX-11 -> UX-12
+Cross-cutting
+  UX-08 -> UX-09 / UX-10 -> UX-11 -> UX-12
 ```
