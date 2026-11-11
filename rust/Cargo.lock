@@ -937,6 +937,7 @@ version = "0.1.0"
 dependencies = [
  "arboard",
  "base64 0.22.1",
+ "chatui-backup",
  "chatui-contracts",
  "chatui-domain",
  "chatui-providers",

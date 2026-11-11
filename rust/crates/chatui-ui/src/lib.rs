@@ -110,15 +110,17 @@ pub use providers::{
     validate_auth_type, validate_base_url, validate_headers,
 };
 pub use settings::{
-    APP_NAME, APP_VERSION, AboutInfo, BackupPlaceholder, DOCS_URL, MAX_SYSTEM_PROMPT_CHARS,
-    MemoryProviderModelCatalog, MemorySettingsStore, ModelOption, ProviderModelCatalog,
-    ProviderOption, RepositorySettingsPersistence, SettingAvailability, SettingDescriptor,
+    APP_NAME, APP_VERSION, AboutInfo, BACKUP_BACKEND_LABELS, BACKUP_CREDENTIAL_SECRET_ID,
+    BackupConfirmation, BackupError, BackupForm, BackupService, BackupSettingsState, BackupStatus,
+    DELETE_REMOTE_CONFIRMATION, DOCS_URL, MAX_SYSTEM_PROMPT_CHARS, MemoryProviderModelCatalog,
+    MemorySettingsStore, ModelOption, ProviderModelCatalog, ProviderOption, REPLACE_CONFIRMATION,
+    RepositorySettingsPersistence, RestoreOutcome, SettingAvailability, SettingDescriptor,
     SettingsController, SettingsError, SettingsErrorCopy, SettingsNavigation, SettingsPersistence,
     SettingsRoute, SettingsService, SettingsStore as SettingsRepositoryStore, SettingsViewModel,
-    SettingsWindow, density_from_index, density_index, describe_settings_error,
-    font_size_from_index, font_size_index, reasoning_from_index, reasoning_index,
-    send_key_from_index, send_key_index, sync_window as sync_settings_window, theme_from_index,
-    theme_index,
+    SettingsWindow, backend_from_index, backend_index, density_from_index, density_index,
+    describe_settings_error, font_size_from_index, font_size_index, reasoning_from_index,
+    reasoning_index, send_key_from_index, send_key_index, sync_backup_window,
+    sync_window as sync_settings_window, theme_from_index, theme_index,
 };
 pub use shell::{Breakpoint, Destination, LayoutMode, ShellController, ShellState, ShellWindow};
 pub use theme::{ReducedMotion, ResolvedTheme, ThemeSettings};
