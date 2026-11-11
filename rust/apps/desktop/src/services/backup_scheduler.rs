@@ -449,6 +449,12 @@ mod tests {
             prefix: "backups".to_owned(),
             access_key_id: "AKIAEXAMPLE".to_owned(),
             secret_access_key: "super-secret".to_owned(),
+            sas_token: String::new(),
+            service_account_json: String::new(),
+            access_token: String::new(),
+            folder_id: String::new(),
+            username: String::new(),
+            password: String::new(),
             passphrase: "correct horse battery staple".to_owned(),
         }
     }

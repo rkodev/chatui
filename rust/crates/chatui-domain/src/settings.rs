@@ -61,6 +61,9 @@ pub enum BackupBackend {
     /// Google Cloud Storage.
     #[serde(rename = "gcs")]
     Gcs,
+    /// Google Drive.
+    #[serde(rename = "google-drive")]
+    GoogleDrive,
     /// WebDAV.
     #[serde(rename = "webdav")]
     Webdav,

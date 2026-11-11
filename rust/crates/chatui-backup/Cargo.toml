@@ -13,11 +13,14 @@ chatui-storage = { version = "0.1.0", path = "../chatui-storage" }
 flate2 = "1"
 hex = "0.4"
 hmac = "0.12"
+httpdate = "1"
 jsonschema = { version = "0.60", default-features = false }
 pbkdf2 = "0.12"
+percent-encoding = "2"
 quick-xml = "0.41"
 rand = "0.8"
-reqwest = { version = "0.12.24", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12.24", default-features = false, features = ["rustls-tls", "json"] }
+rsa = { version = "0.9", features = ["pem", "sha2"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"

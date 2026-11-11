@@ -7,15 +7,24 @@
 use async_trait::async_trait;
 use thiserror::Error;
 
+pub mod azure;
+pub(crate) mod common;
+pub mod gcs;
+pub mod google_drive;
 pub mod s3;
 pub mod sigv4;
+pub mod webdav;
 
+pub use azure::{AzureBlobStorageAdapter, AzureBlobStorageConfig};
+pub use gcs::{GcsServiceAccount, GcsStorageAdapter, GcsStorageConfig};
+pub use google_drive::{GoogleDriveStorageAdapter, GoogleDriveStorageConfig};
 pub use s3::{S3StorageAdapter, S3StorageConfig};
 pub use sigv4::{
     SIGV4_ALGORITHM, SIGV4_SERVICE, SIGV4_TERMINATOR, SigV4Credentials, SigV4Method,
     SigV4SignOptions, SignedRequest, build_canonical_request, build_string_to_sign,
     derive_signing_key, encode_rfc3986, format_amz_date, sha256_hex, sign_request,
 };
+pub use webdav::{WebDavStorageAdapter, WebDavStorageConfig};
 
 /// Stable storage failure categories shared with the web and Android clients.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -244,5 +253,7 @@ pub trait StorageAdapter: Send + Sync {
     ) -> Result<ListObjectsResult, StorageError>;
 }
 
+#[cfg(test)]
+mod additional_tests;
 #[cfg(test)]
 mod tests;

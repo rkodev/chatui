@@ -19,8 +19,14 @@ pub const DELETE_REMOTE_CONFIRMATION: &str = "DELETE REMOTE BACKUP";
 /// Exact typed confirmation required to replace local data on restore.
 pub const REPLACE_CONFIRMATION: &str = "REPLACE LOCAL DATA";
 
-/// Backend labels shown by the selector. Only S3 is enabled in this release.
-pub const BACKUP_BACKEND_LABELS: [&str; 1] = ["S3-compatible"];
+/// Backend labels shown by the selector.
+pub const BACKUP_BACKEND_LABELS: [&str; 5] = [
+    "S3-compatible",
+    "Azure Blob",
+    "Google Cloud Storage",
+    "Google Drive",
+    "WebDAV",
+];
 
 /// User-safe backup failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,7 +54,7 @@ impl BackupError {
             }
             Self::ConfirmationRequired => "Type the exact confirmation text to continue.",
             Self::NotConfigured => "Configure and enable backup first.",
-            Self::UnsupportedBackend => "Only S3-compatible backup is available in this release.",
+            Self::UnsupportedBackend => "This backup backend is not available.",
         }
     }
 }
@@ -76,8 +82,20 @@ pub struct BackupForm {
     pub prefix: String,
     /// Access key id.
     pub access_key_id: String,
-    /// Secret access key.
+    /// Secret access key, or the Azure account key.
     pub secret_access_key: String,
+    /// Azure SAS token. Used when no account key is supplied.
+    pub sas_token: String,
+    /// GCS service account JSON.
+    pub service_account_json: String,
+    /// Google Drive OAuth access token.
+    pub access_token: String,
+    /// Google Drive folder id, or `appDataFolder`.
+    pub folder_id: String,
+    /// WebDAV username.
+    pub username: String,
+    /// WebDAV password.
+    pub password: String,
     /// Encryption passphrase. Never persisted.
     pub passphrase: String,
 }
@@ -92,6 +110,12 @@ impl Default for BackupForm {
             prefix: String::new(),
             access_key_id: String::new(),
             secret_access_key: String::new(),
+            sas_token: String::new(),
+            service_account_json: String::new(),
+            access_token: String::new(),
+            folder_id: String::new(),
+            username: String::new(),
+            password: String::new(),
             passphrase: String::new(),
         }
     }
@@ -111,31 +135,43 @@ impl BackupForm {
             prefix: config.prefix.clone(),
             access_key_id: String::new(),
             secret_access_key: String::new(),
+            sas_token: String::new(),
+            service_account_json: String::new(),
+            access_token: String::new(),
+            folder_id: String::new(),
+            username: String::new(),
+            password: String::new(),
             passphrase: String::new(),
         }
     }
 
     /// Validate the form before a connection test or enable.
     pub fn validate(&self) -> Result<(), BackupError> {
-        if self.backend != BackupBackend::S3 {
-            return Err(BackupError::UnsupportedBackend);
+        match self.backend {
+            BackupBackend::S3 => self.validate_s3()?,
+            BackupBackend::AzureBlob => self.validate_azure()?,
+            BackupBackend::Gcs => self.validate_gcs()?,
+            BackupBackend::GoogleDrive => self.validate_google_drive()?,
+            BackupBackend::Webdav => self.validate_webdav()?,
         }
 
+        if self.passphrase.is_empty() {
+            return Err(BackupError::Validation(
+                "Enter a backup passphrase. It is never stored.".to_owned(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn validate_s3(&self) -> Result<(), BackupError> {
         let endpoint = self.endpoint.trim();
         if endpoint.is_empty() {
             return Err(BackupError::Validation(
                 "Enter the S3-compatible endpoint.".to_owned(),
             ));
         }
-        match url::Url::parse(endpoint) {
-            Ok(url) if url.scheme() == "https" || url.scheme() == "http" => {}
-            _ => {
-                return Err(BackupError::Validation(
-                    "The endpoint must be an http or https URL.".to_owned(),
-                ));
-            }
-        }
-
+        validate_http_url(endpoint)?;
         if self.region.trim().is_empty() {
             return Err(BackupError::Validation(
                 "Enter the bucket region.".to_owned(),
@@ -154,12 +190,87 @@ impl BackupForm {
                 "Enter the secret access key.".to_owned(),
             ));
         }
-        if self.passphrase.is_empty() {
+        Ok(())
+    }
+
+    fn validate_azure(&self) -> Result<(), BackupError> {
+        validate_optional_http_url(self.endpoint.trim())?;
+        if self.bucket.trim().is_empty() {
             return Err(BackupError::Validation(
-                "Enter a backup passphrase. It is never stored.".to_owned(),
+                "Enter the Azure container name.".to_owned(),
             ));
         }
+        if self.access_key_id.trim().is_empty() {
+            return Err(BackupError::Validation(
+                "Enter the Azure account name.".to_owned(),
+            ));
+        }
+        if self.secret_access_key.is_empty() && self.sas_token.trim().is_empty() {
+            return Err(BackupError::Validation(
+                "Enter the Azure account key or a SAS token.".to_owned(),
+            ));
+        }
+        Ok(())
+    }
 
+    fn validate_gcs(&self) -> Result<(), BackupError> {
+        validate_optional_http_url(self.endpoint.trim())?;
+        if self.bucket.trim().is_empty() {
+            return Err(BackupError::Validation(
+                "Enter the GCS bucket name.".to_owned(),
+            ));
+        }
+        if self.service_account_json.trim().is_empty() {
+            return Err(BackupError::Validation(
+                "Paste the GCS service account JSON.".to_owned(),
+            ));
+        }
+        let account: serde_json::Value =
+            serde_json::from_str(&self.service_account_json).map_err(|_| {
+                BackupError::Validation(
+                    "The GCS service account JSON is not valid JSON.".to_owned(),
+                )
+            })?;
+        for field in ["client_email", "private_key"] {
+            if account
+                .get(field)
+                .and_then(serde_json::Value::as_str)
+                .is_none_or(str::is_empty)
+            {
+                return Err(BackupError::Validation(format!(
+                    "The GCS service account JSON is missing {field}."
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_google_drive(&self) -> Result<(), BackupError> {
+        validate_optional_http_url(self.endpoint.trim())?;
+        if self.access_token.trim().is_empty() {
+            return Err(BackupError::Validation(
+                "Enter the Google Drive access token.".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_webdav(&self) -> Result<(), BackupError> {
+        let endpoint = self.endpoint.trim();
+        if endpoint.is_empty() {
+            return Err(BackupError::Validation("Enter the WebDAV URL.".to_owned()));
+        }
+        validate_http_url(endpoint)?;
+        if self.username.is_empty() {
+            return Err(BackupError::Validation(
+                "Enter the WebDAV username.".to_owned(),
+            ));
+        }
+        if self.password.is_empty() {
+            return Err(BackupError::Validation(
+                "Enter the WebDAV password.".to_owned(),
+            ));
+        }
         Ok(())
     }
 
@@ -537,15 +648,38 @@ impl BackupSettingsState {
 pub const fn backend_index(backend: BackupBackend) -> usize {
     match backend {
         BackupBackend::S3 => 0,
-        BackupBackend::AzureBlob | BackupBackend::Gcs | BackupBackend::Webdav => 0,
+        BackupBackend::AzureBlob => 1,
+        BackupBackend::Gcs => 2,
+        BackupBackend::GoogleDrive => 3,
+        BackupBackend::Webdav => 4,
     }
 }
 
-/// Resolve a backend from the Slint combo box. Only S3 is selectable.
+/// Resolve a backend from the Slint combo box.
 pub const fn backend_from_index(index: usize) -> BackupBackend {
     match index {
-        0 => BackupBackend::S3,
+        1 => BackupBackend::AzureBlob,
+        2 => BackupBackend::Gcs,
+        3 => BackupBackend::GoogleDrive,
+        4 => BackupBackend::Webdav,
         _ => BackupBackend::S3,
+    }
+}
+
+fn validate_http_url(value: &str) -> Result<(), BackupError> {
+    match url::Url::parse(value) {
+        Ok(url) if url.scheme() == "https" || url.scheme() == "http" => Ok(()),
+        _ => Err(BackupError::Validation(
+            "The endpoint must be an http or https URL.".to_owned(),
+        )),
+    }
+}
+
+fn validate_optional_http_url(value: &str) -> Result<(), BackupError> {
+    if value.is_empty() {
+        Ok(())
+    } else {
+        validate_http_url(value)
     }
 }
 
@@ -653,6 +787,12 @@ mod tests {
             prefix: "backups".to_owned(),
             access_key_id: "AKIAEXAMPLE".to_owned(),
             secret_access_key: "super-secret".to_owned(),
+            sas_token: String::new(),
+            service_account_json: String::new(),
+            access_token: String::new(),
+            folder_id: String::new(),
+            username: String::new(),
+            password: String::new(),
             passphrase: "correct horse battery staple".to_owned(),
         }
     }
@@ -686,7 +826,85 @@ mod tests {
 
         let mut invalid = form();
         invalid.backend = BackupBackend::Gcs;
-        assert_eq!(invalid.validate(), Err(BackupError::UnsupportedBackend));
+        assert!(matches!(
+            invalid.validate(),
+            Err(BackupError::Validation(message)) if message.contains("service account")
+        ));
+    }
+
+    #[test]
+    fn validation_accepts_each_backend_with_its_own_fields() {
+        let mut azure = form();
+        azure.backend = BackupBackend::AzureBlob;
+        azure.endpoint.clear();
+        azure.region.clear();
+        azure.access_key_id = "account".to_owned();
+        azure.secret_access_key = "a2V5".to_owned();
+        azure.validate().expect("azure form");
+
+        let mut gcs = form();
+        gcs.backend = BackupBackend::Gcs;
+        gcs.endpoint.clear();
+        gcs.region.clear();
+        gcs.service_account_json = serde_json::json!({
+            "client_email": "backup@example.iam.gserviceaccount.com",
+            "private_key": "-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----",
+        })
+        .to_string();
+        gcs.validate().expect("gcs form");
+
+        let mut drive = form();
+        drive.backend = BackupBackend::GoogleDrive;
+        drive.endpoint.clear();
+        drive.region.clear();
+        drive.bucket.clear();
+        drive.access_token = "token".to_owned();
+        drive.validate().expect("drive form");
+
+        let mut webdav = form();
+        webdav.backend = BackupBackend::Webdav;
+        webdav.endpoint = "https://dav.example.com/backups/".to_owned();
+        webdav.region.clear();
+        webdav.bucket.clear();
+        webdav.username = "user".to_owned();
+        webdav.password = "pass".to_owned();
+        webdav.validate().expect("webdav form");
+    }
+
+    #[test]
+    fn validation_rejects_missing_backend_specific_fields() {
+        let mut azure = form();
+        azure.backend = BackupBackend::AzureBlob;
+        azure.secret_access_key.clear();
+        azure.sas_token.clear();
+        assert!(matches!(
+            azure.validate(),
+            Err(BackupError::Validation(message)) if message.contains("SAS")
+        ));
+
+        let mut gcs = form();
+        gcs.backend = BackupBackend::Gcs;
+        gcs.service_account_json = "{}".to_owned();
+        assert!(matches!(
+            gcs.validate(),
+            Err(BackupError::Validation(message)) if message.contains("client_email")
+        ));
+
+        let mut drive = form();
+        drive.backend = BackupBackend::GoogleDrive;
+        drive.access_token.clear();
+        assert!(matches!(
+            drive.validate(),
+            Err(BackupError::Validation(message)) if message.contains("access token")
+        ));
+
+        let mut webdav = form();
+        webdav.backend = BackupBackend::Webdav;
+        webdav.username.clear();
+        assert!(matches!(
+            webdav.validate(),
+            Err(BackupError::Validation(message)) if message.contains("username")
+        ));
     }
 
     #[test]
@@ -892,9 +1110,16 @@ mod tests {
     }
 
     #[test]
-    fn backend_indices_round_trip_to_s3() {
-        assert_eq!(backend_index(BackupBackend::S3), 0);
-        assert_eq!(backend_from_index(0), BackupBackend::S3);
-        assert_eq!(backend_from_index(3), BackupBackend::S3);
+    fn backend_indices_round_trip_for_every_backend() {
+        for backend in [
+            BackupBackend::S3,
+            BackupBackend::AzureBlob,
+            BackupBackend::Gcs,
+            BackupBackend::GoogleDrive,
+            BackupBackend::Webdav,
+        ] {
+            assert_eq!(backend_from_index(backend_index(backend)), backend);
+        }
+        assert_eq!(backend_from_index(99), BackupBackend::S3);
     }
 }

@@ -133,6 +133,12 @@ slint::slint! {
         in-out property <string> backup-prefix: "";
         in-out property <string> backup-access-key: "";
         in-out property <string> backup-secret-key: "";
+        in-out property <string> backup-sas-token: "";
+        in-out property <string> backup-service-account-json: "";
+        in-out property <string> backup-access-token: "";
+        in-out property <string> backup-folder-id: "";
+        in-out property <string> backup-username: "";
+        in-out property <string> backup-password: "";
         in-out property <string> backup-passphrase: "";
         in property <string> backup-status-last: "";
         in property <string> backup-status-pending: "";
@@ -176,6 +182,12 @@ slint::slint! {
         callback backup-prefix-changed(string);
         callback backup-access-key-changed(string);
         callback backup-secret-key-changed(string);
+        callback backup-sas-token-changed(string);
+        callback backup-service-account-json-changed(string);
+        callback backup-access-token-changed(string);
+        callback backup-folder-id-changed(string);
+        callback backup-username-changed(string);
+        callback backup-password-changed(string);
         callback backup-passphrase-changed(string);
         callback backup-test-connection();
         callback backup-enable();
@@ -429,36 +441,151 @@ slint::slint! {
 
                         Text { text: "Backend"; }
                         ComboBox {
-                            model: ["S3-compatible"];
+                            model: ["S3-compatible", "Azure Blob", "Google Cloud Storage", "Google Drive", "WebDAV"];
                             accessible-label: "Backup backend";
                             current-index: root.backup-backend-index;
                             selected(value) => { root.backup-backend-changed(self.current-index); }
                         }
-                        Text {
-                            text: "Other backends are disabled until M5-07.3.";
-                            color: root.dark ? #9ca3af : #5f6368;
-                            wrap: word-wrap;
+
+                        if (root.backup-backend-index == 0) : VerticalLayout {
+                            spacing: 8px;
+                            Text { text: "Endpoint"; }
+                            LineEdit {
+                                text: root.backup-endpoint;
+                                accessible-label: "Backup endpoint";
+                                edited(text) => { root.backup-endpoint-changed(text); }
+                            }
+                            Text { text: "Region"; }
+                            LineEdit {
+                                text: root.backup-region;
+                                accessible-label: "Backup region";
+                                edited(text) => { root.backup-region-changed(text); }
+                            }
+                            Text { text: "Bucket"; }
+                            LineEdit {
+                                text: root.backup-bucket;
+                                accessible-label: "Backup bucket";
+                                edited(text) => { root.backup-bucket-changed(text); }
+                            }
+                            Text { text: "Access key id"; }
+                            LineEdit {
+                                text: root.backup-access-key;
+                                accessible-label: "Backup access key id";
+                                edited(text) => { root.backup-access-key-changed(text); }
+                            }
+                            Text { text: "Secret access key"; }
+                            LineEdit {
+                                text: root.backup-secret-key;
+                                accessible-label: "Backup secret access key";
+                                input-type: InputType.password;
+                                edited(text) => { root.backup-secret-key-changed(text); }
+                            }
                         }
 
-                        Text { text: "Endpoint"; }
-                        LineEdit {
-                            text: root.backup-endpoint;
-                            accessible-label: "Backup endpoint";
-                            edited(text) => { root.backup-endpoint-changed(text); }
+                        if (root.backup-backend-index == 1) : VerticalLayout {
+                            spacing: 8px;
+                            Text { text: "Endpoint (optional)"; }
+                            LineEdit {
+                                text: root.backup-endpoint;
+                                accessible-label: "Azure endpoint";
+                                edited(text) => { root.backup-endpoint-changed(text); }
+                            }
+                            Text { text: "Container"; }
+                            LineEdit {
+                                text: root.backup-bucket;
+                                accessible-label: "Azure container";
+                                edited(text) => { root.backup-bucket-changed(text); }
+                            }
+                            Text { text: "Account name"; }
+                            LineEdit {
+                                text: root.backup-access-key;
+                                accessible-label: "Azure account name";
+                                edited(text) => { root.backup-access-key-changed(text); }
+                            }
+                            Text { text: "Account key"; }
+                            LineEdit {
+                                text: root.backup-secret-key;
+                                accessible-label: "Azure account key";
+                                input-type: InputType.password;
+                                edited(text) => { root.backup-secret-key-changed(text); }
+                            }
+                            Text { text: "SAS token (used when no account key)"; }
+                            LineEdit {
+                                text: root.backup-sas-token;
+                                accessible-label: "Azure SAS token";
+                                input-type: InputType.password;
+                                edited(text) => { root.backup-sas-token-changed(text); }
+                            }
                         }
 
-                        Text { text: "Region"; }
-                        LineEdit {
-                            text: root.backup-region;
-                            accessible-label: "Backup region";
-                            edited(text) => { root.backup-region-changed(text); }
+                        if (root.backup-backend-index == 2) : VerticalLayout {
+                            spacing: 8px;
+                            Text { text: "Endpoint (optional)"; }
+                            LineEdit {
+                                text: root.backup-endpoint;
+                                accessible-label: "GCS endpoint";
+                                edited(text) => { root.backup-endpoint-changed(text); }
+                            }
+                            Text { text: "Bucket"; }
+                            LineEdit {
+                                text: root.backup-bucket;
+                                accessible-label: "GCS bucket";
+                                edited(text) => { root.backup-bucket-changed(text); }
+                            }
+                            Text { text: "Service account JSON"; }
+                            TextEdit {
+                                text: root.backup-service-account-json;
+                                accessible-label: "GCS service account JSON";
+                                edited(text) => { root.backup-service-account-json-changed(text); }
+                                height: 100px;
+                                wrap: word-wrap;
+                            }
                         }
 
-                        Text { text: "Bucket"; }
-                        LineEdit {
-                            text: root.backup-bucket;
-                            accessible-label: "Backup bucket";
-                            edited(text) => { root.backup-bucket-changed(text); }
+                        if (root.backup-backend-index == 3) : VerticalLayout {
+                            spacing: 8px;
+                            Text { text: "Endpoint (optional)"; }
+                            LineEdit {
+                                text: root.backup-endpoint;
+                                accessible-label: "Google Drive endpoint";
+                                edited(text) => { root.backup-endpoint-changed(text); }
+                            }
+                            Text { text: "Folder id (blank for app data folder)"; }
+                            LineEdit {
+                                text: root.backup-folder-id;
+                                accessible-label: "Google Drive folder id";
+                                edited(text) => { root.backup-folder-id-changed(text); }
+                            }
+                            Text { text: "OAuth access token"; }
+                            LineEdit {
+                                text: root.backup-access-token;
+                                accessible-label: "Google Drive access token";
+                                input-type: InputType.password;
+                                edited(text) => { root.backup-access-token-changed(text); }
+                            }
+                        }
+
+                        if (root.backup-backend-index == 4) : VerticalLayout {
+                            spacing: 8px;
+                            Text { text: "WebDAV URL"; }
+                            LineEdit {
+                                text: root.backup-endpoint;
+                                accessible-label: "WebDAV URL";
+                                edited(text) => { root.backup-endpoint-changed(text); }
+                            }
+                            Text { text: "Username"; }
+                            LineEdit {
+                                text: root.backup-username;
+                                accessible-label: "WebDAV username";
+                                edited(text) => { root.backup-username-changed(text); }
+                            }
+                            Text { text: "Password"; }
+                            LineEdit {
+                                text: root.backup-password;
+                                accessible-label: "WebDAV password";
+                                input-type: InputType.password;
+                                edited(text) => { root.backup-password-changed(text); }
+                            }
                         }
 
                         Text { text: "Prefix"; }
@@ -466,21 +593,6 @@ slint::slint! {
                             text: root.backup-prefix;
                             accessible-label: "Backup prefix";
                             edited(text) => { root.backup-prefix-changed(text); }
-                        }
-
-                        Text { text: "Access key id"; }
-                        LineEdit {
-                            text: root.backup-access-key;
-                            accessible-label: "Backup access key id";
-                            edited(text) => { root.backup-access-key-changed(text); }
-                        }
-
-                        Text { text: "Secret access key"; }
-                        LineEdit {
-                            text: root.backup-secret-key;
-                            accessible-label: "Backup secret access key";
-                            input-type: InputType.password;
-                            edited(text) => { root.backup-secret-key-changed(text); }
                         }
 
                         Text { text: "Passphrase (never stored)"; }
@@ -696,6 +808,12 @@ pub fn sync_backup_window(window: &SettingsWindow, state: &BackupSettingsState) 
     window.set_backup_prefix(state.form.prefix.clone().into());
     window.set_backup_access_key(state.form.access_key_id.clone().into());
     window.set_backup_secret_key(state.form.secret_access_key.clone().into());
+    window.set_backup_sas_token(state.form.sas_token.clone().into());
+    window.set_backup_service_account_json(state.form.service_account_json.clone().into());
+    window.set_backup_access_token(state.form.access_token.clone().into());
+    window.set_backup_folder_id(state.form.folder_id.clone().into());
+    window.set_backup_username(state.form.username.clone().into());
+    window.set_backup_password(state.form.password.clone().into());
     window.set_backup_passphrase(state.form.passphrase.clone().into());
     window.set_backup_status_last(state.status.last_backup_text().into());
     window.set_backup_status_pending(state.status.pending_changes_text().into());
@@ -1236,6 +1354,49 @@ impl SettingsController {
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_sas_token_changed(move |value| {
+            backup_state.borrow_mut().form.sas_token = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window
+            .on_backup_service_account_json_changed(move |value| {
+                backup_state.borrow_mut().form.service_account_json = value.to_string();
+                sync_backup(&backup_state, &weak);
+            });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_access_token_changed(move |value| {
+            backup_state.borrow_mut().form.access_token = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_folder_id_changed(move |value| {
+            backup_state.borrow_mut().form.folder_id = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_username_changed(move |value| {
+            backup_state.borrow_mut().form.username = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_password_changed(move |value| {
+            backup_state.borrow_mut().form.password = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_passphrase_changed(move |value| {
             backup_state.borrow_mut().form.passphrase = value.to_string();
             sync_backup(&backup_state, &weak);
@@ -1524,6 +1685,50 @@ mod tests {
 
         window.invoke_backup_disable();
         assert!(!window.get_backup_enabled());
+    }
+
+    #[test]
+    fn backup_backend_specific_fields_update_the_form() {
+        let (controller, _backup) = backup_controller();
+        let window = controller.window();
+
+        window.invoke_backup_backend_changed(1);
+        window.invoke_backup_sas_token_changed("sv=2021-12-02&sig=abc".into());
+        {
+            let state = controller.backup_state();
+            assert_eq!(state.form.backend, chatui_domain::BackupBackend::AzureBlob);
+            assert_eq!(state.form.sas_token, "sv=2021-12-02&sig=abc");
+        }
+
+        window.invoke_backup_backend_changed(2);
+        window.invoke_backup_service_account_json_changed("{\"client_email\":\"a\"}".into());
+        assert_eq!(
+            controller.backup_state().form.service_account_json,
+            "{\"client_email\":\"a\"}"
+        );
+
+        window.invoke_backup_backend_changed(3);
+        window.invoke_backup_access_token_changed("drive-token".into());
+        window.invoke_backup_folder_id_changed("folder-1".into());
+        {
+            let state = controller.backup_state();
+            assert_eq!(
+                state.form.backend,
+                chatui_domain::BackupBackend::GoogleDrive
+            );
+            assert_eq!(state.form.access_token, "drive-token");
+            assert_eq!(state.form.folder_id, "folder-1");
+        }
+
+        window.invoke_backup_backend_changed(4);
+        window.invoke_backup_username_changed("user".into());
+        window.invoke_backup_password_changed("pass".into());
+        {
+            let state = controller.backup_state();
+            assert_eq!(state.form.backend, chatui_domain::BackupBackend::Webdav);
+            assert_eq!(state.form.username, "user");
+            assert_eq!(state.form.password, "pass");
+        }
     }
 
     #[test]

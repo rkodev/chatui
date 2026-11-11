@@ -39,8 +39,10 @@ pub use merge::{
     compare_messages, merge_conversation, merge_manifests, merge_messages,
 };
 pub use storage::{
-    ListObjectsOptions, ListObjectsResult, PutObjectOptions, S3StorageAdapter, S3StorageConfig,
-    StorageAdapter, StorageError, StorageErrorCode, StorageObject,
+    AzureBlobStorageAdapter, AzureBlobStorageConfig, GcsServiceAccount, GcsStorageAdapter,
+    GcsStorageConfig, GoogleDriveStorageAdapter, GoogleDriveStorageConfig, ListObjectsOptions,
+    ListObjectsResult, PutObjectOptions, S3StorageAdapter, S3StorageConfig, StorageAdapter,
+    StorageError, StorageErrorCode, StorageObject, WebDavStorageAdapter, WebDavStorageConfig,
 };
 pub use sync::{
     BackupIdentity, DELETE_REMOTE_CONFIRMATION, MANIFEST_OBJECT_KEY, RestoreOptions, RestoreResult,
