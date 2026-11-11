@@ -49,6 +49,7 @@ import dev.chatui.core.designsystem.LocalSnackbarHostState
 import dev.chatui.core.designsystem.SettingsRow
 import dev.chatui.core.designsystem.Skeleton
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 import java.util.Locale
 import kotlinx.coroutines.launch
 
@@ -128,6 +129,7 @@ fun DataSettingsScreen(
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     val scope = rememberCoroutineScope()
     val host = snackbarHostState ?: remember { SnackbarHostState() }
     var showClearSheet by remember { mutableStateOf(false) }
@@ -288,6 +290,7 @@ fun DataSettingsScreen(
                         icon = Icons.Rounded.FileUpload,
                         showChevron = true,
                         onClick = {
+                            haptics.confirm()
                             onExportAll()
                             scope.launch {
                                 host.showSnackbar("Export started")
@@ -308,6 +311,7 @@ fun DataSettingsScreen(
                         icon = Icons.Rounded.FileDownload,
                         showChevron = true,
                         onClick = {
+                            haptics.confirm()
                             onImportMerge()
                             scope.launch {
                                 host.showSnackbar("Import started")
@@ -320,6 +324,7 @@ fun DataSettingsScreen(
                         icon = Icons.Rounded.FileDownload,
                         showChevron = true,
                         onClick = {
+                            haptics.confirm()
                             onImportReplace()
                             scope.launch {
                                 host.showSnackbar("Import started")
@@ -387,6 +392,7 @@ fun DataSettingsScreen(
                 )
                 Button(
                     onClick = {
+                        haptics.confirm()
                         onClearAll()
                         showClearSheet = false
                     },

@@ -58,6 +58,7 @@ import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.SkeletonList
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.Provider
 import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.providers.getProviderKeyMetadata
@@ -196,6 +197,7 @@ fun ProviderListScreen(
                         ProviderRow(
                             provider = provider,
                             onOpen = { onOpenProvider(provider.id) },
+                            modifier = Modifier.animateItem(),
                         )
                     }
                 }
@@ -211,6 +213,7 @@ fun ProviderListScreen(
                         ProviderRow(
                             provider = provider,
                             onOpen = { onOpenProvider(provider.id) },
+                            modifier = Modifier.animateItem(),
                         )
                     }
                 }
@@ -293,18 +296,26 @@ private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ProviderRow(provider: Provider, onOpen: () -> Unit) {
+private fun ProviderRow(
+    provider: Provider,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     val metadata = getProviderKeyMetadata(provider)
     val keyLabel = metadata?.label ?: if (provider.secretId != null) "Key stored" else "No key"
     val subtitle = "$keyLabel · Usage ${formatUsd(metadata?.usageUsd)}"
 
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .testTag(ProviderListTestTags.provider(provider.id))
-            .clickable(onClick = onOpen),
+            .clickable {
+                haptics.tick()
+                onOpen()
+            },
         shape = RoundedCornerShape(dimens.radiusMd),
         color = colors.bgSurfaceRaised,
     ) {

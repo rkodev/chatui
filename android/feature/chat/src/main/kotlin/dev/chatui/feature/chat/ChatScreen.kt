@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -70,10 +71,12 @@ import dev.chatui.core.designsystem.BrandMark
 import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.LocalReducedMotion
 import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.designsystem.PrimaryButton
 import dev.chatui.core.designsystem.Skeleton
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.Message
 import dev.chatui.core.model.MessageRole
@@ -151,11 +154,15 @@ fun ChatScreen(
 ) {
     val dimens = LocalDimens.current
     val shortcutState = LocalChatShortcutState.current
+    val haptics = rememberHaptics()
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
     val lastAssistant = state.messages.lastOrNull { it.role == MessageRole.ASSISTANT }
     val copyLastResponse: (() -> Unit)? = lastAssistant?.let { message ->
-        { clipboard.setText(AnnotatedString(message.copyableText())) }
+        {
+            clipboard.setText(AnnotatedString(message.copyableText()))
+            haptics.confirm()
+        }
     }
 
     // Publish the conversation title, model label, and header actions to the
@@ -723,7 +730,8 @@ private fun EmptyState(
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
-    var visible by remember { mutableStateOf(false) }
+    val reducedMotion = LocalReducedMotion.current
+    var visible by remember { mutableStateOf(reducedMotion) }
     LaunchedEffect(Unit) { visible = true }
 
     Box(
@@ -735,8 +743,12 @@ private fun EmptyState(
     ) {
         AnimatedVisibility(
             visible = visible,
-            enter = fadeIn(tween(MotionSpecs.emphasizedMillis)) +
-                slideInVertically(tween(MotionSpecs.emphasizedMillis)) { it / 6 },
+            enter = if (reducedMotion) {
+                EnterTransition.None
+            } else {
+                fadeIn(tween(MotionSpecs.emphasizedMillis)) +
+                    slideInVertically(tween(MotionSpecs.emphasizedMillis)) { it / 6 }
+            },
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

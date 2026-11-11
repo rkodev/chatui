@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.BoldHighlight
 import dev.snipme.highlights.model.CodeHighlight
@@ -79,6 +80,7 @@ fun ChatCodeBlock(
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
+    val haptics = rememberHaptics()
     val darkMode = isSystemInDarkTheme()
     val normalized = remember(language) { normalizeCodeLanguage(language) }
     val highlighted = remember(code, normalized, darkMode) {
@@ -147,6 +149,7 @@ fun ChatCodeBlock(
                         } else {
                             clipboard.setText(AnnotatedString(code))
                         }
+                        haptics.confirm()
                         copied = true
                     },
                     modifier = Modifier

@@ -54,6 +54,7 @@ import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.SecureScreen
 import dev.chatui.core.designsystem.SkeletonList
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.Provider
 import dev.chatui.core.providers.getProviderKeyMetadata
 
@@ -329,6 +330,7 @@ private fun KeyUsageSection(
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     val metadata = getProviderKeyMetadata(provider)
     val busy = state.busy != null
 
@@ -415,7 +417,10 @@ private fun KeyUsageSection(
             }
 
             Button(
-                onClick = onValidate,
+                onClick = {
+                    haptics.confirm()
+                    onValidate()
+                },
                 enabled = !busy && provider.secretId != null,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -622,6 +627,7 @@ private fun RotateKeyPanel(
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     val busy = state.busy != null
 
     Column(verticalArrangement = Arrangement.spacedBy(dimens.space2)) {
@@ -642,7 +648,10 @@ private fun RotateKeyPanel(
                 .testTag(ProviderDetailTestTags.NewKeyField),
         )
         Button(
-            onClick = onRotateKey,
+            onClick = {
+                haptics.confirm()
+                onRotateKey()
+            },
             enabled = !busy && state.newKey.isNotBlank(),
             modifier = Modifier
                 .fillMaxWidth()

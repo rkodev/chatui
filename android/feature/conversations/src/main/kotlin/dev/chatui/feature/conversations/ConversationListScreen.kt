@@ -2,7 +2,13 @@ package dev.chatui.feature.conversations
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -72,6 +78,7 @@ import dev.chatui.core.designsystem.ErrorState
 import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.LocalReducedMotion
 import dev.chatui.core.designsystem.LocalSnackbarHostState
 import dev.chatui.core.designsystem.PrimaryButton
 import dev.chatui.core.designsystem.SegmentedControl
@@ -163,6 +170,8 @@ fun ConversationListScreen(
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
+    val haptics = rememberHaptics()
+    val reducedMotion = LocalReducedMotion.current
     val host = snackbarHostState ?: remember { SnackbarHostState() }
     var renameTarget by remember { mutableStateOf<Conversation?>(null) }
     var renameValue by remember { mutableStateOf("") }
@@ -256,7 +265,19 @@ fun ConversationListScreen(
                         placeholder = { Text("Search conversations") },
                         singleLine = true,
                         trailingIcon = {
-                            AnimatedVisibility(visible = state.searchQuery.isNotEmpty()) {
+                            AnimatedVisibility(
+                                visible = state.searchQuery.isNotEmpty(),
+                                enter = if (reducedMotion) {
+                                    EnterTransition.None
+                                } else {
+                                    fadeIn() + expandVertically()
+                                },
+                                exit = if (reducedMotion) {
+                                    ExitTransition.None
+                                } else {
+                                    fadeOut() + shrinkVertically()
+                                },
+                            ) {
                                 IconButton(
                                     onClick = { onSearchQueryChanged("") },
                                     modifier = Modifier
@@ -425,8 +446,10 @@ fun ConversationListScreen(
             onSave = {
                 val trimmed = renameValue.trim()
                 if (trimmed.isEmpty()) {
+                    haptics.reject()
                     renameError = "Enter a title."
                 } else {
+                    haptics.confirm()
                     onRename(target, trimmed)
                     renameTarget = null
                 }
@@ -438,7 +461,10 @@ fun ConversationListScreen(
         DeleteDialog(
             conversation = target,
             onDismiss = onDeleteDismissed,
-            onConfirm = onDeleteConfirmed,
+            onConfirm = {
+                haptics.confirm()
+                onDeleteConfirmed()
+            },
         )
     }
 }
@@ -588,7 +614,10 @@ private fun ConversationRow(
                 .fillMaxWidth()
                 .heightIn(min = dimens.rowMinHeight)
                 .background(if (active) colors.accentSoft else Color.Transparent)
-                .clickable(onClick = onSelect)
+                .clickable {
+                    haptics.tick()
+                    onSelect()
+                }
                 .padding(
                     horizontal = dimens.cardPadding,
                     vertical = dimens.space2,

@@ -44,7 +44,7 @@
 | 7 | [UX-06 Providers and model picker](UX-06-providers-and-model-picker.md) | Complete | UX-01 | providers | UX-02, UX-07 |
 | 8 | [UX-07 Settings and data](UX-07-settings-and-data.md) | Complete | UX-01 | settings | UX-02, UX-06 |
 | 9 | [UX-08 States and feedback adoption](UX-08-states-and-feedback.md) | Complete | UX-01, UX-03, UX-04, UX-05, UX-06, UX-07 | cross-cutting | none; touches all screens |
-| 10 | [UX-09 Motion and haptics tuning](UX-09-motion-and-haptics.md) | Not started | UX-02, UX-03, UX-04, UX-05, UX-06, UX-07 | motion | UX-10 |
+| 10 | [UX-09 Motion and haptics tuning](UX-09-motion-and-haptics.md) | Complete | UX-02, UX-03, UX-04, UX-05, UX-06, UX-07 | motion | UX-10 |
 | 11 | [UX-10 Accessibility and dynamic type audit](UX-10-accessibility-dynamic-type.md) | Not started | UX-02, UX-03, UX-04, UX-05, UX-06, UX-07 | accessibility | UX-09 |
 | 12 | [UX-11 Performance and baseline profile](UX-11-performance-baseline-profile.md) | Not started | UX-03, UX-09 | performance | UX-12 |
 | 13 | [UX-12 Screenshot goldens, device review, and exit evidence](UX-12-screenshots-device-evidence.md) | Not started | UX-00 – UX-11 | evidence | none; final gate |

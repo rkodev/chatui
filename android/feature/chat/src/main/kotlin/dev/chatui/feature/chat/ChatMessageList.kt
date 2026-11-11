@@ -185,6 +185,7 @@ fun ChatMessageList(
                 val isGroupEnd = next == null || next.role != message.role
                 ChatMessageItem(
                     message = message,
+                    modifier = Modifier.animateItem(),
                     chatFontSize = chatFontSize,
                     showTokenUsage = showTokenUsage,
                     loadRemoteImages = loadRemoteImages,

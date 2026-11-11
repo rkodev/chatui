@@ -1,5 +1,6 @@
 package dev.chatui.core.designsystem
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
@@ -9,6 +10,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -25,13 +27,21 @@ fun Stepper(
     step: Int = 1,
 ) {
     val colors = LocalChatUiColors.current
+    val haptics = rememberHaptics()
+    val decreaseInteraction = remember { MutableInteractionSource() }
+    val increaseInteraction = remember { MutableInteractionSource() }
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(
-            onClick = { onValueChange((value - step).coerceAtLeast(min)) },
+            onClick = {
+                haptics.tick()
+                onValueChange((value - step).coerceAtLeast(min))
+            },
             enabled = value > min,
+            interactionSource = decreaseInteraction,
+            modifier = Modifier.pressScale(decreaseInteraction),
         ) {
             Icon(
                 imageVector = Icons.Rounded.Remove,
@@ -47,8 +57,13 @@ fun Stepper(
             modifier = Modifier.widthIn(min = 40.dp),
         )
         IconButton(
-            onClick = { onValueChange((value + step).coerceAtMost(max)) },
+            onClick = {
+                haptics.tick()
+                onValueChange((value + step).coerceAtMost(max))
+            },
             enabled = value < max,
+            interactionSource = increaseInteraction,
+            modifier = Modifier.pressScale(increaseInteraction),
         ) {
             Icon(
                 imageVector = Icons.Rounded.Add,

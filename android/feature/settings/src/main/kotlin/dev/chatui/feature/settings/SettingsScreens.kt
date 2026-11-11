@@ -68,6 +68,7 @@ import dev.chatui.core.designsystem.LocalSnackbarHostState
 import dev.chatui.core.designsystem.SettingsRow
 import dev.chatui.core.designsystem.Stepper
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.Density
 import dev.chatui.core.model.ReasoningEffort
@@ -206,12 +207,14 @@ fun AppearanceSettingsScreen(
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     val scope = rememberCoroutineScope()
     val host = snackbarHostState ?: remember { SnackbarHostState() }
     var loaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(settings) {
         if (loaded) {
+            haptics.confirm()
             scope.launch { host.showSnackbar("Appearance saved") }
         }
         loaded = true
@@ -364,6 +367,7 @@ fun ChatDefaultsSettingsScreen(
     val params = settings.defaultParams
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     val scope = rememberCoroutineScope()
     val host = snackbarHostState ?: remember { SnackbarHostState() }
     var providerMenu by remember { mutableStateOf(false) }
@@ -378,6 +382,7 @@ fun ChatDefaultsSettingsScreen(
 
     LaunchedEffect(settings) {
         if (loaded) {
+            haptics.confirm()
             scope.launch { host.showSnackbar("Chat defaults saved") }
         }
         loaded = true
@@ -770,6 +775,7 @@ private fun SettingsSegmentedControl(
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -783,7 +789,10 @@ private fun SettingsSegmentedControl(
                     .weight(1f)
                     .clip(RoundedCornerShape(dimens.radiusXs - 2.dp))
                     .background(if (selected) colors.bgSurfaceRaised else Color.Transparent)
-                    .clickable { onSelected(index) }
+                    .clickable {
+                        haptics.tick()
+                        onSelected(index)
+                    }
                     .padding(vertical = dimens.space2, horizontal = dimens.space1)
                     .testTag(tags[index]),
                 horizontalArrangement = Arrangement.Center,
@@ -821,6 +830,7 @@ private fun SettingsToggleRow(
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -855,7 +865,10 @@ private fun SettingsToggleRow(
             }
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange,
+                onCheckedChange = {
+                    haptics.tick()
+                    onCheckedChange(it)
+                },
                 modifier = Modifier.testTag(tag),
             )
         }

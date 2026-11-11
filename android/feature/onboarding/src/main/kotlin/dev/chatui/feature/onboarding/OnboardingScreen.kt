@@ -3,6 +3,7 @@ package dev.chatui.feature.onboarding
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -77,6 +78,7 @@ import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.designsystem.SecureScreen
 import dev.chatui.core.designsystem.SkeletonList
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 
 /** Test tags exposed by the onboarding screen. */
 object OnboardingTestTags {
@@ -228,10 +230,15 @@ private fun OnboardingContent(
 private fun StepIndicator(step: OnboardingStep) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val reducedMotion = LocalReducedMotion.current
     val target = if (step == OnboardingStep.WELCOME) 0.5f else 1f
     val progress by animateFloatAsState(
         targetValue = target,
-        animationSpec = MotionSpecs.emphasized(),
+        animationSpec = if (reducedMotion) {
+            androidx.compose.animation.core.snap()
+        } else {
+            MotionSpecs.emphasized()
+        },
         label = "onboardingStepProgress",
     )
 
@@ -369,9 +376,15 @@ private fun ProviderCard(
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
+    val reducedMotion = LocalReducedMotion.current
     val container by androidx.compose.animation.animateColorAsState(
         targetValue = if (selected) colors.accentSoft else colors.bgSurfaceRaised,
-        animationSpec = tween(MotionSpecs.fadeThroughMillis),
+        animationSpec = if (reducedMotion) {
+            androidx.compose.animation.core.snap()
+        } else {
+            tween(MotionSpecs.fadeThroughMillis)
+        },
         label = "providerCardColor",
     )
 
@@ -383,7 +396,10 @@ private fun ProviderCard(
             .selectable(
                 selected = selected,
                 enabled = option.enabled,
-                onClick = onClick,
+                onClick = {
+                    haptics.tick()
+                    onClick()
+                },
             )
             .testTag(OnboardingTestTags.providerOption(option.id)),
         colors = CardDefaults.cardColors(containerColor = container),
@@ -492,6 +508,7 @@ private fun KeyEntryForm(
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val reducedMotion = LocalReducedMotion.current
     val clipboard = LocalClipboardManager.current
     val uriHandler = LocalUriHandler.current
     val enabled = !state.testing && !state.connected
@@ -605,8 +622,12 @@ private fun KeyEntryForm(
                         else -> "Connect"
                     },
                     transitionSpec = {
-                        fadeIn(animationSpec = tween(MotionSpecs.fadeThroughMillis)) togetherWith
-                            fadeOut(animationSpec = tween(MotionSpecs.fadeThroughMillis))
+                        if (reducedMotion) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else {
+                            fadeIn(animationSpec = tween(MotionSpecs.fadeThroughMillis)) togetherWith
+                                fadeOut(animationSpec = tween(MotionSpecs.fadeThroughMillis))
+                        }
                     },
                     label = "connectButton",
                 ) { label ->

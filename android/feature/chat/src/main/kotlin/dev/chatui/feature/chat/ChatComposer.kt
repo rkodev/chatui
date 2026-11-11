@@ -1,10 +1,16 @@
 package dev.chatui.feature.chat
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -74,6 +80,8 @@ import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.LocalReducedMotion
+import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.designsystem.softShadow
@@ -146,11 +154,12 @@ fun ChatComposer(
     var sheetOpen by remember { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
+    val reducedMotion = LocalReducedMotion.current
     val sendInteraction = remember { MutableInteractionSource() }
     val pressed by sendInteraction.collectIsPressedAsState()
     val sendScale by animateFloatAsState(
-        targetValue = if (pressed) 0.88f else 1f,
-        animationSpec = spring(stiffness = 600f, dampingRatio = 0.6f),
+        targetValue = if (pressed) 0.9f else 1f,
+        animationSpec = if (reducedMotion) snap() else MotionSpecs.springPress,
         label = "sendScale",
     )
     val barShape = RoundedCornerShape(dimens.radiusXl)
@@ -314,15 +323,39 @@ fun ChatComposer(
                 )
 
                 Box(
-                    modifier = Modifier.graphicsLayer {
-                        scaleX = sendScale
-                        scaleY = sendScale
-                    },
+                    modifier = Modifier
+                        .animateContentSize(
+                            animationSpec = if (reducedMotion) {
+                                snap()
+                            } else {
+                                MotionSpecs.springGentleSize
+                            },
+                        )
+                        .graphicsLayer {
+                            scaleX = sendScale
+                            scaleY = sendScale
+                        },
                 ) {
                     AnimatedContent(
                         targetState = streaming || sending,
                         transitionSpec = {
-                            fadeIn() togetherWith fadeOut()
+                            if (reducedMotion) {
+                                EnterTransition.None togetherWith ExitTransition.None
+                            } else {
+                                (
+                                    fadeIn(tween(MotionSpecs.dialogMillis)) +
+                                        scaleIn(
+                                            initialScale = 0.8f,
+                                            animationSpec = MotionSpecs.springPress,
+                                        )
+                                    ) togetherWith (
+                                    fadeOut(tween(MotionSpecs.dialogMillis)) +
+                                        scaleOut(
+                                            targetScale = 0.8f,
+                                            animationSpec = MotionSpecs.springPress,
+                                        )
+                                    )
+                            }
                         },
                         label = "sendStopMorph",
                     ) { isStreaming ->

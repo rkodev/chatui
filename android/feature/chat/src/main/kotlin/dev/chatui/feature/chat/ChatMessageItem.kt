@@ -2,11 +2,14 @@ package dev.chatui.feature.chat
 
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -68,7 +71,10 @@ import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.LocalReducedMotion
+import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.bubbleAppear
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.Attachment
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.ContentPart
@@ -171,6 +177,8 @@ fun ChatMessageItem(
     SideEffect { onComposed?.invoke(message.id) }
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
+    val haptics = rememberHaptics()
+    val reducedMotion = LocalReducedMotion.current
     val isUser = message.role == MessageRole.USER
     val text = message.textParts()
     val reasoning = message.reasoningParts()
@@ -226,19 +234,29 @@ fun ChatMessageItem(
                     Column(
                         modifier = Modifier
                             .widthIn(max = maxBubbleWidth)
+                            .bubbleAppear(message.id)
                             .clip(bubbleShape)
                             .background(brush = bubbleBrush, shape = bubbleShape)
                             .pointerInput(message.id) {
                                 detectTapGestures(
                                     onTap = { timestampVisible = !timestampVisible },
-                                    onLongPress = { contextMenuOpen = true },
+                                    onLongPress = {
+                                        haptics.longPress()
+                                        contextMenuOpen = true
+                                    },
                                 )
                             }
                             .padding(
                                 horizontal = dimens.bubblePaddingH,
                                 vertical = dimens.bubblePaddingV,
                             )
-                            .animateContentSize(),
+                            .animateContentSize(
+                                animationSpec = if (reducedMotion) {
+                                    snap()
+                                } else {
+                                    MotionSpecs.springGentleSize
+                                },
+                            ),
                         verticalArrangement = Arrangement.spacedBy(dimens.space2),
                     ) {
                         if (reasoning.isNotEmpty()) {
@@ -423,7 +441,12 @@ private fun ReasoningDisclosure(
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
-    Column(modifier = Modifier.animateContentSize()) {
+    val reduced = LocalReducedMotion.current
+    Column(
+        modifier = Modifier.animateContentSize(
+            animationSpec = if (reduced) snap() else MotionSpecs.springGentleSize,
+        ),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -447,8 +470,16 @@ private fun ReasoningDisclosure(
         }
         AnimatedVisibility(
             visible = expanded,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
+            enter = if (reduced) {
+                EnterTransition.None
+            } else {
+                fadeIn() + expandVertically()
+            },
+            exit = if (reduced) {
+                ExitTransition.None
+            } else {
+                fadeOut() + shrinkVertically()
+            },
         ) {
             Text(
                 text = reasoning,
@@ -561,7 +592,7 @@ private fun StreamingCaret(modifier: Modifier = Modifier) {
             initialValue = 0.2f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 500),
+                animation = tween(durationMillis = MotionSpecs.caretBlinkMillis / 2),
                 repeatMode = RepeatMode.Reverse,
             ),
             label = "caretAlpha",

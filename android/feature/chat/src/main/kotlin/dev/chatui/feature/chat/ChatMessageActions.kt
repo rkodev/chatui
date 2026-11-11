@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.Message
 import kotlinx.coroutines.delay
 
@@ -74,6 +75,7 @@ fun ChatMessageActions(
     onMenuDismiss: (() -> Unit)? = null,
 ) {
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     var copied by remember(message.id) { mutableStateOf(false) }
     var editing by remember(message.id) { mutableStateOf(false) }
     var draft by remember(message.id) { mutableStateOf("") }
@@ -99,6 +101,7 @@ fun ChatMessageActions(
         } else {
             clipboard.setText(AnnotatedString(text))
         }
+        haptics.confirm()
         copied = true
     }
     val regenerateAction: () -> Unit = {

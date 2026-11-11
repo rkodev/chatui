@@ -54,6 +54,7 @@ import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.SkeletonList
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.Model
 
 /** Test tags exposed by the model picker. */
@@ -297,6 +298,7 @@ fun ModelPickerContent(
                     onSelect = { onSelect(model) },
                     onPin = { onPin(model, !model.pinned) },
                     onHide = { onHide(model, !model.hidden) },
+                    modifier = Modifier.animateItem(),
                 )
             }
         }
@@ -374,18 +376,23 @@ private fun ModelRow(
     onSelect: () -> Unit,
     onPin: () -> Unit,
     onHide: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     val free = isFreeModel(model)
     var menuExpanded by remember { mutableStateOf(false) }
     var detailsExpanded by remember { mutableStateOf(false) }
 
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .testTag(ModelPickerTestTags.model(model.id))
-            .clickable(enabled = !busy, onClick = onSelect),
+            .clickable(enabled = !busy) {
+                haptics.tick()
+                onSelect()
+            },
         shape = RoundedCornerShape(dimens.radiusMd),
         color = if (selected) colors.accentSoft else colors.bgSurfaceRaised,
     ) {
@@ -445,6 +452,7 @@ private fun ModelRow(
                             text = { Text(if (model.pinned) "Unpin" else "Pin") },
                             onClick = {
                                 menuExpanded = false
+                                haptics.tick()
                                 onPin()
                             },
                             modifier = Modifier.testTag(ModelPickerTestTags.pin(model.id)),
@@ -453,6 +461,7 @@ private fun ModelRow(
                             text = { Text(if (model.hidden) "Unhide" else "Hide") },
                             onClick = {
                                 menuExpanded = false
+                                haptics.tick()
                                 onHide()
                             },
                             modifier = Modifier.testTag(ModelPickerTestTags.hide(model.id)),
