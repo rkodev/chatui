@@ -36,12 +36,24 @@ class SettingsScreensTest {
             }
         }
 
-        composeRule.onNodeWithTag(SettingsTestTags.Appearance).assertIsDisplayed()
-        composeRule.onNodeWithTag(SettingsTestTags.ChatDefaults).assertIsDisplayed()
-        composeRule.onNodeWithTag(SettingsTestTags.Providers).assertIsDisplayed()
-        composeRule.onNodeWithTag(SettingsTestTags.Data).assertIsDisplayed()
-        composeRule.onNodeWithTag(SettingsTestTags.Backup).assertIsDisplayed()
-        composeRule.onNodeWithTag(SettingsTestTags.About).assertIsDisplayed()
+        composeRule.onNodeWithTag(SettingsTestTags.Appearance)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(SettingsTestTags.ChatDefaults)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(SettingsTestTags.Providers)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(SettingsTestTags.Data)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(SettingsTestTags.Backup)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(SettingsTestTags.About)
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
@@ -62,6 +74,35 @@ class SettingsScreensTest {
         composeRule.onNodeWithTag(SettingsTestTags.theme("dark")).performClick()
 
         assertThat(selected).isEqualTo(Theme.DARK)
+    }
+
+    @Test
+    fun `appearance forwards haptic and dynamic color toggles`() {
+        var haptics: Boolean? = null
+        var dynamicColor: Boolean? = null
+
+        composeRule.setContent {
+            ChatUiTheme {
+                AppearanceSettingsScreen(
+                    settings = AndroidSettings(),
+                    onThemeChanged = {},
+                    onDensityChanged = {},
+                    onChatFontSizeChanged = {},
+                    onHapticFeedbackChanged = { haptics = it },
+                    onDynamicColorChanged = { dynamicColor = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(SettingsTestTags.HapticFeedback)
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag(SettingsTestTags.DynamicColor)
+            .performScrollTo()
+            .performClick()
+
+        assertThat(haptics).isFalse()
+        assertThat(dynamicColor).isTrue()
     }
 
     @Test

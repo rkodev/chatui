@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -87,16 +88,17 @@ class DataSettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(DataSettingsTestTags.ClearButton)
+        composeRule.onNodeWithTag(DataSettingsTestTags.Clear)
             .performScrollTo()
+            .performClick()
+
+        composeRule.onNodeWithTag(DataSettingsTestTags.ClearButton)
             .assertIsNotEnabled()
 
         composeRule.onNodeWithTag(DataSettingsTestTags.ClearConfirmation)
-            .performScrollTo()
             .performTextInput(CLEAR_ALL_CONFIRMATION)
 
         composeRule.onNodeWithTag(DataSettingsTestTags.ClearButton)
-            .performScrollTo()
             .assertIsEnabled()
             .performClick()
 
@@ -174,6 +176,9 @@ class DataSettingsScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(DataSettingsTestTags.BackupButton)
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithTag(DataSettingsTestTags.ExportButton)
             .performScrollTo()
             .performClick()
@@ -183,14 +188,39 @@ class DataSettingsScreenTest {
         composeRule.onNodeWithTag(DataSettingsTestTags.ImportReplace)
             .performScrollTo()
             .performClick()
-        composeRule.onNodeWithTag(DataSettingsTestTags.BackupButton)
-            .performScrollTo()
-            .performClick()
 
         assertThat(exported).isEqualTo(1)
         assertThat(importedMerge).isEqualTo(1)
         assertThat(importedReplace).isEqualTo(1)
         assertThat(openedBackup).isEqualTo(1)
+    }
+
+    @Test
+    fun `export reports progress through the snackbar`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                DataSettingsScreen(
+                    state = state(),
+                    onConfirmationPhraseChanged = {},
+                    onClearAll = {},
+                    onRequestRemoveKey = {},
+                    onCancelRemoveKey = {},
+                    onConfirmRemoveKey = {},
+                    onDismissError = {},
+                    onOpenProviders = {},
+                    onOpenBackup = {},
+                    onExportAll = {},
+                    onImportMerge = {},
+                    onImportReplace = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(DataSettingsTestTags.ExportButton)
+            .performScrollTo()
+            .performClick()
+
+        composeRule.onNodeWithText("Export started").assertIsDisplayed()
     }
 
     private fun state(

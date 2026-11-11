@@ -100,6 +100,21 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `haptic and dynamic color flags persist`() = runTest(dispatcher) {
+        val viewModel = SettingsViewModel(store, service)
+        advanceUntilIdle()
+
+        viewModel.onHapticFeedbackChanged(false)
+        advanceUntilIdle()
+        viewModel.onDynamicColorChanged(true)
+        advanceUntilIdle()
+
+        val stored = store.settings.first()
+        assertThat(stored.hapticFeedback).isFalse()
+        assertThat(stored.dynamicColor).isTrue()
+    }
+
+    @Test
     fun `default prompt and parameters persist`() = runTest(dispatcher) {
         val viewModel = SettingsViewModel(store, service)
         advanceUntilIdle()

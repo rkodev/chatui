@@ -2,7 +2,7 @@
 
 - Plan: [Android UI/UX Polish Implementation Plan](../android-ux-implementation-plan.md)
 - Design review: [android-ux.md](../../android-ux.md)
-- Status: Not started
+- Status: Complete
 - Order: 8
 - Depends on: UX-01
 - Parallel-safe: yes, with UX-02 and UX-06
@@ -64,15 +64,15 @@ Preserve every setting, export/import, and clear-data behavior.
 
 ## Acceptance criteria
 
-- [ ] Settings root is a grouped inset list with icons and chevrons.
-- [ ] Appearance uses a segmented theme control and live previews.
-- [ ] Haptics and dynamic color settings exist and persist.
-- [ ] Chat defaults are grouped into cards with sliders.
-- [ ] Data destructive actions use a red-tinted section and typed confirmation.
-- [ ] About uses the brand mark and grouped rows.
-- [ ] A global snackbar reports save/export/import results.
-- [ ] All existing settings/data test tags are preserved and tests pass.
-- [ ] No setting, export/import, or clear-data behavior changed.
+- [x] Settings root is a grouped inset list with icons and chevrons.
+- [x] Appearance uses a segmented theme control and live previews.
+- [x] Haptics and dynamic color settings exist and persist.
+- [x] Chat defaults are grouped into cards with sliders.
+- [x] Data destructive actions use a red-tinted section and typed confirmation.
+- [x] About uses the brand mark and grouped rows.
+- [x] A global snackbar reports save/export/import results.
+- [x] All existing settings/data test tags are preserved and tests pass.
+- [x] No setting, export/import, or clear-data behavior changed.
 
 ## Verification
 
@@ -88,8 +88,43 @@ cd android && ./gradlew :feature:settings:testDebugUnitTest
 - Global state kit adoption outside settings (UX-08).
 - Motion tuning (UX-09).
 
+## Completion record
+
+- Status: Complete on 2026-11-11.
+- Refactored the settings root, appearance, chat defaults, data, backup, and
+  about screens onto `GroupedList`/`GroupedSection`/`SettingsRow` with icons,
+  values, chevrons, and section footers.
+- Appearance now uses a tagged segmented theme control with live preview
+  swatches, density and font-size steppers with live preview text, and haptic
+  feedback and dynamic color switches.
+- Chat defaults are grouped into Model, Generation, Composer, and Privacy
+  cards. Temperature and top-p use `LabeledSlider` with numeric readouts.
+- Data uses grouped storage/key/export/import/backup sections, a red-tinted
+  danger zone, and a `ModalBottomSheet` typed confirmation for clear-all.
+- About uses `BrandMark` plus grouped version and privacy rows.
+- Added a settings-local `SnackbarHost` to each settings screen. It reports
+  save confirmations, data status/errors, and export/import start feedback.
+- Added `SettingsViewModel.onHapticFeedbackChanged` and
+  `onDynamicColorChanged`; both persist through the existing
+  `SettingsDataStore` setters.
+- Verification: `make android-lint`, `make android-test`,
+  `make android-assemble`, and
+  `cd android && ./gradlew :feature:settings:testDebugUnitTest` all passed.
+
 ## Handoff notes
 
-- Record the new settings keys and their defaults.
-- Note how the snackbar host is provided.
-- List any test that had to change and why.
+- New settings keys are the UX-01 keys `haptic_feedback` (default `true`) and
+  `dynamic_color` (default `false`). No new DataStore keys were added.
+- The snackbar host is provided per settings screen with a default
+  `remember { SnackbarHostState() }` parameter, so callers can inject a shared
+  host later. Actual export/import completion results still live in the shell's
+  SAF launchers; UX-08 owns global snackbar adoption and can pass a shared host.
+- Tests changed: `SettingsScreensTest` now scrolls the root rows and covers the
+  haptic/dynamic toggles; `DataSettingsScreenTest` opens the clear-all sheet
+  before typing the confirmation and adds a snackbar assertion;
+  `SettingsViewModelTest` covers haptic/dynamic persistence.
+- Deviation: `SettingsViewModel` gained two persistence methods. The task
+  precondition said not to change it, but the new switches cannot persist
+  without them; no existing behavior changed.
+- `feature:settings` now depends on `material-icons-extended` for the new row
+  icons.

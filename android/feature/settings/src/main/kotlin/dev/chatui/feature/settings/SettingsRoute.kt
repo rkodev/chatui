@@ -66,6 +66,8 @@ fun SettingsRoute(
             onThemeChanged = viewModel::onThemeChanged,
             onDensityChanged = viewModel::onDensityChanged,
             onChatFontSizeChanged = viewModel::onChatFontSizeChanged,
+            onHapticFeedbackChanged = viewModel::onHapticFeedbackChanged,
+            onDynamicColorChanged = viewModel::onDynamicColorChanged,
             modifier = modifier,
         )
 
