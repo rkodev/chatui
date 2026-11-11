@@ -12,6 +12,8 @@ import dev.chatui.core.database.attachment.AttachmentStorage
 import dev.chatui.core.database.repository.BackupConfigRepository
 import dev.chatui.core.database.sync.RoomSyncLocalStore
 import dev.chatui.core.datastore.secret.SecretStore
+import dev.chatui.feature.backup.work.BackupScheduler
+import dev.chatui.feature.backup.work.BackupSyncRunner
 import javax.inject.Singleton
 
 /** Application-scoped backup settings service. */
@@ -24,6 +26,7 @@ object BackupModule {
         database: ChatUiDatabase,
         secrets: SecretStore,
         @ApplicationContext context: Context,
+        scheduler: BackupScheduler,
     ): BackupSettingsService = BackupSettingsService(
         store = RoomSyncLocalStore(
             database = database,
@@ -32,7 +35,20 @@ object BackupModule {
         secrets = secrets,
         configRepository = BackupConfigRepository(database.backupConfigDao()),
         statusSource = RoomBackupStatusSource(database),
+        scheduler = scheduler,
     )
+
+    @Provides
+    @Singleton
+    fun provideBackupScheduler(
+        @ApplicationContext context: Context,
+    ): BackupScheduler = BackupScheduler(context)
+
+    @Provides
+    @Singleton
+    fun provideBackupSyncRunner(
+        service: BackupSettingsService,
+    ): BackupSyncRunner = BackupSyncRunner { service.backupNow() }
 }
 
 /** Entry point used by the shell to obtain the backup service without Hilt VMs. */
@@ -40,4 +56,11 @@ object BackupModule {
 @InstallIn(SingletonComponent::class)
 interface BackupEntryPoint {
     fun backupSettingsService(): BackupSettingsService
+}
+
+/** Entry point used by [dev.chatui.feature.backup.work.BackupWorker]. */
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface BackupWorkerEntryPoint {
+    fun backupSyncRunner(): BackupSyncRunner
 }

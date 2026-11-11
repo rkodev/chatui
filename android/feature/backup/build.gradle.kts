@@ -26,6 +26,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.hilt.android)
+    implementation(libs.androidx.work.runtime.ktx)
 
     ksp(libs.hilt.compiler)
 
@@ -38,4 +39,5 @@ dependencies {
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.androidx.compose.ui.test.manifest)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation("androidx.work:work-testing:${libs.versions.work.get()}")
 }

@@ -17,6 +17,7 @@ import dev.chatui.core.model.BackupBackend
 import dev.chatui.core.model.BackupConfig
 import dev.chatui.core.model.BackupEncryption
 import dev.chatui.core.model.BackupKdf
+import dev.chatui.feature.backup.work.BackupScheduling
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -32,6 +33,7 @@ class BackupSettingsServiceTest {
     private val statusSource = FakeStatusSource()
     private val storage = FakeStorage()
     private val engine = FakeEngine()
+    private val scheduler = FakeScheduler()
     private val now = Instant.parse("2026-11-11T12:00:00Z")
 
     private fun service(): BackupSettingsService = BackupSettingsService(
@@ -41,6 +43,7 @@ class BackupSettingsServiceTest {
         statusSource = statusSource,
         createStorage = { _, _ -> storage },
         createEngine = { _, _, _ -> engine },
+        scheduler = scheduler,
         now = { now },
     )
 
@@ -75,6 +78,26 @@ class BackupSettingsServiceTest {
         assertThat(secretValue.captured).contains("secret-value")
         assertThat(secretValue.captured).doesNotContain("correct horse battery staple")
         assertThat(saved.captured).isEqualTo(config)
+    }
+
+    @Test
+    fun `enabling backup schedules periodic work`() = runTest {
+        coEvery { repository.get() } returns null
+
+        service().setEnabled(enabled = true, values = form())
+
+        assertThat(scheduler.scheduleCalls).isEqualTo(1)
+        assertThat(scheduler.cancelCalls).isEqualTo(0)
+    }
+
+    @Test
+    fun `disabling backup cancels scheduled work`() = runTest {
+        coEvery { repository.get() } returns savedConfig().copy(enabled = true)
+
+        service().setEnabled(enabled = false, values = form())
+
+        assertThat(scheduler.cancelCalls).isEqualTo(1)
+        assertThat(scheduler.scheduleCalls).isEqualTo(0)
     }
 
     @Test
@@ -229,6 +252,19 @@ class BackupSettingsServiceTest {
         lastManifestEtag = null,
         deviceId = "device-1",
     )
+}
+
+private class FakeScheduler : BackupScheduling {
+    var scheduleCalls: Int = 0
+    var cancelCalls: Int = 0
+
+    override fun schedulePeriodic() {
+        scheduleCalls += 1
+    }
+
+    override fun cancel() {
+        cancelCalls += 1
+    }
 }
 
 private class FakeStatusSource : BackupStatusSource {

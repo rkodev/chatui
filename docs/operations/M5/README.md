@@ -65,7 +65,7 @@ The phase 2 gate is open. Start `M5-01.1` next.
 | 15 | [M5-05.1 Web backup/restore UI and settings](M5-05.1-web-backup-ui.md) | Complete | M5-04.1 | web UI | M5-05.2, M5-05.3 |
 | 16 | [M5-05.2 Android backup/restore UI and settings](M5-05.2-android-backup-ui.md) | Complete | M5-04.2 | android UI | M5-05.1, M5-05.3 |
 | 17 | [M5-05.3 Rust backup/restore UI and settings](M5-05.3-rust-backup-ui.md) | Complete | M5-04.3 | rust UI | M5-05.1, M5-05.2 |
-| 18 | [M5-06.1 Android WorkManager scheduling](M5-06.1-android-workmanager.md) | Not started | M5-05.2 | android scheduling | M5-06.2, M5-06.3 |
+| 18 | [M5-06.1 Android WorkManager scheduling](M5-06.1-android-workmanager.md) | Complete | M5-05.2 | android scheduling | M5-06.2, M5-06.3 |
 | 19 | [M5-06.2 Web scheduling and platform constraints](M5-06.2-web-scheduling.md) | Not started | M5-05.1 | web scheduling | M5-06.1, M5-06.3 |
 | 20 | [M5-06.3 Rust desktop scheduling and documentation](M5-06.3-rust-scheduling.md) | Not started | M5-05.3 | rust scheduling | M5-06.1, M5-06.2 |
 | 21 | [M5-07.1 Web Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.1-web-additional-backends.md) | Not started | M5-03.1, M5-04.1 | web backend | M5-07.2, M5-07.3 |

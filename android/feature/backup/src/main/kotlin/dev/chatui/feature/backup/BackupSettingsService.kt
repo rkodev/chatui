@@ -15,6 +15,8 @@ import dev.chatui.core.model.BackupBackend
 import dev.chatui.core.model.BackupConfig
 import dev.chatui.core.model.BackupEncryption
 import dev.chatui.core.model.BackupKdf
+import dev.chatui.feature.backup.work.BackupScheduling
+import dev.chatui.feature.backup.work.NoOpBackupScheduling
 import java.net.URI
 import java.time.Instant
 import kotlinx.serialization.Serializable
@@ -138,6 +140,7 @@ class BackupSettingsService(
         ::defaultCreateStorage,
     private val createEngine: (SyncLocalStore, StorageAdapter, String) -> BackupSyncEngine =
         ::defaultCreateEngine,
+    private val scheduler: BackupScheduling = NoOpBackupScheduling,
     private val now: () -> Instant = Instant::now,
 ) : BackupSettingsServiceLike {
     private val json = Json { ignoreUnknownKeys = true }
@@ -186,6 +189,9 @@ class BackupSettingsService(
         configRepository.put(config)
         passphrase = values.passphrase
         lastError = null
+        if (enabled) {
+            scheduler.schedulePeriodic()
+        }
         return config
     }
 
@@ -197,9 +203,14 @@ class BackupSettingsService(
             return saveConfig(values, enabled = true)
         }
 
-        val existing = configRepository.get() ?: return null
+        val existing = configRepository.get()
+        if (existing == null) {
+            scheduler.cancel()
+            return null
+        }
         val config = existing.copy(enabled = false)
         configRepository.put(config)
+        scheduler.cancel()
         return config
     }
 
