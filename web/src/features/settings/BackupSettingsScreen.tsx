@@ -20,6 +20,14 @@ const EMPTY_FORM: BackupFormValues = {
   accessKeyId: '',
   secretAccessKey: '',
   passphrase: '',
+  accountName: '',
+  accountKey: '',
+  sasToken: '',
+  serviceAccountJson: '',
+  accessToken: '',
+  folderId: '',
+  username: '',
+  password: '',
 }
 
 export interface BackupSettingsScreenProps {
@@ -119,6 +127,16 @@ export function BackupSettingsScreen({ service }: BackupSettingsScreenProps = {}
             accessKeyId: snapshot.credentials?.accessKeyId ?? '',
             secretAccessKey: snapshot.credentials?.secretAccessKey ?? '',
             passphrase: '',
+            accountName: snapshot.credentials?.accountName ?? '',
+            accountKey: snapshot.credentials?.accountKey ?? '',
+            sasToken: snapshot.credentials?.sasToken ?? '',
+            serviceAccountJson: snapshot.credentials?.serviceAccountJson ?? '',
+            accessToken: snapshot.credentials?.accessToken ?? '',
+            folderId:
+              snapshot.credentials?.folderId ??
+              (snapshot.config.backend === 'google-drive' ? snapshot.config.bucket : ''),
+            username: snapshot.credentials?.username ?? '',
+            password: snapshot.credentials?.password ?? '',
           })
           setEnabled(snapshot.config.enabled)
         }
@@ -312,96 +330,322 @@ export function BackupSettingsScreen({ service }: BackupSettingsScreenProps = {}
                 }
               >
                 <option value="s3">S3-compatible</option>
-                <option value="azure-blob" disabled>
-                  Azure Blob (coming soon)
-                </option>
-                <option value="gcs" disabled>
-                  Google Cloud Storage (coming soon)
-                </option>
-                <option value="webdav" disabled>
-                  WebDAV (coming soon)
-                </option>
+                <option value="azure-blob">Azure Blob</option>
+                <option value="gcs">Google Cloud Storage</option>
+                <option value="google-drive">Google Drive</option>
+                <option value="webdav">WebDAV</option>
               </select>
             </label>
 
-            <div className="settings-screen__grid">
-              <label className="settings-screen__field" htmlFor="backup-endpoint">
-                <span>Endpoint</span>
-                <input
-                  id="backup-endpoint"
-                  type="url"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={form.endpoint}
-                  disabled={busy !== null}
-                  onChange={(event) => updateField('endpoint', event.target.value)}
-                />
-              </label>
+            {form.backend === 's3' && (
+              <>
+                <div className="settings-screen__grid">
+                  <label className="settings-screen__field" htmlFor="backup-endpoint">
+                    <span>Endpoint</span>
+                    <input
+                      id="backup-endpoint"
+                      type="url"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.endpoint}
+                      disabled={busy !== null}
+                      onChange={(event) => updateField('endpoint', event.target.value)}
+                    />
+                  </label>
 
-              <label className="settings-screen__field" htmlFor="backup-region">
-                <span>Region</span>
-                <input
-                  id="backup-region"
-                  type="text"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={form.region}
-                  disabled={busy !== null}
-                  onChange={(event) => updateField('region', event.target.value)}
-                />
-              </label>
+                  <label className="settings-screen__field" htmlFor="backup-region">
+                    <span>Region</span>
+                    <input
+                      id="backup-region"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.region}
+                      disabled={busy !== null}
+                      onChange={(event) => updateField('region', event.target.value)}
+                    />
+                  </label>
 
-              <label className="settings-screen__field" htmlFor="backup-bucket">
-                <span>Bucket</span>
-                <input
-                  id="backup-bucket"
-                  type="text"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={form.bucket}
-                  disabled={busy !== null}
-                  onChange={(event) => updateField('bucket', event.target.value)}
-                />
-              </label>
+                  <label className="settings-screen__field" htmlFor="backup-bucket">
+                    <span>Bucket</span>
+                    <input
+                      id="backup-bucket"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.bucket}
+                      disabled={busy !== null}
+                      onChange={(event) => updateField('bucket', event.target.value)}
+                    />
+                  </label>
 
-              <label className="settings-screen__field" htmlFor="backup-prefix">
-                <span>Prefix</span>
-                <input
-                  id="backup-prefix"
-                  type="text"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={form.prefix}
-                  disabled={busy !== null}
-                  onChange={(event) => updateField('prefix', event.target.value)}
-                />
-              </label>
-            </div>
+                  <label className="settings-screen__field" htmlFor="backup-prefix">
+                    <span>Prefix</span>
+                    <input
+                      id="backup-prefix"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.prefix}
+                      disabled={busy !== null}
+                      onChange={(event) => updateField('prefix', event.target.value)}
+                    />
+                  </label>
+                </div>
 
-            <label className="settings-screen__field" htmlFor="backup-access-key">
-              <span>Access key ID</span>
-              <input
-                id="backup-access-key"
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                value={form.accessKeyId}
-                disabled={busy !== null}
-                onChange={(event) => updateField('accessKeyId', event.target.value)}
-              />
-            </label>
+                <label className="settings-screen__field" htmlFor="backup-access-key">
+                  <span>Access key ID</span>
+                  <input
+                    id="backup-access-key"
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={form.accessKeyId}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('accessKeyId', event.target.value)}
+                  />
+                </label>
 
-            <label className="settings-screen__field" htmlFor="backup-secret-key">
-              <span>Secret access key</span>
-              <input
-                id="backup-secret-key"
-                type="password"
-                autoComplete="new-password"
-                value={form.secretAccessKey}
-                disabled={busy !== null}
-                onChange={(event) => updateField('secretAccessKey', event.target.value)}
-              />
-            </label>
+                <label className="settings-screen__field" htmlFor="backup-secret-key">
+                  <span>Secret access key</span>
+                  <input
+                    id="backup-secret-key"
+                    type="password"
+                    autoComplete="new-password"
+                    value={form.secretAccessKey}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('secretAccessKey', event.target.value)}
+                  />
+                </label>
+              </>
+            )}
+
+            {form.backend === 'azure-blob' && (
+              <>
+                <div className="settings-screen__grid">
+                  <label className="settings-screen__field" htmlFor="backup-azure-account">
+                    <span>Account name</span>
+                    <input
+                      id="backup-azure-account"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.accountName ?? ''}
+                      disabled={busy !== null}
+                      onChange={(event) => updateField('accountName', event.target.value)}
+                    />
+                  </label>
+
+                  <label className="settings-screen__field" htmlFor="backup-azure-container">
+                    <span>Container</span>
+                    <input
+                      id="backup-azure-container"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.bucket}
+                      disabled={busy !== null}
+                      onChange={(event) => updateField('bucket', event.target.value)}
+                    />
+                  </label>
+
+                  <label className="settings-screen__field" htmlFor="backup-azure-endpoint">
+                    <span>Endpoint (optional)</span>
+                    <input
+                      id="backup-azure-endpoint"
+                      type="url"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.endpoint}
+                      disabled={busy !== null}
+                      onChange={(event) => updateField('endpoint', event.target.value)}
+                    />
+                  </label>
+
+                  <label className="settings-screen__field" htmlFor="backup-azure-prefix">
+                    <span>Prefix</span>
+                    <input
+                      id="backup-azure-prefix"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.prefix}
+                      disabled={busy !== null}
+                      onChange={(event) => updateField('prefix', event.target.value)}
+                    />
+                  </label>
+                </div>
+
+                <label className="settings-screen__field" htmlFor="backup-azure-key">
+                  <span>Account key</span>
+                  <input
+                    id="backup-azure-key"
+                    type="password"
+                    autoComplete="new-password"
+                    value={form.accountKey ?? ''}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('accountKey', event.target.value)}
+                  />
+                </label>
+
+                <label className="settings-screen__field" htmlFor="backup-azure-sas">
+                  <span>SAS token</span>
+                  <input
+                    id="backup-azure-sas"
+                    type="password"
+                    autoComplete="new-password"
+                    value={form.sasToken ?? ''}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('sasToken', event.target.value)}
+                  />
+                </label>
+              </>
+            )}
+
+            {form.backend === 'gcs' && (
+              <>
+                <div className="settings-screen__grid">
+                  <label className="settings-screen__field" htmlFor="backup-gcs-bucket">
+                    <span>Bucket</span>
+                    <input
+                      id="backup-gcs-bucket"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.bucket}
+                      disabled={busy !== null}
+                      onChange={(event) => updateField('bucket', event.target.value)}
+                    />
+                  </label>
+
+                  <label className="settings-screen__field" htmlFor="backup-gcs-prefix">
+                    <span>Prefix</span>
+                    <input
+                      id="backup-gcs-prefix"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.prefix}
+                      disabled={busy !== null}
+                      onChange={(event) => updateField('prefix', event.target.value)}
+                    />
+                  </label>
+                </div>
+
+                <label className="settings-screen__field" htmlFor="backup-gcs-service-account">
+                  <span>Service account JSON</span>
+                  <textarea
+                    id="backup-gcs-service-account"
+                    rows={6}
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={form.serviceAccountJson ?? ''}
+                    disabled={busy !== null}
+                    onChange={(event) =>
+                      updateField('serviceAccountJson', event.target.value)
+                    }
+                  />
+                </label>
+              </>
+            )}
+
+            {form.backend === 'google-drive' && (
+              <div className="settings-screen__grid">
+                <label className="settings-screen__field" htmlFor="backup-drive-token">
+                  <span>Access token</span>
+                  <input
+                    id="backup-drive-token"
+                    type="password"
+                    autoComplete="new-password"
+                    value={form.accessToken ?? ''}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('accessToken', event.target.value)}
+                  />
+                </label>
+
+                <label className="settings-screen__field" htmlFor="backup-drive-folder">
+                  <span>Folder ID</span>
+                  <input
+                    id="backup-drive-folder"
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="appDataFolder"
+                    value={form.folderId ?? ''}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('folderId', event.target.value)}
+                  />
+                </label>
+
+                <label className="settings-screen__field" htmlFor="backup-drive-prefix">
+                  <span>Prefix</span>
+                  <input
+                    id="backup-drive-prefix"
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={form.prefix}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('prefix', event.target.value)}
+                  />
+                </label>
+              </div>
+            )}
+
+            {form.backend === 'webdav' && (
+              <div className="settings-screen__grid">
+                <label className="settings-screen__field" htmlFor="backup-webdav-url">
+                  <span>WebDAV URL</span>
+                  <input
+                    id="backup-webdav-url"
+                    type="url"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={form.endpoint}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('endpoint', event.target.value)}
+                  />
+                </label>
+
+                <label className="settings-screen__field" htmlFor="backup-webdav-username">
+                  <span>Username</span>
+                  <input
+                    id="backup-webdav-username"
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={form.username ?? ''}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('username', event.target.value)}
+                  />
+                </label>
+
+                <label className="settings-screen__field" htmlFor="backup-webdav-password">
+                  <span>Password</span>
+                  <input
+                    id="backup-webdav-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={form.password ?? ''}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('password', event.target.value)}
+                  />
+                </label>
+
+                <label className="settings-screen__field" htmlFor="backup-webdav-prefix">
+                  <span>Prefix</span>
+                  <input
+                    id="backup-webdav-prefix"
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={form.prefix}
+                    disabled={busy !== null}
+                    onChange={(event) => updateField('prefix', event.target.value)}
+                  />
+                </label>
+              </div>
+            )}
 
             <label className="settings-screen__field" htmlFor="backup-passphrase">
               <span>Passphrase</span>

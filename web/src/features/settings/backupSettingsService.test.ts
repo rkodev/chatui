@@ -16,6 +16,7 @@ import {
   BACKUP_CREDENTIALS_SECRET_ID,
   BackupSettingsService,
   RESTORE_REPLACE_CONFIRMATION,
+  validateBackupForm,
   type BackupFormValues,
   type SyncEngineLike,
 } from './backupSettingsService'
@@ -350,5 +351,169 @@ describe('BackupSettingsService', () => {
     expect(status.pendingChanges).toBe(1)
     expect(status.lastError).toBe('network down')
     expect(status.storageUsageBytes).toBeGreaterThan(0)
+  })
+
+  it('validates and saves Azure Blob configuration and credentials', async () => {
+    const { service, secrets } = await setup()
+    const azureValues: BackupFormValues = {
+      ...values,
+      backend: 'azure-blob',
+      endpoint: '',
+      region: '',
+      bucket: 'backup-container',
+      accountName: 'chatuiaccount',
+      accountKey: 'a2V5',
+      sasToken: '',
+    }
+
+    expect(validateBackupForm({ ...azureValues, accountName: '' })).toBe(
+      'Azure account name is required.',
+    )
+    expect(
+      validateBackupForm({ ...azureValues, accountKey: '', sasToken: '' }),
+    ).toBe('Azure account key or SAS token is required.')
+
+    const config = await service.saveConfig(azureValues)
+
+    expect(config.backend).toBe('azure-blob')
+    expect(config.endpoint).toBe('https://chatuiaccount.blob.core.windows.net')
+    expect(config.region).toBeNull()
+    expect(config.bucket).toBe('backup-container')
+
+    const stored = JSON.parse(
+      (await secrets.getSecret(BACKUP_CREDENTIALS_SECRET_ID)) ?? '{}',
+    ) as Record<string, unknown>
+    expect(stored.accountName).toBe('chatuiaccount')
+    expect(stored.accountKey).toBe('a2V5')
+  })
+
+  it('validates and saves GCS configuration and credentials', async () => {
+    const { service, secrets } = await setup()
+    const gcsValues: BackupFormValues = {
+      ...values,
+      backend: 'gcs',
+      endpoint: '',
+      region: '',
+      bucket: 'chatui-gcs',
+      serviceAccountJson: JSON.stringify({
+        client_email: 'backup@example.test',
+        private_key: 'test-key',
+      }),
+    }
+
+    expect(validateBackupForm({ ...gcsValues, serviceAccountJson: 'not-json' })).toBe(
+      'GCS service account JSON must be valid JSON.',
+    )
+    expect(
+      validateBackupForm({
+        ...gcsValues,
+        serviceAccountJson: JSON.stringify({ client_email: 'backup@example.test' }),
+      }),
+    ).toBe('GCS service account JSON is missing private_key.')
+
+    const config = await service.saveConfig(gcsValues)
+
+    expect(config.backend).toBe('gcs')
+    expect(config.endpoint).toBeNull()
+    expect(config.region).toBeNull()
+    expect(config.bucket).toBe('chatui-gcs')
+
+    const stored = JSON.parse(
+      (await secrets.getSecret(BACKUP_CREDENTIALS_SECRET_ID)) ?? '{}',
+    ) as Record<string, unknown>
+    expect(stored.serviceAccountJson).toBe(gcsValues.serviceAccountJson)
+  })
+
+  it('validates and saves Google Drive configuration and credentials', async () => {
+    const { service, secrets } = await setup()
+    const driveValues: BackupFormValues = {
+      ...values,
+      backend: 'google-drive',
+      endpoint: '',
+      region: '',
+      bucket: '',
+      accessToken: 'drive-token',
+      folderId: 'folder-1',
+    }
+
+    expect(validateBackupForm({ ...driveValues, accessToken: '' })).toBe(
+      'Google Drive access token is required.',
+    )
+
+    const config = await service.saveConfig(driveValues)
+
+    expect(config.backend).toBe('google-drive')
+    expect(config.endpoint).toBeNull()
+    expect(config.region).toBeNull()
+    expect(config.bucket).toBe('folder-1')
+
+    const stored = JSON.parse(
+      (await secrets.getSecret(BACKUP_CREDENTIALS_SECRET_ID)) ?? '{}',
+    ) as Record<string, unknown>
+    expect(stored.accessToken).toBe('drive-token')
+    expect(stored.folderId).toBe('folder-1')
+  })
+
+  it('validates and saves WebDAV configuration and credentials', async () => {
+    const { service, secrets } = await setup()
+    const webdavValues: BackupFormValues = {
+      ...values,
+      backend: 'webdav',
+      endpoint: 'https://dav.example.test/dav/',
+      region: '',
+      bucket: '',
+      username: 'backup-user',
+      password: 'backup-pass',
+    }
+
+    expect(validateBackupForm({ ...webdavValues, password: '' })).toBe(
+      'WebDAV password is required.',
+    )
+
+    const config = await service.saveConfig(webdavValues)
+
+    expect(config.backend).toBe('webdav')
+    expect(config.endpoint).toBe('https://dav.example.test/dav/')
+    expect(config.region).toBeNull()
+    expect(config.bucket).toBe('')
+
+    const stored = JSON.parse(
+      (await secrets.getSecret(BACKUP_CREDENTIALS_SECRET_ID)) ?? '{}',
+    ) as Record<string, unknown>
+    expect(stored.username).toBe('backup-user')
+    expect(stored.password).toBe('backup-pass')
+  })
+
+  it('builds the backend-specific adapter for connectivity tests', async () => {
+    const { db, secrets, storage } = await setup()
+    const createStorage = vi.fn(() => storage.storage)
+    const service = new BackupSettingsService({
+      db,
+      secrets,
+      createStorage,
+      createEngine: () => createEngine().engine,
+      now: () => NOW,
+    })
+
+    await service.testConnection({
+      ...values,
+      backend: 'azure-blob',
+      endpoint: '',
+      region: '',
+      bucket: 'backup-container',
+      accountName: 'chatuiaccount',
+      accountKey: 'a2V5',
+      sasToken: '',
+    })
+
+    expect(createStorage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backend: 'azure-blob',
+        endpoint: 'https://chatuiaccount.blob.core.windows.net',
+        bucket: 'backup-container',
+      }),
+      expect.objectContaining({ accountName: 'chatuiaccount', accountKey: 'a2V5' }),
+    )
+    expect(storage.testConnection).toHaveBeenCalledTimes(1)
   })
 })

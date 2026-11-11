@@ -253,4 +253,40 @@ describe('BackupSettingsScreen', () => {
       screen.getByText(/If you lose your passphrase, you lose access/i),
     ).toBeInTheDocument()
   })
+
+  it('enables every backend and shows backend-specific fields', async () => {
+    const user = userEvent.setup()
+    const { service } = createFakeService()
+
+    renderScreen(service)
+    await screen.findByLabelText('Bucket')
+
+    const options = screen.getAllByRole('option') as HTMLOptionElement[]
+    expect(options.map((option) => option.value)).toEqual([
+      's3',
+      'azure-blob',
+      'gcs',
+      'google-drive',
+      'webdav',
+    ])
+    expect(options.every((option) => !option.disabled)).toBe(true)
+
+    await user.selectOptions(screen.getByLabelText('Backend'), 'azure-blob')
+    expect(screen.getByLabelText('Account name')).toBeInTheDocument()
+    expect(screen.getByLabelText('Container')).toBeInTheDocument()
+    expect(screen.getByLabelText('Account key')).toBeInTheDocument()
+    expect(screen.getByLabelText('SAS token')).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Backend'), 'gcs')
+    expect(screen.getByLabelText('Service account JSON')).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Backend'), 'google-drive')
+    expect(screen.getByLabelText('Access token')).toBeInTheDocument()
+    expect(screen.getByLabelText('Folder ID')).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Backend'), 'webdav')
+    expect(screen.getByLabelText('WebDAV URL')).toBeInTheDocument()
+    expect(screen.getByLabelText('Username')).toBeInTheDocument()
+    expect(screen.getByLabelText('Password')).toBeInTheDocument()
+  })
 })

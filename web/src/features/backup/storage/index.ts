@@ -16,6 +16,13 @@ export {
   type SignedRequest,
 } from './sigv4'
 export { S3StorageAdapter, type S3StorageConfig } from './s3'
+export { AzureBlobStorageAdapter, type AzureBlobStorageConfig } from './azure'
+export { GcsStorageAdapter, type GcsServiceAccount, type GcsStorageConfig } from './gcs'
+export {
+  GoogleDriveStorageAdapter,
+  type GoogleDriveStorageConfig,
+} from './google-drive'
+export { WebDavStorageAdapter, type WebDavStorageConfig } from './webdav'
 export {
   StorageError,
   type ListObjectsOptions,

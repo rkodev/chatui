@@ -287,7 +287,7 @@ const modelSchema = z
 const backupConfigSchema = z
   .object({
     enabled: z.boolean(),
-    backend: z.enum(['s3', 'azure-blob', 'gcs', 'webdav']),
+    backend: z.enum(['s3', 'azure-blob', 'gcs', 'google-drive', 'webdav']),
     endpoint: z.string().nullable(),
     region: z.string().nullable(),
     bucket: z.string(),

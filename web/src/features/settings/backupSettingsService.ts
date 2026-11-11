@@ -7,7 +7,14 @@ import {
   type ChatUiDB,
 } from '../../storage'
 import { SecretStore, type SecretMode } from '../../storage/SecretStore'
-import { S3StorageAdapter, type StorageAdapter } from '../backup/storage'
+import {
+  AzureBlobStorageAdapter,
+  GcsStorageAdapter,
+  GoogleDriveStorageAdapter,
+  S3StorageAdapter,
+  WebDavStorageAdapter,
+  type StorageAdapter,
+} from '../backup/storage'
 import { BackupScheduler, type BackupSchedulerLike } from '../backup/scheduler'
 import {
   DELETE_REMOTE_CONFIRMATION,
@@ -26,6 +33,22 @@ export const RESTORE_REPLACE_CONFIRMATION = 'REPLACE LOCAL DATA'
 export interface BackupCredentials {
   accessKeyId: string
   secretAccessKey: string
+  /** Azure Blob account name. */
+  accountName?: string
+  /** Azure Blob account key. */
+  accountKey?: string
+  /** Azure Blob SAS token. */
+  sasToken?: string
+  /** GCS service account JSON. */
+  serviceAccountJson?: string
+  /** Google Drive OAuth access token. */
+  accessToken?: string
+  /** Google Drive folder id, or `appDataFolder`. */
+  folderId?: string
+  /** WebDAV username. */
+  username?: string
+  /** WebDAV password. */
+  password?: string
 }
 
 export interface BackupFormValues {
@@ -37,6 +60,22 @@ export interface BackupFormValues {
   accessKeyId: string
   secretAccessKey: string
   passphrase: string
+  /** Azure Blob account name. */
+  accountName?: string
+  /** Azure Blob account key. */
+  accountKey?: string
+  /** Azure Blob SAS token. */
+  sasToken?: string
+  /** GCS service account JSON. */
+  serviceAccountJson?: string
+  /** Google Drive OAuth access token. */
+  accessToken?: string
+  /** Google Drive folder id, or `appDataFolder`. */
+  folderId?: string
+  /** WebDAV username. */
+  username?: string
+  /** WebDAV password. */
+  password?: string
 }
 
 export interface BackupSettingsSnapshot {
@@ -138,10 +177,26 @@ function parseCredentials(raw: string | null): BackupCredentials | null {
       typeof parsed.accessKeyId === 'string' &&
       typeof parsed.secretAccessKey === 'string'
     ) {
-      return {
+      const credentials: BackupCredentials = {
         accessKeyId: parsed.accessKeyId,
         secretAccessKey: parsed.secretAccessKey,
       }
+      for (const key of [
+        'accountName',
+        'accountKey',
+        'sasToken',
+        'serviceAccountJson',
+        'accessToken',
+        'folderId',
+        'username',
+        'password',
+      ] as const) {
+        const value = parsed[key]
+        if (typeof value === 'string') {
+          credentials[key] = value
+        }
+      }
+      return credentials
     }
   } catch {
     return null
@@ -150,23 +205,60 @@ function parseCredentials(raw: string | null): BackupCredentials | null {
   return null
 }
 
+function credentialsFromValues(values: BackupFormValues): BackupCredentials {
+  return {
+    accessKeyId: values.accessKeyId.trim(),
+    secretAccessKey: values.secretAccessKey,
+    accountName: values.accountName?.trim(),
+    accountKey: values.accountKey,
+    sasToken: values.sasToken,
+    serviceAccountJson: values.serviceAccountJson,
+    accessToken: values.accessToken,
+    folderId: values.folderId?.trim(),
+    username: values.username,
+    password: values.password,
+  }
+}
+
 /** Validate the storage fields. The passphrase is validated separately. */
 export function validateBackupForm(values: BackupFormValues): string | null {
-  if (values.backend !== 's3') {
-    return 'Only S3-compatible storage is available in this release.'
+  switch (values.backend) {
+    case 's3':
+      return validateS3Form(values)
+    case 'azure-blob':
+      return validateAzureForm(values)
+    case 'gcs':
+      return validateGcsForm(values)
+    case 'google-drive':
+      return validateGoogleDriveForm(values)
+    case 'webdav':
+      return validateWebDavForm(values)
+    default:
+      return 'Unsupported backup backend.'
   }
+}
 
-  if (values.endpoint.trim() === '') {
-    return 'Endpoint is required.'
+function validateEndpoint(value: string, label: string): string | null {
+  if (value.trim() === '') {
+    return `${label} is required.`
   }
 
   try {
-    const endpoint = new URL(values.endpoint)
+    const endpoint = new URL(value)
     if (endpoint.protocol !== 'https:' && endpoint.protocol !== 'http:') {
-      return 'Endpoint must use http or https.'
+      return `${label} must use http or https.`
     }
   } catch {
-    return 'Endpoint must be a valid URL.'
+    return `${label} must be a valid URL.`
+  }
+
+  return null
+}
+
+function validateS3Form(values: BackupFormValues): string | null {
+  const endpointError = validateEndpoint(values.endpoint, 'Endpoint')
+  if (endpointError !== null) {
+    return endpointError
   }
 
   if (values.region.trim() === '') {
@@ -185,6 +277,69 @@ export function validateBackupForm(values: BackupFormValues): string | null {
   return null
 }
 
+function validateAzureForm(values: BackupFormValues): string | null {
+  if ((values.accountName ?? '').trim() === '') {
+    return 'Azure account name is required.'
+  }
+  if (values.bucket.trim() === '') {
+    return 'Azure container is required.'
+  }
+  if ((values.accountKey ?? '') === '' && (values.sasToken ?? '') === '') {
+    return 'Azure account key or SAS token is required.'
+  }
+  if (values.endpoint.trim() !== '') {
+    return validateEndpoint(values.endpoint, 'Azure endpoint')
+  }
+  return null
+}
+
+function validateGcsForm(values: BackupFormValues): string | null {
+  if (values.bucket.trim() === '') {
+    return 'GCS bucket is required.'
+  }
+  if ((values.serviceAccountJson ?? '').trim() === '') {
+    return 'GCS service account JSON is required.'
+  }
+
+  try {
+    const parsed = JSON.parse(values.serviceAccountJson ?? '') as {
+      client_email?: unknown
+      private_key?: unknown
+    }
+    if (typeof parsed.client_email !== 'string' || parsed.client_email === '') {
+      return 'GCS service account JSON is missing client_email.'
+    }
+    if (typeof parsed.private_key !== 'string' || parsed.private_key === '') {
+      return 'GCS service account JSON is missing private_key.'
+    }
+  } catch {
+    return 'GCS service account JSON must be valid JSON.'
+  }
+
+  return null
+}
+
+function validateGoogleDriveForm(values: BackupFormValues): string | null {
+  if ((values.accessToken ?? '').trim() === '') {
+    return 'Google Drive access token is required.'
+  }
+  return null
+}
+
+function validateWebDavForm(values: BackupFormValues): string | null {
+  const endpointError = validateEndpoint(values.endpoint, 'WebDAV URL')
+  if (endpointError !== null) {
+    return endpointError
+  }
+  if ((values.username ?? '') === '') {
+    return 'WebDAV username is required.'
+  }
+  if ((values.password ?? '') === '') {
+    return 'WebDAV password is required.'
+  }
+  return null
+}
+
 export function validatePassphrase(passphrase: string): string | null {
   return passphrase.length === 0 ? 'Passphrase is required.' : null
 }
@@ -193,21 +348,53 @@ function defaultCreateStorage(
   config: BackupConfig,
   credentials: BackupCredentials,
 ): StorageAdapter {
-  if (config.backend !== 's3') {
-    throw new Error('Only S3-compatible storage is available in this release.')
+  switch (config.backend) {
+    case 's3':
+      if (config.endpoint === null || config.region === null) {
+        throw new Error('Endpoint and region are required.')
+      }
+      return new S3StorageAdapter({
+        endpoint: config.endpoint,
+        bucket: config.bucket,
+        region: config.region,
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        prefix: config.prefix,
+      })
+    case 'azure-blob':
+      return new AzureBlobStorageAdapter({
+        accountName: credentials.accountName ?? '',
+        accountKey: credentials.accountKey,
+        sasToken: credentials.sasToken,
+        container: config.bucket,
+        endpoint: config.endpoint ?? undefined,
+        prefix: config.prefix,
+      })
+    case 'gcs':
+      return new GcsStorageAdapter({
+        bucket: config.bucket,
+        serviceAccountJson: credentials.serviceAccountJson ?? '',
+        prefix: config.prefix,
+      })
+    case 'google-drive':
+      return new GoogleDriveStorageAdapter({
+        accessToken: credentials.accessToken ?? '',
+        folderId: config.bucket === '' ? credentials.folderId : config.bucket,
+        prefix: config.prefix,
+      })
+    case 'webdav':
+      if (config.endpoint === null) {
+        throw new Error('WebDAV URL is required.')
+      }
+      return new WebDavStorageAdapter({
+        url: config.endpoint,
+        username: credentials.username ?? '',
+        password: credentials.password ?? '',
+        prefix: config.prefix,
+      })
+    default:
+      throw new Error('Unsupported backup backend.')
   }
-  if (config.endpoint === null || config.region === null) {
-    throw new Error('Endpoint and region are required.')
-  }
-
-  return new S3StorageAdapter({
-    endpoint: config.endpoint,
-    bucket: config.bucket,
-    region: config.region,
-    accessKeyId: credentials.accessKeyId,
-    secretAccessKey: credentials.secretAccessKey,
-    prefix: config.prefix,
-  })
 }
 
 function defaultCreateEngine(options: {
@@ -279,20 +466,12 @@ export class BackupSettingsService implements BackupSettingsServiceLike {
 
     const existing = await this.repository.get()
     const secretId = existing?.credentialSecretId ?? BACKUP_CREDENTIALS_SECRET_ID
-    const credentials: BackupCredentials = {
-      accessKeyId: values.accessKeyId.trim(),
-      secretAccessKey: values.secretAccessKey,
-    }
+    const credentials = credentialsFromValues(values)
 
     await this.secrets.setSecret(secretId, JSON.stringify(credentials), 'remember')
 
     const config: BackupConfig = {
-      enabled,
-      backend: values.backend,
-      endpoint: values.endpoint.trim(),
-      region: values.region.trim(),
-      bucket: values.bucket.trim(),
-      prefix: values.prefix.trim(),
+      ...this.configFromValues(values, enabled),
       credentialSecretId: secretId,
       encryption: existing?.encryption ?? DEFAULT_CONFIG.encryption,
       kdf: existing?.kdf ?? DEFAULT_CONFIG.kdf,
@@ -333,10 +512,7 @@ export class BackupSettingsService implements BackupSettingsServiceLike {
     }
 
     const config = this.configFromValues(values, false)
-    const storage = this.createStorage(config, {
-      accessKeyId: values.accessKeyId.trim(),
-      secretAccessKey: values.secretAccessKey,
-    })
+    const storage = this.createStorage(config, credentialsFromValues(values))
     await storage.testConnection()
   }
 
@@ -435,14 +611,54 @@ export class BackupSettingsService implements BackupSettingsServiceLike {
   }
 
   private configFromValues(values: BackupFormValues, enabled: boolean): BackupConfig {
-    return {
+    const base: BackupConfig = {
       ...DEFAULT_CONFIG,
       enabled,
       backend: values.backend,
-      endpoint: values.endpoint.trim(),
-      region: values.region.trim(),
-      bucket: values.bucket.trim(),
       prefix: values.prefix.trim(),
+    }
+
+    switch (values.backend) {
+      case 's3':
+        return {
+          ...base,
+          endpoint: values.endpoint.trim(),
+          region: values.region.trim(),
+          bucket: values.bucket.trim(),
+        }
+      case 'azure-blob':
+        return {
+          ...base,
+          endpoint:
+            values.endpoint.trim() === ''
+              ? `https://${(values.accountName ?? '').trim()}.blob.core.windows.net`
+              : values.endpoint.trim(),
+          region: null,
+          bucket: values.bucket.trim(),
+        }
+      case 'gcs':
+        return {
+          ...base,
+          endpoint: null,
+          region: null,
+          bucket: values.bucket.trim(),
+        }
+      case 'google-drive':
+        return {
+          ...base,
+          endpoint: null,
+          region: null,
+          bucket: (values.folderId ?? '').trim() || 'appDataFolder',
+        }
+      case 'webdav':
+        return {
+          ...base,
+          endpoint: values.endpoint.trim(),
+          region: null,
+          bucket: '',
+        }
+      default:
+        return base
     }
   }
 
