@@ -1,5 +1,6 @@
 package dev.chatui.core.database.repository
 
+import dev.chatui.core.database.dao.BackupConfigDao
 import dev.chatui.core.database.entity.ConversationEntity
 import dev.chatui.core.database.entity.AttachmentEntity
 import dev.chatui.core.database.entity.BackupConfigEntity
@@ -164,6 +165,24 @@ internal fun BackupConfigEntity.toDomain(): BackupConfig = BackupConfig(
     lastSyncAt = lastSyncAt?.let(Instant::parse),
     lastManifestEtag = lastManifestEtag,
     deviceId = deviceId,
+)
+
+internal fun BackupConfig.toEntity(): BackupConfigEntity = BackupConfigEntity(
+    id = BackupConfigDao.DEFAULT_ID,
+    enabled = enabled,
+    backend = serialName(BackupBackend.serializer(), backend),
+    endpoint = endpoint,
+    region = region,
+    bucket = bucket,
+    prefix = prefix,
+    credentialSecretId = credentialSecretId,
+    encryption = serialName(BackupEncryption.serializer(), encryption),
+    kdf = serialName(BackupKdf.serializer(), kdf),
+    kdfSalt = kdfSalt,
+    lastSyncAt = lastSyncAt?.toString(),
+    lastManifestEtag = lastManifestEtag,
+    deviceId = deviceId,
+    updatedAt = java.time.Instant.now().toString(),
 )
 
 internal fun MessageEntity.toDomain(): Message = Message(    id = id,
