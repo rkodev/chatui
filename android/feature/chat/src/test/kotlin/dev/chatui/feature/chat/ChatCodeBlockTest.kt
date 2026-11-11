@@ -1,5 +1,6 @@
 package dev.chatui.feature.chat
 
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -68,10 +69,12 @@ class ChatCodeBlockTest {
             }
         }
 
-        composeRule.onNodeWithTag(ChatCodeBlockTestTags.Wrap).assertTextEquals("Wrap")
+        composeRule.onNodeWithTag(ChatCodeBlockTestTags.Wrap)
+            .assertContentDescriptionEquals("Wrap")
         composeRule.onNodeWithTag(ChatCodeBlockTestTags.Wrap).performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag(ChatCodeBlockTestTags.Wrap).assertTextEquals("Scroll")
+        composeRule.onNodeWithTag(ChatCodeBlockTestTags.Wrap)
+            .assertContentDescriptionEquals("Scroll")
 
         composeRule.onNodeWithTag(ChatCodeBlockTestTags.Copy).performClick()
         composeRule.waitForIdle()

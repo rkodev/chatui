@@ -2,7 +2,7 @@
 
 - Plan: [Android UI/UX Polish Implementation Plan](../android-ux-implementation-plan.md)
 - Design review: [android-ux.md](../../android-ux.md)
-- Status: Not started
+- Status: Complete
 - Order: 4
 - Depends on: UX-01, UX-02
 - Parallel-safe: yes, with UX-04 and UX-05
@@ -108,16 +108,16 @@ and action behavior.
 
 ## Acceptance criteria
 
-- [ ] Bubbles use the new geometry, grouping, and avatars.
-- [ ] Streaming shows a three-dot indicator, caret, and first-token shimmer.
-- [ ] Reasoning and code blocks are polished and animated.
-- [ ] Message actions are available via long-press and overflow.
-- [ ] Scroll-to-bottom FAB and new-message pill work.
-- [ ] Composer is a floating bar with an attach sheet and morphing send/stop.
-- [ ] Attachment chips show thumbnails and remove with animation.
-- [ ] Empty, availability, and error states use the new cards.
-- [ ] All existing chat test tags are preserved and tests pass.
-- [ ] No streaming, persistence, or attachment behavior changed.
+- [x] Bubbles use the new geometry, grouping, and avatars.
+- [x] Streaming shows a three-dot indicator, caret, and first-token shimmer.
+- [x] Reasoning and code blocks are polished and animated.
+- [x] Message actions are available via long-press and overflow.
+- [x] Scroll-to-bottom FAB and new-message pill work.
+- [x] Composer is a floating bar with an attach sheet and morphing send/stop.
+- [x] Attachment chips show thumbnails and remove with animation.
+- [x] Empty, availability, and error states use the new cards.
+- [x] All existing chat test tags are preserved and tests pass.
+- [x] No streaming, persistence, or attachment behavior changed.
 
 ## Verification
 
@@ -135,8 +135,50 @@ Plus a manual streaming check on a device/emulator when available.
 - Global state kit adoption outside chat (UX-08).
 - Motion tuning across all screens (UX-09).
 
+## Completion record
+
+- Status: Complete on 2026-11-11.
+- Refactored `ChatMessageItem` into grouped bubbles with 78% max width, 20 dp
+  radius, a 4 dp sender-side tail, 14×10 dp padding, 28 dp avatars, animated
+  reasoning disclosure, streaming typing/caret/shimmer, and an inline error
+  card.
+- Added grouping in `ChatMessageList` (avatar on group start, timestamp on
+  group end or tap), a scroll-to-bottom FAB, a new-message pill, and animated
+  programmatic scrolls.
+- Refactored `ChatCodeBlock` to a 12 dp container with a language pill, icon
+  copy/wrap buttons, and an edge fade.
+- Refactored `ChatMessageActions` into an inline row for the last assistant
+  message plus an overflow menu and long-press context menu for every message.
+- Rebuilt `ChatComposer` as a floating rounded bar with a `+` attach sheet,
+  auto-growing field, morphing send/stop button, thumbnail attachment chips,
+  focus border, soft shadow, offline banner, send haptic, and press scale.
+- Replaced the empty state with a branded greeting, prompt chips, and model
+  selector; converted availability and screen errors to warning/error cards.
+- Verification: `make android-lint`, `make android-test`,
+  `make android-assemble`, and
+  `cd android && ./gradlew :feature:chat:testDebugUnitTest` all passed.
+
 ## Handoff notes
 
-- Record any test that had to change and why.
-- Note the grouping rule and how timestamps are shown.
-- Note the scroll FAB visibility threshold.
+- Tests updated for visible-text changes only: `ChatScreenTest` now expects the
+  new empty-state greeting and opens the overflow menu before editing the last
+  user message; `ChatCodeBlockTest` asserts the wrap/copy icon content
+  descriptions instead of text labels. No behavior assertion was weakened.
+- New tests: grouping/avatar count, scroll-to-bottom FAB, new-message pill,
+  typing indicator vs. streaming caret, attach sheet, and overflow actions.
+- Grouping rule: consecutive messages with the same role form a group. The
+  avatar renders only on the first row; the timestamp renders on the last row
+  of the group and on tap. The list uses 2 dp spacing plus a 10 dp top pad on
+  group starts for the 12 dp inter-group gap.
+- Scroll FAB visibility threshold: shown when the user is not within two items
+  of the end and either a stream is active or new content arrived off-screen.
+  The new-message pill uses the same off-screen condition.
+- Deviation: the last user message exposes Edit through the overflow menu
+  rather than an inline row, so the inline row stays reserved for the last
+  assistant message as specified.
+- Deviation: `ChatUiState.error` has no retry callback, so the screen-level
+  transient error renders as an inline error card with Dismiss. Message-level
+  failures keep the inline Retry action.
+- Manual streaming check on a device/emulator was not available in this
+  environment; the streaming behavior is covered by the existing
+  `ChatRouteFlowTest` and the new indicator tests.

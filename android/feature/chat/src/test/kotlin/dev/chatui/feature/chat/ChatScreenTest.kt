@@ -65,6 +65,7 @@ class ChatScreenTest {
 
     private fun screen(
         state: ChatUiState,
+        onDraftChange: (String) -> Unit = {},
         onSend: () -> Unit = {},
         onStop: () -> Unit = {},
         onLoadOlder: () -> Unit = {},
@@ -82,7 +83,7 @@ class ChatScreenTest {
             ChatUiTheme {
                 ChatScreen(
                     state = state,
-                    onDraftChange = {},
+                    onDraftChange = onDraftChange,
                     onSend = onSend,
                     onStop = onStop,
                     onLoadOlder = onLoadOlder,
@@ -113,8 +114,18 @@ class ChatScreenTest {
         screen(state())
 
         composeRule.onNodeWithTag(ChatScreenTestTags.Empty).assertIsDisplayed()
-        composeRule.onNodeWithText("Start the conversation").assertIsDisplayed()
+        composeRule.onNodeWithText("How can I help?").assertIsDisplayed()
         composeRule.onNodeWithTag(ChatComposerTestTags.Composer).assertIsDisplayed()
+    }
+
+    @Test
+    fun `empty state prompt chips fill the draft`() {
+        var draft = ""
+        screen(state(), onDraftChange = { draft = it })
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.emptyPrompt(0)).performClick()
+
+        assertThat(draft).isEqualTo("Summarize a document")
     }
 
     @Test
@@ -284,6 +295,7 @@ class ChatScreenTest {
         composeRule.onNodeWithTag(ChatMessageActionsTestTags.Regenerate).performClick()
         assertThat(regenerated?.id).isEqualTo("assistant-1")
 
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Overflow).performClick()
         composeRule.onNodeWithTag(ChatMessageActionsTestTags.Edit).performClick()
         composeRule.onNodeWithTag(ChatMessageActionsTestTags.EditInput)
             .performTextReplacement("Updated")

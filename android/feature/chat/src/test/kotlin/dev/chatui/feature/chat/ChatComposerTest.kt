@@ -220,6 +220,41 @@ class ChatComposerTest {
     }
 
     @Test
+    fun `attach button opens a sheet with photo file and paste`() {
+        var photos = 0
+        var files = 0
+        var pastes = 0
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    draft = "",
+                    onDraftChange = {},
+                    onSend = {},
+                    onStop = {},
+                    sendKey = SendKey.ENTER,
+                    enabled = true,
+                    streaming = false,
+                    sending = false,
+                    onAddPhoto = { photos += 1 },
+                    onAddFile = { files += 1 },
+                    onPasteImage = { pastes += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.Attach).performClick()
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachPhoto).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachFile).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.Paste).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachPhoto).performClick()
+
+        assertThat(photos).isEqualTo(1)
+        assertThat(files).isEqualTo(0)
+        assertThat(pastes).isEqualTo(0)
+    }
+
+    @Test
     fun `attachment warning and error are rendered`() {
         composeRule.setContent {
             ChatUiTheme {

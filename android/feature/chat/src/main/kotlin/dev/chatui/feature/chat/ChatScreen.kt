@@ -8,11 +8,17 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,7 +31,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -36,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,7 +66,14 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.database.attachment.AttachmentInput
 import dev.chatui.core.database.attachment.MAX_IMAGE_BYTES
+import dev.chatui.core.designsystem.BannerSeverity
+import dev.chatui.core.designsystem.BrandMark
+import dev.chatui.core.designsystem.InlineBanner
+import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.MotionSpecs
+import dev.chatui.core.designsystem.PrimaryButton
+import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.Message
 import dev.chatui.core.model.MessageRole
@@ -94,6 +107,9 @@ object ChatScreenTestTags {
     const val SendConfirmation = "chat-screen-send-confirmation"
     const val SendAnyway = "chat-screen-send-anyway"
     const val CancelSend = "chat-screen-cancel-send"
+    const val EmptyModelSelector = "chat-screen-empty-model-selector"
+
+    fun emptyPrompt(index: Int): String = "chat-screen-empty-prompt-$index"
 }
 
 /**
@@ -462,24 +478,23 @@ private fun ChatContent(
         }
 
         state.error?.let { error ->
-            Column(
+            InlineBanner(
+                severity = BannerSeverity.Error,
+                title = "Something went wrong",
+                body = error.message,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = dimensPadding, vertical = dimens.space2)
                     .testTag(ChatScreenTestTags.Error),
-                verticalArrangement = Arrangement.spacedBy(dimens.space1),
-            ) {
-                Text(
-                    text = error.message,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                TextButton(
-                    onClick = onDismissError,
-                    modifier = Modifier.heightIn(min = dimens.touchTargetMin),
-                ) {
-                    Text("Dismiss")
-                }
-            }
+                action = {
+                    TextButton(
+                        onClick = onDismissError,
+                        modifier = Modifier.heightIn(min = dimens.touchTargetMin),
+                    ) {
+                        Text("Dismiss")
+                    }
+                },
+            )
         }
 
         state.attachmentWarning?.let { warning ->
@@ -499,6 +514,8 @@ private fun ChatContent(
                 EmptyState(
                     modelLabel = modelLabel,
                     enabled = availability?.available != false,
+                    onPromptSelected = onDraftChange,
+                    onOpenProviders = onOpenProviders,
                 )
             } else {
                 ChatMessageList(
@@ -622,71 +639,133 @@ private fun AvailabilityBanner(
     onOpenProviders: () -> Unit,
 ) {
     val dimens = LocalDimens.current
-    val (tag, title, action) = when (availability.reason) {
-        ChatUnavailableReason.NO_PROVIDER -> Triple(
-            ChatScreenTestTags.NoProvider,
-            "No provider is configured. Add a provider before starting a chat.",
-            "Add provider",
+    val (tag, title, body, action) = when (availability.reason) {
+        ChatUnavailableReason.NO_PROVIDER -> AvailabilityCopy(
+            tag = ChatScreenTestTags.NoProvider,
+            title = "No provider configured",
+            body = "Add a provider before starting a chat.",
+            action = "Add provider",
         )
 
-        ChatUnavailableReason.MODEL_UNAVAILABLE -> Triple(
-            ChatScreenTestTags.ModelUnavailable,
-            availability.message ?: "The selected model is unavailable. Choose another model.",
-            "Choose another model",
+        ChatUnavailableReason.MODEL_UNAVAILABLE -> AvailabilityCopy(
+            tag = ChatScreenTestTags.ModelUnavailable,
+            title = "Model unavailable",
+            body = availability.message
+                ?: "The selected model is unavailable. Choose another model.",
+            action = "Choose another model",
         )
 
-        ChatUnavailableReason.NO_KEY -> Triple(
-            ChatScreenTestTags.NoKey,
-            availability.message ?: "The API key for this provider is unavailable.",
-            "Open providers",
+        ChatUnavailableReason.NO_KEY -> AvailabilityCopy(
+            tag = ChatScreenTestTags.NoKey,
+            title = "API key needed",
+            body = availability.message ?: "The API key for this provider is unavailable.",
+            action = "Open providers",
         )
 
-        null -> Triple(ChatScreenTestTags.Error, availability.message.orEmpty(), "Open providers")
+        null -> AvailabilityCopy(
+            tag = ChatScreenTestTags.Error,
+            title = "Chat unavailable",
+            body = availability.message.orEmpty(),
+            action = "Open providers",
+        )
     }
 
-    Column(
+    InlineBanner(
+        severity = BannerSeverity.Warning,
+        title = title,
+        body = body,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = dimens.padding, vertical = dimens.space2)
             .testTag(tag),
-        verticalArrangement = Arrangement.spacedBy(dimens.space1),
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.error,
-        )
-        Button(
-            onClick = onOpenProviders,
-            modifier = Modifier
-                .heightIn(min = dimens.touchTargetMin)
-                .testTag(ChatScreenTestTags.OpenProviders),
-        ) {
-            Text(action)
-        }
-    }
+        action = {
+            PrimaryButton(
+                text = action,
+                onClick = onOpenProviders,
+                modifier = Modifier.testTag(ChatScreenTestTags.OpenProviders),
+            )
+        },
+    )
 }
 
+private data class AvailabilityCopy(
+    val tag: String,
+    val title: String,
+    val body: String,
+    val action: String,
+)
+
+private val SUGGESTED_PROMPTS = listOf(
+    "Summarize a document",
+    "Brainstorm ideas",
+    "Explain a concept",
+)
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun EmptyState(modelLabel: String, enabled: Boolean) {
-    Column(
+private fun EmptyState(
+    modelLabel: String,
+    enabled: Boolean,
+    onPromptSelected: (String) -> Unit,
+    onOpenProviders: () -> Unit,
+) {
+    val colors = LocalChatUiColors.current
+    val dimens = LocalDimens.current
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
+            .padding(dimens.sectionGap)
             .testTag(ChatScreenTestTags.Empty),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+        contentAlignment = Alignment.Center,
     ) {
-        Text("Start the conversation", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            text = if (enabled) {
-                "Send a message to $modelLabel."
-            } else {
-                "Fix the provider or model setup before sending a message."
-            },
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
-        )
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(MotionSpecs.emphasizedMillis)) +
+                slideInVertically(tween(MotionSpecs.emphasizedMillis)) { it / 6 },
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(dimens.space3),
+            ) {
+                BrandMark(size = 64.dp)
+                Text(
+                    text = "How can I help?",
+                    style = Typography.title2,
+                    color = colors.fgPrimary,
+                )
+                Text(
+                    text = if (enabled) {
+                        "Ask anything, or start with a suggestion."
+                    } else {
+                        "Fix the provider or model setup before sending a message."
+                    },
+                    style = Typography.subhead,
+                    color = colors.fgSecondary,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(dimens.space2),
+                    verticalArrangement = Arrangement.spacedBy(dimens.space2),
+                ) {
+                    SUGGESTED_PROMPTS.forEachIndexed { index, prompt ->
+                        AssistChip(
+                            onClick = { onPromptSelected(prompt) },
+                            label = { Text(prompt) },
+                            modifier = Modifier.testTag(ChatScreenTestTags.emptyPrompt(index)),
+                        )
+                    }
+                }
+                AssistChip(
+                    onClick = onOpenProviders,
+                    label = { Text(modelLabel) },
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatScreenTestTags.EmptyModelSelector),
+                )
+            }
+        }
     }
 }
 

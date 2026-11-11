@@ -38,7 +38,7 @@
 | 1 | [UX-00 Preflight, decisions, and baseline capture](UX-00-preflight-decisions-baseline.md) | Complete | none | preflight | none; blocks all |
 | 2 | [UX-01 Design-system foundation](UX-01-design-system-foundation.md) | Complete | UX-00 | foundation | none; blocks screens |
 | 3 | [UX-02 Shell and navigation](UX-02-shell-and-navigation.md) | Complete | UX-01 | shell | UX-06, UX-07 |
-| 4 | [UX-03 Chat experience](UX-03-chat-experience.md) | Not started | UX-01, UX-02 | chat | UX-04, UX-05 |
+| 4 | [UX-03 Chat experience](UX-03-chat-experience.md) | Complete | UX-01, UX-02 | chat | UX-04, UX-05 |
 | 5 | [UX-04 Conversations](UX-04-conversations.md) | Not started | UX-01, UX-02 | conversations | UX-03, UX-05 |
 | 6 | [UX-05 Onboarding](UX-05-onboarding.md) | Not started | UX-01 | onboarding | UX-03, UX-04 |
 | 7 | [UX-06 Providers and model picker](UX-06-providers-and-model-picker.md) | Not started | UX-01 | providers | UX-02, UX-07 |
