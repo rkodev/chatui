@@ -3,7 +3,7 @@
 - Source plan: [Android UI/UX Polish Implementation Plan](../android-ux-implementation-plan.md)
 - Source design review: [android-ux.md](../../android-ux.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: In progress
+- Status: Complete
 - Last updated: 2026-11-11
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
 - Scope: Android-only visual, interaction, motion, feedback, and perceived-performance polish. No new product features, provider protocols, backup/sync, or localization.
@@ -47,7 +47,7 @@
 | 10 | [UX-09 Motion and haptics tuning](UX-09-motion-and-haptics.md) | Complete | UX-02, UX-03, UX-04, UX-05, UX-06, UX-07 | motion | UX-10 |
 | 11 | [UX-10 Accessibility and dynamic type audit](UX-10-accessibility-dynamic-type.md) | Complete | UX-02, UX-03, UX-04, UX-05, UX-06, UX-07 | accessibility | UX-09 |
 | 12 | [UX-11 Performance and baseline profile](UX-11-performance-baseline-profile.md) | Complete | UX-03, UX-09 | performance | UX-12 |
-| 13 | [UX-12 Screenshot goldens, device review, and exit evidence](UX-12-screenshots-device-evidence.md) | Not started | UX-00 – UX-11 | evidence | none; final gate |
+| 13 | [UX-12 Screenshot goldens, device review, and exit evidence](UX-12-screenshots-device-evidence.md) | Complete | UX-00 – UX-11 | evidence | none; final gate |
 
 ## Parallel execution groups
 

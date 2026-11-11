@@ -3,8 +3,9 @@
 - Source design review: [android-ux.md](../android-ux.md)
 - Authoritative spec: [IMPLEMENTATION.md](../IMPLEMENTATION.md)
 - Current milestone baseline: [M3 verification](../operations/M3/M3-verification.md) and [M4 verification](../operations/M4/M4-verification.md)
-- Status: Proposed
+- Status: Complete
 - Prepared: 2026-11-11
+- Completed: 2026-11-11
 - Scope: Visual, interaction, motion, feedback, and perceived-performance polish of the existing Android client. No new product features, provider protocols, backup/sync, or localization.
 - Platforms: Android only
 - Planning assumption: M1–M4 Android behavior is complete and is the functional baseline. This plan changes presentation and interaction, not data, security, or transport semantics.

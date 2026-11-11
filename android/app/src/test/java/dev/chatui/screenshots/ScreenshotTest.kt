@@ -17,15 +17,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.BrowserCors
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.ChatErrorCode
+import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.ChatParams
 import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.Conversation
+import dev.chatui.core.model.Density
 import dev.chatui.core.model.InputModality
 import dev.chatui.core.model.Message
 import dev.chatui.core.model.MessageRole
@@ -47,6 +52,9 @@ import dev.chatui.feature.conversations.ConversationGroup
 import dev.chatui.feature.conversations.ConversationGroupKey
 import dev.chatui.feature.conversations.ConversationListScreen
 import dev.chatui.feature.conversations.ConversationListUiState
+import dev.chatui.feature.conversations.ConversationListView
+import dev.chatui.feature.conversations.ConversationSearchMessageMatch
+import dev.chatui.feature.conversations.ConversationSearchResult
 import dev.chatui.feature.onboarding.CatalogModel
 import dev.chatui.feature.onboarding.CatalogUiState
 import dev.chatui.feature.onboarding.OnboardingScreen
@@ -55,16 +63,22 @@ import dev.chatui.feature.onboarding.OnboardingUiState
 import dev.chatui.feature.onboarding.ProviderOption
 import dev.chatui.feature.providers.ModelPickerContent
 import dev.chatui.feature.providers.ModelPickerTarget
+import dev.chatui.feature.providers.ModelPickerTestTags
 import dev.chatui.feature.providers.ModelPickerUiState
 import dev.chatui.feature.providers.ProviderAvailability
 import dev.chatui.feature.providers.ProviderDetailScreen
 import dev.chatui.feature.providers.ProviderDetailUiState
 import dev.chatui.feature.providers.ProviderListScreen
+import dev.chatui.feature.providers.ProviderListTestTags
 import dev.chatui.feature.providers.ProviderListUiState
+import dev.chatui.feature.settings.AboutSettingsScreen
+import dev.chatui.feature.settings.AppearanceSettingsScreen
+import dev.chatui.feature.settings.ChatDefaultsSettingsScreen
 import dev.chatui.feature.settings.DataSettingsScreen
 import dev.chatui.feature.settings.DataSettingsUiState
 import dev.chatui.feature.settings.ProviderKeySummary
 import dev.chatui.feature.settings.SettingsRootScreen
+import dev.chatui.feature.settings.SettingsUiState
 import dev.chatui.feature.settings.StorageUsage
 import dev.chatui.feature.settings.StorageUsageEntry
 import dev.chatui.shell.AdaptiveShell
@@ -98,7 +112,11 @@ class ScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private fun captureBoth(name: String, content: @Composable () -> Unit) {
+    private fun captureBoth(
+        name: String,
+        interaction: (() -> Unit)? = null,
+        content: @Composable () -> Unit,
+    ) {
         var theme by mutableStateOf(Theme.LIGHT)
         composeRule.setContent {
             ChatUiTheme(themeMode = theme, reducedMotion = true) {
@@ -111,6 +129,8 @@ class ScreenshotTest {
                 }
             }
         }
+        composeRule.waitForIdle()
+        interaction?.invoke()
         composeRule.waitForIdle()
         composeRule.onRoot().captureRoboImage("${name}_light.png")
 
@@ -141,6 +161,134 @@ class ScreenshotTest {
     fun onboardingTablet() = captureBoth("onboarding_tablet") {
         OnboardingScreen(
             state = onboardingState(),
+            onApiKeyChanged = {},
+            onLabelChanged = {},
+            onProviderSelected = {},
+            onContinue = {},
+            onBack = {},
+            onConnect = {},
+            onRetryCatalog = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun onboardingKeyEntryPhone() = captureBoth("onboarding_key_entry_phone") {
+        OnboardingScreen(
+            state = onboardingState(
+                step = OnboardingStep.KEY_ENTRY,
+                catalog = CatalogUiState.Loading,
+            ),
+            onApiKeyChanged = {},
+            onLabelChanged = {},
+            onProviderSelected = {},
+            onContinue = {},
+            onBack = {},
+            onConnect = {},
+            onRetryCatalog = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun onboardingKeyEntryTablet() = captureBoth("onboarding_key_entry_tablet") {
+        OnboardingScreen(
+            state = onboardingState(
+                step = OnboardingStep.KEY_ENTRY,
+                catalog = CatalogUiState.Loading,
+            ),
+            onApiKeyChanged = {},
+            onLabelChanged = {},
+            onProviderSelected = {},
+            onContinue = {},
+            onBack = {},
+            onConnect = {},
+            onRetryCatalog = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun onboardingCatalogPhone() = captureBoth("onboarding_catalog_phone") {
+        OnboardingScreen(
+            state = onboardingState(
+                step = OnboardingStep.KEY_ENTRY,
+                apiKey = "sk-or-v1-example-not-a-real-key",
+                catalog = CatalogUiState.Ready(
+                    listOf(
+                        CatalogModel("openrouter/auto", "Auto Router", 128_000, false),
+                        CatalogModel("openrouter/free", "Free Model", 32_000, true),
+                    ),
+                ),
+            ),
+            onApiKeyChanged = {},
+            onLabelChanged = {},
+            onProviderSelected = {},
+            onContinue = {},
+            onBack = {},
+            onConnect = {},
+            onRetryCatalog = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun onboardingCatalogTablet() = captureBoth("onboarding_catalog_tablet") {
+        OnboardingScreen(
+            state = onboardingState(
+                step = OnboardingStep.KEY_ENTRY,
+                apiKey = "sk-or-v1-example-not-a-real-key",
+                catalog = CatalogUiState.Ready(
+                    listOf(
+                        CatalogModel("openrouter/auto", "Auto Router", 128_000, false),
+                        CatalogModel("openrouter/free", "Free Model", 32_000, true),
+                    ),
+                ),
+            ),
+            onApiKeyChanged = {},
+            onLabelChanged = {},
+            onProviderSelected = {},
+            onContinue = {},
+            onBack = {},
+            onConnect = {},
+            onRetryCatalog = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun onboardingCompletionPhone() = captureBoth("onboarding_completion_phone") {
+        OnboardingScreen(
+            state = onboardingState(
+                step = OnboardingStep.KEY_ENTRY,
+                apiKey = "sk-or-v1-example-not-a-real-key",
+                connected = true,
+                catalog = CatalogUiState.Ready(
+                    listOf(CatalogModel("openrouter/auto", "Auto Router", 128_000, false)),
+                ),
+            ),
+            onApiKeyChanged = {},
+            onLabelChanged = {},
+            onProviderSelected = {},
+            onContinue = {},
+            onBack = {},
+            onConnect = {},
+            onRetryCatalog = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun onboardingCompletionTablet() = captureBoth("onboarding_completion_tablet") {
+        OnboardingScreen(
+            state = onboardingState(
+                step = OnboardingStep.KEY_ENTRY,
+                apiKey = "sk-or-v1-example-not-a-real-key",
+                connected = true,
+                catalog = CatalogUiState.Ready(
+                    listOf(CatalogModel("openrouter/auto", "Auto Router", 128_000, false)),
+                ),
+            ),
             onApiKeyChanged = {},
             onLabelChanged = {},
             onProviderSelected = {},
@@ -187,8 +335,39 @@ class ScreenshotTest {
 
     @Test
     @Config(qualifiers = "w411dp-h891dp")
-    fun chatStreamingPhone() = captureBoth("chat_streaming_phone") {
+    fun chatPopulatedPhone() = captureBoth("chat_populated_phone") {
         ChatScreen(
+            state = chatState(messages = listOf(userMessage(), assistantMessage())),
+            onDraftChange = {},
+            onSend = {},
+            onStop = {},
+            onLoadOlder = {},
+            onRetryMessage = {},
+            onDismissError = {},
+            zoneId = ZoneOffset.UTC,
+            imeInsets = WindowInsets(0, 0, 0, 0),
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun chatPopulatedTablet() = captureBoth("chat_populated_tablet") {
+        ChatScreen(
+            state = chatState(messages = listOf(userMessage(), assistantMessage())),
+            onDraftChange = {},
+            onSend = {},
+            onStop = {},
+            onLoadOlder = {},
+            onRetryMessage = {},
+            onDismissError = {},
+            zoneId = ZoneOffset.UTC,
+            imeInsets = WindowInsets(0, 0, 0, 0),
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun chatStreamingPhone() = captureBoth("chat_streaming_phone") {        ChatScreen(
             state = chatState(
                 messages = listOf(userMessage()),
                 streaming = StreamingState(
@@ -331,6 +510,80 @@ class ScreenshotTest {
         )
     }
 
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun modelPickerFiltersPhone() = captureBoth(
+        name = "model_picker_filters_phone",
+        interaction = {
+            composeRule.onNodeWithTag(ModelPickerTestTags.filter("pinned")).performClick()
+        },
+    ) {
+        ModelPickerContent(
+            state = modelPickerState(),
+            onQueryChanged = {},
+            onSelect = {},
+            onPin = { _, _ -> },
+            onHide = { _, _ -> },
+            onManualRemoteIdChanged = {},
+            onManualLabelChanged = {},
+            onAddManual = {},
+            onRefresh = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun modelPickerFiltersTablet() = captureBoth(
+        name = "model_picker_filters_tablet",
+        interaction = {
+            composeRule.onNodeWithTag(ModelPickerTestTags.filter("pinned")).performClick()
+        },
+    ) {
+        ModelPickerContent(
+            state = modelPickerState(),
+            onQueryChanged = {},
+            onSelect = {},
+            onPin = { _, _ -> },
+            onHide = { _, _ -> },
+            onManualRemoteIdChanged = {},
+            onManualLabelChanged = {},
+            onAddManual = {},
+            onRefresh = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun modelPickerEmptyPhone() = captureBoth("model_picker_empty_phone") {
+        ModelPickerContent(
+            state = modelPickerState(models = emptyList()),
+            onQueryChanged = {},
+            onSelect = {},
+            onPin = { _, _ -> },
+            onHide = { _, _ -> },
+            onManualRemoteIdChanged = {},
+            onManualLabelChanged = {},
+            onAddManual = {},
+            onRefresh = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun modelPickerEmptyTablet() = captureBoth("model_picker_empty_tablet") {
+        ModelPickerContent(
+            state = modelPickerState(models = emptyList()),
+            onQueryChanged = {},
+            onSelect = {},
+            onPin = { _, _ -> },
+            onHide = { _, _ -> },
+            onManualRemoteIdChanged = {},
+            onManualLabelChanged = {},
+            onAddManual = {},
+            onRefresh = {},
+        )
+    }
+
     // Providers ------------------------------------------------------------------
 
     @Test
@@ -346,6 +599,36 @@ class ScreenshotTest {
     @Test
     @Config(qualifiers = "w840dp-h1280dp")
     fun providerListTablet() = captureBoth("provider_list_tablet") {
+        ProviderListScreen(
+            state = providerListState(),
+            onOpenProvider = {},
+            onRetry = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun providerAddSheetPhone() = captureBoth(
+        name = "provider_add_sheet_phone",
+        interaction = {
+            composeRule.onNodeWithTag(ProviderListTestTags.AddProvider).performClick()
+        },
+    ) {
+        ProviderListScreen(
+            state = providerListState(),
+            onOpenProvider = {},
+            onRetry = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun providerAddSheetTablet() = captureBoth(
+        name = "provider_add_sheet_tablet",
+        interaction = {
+            composeRule.onNodeWithTag(ProviderListTestTags.AddProvider).performClick()
+        },
+    ) {
         ProviderListScreen(
             state = providerListState(),
             onOpenProvider = {},
@@ -419,6 +702,94 @@ class ScreenshotTest {
             onOpenBackup = {},
             onOpenAbout = {},
         )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun settingsAppearancePhone() = captureBoth("settings_appearance_phone") {
+        AppearanceSettingsScreen(
+            settings = AndroidSettings(
+                theme = Theme.SYSTEM,
+                density = Density.COMFORTABLE,
+                chatFontSize = ChatFontSize.MD,
+                hapticFeedback = true,
+                dynamicColor = false,
+            ),
+            onThemeChanged = {},
+            onDensityChanged = {},
+            onChatFontSizeChanged = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun settingsAppearanceTablet() = captureBoth("settings_appearance_tablet") {
+        AppearanceSettingsScreen(
+            settings = AndroidSettings(
+                theme = Theme.SYSTEM,
+                density = Density.COMFORTABLE,
+                chatFontSize = ChatFontSize.MD,
+                hapticFeedback = true,
+                dynamicColor = false,
+            ),
+            onThemeChanged = {},
+            onDensityChanged = {},
+            onChatFontSizeChanged = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun settingsChatDefaultsPhone() = captureBoth("settings_chat_defaults_phone") {
+        ChatDefaultsSettingsScreen(
+            state = settingsState(),
+            onDefaultProviderChanged = {},
+            onDefaultModelChanged = {},
+            onDefaultSystemPromptChanged = {},
+            onTemperatureChanged = {},
+            onTopPChanged = {},
+            onMaxOutputTokensChanged = {},
+            onStopChanged = {},
+            onReasoningEffortChanged = {},
+            onStreamingChanged = {},
+            onSendKeyChanged = {},
+            onShowTokenUsageChanged = {},
+            onLoadRemoteImagesChanged = {},
+            onDismissError = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun settingsChatDefaultsTablet() = captureBoth("settings_chat_defaults_tablet") {
+        ChatDefaultsSettingsScreen(
+            state = settingsState(),
+            onDefaultProviderChanged = {},
+            onDefaultModelChanged = {},
+            onDefaultSystemPromptChanged = {},
+            onTemperatureChanged = {},
+            onTopPChanged = {},
+            onMaxOutputTokensChanged = {},
+            onStopChanged = {},
+            onReasoningEffortChanged = {},
+            onStreamingChanged = {},
+            onSendKeyChanged = {},
+            onShowTokenUsageChanged = {},
+            onLoadRemoteImagesChanged = {},
+            onDismissError = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun settingsAboutPhone() = captureBoth("settings_about_phone") {
+        AboutSettingsScreen()
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun settingsAboutTablet() = captureBoth("settings_about_tablet") {
+        AboutSettingsScreen()
     }
 
     @Test
@@ -500,6 +871,166 @@ class ScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun conversationListArchivedPhone() = captureBoth("conversation_list_archived_phone") {
+        ConversationListScreen(
+            state = conversationListState(
+                view = ConversationListView.ARCHIVED,
+                archivedGroups = conversationListState().groups,
+            ),
+            onNewChat = {},
+            onSelect = {},
+            onRename = { _, _ -> },
+            onDeleteRequested = {},
+            onDeleteDismissed = {},
+            onDeleteConfirmed = {},
+            onRetry = {},
+            onSearchQueryChanged = {},
+            onSearchRetry = {},
+            now = FIXED_NOW,
+            zoneId = ZoneOffset.UTC,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun conversationListArchivedTablet() = captureBoth("conversation_list_archived_tablet") {
+        ConversationListScreen(
+            state = conversationListState(
+                view = ConversationListView.ARCHIVED,
+                archivedGroups = conversationListState().groups,
+            ),
+            onNewChat = {},
+            onSelect = {},
+            onRename = { _, _ -> },
+            onDeleteRequested = {},
+            onDeleteDismissed = {},
+            onDeleteConfirmed = {},
+            onRetry = {},
+            onSearchQueryChanged = {},
+            onSearchRetry = {},
+            now = FIXED_NOW,
+            zoneId = ZoneOffset.UTC,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun conversationListSearchPhone() = captureBoth("conversation_list_search_phone") {
+        ConversationListScreen(
+            state = conversationListState(
+                searchQuery = "release",
+                searchResults = listOf(
+                    ConversationSearchResult(
+                        conversation = conversation().copy(
+                            id = "conversation-1",
+                            title = "Release notes",
+                        ),
+                        titleMatched = true,
+                        messageMatches = listOf(
+                            ConversationSearchMessageMatch(
+                                messageId = "message-1",
+                                sequence = 1,
+                                role = MessageRole.USER,
+                                snippet = "Summarize the release notes in one sentence.",
+                                createdAt = FIXED_NOW,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            onNewChat = {},
+            onSelect = {},
+            onRename = { _, _ -> },
+            onDeleteRequested = {},
+            onDeleteDismissed = {},
+            onDeleteConfirmed = {},
+            onRetry = {},
+            onSearchQueryChanged = {},
+            onSearchRetry = {},
+            now = FIXED_NOW,
+            zoneId = ZoneOffset.UTC,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun conversationListSearchTablet() = captureBoth("conversation_list_search_tablet") {
+        ConversationListScreen(
+            state = conversationListState(
+                searchQuery = "release",
+                searchResults = listOf(
+                    ConversationSearchResult(
+                        conversation = conversation().copy(
+                            id = "conversation-1",
+                            title = "Release notes",
+                        ),
+                        titleMatched = true,
+                        messageMatches = listOf(
+                            ConversationSearchMessageMatch(
+                                messageId = "message-1",
+                                sequence = 1,
+                                role = MessageRole.USER,
+                                snippet = "Summarize the release notes in one sentence.",
+                                createdAt = FIXED_NOW,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            onNewChat = {},
+            onSelect = {},
+            onRename = { _, _ -> },
+            onDeleteRequested = {},
+            onDeleteDismissed = {},
+            onDeleteConfirmed = {},
+            onRetry = {},
+            onSearchQueryChanged = {},
+            onSearchRetry = {},
+            now = FIXED_NOW,
+            zoneId = ZoneOffset.UTC,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun conversationListEmptyPhone() = captureBoth("conversation_list_empty_phone") {
+        ConversationListScreen(
+            state = conversationListState(groups = emptyList()),
+            onNewChat = {},
+            onSelect = {},
+            onRename = { _, _ -> },
+            onDeleteRequested = {},
+            onDeleteDismissed = {},
+            onDeleteConfirmed = {},
+            onRetry = {},
+            onSearchQueryChanged = {},
+            onSearchRetry = {},
+            now = FIXED_NOW,
+            zoneId = ZoneOffset.UTC,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun conversationListEmptyTablet() = captureBoth("conversation_list_empty_tablet") {
+        ConversationListScreen(
+            state = conversationListState(groups = emptyList()),
+            onNewChat = {},
+            onSelect = {},
+            onRename = { _, _ -> },
+            onDeleteRequested = {},
+            onDeleteDismissed = {},
+            onDeleteConfirmed = {},
+            onRetry = {},
+            onSearchQueryChanged = {},
+            onSearchRetry = {},
+            now = FIXED_NOW,
+            zoneId = ZoneOffset.UTC,
+        )
+    }
+
+    @Test
     @Config(qualifiers = "w840dp-h1280dp")
     fun expandedShellTablet() = captureBoth("expanded_shell_tablet") {
         AdaptiveShell(
@@ -522,8 +1053,18 @@ class ScreenshotTest {
 
     // Fixtures -------------------------------------------------------------------
 
-    private fun onboardingState(): OnboardingUiState = OnboardingUiState(
-        step = OnboardingStep.WELCOME,
+    private fun onboardingState(
+        step: OnboardingStep = OnboardingStep.WELCOME,
+        apiKey: String = "",
+        connected: Boolean = false,
+        catalog: CatalogUiState = CatalogUiState.Ready(
+            listOf(
+                CatalogModel("openrouter/auto", "Auto Router", 128_000, false),
+                CatalogModel("openrouter/free", "Free Model", 32_000, true),
+            ),
+        ),
+    ): OnboardingUiState = OnboardingUiState(
+        step = step,
         providers = listOf(
             ProviderOption("openrouter", "OpenRouter", true, true, "Recommended"),
             ProviderOption("openai", "OpenAI", true, false, null),
@@ -531,12 +1072,9 @@ class ScreenshotTest {
             ProviderOption("google", "Google Gemini", false, false, "Coming later"),
         ),
         selectedProviderId = "openrouter",
-        catalog = CatalogUiState.Ready(
-            listOf(
-                CatalogModel("openrouter/auto", "Auto Router", 128_000, false),
-                CatalogModel("openrouter/free", "Free Model", 32_000, true),
-            ),
-        ),
+        apiKey = apiKey,
+        connected = connected,
+        catalog = catalog,
     )
 
     private fun chatState(
@@ -592,16 +1130,61 @@ class ScreenshotTest {
         deletedAt = null,
     )
 
-    private fun modelPickerState(): ModelPickerUiState = ModelPickerUiState(
-        target = ModelPickerTarget.Defaults,
-        models = listOf(
+    private fun assistantMessage(): Message = Message(
+        id = "message-2",
+        conversationId = CONVERSATION_ID,
+        sequence = 2,
+        role = MessageRole.ASSISTANT,
+        parts = listOf(
+            ContentPart.Text(
+                "The release adds grouped chat bubbles, a floating composer, and " +
+                    "reviewed screenshot goldens.",
+            ),
+        ),
+        status = MessageStatus.COMPLETE,
+        providerId = "provider-1",
+        modelId = "model-1",
+        modelLabel = "Model One",
+        usage = null,
+        finishReason = null,
+        error = null,
+        latencyMs = 640,
+        firstTokenMs = 210,
+        createdAt = FIXED_NOW,
+        updatedAt = FIXED_NOW,
+        deletedAt = null,
+    )
+
+    private fun settingsState(): SettingsUiState = SettingsUiState(
+        settings = AndroidSettings(
+            theme = Theme.SYSTEM,
+            density = Density.COMFORTABLE,
+            chatFontSize = ChatFontSize.MD,
+            defaultProviderId = "provider-1",
+            defaultModelId = "model-1",
+            defaultSystemPrompt = "You are a concise assistant.",
+            showTokenUsage = true,
+            loadRemoteImages = true,
+            hapticFeedback = true,
+            dynamicColor = false,
+        ),
+        providers = listOf(provider()),
+        models = listOf(model("model-1", "Model One")),
+        loading = false,
+    )
+
+    private fun modelPickerState(
+        models: List<Model> = listOf(
             model("model-1", "Model One", pinned = true),
             model("model-2", "Model Two"),
             model("model-3", "Model Three"),
         ),
+    ): ModelPickerUiState = ModelPickerUiState(
+        target = ModelPickerTarget.Defaults,
+        models = models,
         providers = listOf(provider()),
         loading = false,
-        selectedModelId = "model-1",
+        selectedModelId = models.firstOrNull()?.id,
     )
 
     private fun providerListState(): ProviderListUiState = ProviderListUiState(
@@ -636,8 +1219,8 @@ class ScreenshotTest {
         loading = false,
     )
 
-    private fun conversationListState(): ConversationListUiState = ConversationListUiState(
-        groups = listOf(
+    private fun conversationListState(
+        groups: List<ConversationGroup> = listOf(
             ConversationGroup(
                 key = ConversationGroupKey.TODAY,
                 label = "Today",
@@ -653,6 +1236,16 @@ class ScreenshotTest {
                 ),
             ),
         ),
+        view: ConversationListView = ConversationListView.ACTIVE,
+        archivedGroups: List<ConversationGroup> = emptyList(),
+        searchQuery: String = "",
+        searchResults: List<ConversationSearchResult> = emptyList(),
+    ): ConversationListUiState = ConversationListUiState(
+        groups = groups,
+        archivedGroups = archivedGroups,
+        view = view,
+        searchQuery = searchQuery,
+        searchResults = searchResults,
         loading = false,
     )
 
