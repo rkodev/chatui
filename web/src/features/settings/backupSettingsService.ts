@@ -8,6 +8,7 @@ import {
 } from '../../storage'
 import { SecretStore, type SecretMode } from '../../storage/SecretStore'
 import { S3StorageAdapter, type StorageAdapter } from '../backup/storage'
+import { BackupScheduler, type BackupSchedulerLike } from '../backup/scheduler'
 import {
   DELETE_REMOTE_CONFIRMATION,
   SyncEngine,
@@ -77,6 +78,8 @@ export interface BackupSettingsServiceOptions {
   createStorage?: BackupStorageFactory
   createEngine?: BackupEngineFactory
   now?: () => string
+  /** Optional scheduler. Production wiring is added by the factory below. */
+  scheduler?: BackupSchedulerLike
 }
 
 export interface CreateBackupSettingsServiceOptions {
@@ -232,6 +235,7 @@ export class BackupSettingsService implements BackupSettingsServiceLike {
   private readonly syncQueue: SyncQueueRepository
   private passphrase = ''
   private lastError: string | null = null
+  private scheduler: BackupSchedulerLike | null
 
   constructor(options: BackupSettingsServiceOptions) {
     this.db = options.db
@@ -241,12 +245,22 @@ export class BackupSettingsService implements BackupSettingsServiceLike {
     this.now = options.now ?? (() => new Date().toISOString())
     this.repository = new BackupConfigRepository(options.db)
     this.syncQueue = new SyncQueueRepository(options.db)
+    this.scheduler = options.scheduler ?? null
+  }
+
+  /** Attach the scheduler used by enable/disable and app-open scheduling. */
+  setScheduler(scheduler: BackupSchedulerLike | null): void {
+    this.scheduler = scheduler
   }
 
   async load(): Promise<BackupSettingsSnapshot> {
     const config = await this.repository.get()
     if (config === null) {
       return { config: null, credentials: null }
+    }
+
+    if (config.enabled) {
+      await this.scheduler?.schedule()
     }
 
     return { config, credentials: await this.loadCredentials(config) }
@@ -296,7 +310,9 @@ export class BackupSettingsService implements BackupSettingsServiceLike {
 
   async setEnabled(enabled: boolean, values: BackupFormValues): Promise<BackupConfig | null> {
     if (enabled) {
-      return this.saveConfig(values, true)
+      const config = await this.saveConfig(values, true)
+      await this.scheduler?.schedule()
+      return config
     }
 
     const existing = await this.repository.get()
@@ -306,6 +322,7 @@ export class BackupSettingsService implements BackupSettingsServiceLike {
 
     const config: BackupConfig = { ...existing, enabled: false }
     await this.repository.put(config)
+    await this.scheduler?.cancel()
     return config
   }
 
@@ -488,11 +505,21 @@ export async function createBackupSettingsService(
 ): Promise<BackupSettingsService> {
   const db = options.db ?? (await openDatabase())
 
-  return new BackupSettingsService({
+  const service = new BackupSettingsService({
     db,
     secrets: options.secrets ?? new SecretStore({ db }),
     createStorage: options.createStorage,
     createEngine: options.createEngine,
     now: options.now,
   })
+
+  const repository = new BackupConfigRepository(db)
+  service.setScheduler(
+    new BackupScheduler({
+      engine: { backupNow: () => service.backupNow() },
+      isEnabled: async () => (await repository.get())?.enabled ?? false,
+    }),
+  )
+
+  return service
 }

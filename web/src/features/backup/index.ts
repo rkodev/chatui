@@ -71,3 +71,19 @@ export {
   type SyncEngineOptions,
   type SyncResult,
 } from './sync'
+export {
+  BackupScheduler,
+  DEFAULT_DUE_AFTER_MS,
+  DEFAULT_FOREGROUND_INTERVAL_MS,
+  PERIODIC_SYNC_MIN_INTERVAL_MS,
+  PERIODIC_SYNC_TAG,
+  type BackupSchedulerEngine,
+  type BackupSchedulerLike,
+  type BackupSchedulerOptions,
+  type PeriodicSyncManagerLike,
+  type PeriodicSyncRegistrationLike,
+  type PermissionsLike,
+  type SchedulerDocument,
+  type SchedulerTimers,
+  type ServiceWorkerContainerLike,
+} from './scheduler'

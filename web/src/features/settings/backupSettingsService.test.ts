@@ -10,6 +10,7 @@ import {
 } from '../../storage'
 import { SecretStore } from '../../storage/SecretStore'
 import { StorageError, type StorageAdapter } from '../backup/storage'
+import type { BackupSchedulerLike } from '../backup/scheduler'
 import { DELETE_REMOTE_CONFIRMATION } from '../backup/sync'
 import {
   BACKUP_CREDENTIALS_SECRET_ID,
@@ -148,6 +149,15 @@ function createEngine() {
   return { engine, backupNow, restore, deleteRemote }
 }
 
+function createScheduler() {
+  const schedule = vi.fn(async () => undefined)
+  const cancel = vi.fn(async () => undefined)
+  const runIfDue = vi.fn(async () => false)
+  const scheduler: BackupSchedulerLike = { schedule, cancel, runIfDue }
+
+  return { scheduler, schedule, cancel, runIfDue }
+}
+
 async function setup() {
   const name = uniqueDatabaseName()
   const db = await openDatabase(name)
@@ -238,6 +248,32 @@ describe('BackupSettingsService', () => {
 
     const disabled = await service.setEnabled(false, values)
     expect(disabled?.enabled).toBe(false)
+  })
+
+  it('schedules when enabled and cancels when disabled', async () => {
+    const { service } = await setup()
+    const scheduler = createScheduler()
+    service.setScheduler(scheduler.scheduler)
+
+    await service.setEnabled(true, values)
+    expect(scheduler.schedule).toHaveBeenCalledTimes(1)
+
+    await service.setEnabled(false, values)
+    expect(scheduler.cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('starts scheduling on load only when backup is already enabled', async () => {
+    const { service } = await setup()
+    const scheduler = createScheduler()
+    service.setScheduler(scheduler.scheduler)
+
+    await service.saveConfig(values, false)
+    await service.load()
+    expect(scheduler.schedule).not.toHaveBeenCalled()
+
+    await service.saveConfig(values, true)
+    await service.load()
+    expect(scheduler.schedule).toHaveBeenCalledTimes(1)
   })
 
   it('backs up now through the sync engine and records the last backup time', async () => {
