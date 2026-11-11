@@ -1,30 +1,56 @@
 package dev.chatui.feature.providers
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import dev.chatui.core.designsystem.EmptyState
+import dev.chatui.core.designsystem.IconAction
+import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.SkeletonList
+import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.model.Model
 
 /** Test tags exposed by the model picker. */
@@ -32,6 +58,7 @@ object ModelPickerTestTags {
     const val Sheet = "model-picker-sheet"
     const val Content = "model-picker-content"
     const val Search = "model-picker-search"
+    const val Filters = "model-picker-filters"
     const val Warning = "model-picker-warning"
     const val Error = "model-picker-error"
     const val Notice = "model-picker-notice"
@@ -53,6 +80,18 @@ object ModelPickerTestTags {
     fun hide(id: String): String = "model-picker-hide-$id"
 
     fun details(id: String): String = "model-picker-details-$id"
+
+    fun menu(id: String): String = "model-picker-menu-$id"
+
+    fun check(id: String): String = "model-picker-check-$id"
+
+    fun filter(key: String): String = "model-picker-filter-$key"
+}
+
+private enum class ModelFilter(val label: String, val key: String) {
+    All("All", "all"),
+    Free("Free", "free"),
+    Pinned("Pinned", "pinned"),
 }
 
 /** Bottom-sheet wrapper around [ModelPickerContent]. */
@@ -106,6 +145,7 @@ fun ModelPickerSheet(
  * the same content works for global defaults, per-conversation overrides, and
  * model management.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ModelPickerContent(
     state: ModelPickerUiState,
@@ -122,32 +162,53 @@ fun ModelPickerContent(
     header: (@Composable () -> Unit)? = null,
 ) {
     val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
+    var filter by rememberSaveable { mutableStateOf(ModelFilter.All) }
+    val groups = remember(state.groups, filter) { filterGroups(state.groups, filter) }
 
     LazyColumn(
         modifier = modifier
             .fillMaxWidth()
+            .fillMaxHeight()
             .testTag(ModelPickerTestTags.Content),
         contentPadding = PaddingValues(dimens.padding),
         verticalArrangement = Arrangement.spacedBy(dimens.gap),
     ) {
         item {
-            Text(text = title, style = MaterialTheme.typography.headlineSmall)
+            Text(
+                text = title,
+                style = Typography.title1,
+                color = colors.fgPrimary,
+            )
         }
 
         header?.let { headerContent ->
             item { headerContent() }
         }
 
-        item {
-            OutlinedTextField(
-                value = state.query,
-                onValueChange = onQueryChanged,
-                label = { Text("Search models") },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ModelPickerTestTags.Search),
-            )
+        stickyHeader {
+            Surface(color = colors.bgCanvas) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = dimens.space2),
+                    verticalArrangement = Arrangement.spacedBy(dimens.space2),
+                ) {
+                    OutlinedTextField(
+                        value = state.query,
+                        onValueChange = onQueryChanged,
+                        label = { Text("Search models") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(ModelPickerTestTags.Search),
+                    )
+                    ModelFilterRow(
+                        selected = filter,
+                        onSelected = { filter = it },
+                    )
+                }
+            }
         }
 
         state.error?.let { error ->
@@ -183,33 +244,39 @@ fun ModelPickerContent(
 
         if (state.loading) {
             item {
-                Text(
-                    text = "Loading models…",
+                SkeletonList(
                     modifier = Modifier.testTag(ModelPickerTestTags.Loading),
+                    count = 5,
                 )
             }
         }
 
-        if (!state.loading && state.groups.isEmpty()) {
+        if (!state.loading && groups.isEmpty()) {
             item {
-                Text(
-                    text = "No models match your search.",
+                EmptyState(
+                    title = "No models found",
+                    body = "Try a different search or refresh the catalog.",
                     modifier = Modifier.testTag(ModelPickerTestTags.Empty),
                 )
             }
         }
 
-        state.groups.forEach { group ->
+        groups.forEach { group ->
             item(key = "group-${group.key}") {
                 Text(
                     text = group.label,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = Typography.title3,
+                    color = colors.fgPrimary,
                     modifier = Modifier.testTag(ModelPickerTestTags.group(group.key)),
                 )
             }
             items(group.models, key = { it.id }) { model ->
                 ModelRow(
                     model = model,
+                    providerLabel = state.providers
+                        .firstOrNull { it.id == model.providerId }
+                        ?.label
+                        ?: model.providerId,
                     selected = model.id == state.selectedModelId,
                     busy = state.busy,
                     onSelect = { onSelect(model) },
@@ -243,112 +310,190 @@ fun ModelPickerContent(
     }
 }
 
+private fun filterGroups(
+    groups: List<ModelPickerGroup>,
+    filter: ModelFilter,
+): List<ModelPickerGroup> = when (filter) {
+    ModelFilter.All -> groups
+    ModelFilter.Free -> groups.mapNotNull { group ->
+        group.models
+            .filter(::isFreeModel)
+            .takeIf { it.isNotEmpty() }
+            ?.let { group.copy(models = it) }
+    }
+
+    ModelFilter.Pinned -> groups.filter { it.pinned }
+}
+
+@Composable
+private fun ModelFilterRow(
+    selected: ModelFilter,
+    onSelected: (ModelFilter) -> Unit,
+) {
+    val dimens = LocalDimens.current
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ModelPickerTestTags.Filters),
+        horizontalArrangement = Arrangement.spacedBy(dimens.space1),
+    ) {
+        ModelFilter.entries.forEach { filter ->
+            FilterChip(
+                selected = filter == selected,
+                onClick = { onSelected(filter) },
+                label = { Text(filter.label) },
+                modifier = Modifier.testTag(ModelPickerTestTags.filter(filter.key)),
+            )
+        }
+    }
+}
+
 @Composable
 private fun ModelRow(
     model: Model,
+    providerLabel: String,
     selected: Boolean,
     busy: Boolean,
     onSelect: () -> Unit,
     onPin: () -> Unit,
     onHide: () -> Unit,
 ) {
+    val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
     val free = isFreeModel(model)
+    var menuExpanded by remember { mutableStateOf(false) }
+    var detailsExpanded by remember { mutableStateOf(false) }
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag(ModelPickerTestTags.model(model.id)),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) {
-                MaterialTheme.colorScheme.secondaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
+            .testTag(ModelPickerTestTags.model(model.id))
+            .clickable(enabled = !busy, onClick = onSelect),
+        shape = RoundedCornerShape(dimens.radiusMd),
+        color = if (selected) colors.accentSoft else colors.bgSurfaceRaised,
     ) {
         Column(
-            modifier = Modifier.padding(dimens.space3),
-            verticalArrangement = Arrangement.spacedBy(dimens.space1),
+            modifier = Modifier.padding(dimens.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(dimens.space2),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(text = model.label, style = MaterialTheme.typography.titleSmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = model.remoteId,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = model.label,
+                        style = Typography.headline,
+                        color = colors.fgPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = providerLabel,
+                        style = Typography.footnote,
+                        color = colors.fgSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 if (free) {
                     Text(
                         text = "Free",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.testTag(ModelPickerTestTags.freeBadge(model.id)),
+                        style = Typography.caption,
+                        color = colors.accent,
+                        modifier = Modifier
+                            .padding(horizontal = dimens.space1)
+                            .testTag(ModelPickerTestTags.freeBadge(model.id)),
                     )
+                }
+                if (selected) {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = "Selected",
+                        tint = colors.accent,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .testTag(ModelPickerTestTags.check(model.id)),
+                    )
+                }
+                Box {
+                    IconAction(
+                        icon = Icons.Rounded.MoreVert,
+                        contentDescription = "Model actions",
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.testTag(ModelPickerTestTags.menu(model.id)),
+                    )
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(if (model.pinned) "Unpin" else "Pin") },
+                            onClick = {
+                                menuExpanded = false
+                                onPin()
+                            },
+                            modifier = Modifier.testTag(ModelPickerTestTags.pin(model.id)),
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (model.hidden) "Unhide" else "Hide") },
+                            onClick = {
+                                menuExpanded = false
+                                onHide()
+                            },
+                            modifier = Modifier.testTag(ModelPickerTestTags.hide(model.id)),
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (detailsExpanded) "Hide details" else "Details") },
+                            onClick = {
+                                menuExpanded = false
+                                detailsExpanded = !detailsExpanded
+                            },
+                        )
+                    }
                 }
             }
 
-            Text(
-                text = "${formatContextWindow(model.contextWindow)} · " +
-                    formatModalities(model),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                text = formatModelPrice(model),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(dimens.space1)) {
+                ModelChip(formatContextWindow(model.contextWindow))
+                ModelChip(formatModelPrice(model))
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(dimens.space1)) {
                 modelCapabilityChips(model).forEach { chip ->
-                    Text(
-                        text = chip,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    ModelChip(chip)
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(dimens.space2)) {
-                TextButton(
-                    onClick = onSelect,
-                    enabled = !busy,
-                    modifier = Modifier.heightIn(min = dimens.touchTargetMin),
-                ) {
-                    Text(if (selected) "Selected" else "Select")
-                }
-                TextButton(
-                    onClick = onPin,
-                    enabled = !busy,
-                    modifier = Modifier
-                        .heightIn(min = dimens.touchTargetMin)
-                        .testTag(ModelPickerTestTags.pin(model.id)),
-                ) {
-                    Text(if (model.pinned) "Unpin" else "Pin")
-                }
-                TextButton(
-                    onClick = onHide,
-                    enabled = !busy,
-                    modifier = Modifier
-                        .heightIn(min = dimens.touchTargetMin)
-                        .testTag(ModelPickerTestTags.hide(model.id)),
-                ) {
-                    Text(if (model.hidden) "Unhide" else "Hide")
-                }
+            if (detailsExpanded) {
+                ModelDetails(model)
             }
-
-            ModelDetails(model)
         }
     }
 }
 
 @Composable
+private fun ModelChip(text: String) {
+    val colors = LocalChatUiColors.current
+    val dimens = LocalDimens.current
+
+    Surface(
+        shape = RoundedCornerShape(dimens.radiusFull),
+        color = colors.bgGrouped,
+    ) {
+        Text(
+            text = text,
+            style = Typography.caption,
+            color = colors.fgSecondary,
+            modifier = Modifier.padding(
+                horizontal = dimens.space2,
+                vertical = dimens.space1,
+            ),
+        )
+    }
+}
+
+@Composable
 private fun ModelDetails(model: Model) {
+    val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
 
     Column(
@@ -357,28 +502,37 @@ private fun ModelDetails(model: Model) {
             .testTag(ModelPickerTestTags.details(model.id)),
         verticalArrangement = Arrangement.spacedBy(dimens.space1),
     ) {
-        Text("Details", style = MaterialTheme.typography.labelLarge)
+        Text(
+            text = "Details",
+            style = Typography.footnote,
+            color = colors.fgMuted,
+        )
         Text(
             text = "Canonical slug: ${model.canonicalSlug ?: "Not reported"}",
-            style = MaterialTheme.typography.bodySmall,
+            style = Typography.footnote,
+            color = colors.fgSecondary,
         )
         Text(
             text = "Max output: ${model.maxOutputTokens?.let { "$it tokens" } ?: "Not reported"}",
-            style = MaterialTheme.typography.bodySmall,
+            style = Typography.footnote,
+            color = colors.fgSecondary,
         )
         Text(
             text = "Upstream context: ${upstreamContext(model)}",
-            style = MaterialTheme.typography.bodySmall,
+            style = Typography.footnote,
+            color = colors.fgSecondary,
         )
         Text(
             text = "Supported parameters: " +
                 (model.supportedParameters.takeIf { it.isNotEmpty() }?.joinToString(", ")
                     ?: "Not reported"),
-            style = MaterialTheme.typography.bodySmall,
+            style = Typography.footnote,
+            color = colors.fgSecondary,
         )
         Text(
             text = "Moderation: ${moderationLabel(model)}",
-            style = MaterialTheme.typography.bodySmall,
+            style = Typography.footnote,
+            color = colors.fgSecondary,
         )
     }
 }
@@ -393,7 +547,11 @@ private fun ManualAddSection(
     val dimens = LocalDimens.current
 
     Column(verticalArrangement = Arrangement.spacedBy(dimens.space2)) {
-        Text("Add a model manually", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Add a model manually",
+            style = Typography.title3,
+            color = LocalChatUiColors.current.fgPrimary,
+        )
         OutlinedTextField(
             value = state.manualRemoteId,
             onValueChange = onManualRemoteIdChanged,

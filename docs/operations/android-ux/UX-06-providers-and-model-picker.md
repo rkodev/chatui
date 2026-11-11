@@ -2,7 +2,7 @@
 
 - Plan: [Android UI/UX Polish Implementation Plan](../android-ux-implementation-plan.md)
 - Design review: [android-ux.md](../../android-ux.md)
-- Status: Not started
+- Status: Complete
 - Order: 7
 - Depends on: UX-01
 - Parallel-safe: yes, with UX-02 and UX-07
@@ -72,16 +72,16 @@ refresh, pin/hide, and selection behavior.
 
 ## Acceptance criteria
 
-- [ ] Provider list is grouped with avatar rows and no "Manage" button.
-- [ ] Add-provider uses a sheet with preset/custom options.
-- [ ] Provider detail uses a header card and grouped sections.
-- [ ] Usage/limit is shown as a progress bar.
-- [ ] Key rotation/removal is in a destructive section with confirmation.
-- [ ] Model picker has filters, compact rows, and a details disclosure.
-- [ ] Pin/hide no longer uses three text buttons per row.
-- [ ] Skeletons and empty states are present.
-- [ ] All existing provider/model test tags are preserved and tests pass.
-- [ ] No provider, key, model, or selection behavior changed.
+- [x] Provider list is grouped with avatar rows and no "Manage" button.
+- [x] Add-provider uses a sheet with preset/custom options.
+- [x] Provider detail uses a header card and grouped sections.
+- [x] Usage/limit is shown as a progress bar.
+- [x] Key rotation/removal is in a destructive section with confirmation.
+- [x] Model picker has filters, compact rows, and a details disclosure.
+- [x] Pin/hide no longer uses three text buttons per row.
+- [x] Skeletons and empty states are present.
+- [x] All existing provider/model test tags are preserved and tests pass.
+- [x] No provider, key, model, or selection behavior changed.
 
 ## Verification
 
@@ -97,8 +97,41 @@ cd android && ./gradlew :feature:providers:testDebugUnitTest
 - Global state kit adoption (UX-08).
 - Motion tuning (UX-09).
 
+## Completion record
+
+Completed on 2026-11-11.
+
+- Provider list now groups configured providers into Connected (a key is
+  stored) and Available (added without a key). Rows use an initial avatar,
+  status dot, key/usage subtitle, and chevron; the whole row opens the detail.
+- Add provider moved to a top-right `+` that opens a bottom sheet. The choose
+  step lists preset cards and a Custom option; the preset and custom steps host
+  the existing forms with a sticky primary action.
+- Provider detail uses a header card plus Key & usage, Models, and Advanced
+  sections. Usage renders as a labelled progress bar. Key rotation and removal
+  live in a destructive Advanced section; removal opens a confirmation dialog.
+- Model picker uses a pinned search/filter header, compact rows with context,
+  price, capability chips, free badge, selected checkmark, and a trailing menu
+  for pin/hide/details. Loading uses skeletons and empty results use a friendly
+  empty state.
+
 ## Handoff notes
 
-- Record how the add-provider sheet hosts the existing forms.
-- Note the model filter behavior and the details disclosure.
-- List any test that had to change and why.
+- The add-provider sheet hosts the existing `PresetProviderForm` and
+  `CustomProviderForm` composables. The choose step keeps every
+  `providerOption(id)` tag; the preset/custom steps keep `PresetForm`,
+  `CustomForm`, and all field/action tags. The primary action is pinned below
+  the scrollable form.
+- Model filters are local UI state: All shows every group, Free keeps only
+  `isFreeModel` rows and drops empty groups, Pinned shows only the pinned
+  group. Details expand from the trailing menu and keep `details(id)`.
+- Tests changed: `ProviderListScreenTest` now opens the add sheet, clicks
+  provider rows instead of "Manage", and scrolls within the sheet.
+  `ModelPickerContentTest` now opens the trailing menu for pin/hide/details,
+  clicks the row to select, and covers the Free/Pinned filters. All existing
+  test tags and accessible names were preserved.
+- Decision: "Connected" means a provider has a stored secret (`secretId !=
+  null`); "Available" means the provider record exists without a key.
+- Verification: `make android-lint`, `make android-test`,
+  `make android-assemble`, and
+  `cd android && ./gradlew :feature:providers:testDebugUnitTest` all passed.
