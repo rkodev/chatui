@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rkodev/chatui/contracts/schema/backup-manifest-body.schema.json",
+  "title": "ChatUI Backup Manifest Body",
+  "contractVersion": 1,
+  "description": "Plaintext manifest body stored inside manifest.enc. The manifest is canonical JSON and is not gzipped (M5-decisions.md DEC-M5-08). It contains the conversation index, attachment index, and deletion tombstones.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "createdAt",
+    "updatedAt",
+    "deviceId",
+    "conversations",
+    "attachments",
+    "tombstones"
+  ],
+  "properties": {
+    "formatVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Backup payload format version. v1 clients reject any other value with unsupported-version."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deviceId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Device that last wrote the manifest."
+    },
+    "conversations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/conversationIndexEntry"
+      }
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/attachmentIndexEntry"
+      }
+    },
+    "tombstones": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/tombstone"
+      }
+    }
+  },
+  "$defs": {
+    "conversationIndexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "storageKey",
+        "revision",
+        "updatedAt",
+        "deletedAt",
+        "deviceId",
+        "objectKey"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Conversation UUID. Never used as an object name."
+        },
+        "storageKey": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "description": "128 random bits as 32 lowercase hexadecimal characters."
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic revision starting at 1 and incremented on every local change."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deletedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deviceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objectKey": {
+          "type": "string",
+          "pattern": "^conversations/[0-9a-f]{32}\\.enc$"
+        }
+      }
+    },
+    "attachmentIndexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256",
+        "size",
+        "objectKey",
+        "createdAt"
+      ],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 of the attachment bytes as 64 lowercase hexadecimal characters."
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "objectKey": {
+          "type": "string",
+          "pattern": "^attachments/[0-9a-f]{64}\\.enc$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "tombstone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conversationId",
+        "deletedAt",
+        "deviceId"
+      ],
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deletedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deviceId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

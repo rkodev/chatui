@@ -49,7 +49,7 @@ The phase 2 gate is open. Start `M5-01.1` next.
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | [M5-00.1 Preflight, decisions, and cross-client test vectors](M5-00.1-preflight-decisions-vectors.md) | Complete | none | preflight | none; blocks all |
-| 2 | [M5-01.1 Contracts: envelope, manifest body, conversation payload, fixtures](M5-01.1-contracts-envelope-manifest.md) | Not started | M5-00.1 | contracts | none; blocks client codecs |
+| 2 | [M5-01.1 Contracts: envelope, manifest body, conversation payload, fixtures](M5-01.1-contracts-envelope-manifest.md) | Complete | M5-00.1 | contracts | none; blocks client codecs |
 | 3 | [M5-01.2 Web envelope codec and crypto tests](M5-01.2-web-envelope-codec.md) | Not started | M5-01.1 | web crypto | M5-01.3, M5-01.4 |
 | 4 | [M5-01.3 Android envelope codec and crypto tests](M5-01.3-android-envelope-codec.md) | Not started | M5-01.1 | android crypto | M5-01.2, M5-01.4 |
 | 5 | [M5-01.4 Rust envelope codec and crypto tests](M5-01.4-rust-envelope-codec.md) | Not started | M5-01.1 | rust crypto | M5-01.2, M5-01.3 |

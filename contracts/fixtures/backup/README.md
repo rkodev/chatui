@@ -47,3 +47,24 @@ format bug, not a test-fixture bug.
 
 The canonical header key order and AAD encoding are frozen in
 `M5-decisions.md`. Do not infer them from a JSON serializer's default order.
+
+## Schema fixtures
+
+These files are synthetic examples validated by `scripts/validate-contracts.mjs`
+against the backup schemas. They are not known-answer vectors and contain no
+real user data, prompts, API keys, or passphrases.
+
+| File | Schema | Purpose |
+| --- | --- | --- |
+| `manifest.json` | `backup-manifest-body.schema.json` | Valid manifest body with a conversation index, attachment index, and tombstone. |
+| `conversation.json` | `backup-conversation.schema.json` | Valid self-contained conversation with metadata, messages, and attachment references. |
+| `envelope-header.json` | `backup-envelope.schema.json` | Valid canonical envelope header. |
+| `invalid/envelope-missing-field.json` | `backup-envelope.schema.json` | Fails because `salt` is missing. |
+| `invalid/envelope-wrong-alg.json` | `backup-envelope.schema.json` | Fails because `alg` is not `AES-256-GCM`. |
+| `invalid/envelope-wrong-kdf.json` | `backup-envelope.schema.json` | Fails because `kdf` is not `pbkdf2-sha256`. |
+| `invalid/envelope-bad-object-type.json` | `backup-envelope.schema.json` | Fails because `objectType` is not a v1 backup object type. |
+| `invalid/envelope-bad-format-version.json` | `backup-envelope.schema.json` | Fails because `formatVersion` is not `1`. |
+
+Each invalid fixture must fail for exactly the documented reason. The validator
+also mutates valid fixtures in memory to prove the new schemas reject broken
+vectors.

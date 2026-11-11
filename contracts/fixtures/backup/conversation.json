@@ -1,0 +1,81 @@
+{
+  "id": "0190f5a0-7a00-7000-8000-000000000001",
+  "title": "Synthetic backup conversation",
+  "systemPrompt": "You are a synthetic test assistant.",
+  "providerId": "openrouter",
+  "modelId": "synthetic/model-1",
+  "modelLabel": "Synthetic Model 1",
+  "params": {
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 1024,
+    "stop": [],
+    "reasoningEffort": null,
+    "streaming": true,
+    "extra": {}
+  },
+  "pinned": false,
+  "archived": false,
+  "temporary": false,
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-01-01T00:05:00.000Z",
+  "lastMessageAt": "2026-01-01T00:03:00.000Z",
+  "revision": 3,
+  "storageKey": "00112233445566778899aabbccddeeff",
+  "messages": [
+    {
+      "id": "0190f5a0-7a00-7000-8000-000000000010",
+      "sequence": 0,
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "Synthetic hello"
+        }
+      ],
+      "status": "complete",
+      "usage": null,
+      "createdAt": "2026-01-01T00:01:00.000Z",
+      "updatedAt": "2026-01-01T00:01:00.000Z",
+      "deletedAt": null
+    },
+    {
+      "id": "0190f5a0-7a00-7000-8000-000000000011",
+      "sequence": 1,
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "text",
+          "text": "Synthetic reply"
+        },
+        {
+          "type": "image",
+          "attachmentId": "0190f5a0-7a00-7000-8000-000000000020",
+          "mimeType": "image/png",
+          "alt": "Synthetic image"
+        }
+      ],
+      "status": "complete",
+      "usage": {
+        "inputTokens": 12,
+        "outputTokens": 8,
+        "totalTokens": 20,
+        "costUsd": 0.0001,
+        "estimated": false
+      },
+      "createdAt": "2026-01-01T00:02:00.000Z",
+      "updatedAt": "2026-01-01T00:03:00.000Z",
+      "deletedAt": null
+    }
+  ],
+  "attachments": [
+    {
+      "id": "0190f5a0-7a00-7000-8000-000000000020",
+      "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "mimeType": "image/png",
+      "name": "synthetic.png",
+      "size": 1234,
+      "storageKey": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  ]
+}

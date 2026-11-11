@@ -26,6 +26,11 @@
       "type": "integer",
       "minimum": 1
     },
+    "formatVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Backup payload format version. v1 clients reject any other value with unsupported-version."
+    },
     "createdAt": {
       "type": "string",
       "format": "date-time"

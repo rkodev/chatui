@@ -1,0 +1,32 @@
+{
+  "formatVersion": 1,
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-01-01T00:05:00.000Z",
+  "deviceId": "device-synthetic-0001",
+  "conversations": [
+    {
+      "id": "0190f5a0-7a00-7000-8000-000000000001",
+      "storageKey": "00112233445566778899aabbccddeeff",
+      "revision": 3,
+      "updatedAt": "2026-01-01T00:05:00.000Z",
+      "deletedAt": null,
+      "deviceId": "device-synthetic-0001",
+      "objectKey": "conversations/00112233445566778899aabbccddeeff.enc"
+    }
+  ],
+  "attachments": [
+    {
+      "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "size": 1234,
+      "objectKey": "attachments/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.enc",
+      "createdAt": "2026-01-01T00:01:00.000Z"
+    }
+  ],
+  "tombstones": [
+    {
+      "conversationId": "0190f5a0-7a00-7000-8000-000000000002",
+      "deletedAt": "2026-01-01T00:04:00.000Z",
+      "deviceId": "device-synthetic-0001"
+    }
+  ]
+}

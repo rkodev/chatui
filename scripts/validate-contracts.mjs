@@ -20,6 +20,7 @@ const contractsDir = path.join(repoRoot, 'contracts');
 const fixturesDir = path.join(contractsDir, 'fixtures');
 const expectedDir = path.join(fixturesDir, 'expected');
 const requestsDir = path.join(fixturesDir, 'requests');
+const backupFixturesDir = path.join(fixturesDir, 'backup');
 const schemaDir = path.join(contractsDir, 'schema');
 
 const EXPECTED_STREAM_SOURCES = new Map([
@@ -240,7 +241,24 @@ const REQUIRED_SCHEMA_FILES = [
   'settings.schema.json',
   'chat-export.schema.json',
   'backup-manifest.schema.json',
+  'backup-envelope.schema.json',
+  'backup-manifest-body.schema.json',
+  'backup-conversation.schema.json',
 ];
+
+const BACKUP_VALID_FIXTURES = new Map([
+  ['manifest.json', 'backup-manifest-body.schema.json'],
+  ['conversation.json', 'backup-conversation.schema.json'],
+  ['envelope-header.json', 'backup-envelope.schema.json'],
+]);
+
+const BACKUP_INVALID_FIXTURES = new Map([
+  ['envelope-missing-field.json', 'backup-envelope.schema.json'],
+  ['envelope-wrong-alg.json', 'backup-envelope.schema.json'],
+  ['envelope-wrong-kdf.json', 'backup-envelope.schema.json'],
+  ['envelope-bad-object-type.json', 'backup-envelope.schema.json'],
+  ['envelope-bad-format-version.json', 'backup-envelope.schema.json'],
+]);
 
 const REQUIRED_PRESET_FIELDS = [
   'id',
@@ -570,6 +588,47 @@ function validateModelFixtures(validators) {
         reportAjvErrors(filePath, validateModelInfo, prefix);
       }
     });
+  }
+}
+
+function validateBackupFixtures(validators) {
+  for (const [name, schemaName] of BACKUP_VALID_FIXTURES) {
+    const filePath = path.join(backupFixturesDir, name);
+    const document = readJson(filePath);
+    if (document === undefined) {
+      continue;
+    }
+    const validate = validators.get(schemaName);
+    if (!validate) {
+      continue;
+    }
+    if (!validate(document)) {
+      reportAjvErrors(filePath, validate);
+    }
+  }
+
+  for (const [name, schemaName] of BACKUP_INVALID_FIXTURES) {
+    const filePath = path.join(backupFixturesDir, 'invalid', name);
+    const document = readJson(filePath);
+    if (document === undefined) {
+      continue;
+    }
+    const validate = validators.get(schemaName);
+    if (!validate) {
+      continue;
+    }
+    if (validate(document)) {
+      addError(filePath, '$', 'invalid fixture unexpectedly passed schema validation');
+      continue;
+    }
+    const failureCount = (validate.errors ?? []).length;
+    if (failureCount !== 1) {
+      addError(
+        filePath,
+        '$',
+        `invalid fixture must fail for exactly one documented reason, found ${failureCount}`,
+      );
+    }
   }
 }
 
@@ -3646,6 +3705,48 @@ function runBrokenVectorSelfTest(validators) {
     validators.get('chat-export.schema.json'),
   );
 
+  const brokenManifestPath = path.join(backupFixturesDir, '__broken-manifest__.json');
+  const manifestDocument = JSON.parse(
+    readFileSync(path.join(backupFixturesDir, 'manifest.json'), 'utf8'),
+  );
+  delete manifestDocument.deviceId;
+  const validateManifestBody = validators.get('backup-manifest-body.schema.json');
+  if (validateManifestBody) {
+    if (validateManifestBody(manifestDocument)) {
+      addError(brokenManifestPath, '/deviceId', 'broken-vector self-test fixture unexpectedly passed');
+    } else {
+      reportAjvErrors(brokenManifestPath, validateManifestBody);
+    }
+  }
+
+  const brokenConversationPath = path.join(backupFixturesDir, '__broken-conversation__.json');
+  const conversationDocument = JSON.parse(
+    readFileSync(path.join(backupFixturesDir, 'conversation.json'), 'utf8'),
+  );
+  delete conversationDocument.messages;
+  const validateConversation = validators.get('backup-conversation.schema.json');
+  if (validateConversation) {
+    if (validateConversation(conversationDocument)) {
+      addError(brokenConversationPath, '/messages', 'broken-vector self-test fixture unexpectedly passed');
+    } else {
+      reportAjvErrors(brokenConversationPath, validateConversation);
+    }
+  }
+
+  const brokenEnvelopePath = path.join(backupFixturesDir, '__broken-envelope__.json');
+  const envelopeDocument = JSON.parse(
+    readFileSync(path.join(backupFixturesDir, 'envelope-header.json'), 'utf8'),
+  );
+  envelopeDocument.alg = 'AES-128-GCM';
+  const validateEnvelope = validators.get('backup-envelope.schema.json');
+  if (validateEnvelope) {
+    if (validateEnvelope(envelopeDocument)) {
+      addError(brokenEnvelopePath, '/alg', 'broken-vector self-test fixture unexpectedly passed');
+    } else {
+      reportAjvErrors(brokenEnvelopePath, validateEnvelope);
+    }
+  }
+
   const produced = errors.slice(start);
   errors.length = start;
 
@@ -3672,6 +3773,15 @@ function runBrokenVectorSelfTest(validators) {
   );
   const exportOk = produced.some(
     (message) => message.includes(relative(brokenExportPath)) && message.includes('/format'),
+  );
+  const manifestOk = produced.some(
+    (message) => message.includes(relative(brokenManifestPath)) && message.includes('/deviceId'),
+  );
+  const conversationOk = produced.some(
+    (message) => message.includes(relative(brokenConversationPath)) && message.includes('/messages'),
+  );
+  const envelopeOk = produced.some(
+    (message) => message.includes(relative(brokenEnvelopePath)) && message.includes('/alg'),
   );
 
   if (!streamOk) {
@@ -3708,6 +3818,27 @@ function runBrokenVectorSelfTest(validators) {
       'broken-vector self-test did not report the expected export mismatch',
     );
   }
+  if (!manifestOk) {
+    addError(
+      brokenManifestPath,
+      '/deviceId',
+      'broken-vector self-test did not report the expected manifest body mismatch',
+    );
+  }
+  if (!conversationOk) {
+    addError(
+      brokenConversationPath,
+      '/messages',
+      'broken-vector self-test did not report the expected conversation payload mismatch',
+    );
+  }
+  if (!envelopeOk) {
+    addError(
+      brokenEnvelopePath,
+      '/alg',
+      'broken-vector self-test did not report the expected envelope header mismatch',
+    );
+  }
 }
 
 function main() {
@@ -3717,6 +3848,7 @@ function main() {
   validateAllJsonFiles();
   validateProviders(validators);
   validateModelFixtures(validators);
+  validateBackupFixtures(validators);
   validateExpectedVectors(validators);
   validateRequestVectors();
   validateFixtureEncoding();
