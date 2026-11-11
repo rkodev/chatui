@@ -53,3 +53,21 @@ export {
   type ConversationPayloadErrorCode,
   type ConversationPayloadMessage,
 } from './conversationPayload'
+export {
+  compareMessages,
+  mergeConversation,
+  mergeMessages,
+  type MergeConversationOptions,
+  type MergedConversation,
+  type MergedMessages,
+} from './merge'
+export {
+  DELETE_REMOTE_CONFIRMATION,
+  MANIFEST_OBJECT_KEY,
+  SyncEngine,
+  type BackupIdentity,
+  type RestoreOptions,
+  type RestoreResult,
+  type SyncEngineOptions,
+  type SyncResult,
+} from './sync'
