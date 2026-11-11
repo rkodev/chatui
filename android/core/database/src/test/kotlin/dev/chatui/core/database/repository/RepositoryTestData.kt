@@ -65,6 +65,8 @@ internal object RepositoryTestData {
         messageCount: Int = 0,
         lastError: ChatError? = null,
         sync: SyncMeta? = null,
+        storageKey: String = "",
+        revision: Long = 1,
     ): Conversation = Conversation(
         id = id,
         title = title,
@@ -82,6 +84,8 @@ internal object RepositoryTestData {
         messageCount = messageCount,
         lastError = lastError,
         sync = sync,
+        storageKey = storageKey,
+        revision = revision,
     )
 
     fun message(

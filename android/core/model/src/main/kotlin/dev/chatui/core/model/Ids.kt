@@ -101,3 +101,28 @@ fun newId(): String = UuidV7.generate()
 
 /** Return true when [value] is a canonical UUIDv7 string. */
 fun isUuidV7(value: String): Boolean = UUID_V7_PATTERN.matches(value)
+
+private val STORAGE_KEY_PATTERN = Regex("^[0-9a-f]{32}$")
+
+/**
+ * Generate a random 128-bit backup storage key as 32 lowercase hex characters.
+ *
+ * The key is independent of the conversation UUID so backup object names do
+ * not leak conversation counts or creation times (spec 6.1 and 13.3).
+ */
+fun newStorageKey(random: Random = SecureRandom()): String {
+    val bytes = ByteArray(16)
+    random.nextBytes(bytes)
+    val hex = CharArray(32)
+    for (index in bytes.indices) {
+        val value = bytes[index].toInt() and 0xFF
+        hex[index * 2] = HEX_DIGITS[value ushr 4]
+        hex[index * 2 + 1] = HEX_DIGITS[value and 0x0F]
+    }
+    return String(hex)
+}
+
+/** Return true when [value] is a 32-character lowercase hex storage key. */
+fun isStorageKey(value: String): Boolean = STORAGE_KEY_PATTERN.matches(value)
+
+private const val HEX_DIGITS = "0123456789abcdef"

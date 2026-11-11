@@ -167,9 +167,9 @@ class DefaultConversationService @Inject constructor(
             sync = null,
         )
 
-        conversations.create(conversation)
-        settings.setLastActiveConversation(conversation.id)
-        return CreateConversationResult.Created(conversation)
+        val created = conversations.create(conversation)
+        settings.setLastActiveConversation(created.id)
+        return CreateConversationResult.Created(created)
     }
 
     override suspend fun renameConversation(id: String, title: String): Conversation {

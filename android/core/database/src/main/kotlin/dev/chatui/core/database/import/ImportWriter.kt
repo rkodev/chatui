@@ -12,6 +12,7 @@ import dev.chatui.core.model.Message
 import dev.chatui.core.model.Model
 import dev.chatui.core.model.ModelSource
 import dev.chatui.core.model.Provider
+import dev.chatui.core.model.newStorageKey
 
 /** How an import applies an archive to local data. */
 enum class ImportMode {
@@ -98,7 +99,13 @@ class ImportWriter(
                 }
 
                 request.conversations.forEach { conversation ->
-                    database.conversationDao().upsert(conversation.toEntity())
+                    // The plaintext export contract does not carry sync-only
+                    // fields, so backfill them on import.
+                    val prepared = conversation.copy(
+                        storageKey = conversation.storageKey.ifBlank { newStorageKey() },
+                        revision = conversation.revision.coerceAtLeast(1),
+                    )
+                    database.conversationDao().upsert(prepared.toEntity())
                 }
 
                 request.messages.forEach { message ->

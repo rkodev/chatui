@@ -44,7 +44,7 @@ class DestructiveMigrationGuardTest {
 
         val path = context.getDatabasePath(DB_NAME).absolutePath
         SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READWRITE).use { raw ->
-            raw.execSQL("PRAGMA user_version = 2")
+            raw.execSQL("PRAGMA user_version = 3")
         }
 
         val reopened = ChatUiDatabase.builder(context, DB_NAME).build()
