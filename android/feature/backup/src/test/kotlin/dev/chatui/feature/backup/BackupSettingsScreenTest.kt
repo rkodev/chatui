@@ -8,6 +8,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.google.common.truth.Truth.assertThat
@@ -149,14 +151,113 @@ class BackupSettingsScreenTest {
             .assertIsEnabled()
     }
 
+    @Test
+    fun `backend selector offers every backend`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                BackupSettingsScreen(
+                    state = state(),
+                    onFormChanged = {},
+                    onTestConnection = {},
+                    onEnableChanged = {},
+                    onBackupNow = {},
+                    onRestoreMerge = {},
+                    onRequestRestoreReplace = {},
+                    onReplaceConfirmationChanged = {},
+                    onConfirmRestoreReplace = {},
+                    onRequestDeleteRemote = {},
+                    onDeleteConfirmationChanged = {},
+                    onConfirmDeleteRemote = {},
+                    onDismissDialogs = {},
+                    onDismissError = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(BackupSettingsTestTags.Backend).performClick()
+
+        listOf(
+            "S3-compatible",
+            "Azure Blob",
+            "Google Cloud Storage",
+            "Google Drive",
+            "WebDAV",
+        ).forEach { label ->
+            composeRule.onAllNodesWithText(label).onFirst().assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun `additional backend fields render`() {
+        var backend by mutableStateOf(BackupBackend.AZURE_BLOB)
+        composeRule.setContent {
+            ChatUiTheme {
+                BackupSettingsScreen(
+                    state = state(backend = backend),
+                    onFormChanged = {},
+                    onTestConnection = {},
+                    onEnableChanged = {},
+                    onBackupNow = {},
+                    onRestoreMerge = {},
+                    onRequestRestoreReplace = {},
+                    onReplaceConfirmationChanged = {},
+                    onConfirmRestoreReplace = {},
+                    onRequestDeleteRemote = {},
+                    onDeleteConfirmationChanged = {},
+                    onConfirmDeleteRemote = {},
+                    onDismissDialogs = {},
+                    onDismissError = {},
+                )
+            }
+        }
+
+        val cases = listOf(
+            BackupBackend.AZURE_BLOB to listOf(
+                BackupSettingsTestTags.AccountName,
+                BackupSettingsTestTags.AccountKey,
+                BackupSettingsTestTags.SasToken,
+                BackupSettingsTestTags.Bucket,
+                BackupSettingsTestTags.Endpoint,
+                BackupSettingsTestTags.Prefix,
+            ),
+            BackupBackend.GCS to listOf(
+                BackupSettingsTestTags.Bucket,
+                BackupSettingsTestTags.ServiceAccountJson,
+                BackupSettingsTestTags.Prefix,
+            ),
+            BackupBackend.GOOGLE_DRIVE to listOf(
+                BackupSettingsTestTags.AccessToken,
+                BackupSettingsTestTags.DriveFolder,
+                BackupSettingsTestTags.Prefix,
+            ),
+            BackupBackend.WEBDAV to listOf(
+                BackupSettingsTestTags.Endpoint,
+                BackupSettingsTestTags.WebDavUsername,
+                BackupSettingsTestTags.WebDavPassword,
+                BackupSettingsTestTags.Prefix,
+            ),
+        )
+
+        for ((value, tags) in cases) {
+            backend = value
+            composeRule.waitForIdle()
+            tags.forEach { tag ->
+                composeRule.onNodeWithTag(tag)
+                    .performScrollTo()
+                    .assertIsDisplayed()
+            }
+        }
+    }
+
     private fun state(
         enabled: Boolean = true,
         showDeleteDialog: Boolean = false,
         deleteConfirmation: String = "",
+        backend: BackupBackend = BackupBackend.S3,
     ) = BackupUiState(
         loading = false,
         form = BackupFormValues(
-            backend = BackupBackend.S3,
+            backend = backend,
             endpoint = "https://s3.example.com",
             region = "us-east-1",
             bucket = "chatui",

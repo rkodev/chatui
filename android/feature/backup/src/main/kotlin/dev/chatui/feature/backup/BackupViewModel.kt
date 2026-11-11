@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.chatui.core.backup.sync.DELETE_REMOTE_CONFIRMATION
+import dev.chatui.core.model.BackupBackend
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -343,10 +344,22 @@ private fun BackupSettingsSnapshot.toForm(fallback: BackupFormValues): BackupFor
         backend = config.backend,
         endpoint = config.endpoint.orEmpty(),
         region = config.region.orEmpty(),
-        bucket = config.bucket,
+        bucket = if (config.backend == BackupBackend.WEBDAV) "" else config.bucket,
         prefix = config.prefix,
         accessKeyId = credentials?.accessKeyId.orEmpty(),
         secretAccessKey = credentials?.secretAccessKey.orEmpty(),
+        accountName = credentials?.accountName.orEmpty(),
+        accountKey = credentials?.accountKey.orEmpty(),
+        sasToken = credentials?.sasToken.orEmpty(),
+        serviceAccountJson = credentials?.serviceAccountJson.orEmpty(),
+        accessToken = credentials?.accessToken.orEmpty(),
+        driveFolderId = if (config.backend == BackupBackend.GOOGLE_DRIVE) {
+            config.bucket
+        } else {
+            credentials?.driveFolderId.orEmpty()
+        },
+        webdavUsername = credentials?.webdavUsername.orEmpty(),
+        webdavPassword = credentials?.webdavPassword.orEmpty(),
         passphrase = "",
     )
 }

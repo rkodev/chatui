@@ -1,8 +1,16 @@
 package dev.chatui.feature.backup
 
+import dev.chatui.core.backup.storage.AzureBlobStorageAdapter
+import dev.chatui.core.backup.storage.AzureBlobStorageConfig
+import dev.chatui.core.backup.storage.GcsStorageAdapter
+import dev.chatui.core.backup.storage.GcsStorageConfig
+import dev.chatui.core.backup.storage.GoogleDriveStorageAdapter
+import dev.chatui.core.backup.storage.GoogleDriveStorageConfig
 import dev.chatui.core.backup.storage.S3StorageAdapter
 import dev.chatui.core.backup.storage.S3StorageConfig
 import dev.chatui.core.backup.storage.StorageAdapter
+import dev.chatui.core.backup.storage.WebDavStorageAdapter
+import dev.chatui.core.backup.storage.WebDavStorageConfig
 import dev.chatui.core.backup.sync.DELETE_REMOTE_CONFIRMATION
 import dev.chatui.core.backup.sync.RestoreOptions
 import dev.chatui.core.backup.sync.RestoreResult
@@ -31,8 +39,16 @@ const val RESTORE_REPLACE_CONFIRMATION: String = "REPLACE LOCAL DATA"
 /** Credentials stored as one encrypted secret value. */
 @Serializable
 data class BackupCredentials(
-    val accessKeyId: String,
-    val secretAccessKey: String,
+    val accessKeyId: String = "",
+    val secretAccessKey: String = "",
+    val accountName: String = "",
+    val accountKey: String = "",
+    val sasToken: String = "",
+    val serviceAccountJson: String = "",
+    val accessToken: String = "",
+    val driveFolderId: String = "",
+    val webdavUsername: String = "",
+    val webdavPassword: String = "",
 )
 
 /** Editable backup form values. The passphrase is never persisted. */
@@ -44,6 +60,14 @@ data class BackupFormValues(
     val prefix: String = "",
     val accessKeyId: String = "",
     val secretAccessKey: String = "",
+    val accountName: String = "",
+    val accountKey: String = "",
+    val sasToken: String = "",
+    val serviceAccountJson: String = "",
+    val accessToken: String = "",
+    val driveFolderId: String = "",
+    val webdavUsername: String = "",
+    val webdavPassword: String = "",
     val passphrase: String = "",
 )
 
@@ -88,11 +112,15 @@ interface BackupSettingsServiceLike {
 }
 
 /** Validate the storage fields. The passphrase is validated separately. */
-fun validateBackupForm(values: BackupFormValues): String? {
-    if (values.backend != BackupBackend.S3) {
-        return "Only S3-compatible storage is available in this release."
-    }
+fun validateBackupForm(values: BackupFormValues): String? = when (values.backend) {
+    BackupBackend.S3 -> validateS3Form(values)
+    BackupBackend.AZURE_BLOB -> validateAzureForm(values)
+    BackupBackend.GCS -> validateGcsForm(values)
+    BackupBackend.GOOGLE_DRIVE -> validateGoogleDriveForm(values)
+    BackupBackend.WEBDAV -> validateWebDavForm(values)
+}
 
+private fun validateS3Form(values: BackupFormValues): String? {
     val endpoint = values.endpoint.trim()
     if (endpoint.isEmpty()) {
         return "Endpoint is required."
@@ -116,6 +144,73 @@ fun validateBackupForm(values: BackupFormValues): String? {
         return "Secret access key is required."
     }
 
+    return null
+}
+
+private fun validateAzureForm(values: BackupFormValues): String? {
+    if (values.accountName.trim().isEmpty()) {
+        return "Azure account name is required."
+    }
+    if (values.bucket.trim().isEmpty()) {
+        return "Azure container is required."
+    }
+    if (values.accountKey.isEmpty() && values.sasToken.trim().isEmpty()) {
+        return "Azure account key or SAS token is required."
+    }
+    val endpoint = values.endpoint.trim()
+    if (endpoint.isNotEmpty()) {
+        val uri = runCatching { URI(endpoint) }.getOrNull()
+        if (uri == null || uri.scheme !in setOf("http", "https") || uri.host.isNullOrBlank()) {
+            return "Azure endpoint must be a valid http or https URL."
+        }
+    }
+    return null
+}
+
+private fun validateGcsForm(values: BackupFormValues): String? {
+    if (values.bucket.trim().isEmpty()) {
+        return "GCS bucket is required."
+    }
+    if (values.serviceAccountJson.trim().isEmpty()) {
+        return "Service account JSON is required."
+    }
+    val parsed = runCatching {
+        Json { ignoreUnknownKeys = true }
+            .parseToJsonElement(values.serviceAccountJson)
+    }.getOrNull()
+    if (parsed == null) {
+        return "Service account JSON is not valid JSON."
+    }
+    val objectValue = parsed as? kotlinx.serialization.json.JsonObject
+        ?: return "Service account JSON must be an object."
+    if (objectValue["client_email"] == null || objectValue["private_key"] == null) {
+        return "Service account JSON must include client_email and private_key."
+    }
+    return null
+}
+
+private fun validateGoogleDriveForm(values: BackupFormValues): String? {
+    if (values.accessToken.trim().isEmpty()) {
+        return "Google Drive access token is required."
+    }
+    return null
+}
+
+private fun validateWebDavForm(values: BackupFormValues): String? {
+    val endpoint = values.endpoint.trim()
+    if (endpoint.isEmpty()) {
+        return "WebDAV URL is required."
+    }
+    val uri = runCatching { URI(endpoint) }.getOrNull()
+    if (uri == null || uri.scheme !in setOf("http", "https") || uri.host.isNullOrBlank()) {
+        return "WebDAV URL must be a valid http or https URL."
+    }
+    if (values.webdavUsername.trim().isEmpty()) {
+        return "WebDAV username is required."
+    }
+    if (values.webdavPassword.isEmpty()) {
+        return "WebDAV password is required."
+    }
     return null
 }
 
@@ -165,18 +260,15 @@ class BackupSettingsService(
 
         val existing = configRepository.get()
         val secretId = existing?.credentialSecretId ?: BACKUP_CREDENTIALS_SECRET_ID
-        val credentials = BackupCredentials(
-            accessKeyId = values.accessKeyId.trim(),
-            secretAccessKey = values.secretAccessKey,
-        )
+        val credentials = credentialsFromValues(values)
         secrets.put(secretId, json.encodeToString(BackupCredentials.serializer(), credentials))
 
         val config = BackupConfig(
             enabled = enabled,
             backend = values.backend,
-            endpoint = values.endpoint.trim(),
-            region = values.region.trim(),
-            bucket = values.bucket.trim(),
+            endpoint = configEndpoint(values),
+            region = configRegion(values),
+            bucket = configBucket(values),
             prefix = values.prefix.trim(),
             credentialSecretId = secretId,
             encryption = existing?.encryption ?: BackupEncryption.AES_256_GCM,
@@ -218,10 +310,7 @@ class BackupSettingsService(
         validateBackupForm(values)?.let { throw IllegalArgumentException(it) }
 
         val config = configFromValues(values, enabled = false)
-        val credentials = BackupCredentials(
-            accessKeyId = values.accessKeyId.trim(),
-            secretAccessKey = values.secretAccessKey,
-        )
+        val credentials = credentialsFromValues(values)
         createStorage(config, credentials).testConnection()
     }
 
@@ -312,9 +401,9 @@ class BackupSettingsService(
         BackupConfig(
             enabled = enabled,
             backend = values.backend,
-            endpoint = values.endpoint.trim(),
-            region = values.region.trim(),
-            bucket = values.bucket.trim(),
+            endpoint = configEndpoint(values),
+            region = configRegion(values),
+            bucket = configBucket(values),
             prefix = values.prefix.trim(),
             credentialSecretId = null,
             encryption = BackupEncryption.AES_256_GCM,
@@ -324,6 +413,41 @@ class BackupSettingsService(
             lastManifestEtag = null,
             deviceId = "",
         )
+
+    private fun credentialsFromValues(values: BackupFormValues): BackupCredentials =
+        BackupCredentials(
+            accessKeyId = values.accessKeyId.trim(),
+            secretAccessKey = values.secretAccessKey,
+            accountName = values.accountName.trim(),
+            accountKey = values.accountKey,
+            sasToken = values.sasToken.trim(),
+            serviceAccountJson = values.serviceAccountJson,
+            accessToken = values.accessToken.trim(),
+            driveFolderId = values.driveFolderId.trim(),
+            webdavUsername = values.webdavUsername.trim(),
+            webdavPassword = values.webdavPassword,
+        )
+
+    private fun configEndpoint(values: BackupFormValues): String? = when (values.backend) {
+        BackupBackend.S3 -> values.endpoint.trim()
+        BackupBackend.AZURE_BLOB -> values.endpoint.trim().ifEmpty { null }
+        BackupBackend.GCS -> null
+        BackupBackend.GOOGLE_DRIVE -> null
+        BackupBackend.WEBDAV -> values.endpoint.trim()
+    }
+
+    private fun configRegion(values: BackupFormValues): String? = when (values.backend) {
+        BackupBackend.S3 -> values.region.trim()
+        else -> null
+    }
+
+    private fun configBucket(values: BackupFormValues): String = when (values.backend) {
+        BackupBackend.S3 -> values.bucket.trim()
+        BackupBackend.AZURE_BLOB -> values.bucket.trim()
+        BackupBackend.GCS -> values.bucket.trim()
+        BackupBackend.GOOGLE_DRIVE -> values.driveFolderId.trim().ifEmpty { "appDataFolder" }
+        BackupBackend.WEBDAV -> ""
+    }
 
     private suspend fun loadCredentials(config: BackupConfig): BackupCredentials? {
         val secretId = config.credentialSecretId ?: return null
@@ -354,25 +478,63 @@ class BackupSettingsService(
 private fun defaultCreateStorage(
     config: BackupConfig,
     credentials: BackupCredentials,
-): StorageAdapter {
-    require(config.backend == BackupBackend.S3) {
-        "Only S3-compatible storage is available in this release."
+): StorageAdapter = when (config.backend) {
+    BackupBackend.S3 -> {
+        val endpoint = config.endpoint
+            ?: throw IllegalArgumentException("Endpoint is required.")
+        val region = config.region
+            ?: throw IllegalArgumentException("Region is required.")
+        S3StorageAdapter(
+            S3StorageConfig(
+                endpoint = endpoint,
+                bucket = config.bucket,
+                region = region,
+                accessKeyId = credentials.accessKeyId,
+                secretAccessKey = credentials.secretAccessKey,
+                prefix = config.prefix,
+            ),
+        )
     }
-    val endpoint = config.endpoint
-        ?: throw IllegalArgumentException("Endpoint is required.")
-    val region = config.region
-        ?: throw IllegalArgumentException("Region is required.")
 
-    return S3StorageAdapter(
-        S3StorageConfig(
-            endpoint = endpoint,
-            bucket = config.bucket,
-            region = region,
-            accessKeyId = credentials.accessKeyId,
-            secretAccessKey = credentials.secretAccessKey,
+    BackupBackend.AZURE_BLOB -> AzureBlobStorageAdapter(
+        AzureBlobStorageConfig(
+            accountName = credentials.accountName,
+            accountKey = credentials.accountKey.ifBlank { null },
+            sasToken = credentials.sasToken.ifBlank { null },
+            container = config.bucket,
+            endpoint = config.endpoint,
             prefix = config.prefix,
         ),
     )
+
+    BackupBackend.GCS -> GcsStorageAdapter(
+        GcsStorageConfig(
+            serviceAccountJson = credentials.serviceAccountJson,
+            bucket = config.bucket,
+            prefix = config.prefix,
+        ),
+    )
+
+    BackupBackend.GOOGLE_DRIVE -> GoogleDriveStorageAdapter(
+        GoogleDriveStorageConfig(
+            accessToken = credentials.accessToken,
+            folderId = config.bucket.ifBlank { "appDataFolder" },
+            prefix = config.prefix,
+        ),
+    )
+
+    BackupBackend.WEBDAV -> {
+        val endpoint = config.endpoint
+            ?: throw IllegalArgumentException("WebDAV URL is required.")
+        WebDavStorageAdapter(
+            WebDavStorageConfig(
+                baseUrl = endpoint,
+                username = credentials.webdavUsername,
+                password = credentials.webdavPassword,
+                prefix = config.prefix,
+            ),
+        )
+    }
 }
 
 private fun defaultCreateEngine(

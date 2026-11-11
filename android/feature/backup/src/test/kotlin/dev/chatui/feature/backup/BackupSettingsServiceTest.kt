@@ -237,6 +237,114 @@ class BackupSettingsServiceTest {
         assertThat(validatePassphrase("x")).isNull()
     }
 
+    @Test
+    fun `validation accepts each additional backend form`() {
+        assertThat(validateBackupForm(azureForm())).isNull()
+        assertThat(validateBackupForm(gcsForm())).isNull()
+        assertThat(validateBackupForm(driveForm())).isNull()
+        assertThat(validateBackupForm(webdavForm())).isNull()
+    }
+
+    @Test
+    fun `validation rejects missing additional backend fields`() {
+        assertThat(validateBackupForm(azureForm().copy(accountName = "")))
+            .isEqualTo("Azure account name is required.")
+        assertThat(validateBackupForm(azureForm().copy(bucket = "")))
+            .isEqualTo("Azure container is required.")
+        assertThat(validateBackupForm(azureForm().copy(accountKey = "", sasToken = "")))
+            .isEqualTo("Azure account key or SAS token is required.")
+        assertThat(validateBackupForm(gcsForm().copy(bucket = "")))
+            .isEqualTo("GCS bucket is required.")
+        assertThat(validateBackupForm(gcsForm().copy(serviceAccountJson = "")))
+            .isEqualTo("Service account JSON is required.")
+        assertThat(validateBackupForm(gcsForm().copy(serviceAccountJson = "not json")))
+            .isEqualTo("Service account JSON is not valid JSON.")
+        assertThat(validateBackupForm(gcsForm().copy(serviceAccountJson = "[]")))
+            .isEqualTo("Service account JSON must be an object.")
+        assertThat(validateBackupForm(gcsForm().copy(serviceAccountJson = "{}")))
+            .isEqualTo("Service account JSON must include client_email and private_key.")
+        assertThat(validateBackupForm(driveForm().copy(accessToken = "")))
+            .isEqualTo("Google Drive access token is required.")
+        assertThat(validateBackupForm(webdavForm().copy(endpoint = "")))
+            .isEqualTo("WebDAV URL is required.")
+        assertThat(validateBackupForm(webdavForm().copy(endpoint = "ftp://example.com")))
+            .isEqualTo("WebDAV URL must be a valid http or https URL.")
+        assertThat(validateBackupForm(webdavForm().copy(webdavUsername = "")))
+            .isEqualTo("WebDAV username is required.")
+        assertThat(validateBackupForm(webdavForm().copy(webdavPassword = "")))
+            .isEqualTo("WebDAV password is required.")
+    }
+
+    @Test
+    fun `saveConfig stores backend-specific credentials and config fields`() = runTest {
+        coEvery { repository.get() } returns null
+        val secretValue = slot<String>()
+        coEvery { secrets.put(any(), capture(secretValue)) } returns Unit
+        val saved = slot<BackupConfig>()
+        coEvery { repository.put(capture(saved)) } returns Unit
+
+        val azure = service().saveConfig(azureForm())
+        assertThat(azure.backend).isEqualTo(BackupBackend.AZURE_BLOB)
+        assertThat(azure.bucket).isEqualTo("container")
+        assertThat(azure.endpoint).isNull()
+        assertThat(secretValue.captured).contains("account-name")
+        assertThat(secretValue.captured).contains("account-key")
+
+        val gcs = service().saveConfig(gcsForm())
+        assertThat(gcs.backend).isEqualTo(BackupBackend.GCS)
+        assertThat(gcs.bucket).isEqualTo("gcs-bucket")
+        assertThat(gcs.endpoint).isNull()
+        assertThat(secretValue.captured).contains("client_email")
+
+        val drive = service().saveConfig(driveForm())
+        assertThat(drive.backend).isEqualTo(BackupBackend.GOOGLE_DRIVE)
+        assertThat(drive.bucket).isEqualTo("folder-1")
+        assertThat(drive.endpoint).isNull()
+        assertThat(secretValue.captured).contains("drive-token")
+
+        val webdav = service().saveConfig(webdavForm())
+        assertThat(webdav.backend).isEqualTo(BackupBackend.WEBDAV)
+        assertThat(webdav.bucket).isEmpty()
+        assertThat(webdav.endpoint).isEqualTo("https://dav.example.com/dav")
+        assertThat(secretValue.captured).contains("dav-user")
+        assertThat(secretValue.captured).contains("dav-pass")
+        assertThat(saved.captured).isEqualTo(webdav)
+    }
+
+    private fun azureForm() = BackupFormValues(
+        backend = BackupBackend.AZURE_BLOB,
+        accountName = "account-name",
+        accountKey = "account-key",
+        bucket = "container",
+        prefix = "backups",
+        passphrase = "correct horse battery staple",
+    )
+
+    private fun gcsForm() = BackupFormValues(
+        backend = BackupBackend.GCS,
+        bucket = "gcs-bucket",
+        serviceAccountJson = """{"client_email":"a@b.c","private_key":"key"}""",
+        prefix = "backups",
+        passphrase = "correct horse battery staple",
+    )
+
+    private fun driveForm() = BackupFormValues(
+        backend = BackupBackend.GOOGLE_DRIVE,
+        accessToken = "drive-token",
+        driveFolderId = "folder-1",
+        prefix = "backups",
+        passphrase = "correct horse battery staple",
+    )
+
+    private fun webdavForm() = BackupFormValues(
+        backend = BackupBackend.WEBDAV,
+        endpoint = "https://dav.example.com/dav",
+        webdavUsername = "dav-user",
+        webdavPassword = "dav-pass",
+        prefix = "backups",
+        passphrase = "correct horse battery staple",
+    )
+
     private fun savedConfig() = BackupConfig(
         enabled = false,
         backend = BackupBackend.S3,

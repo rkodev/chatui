@@ -62,6 +62,61 @@ class BackupViewModelTest {
     }
 
     @Test
+    fun `load populates backend-specific credentials`() = runTest(dispatcher) {
+        val service = FakeBackupService().apply {
+            snapshot = BackupSettingsSnapshot(
+                config = config(enabled = false).copy(
+                    backend = BackupBackend.GOOGLE_DRIVE,
+                    endpoint = null,
+                    region = null,
+                    bucket = "folder-1",
+                ),
+                credentials = BackupCredentials(
+                    accessToken = "drive-token",
+                    driveFolderId = "folder-1",
+                ),
+            )
+        }
+
+        val viewModel = BackupViewModel(service)
+        advanceUntilIdle()
+
+        val form = viewModel.state.value.form
+        assertThat(form.backend).isEqualTo(BackupBackend.GOOGLE_DRIVE)
+        assertThat(form.accessToken).isEqualTo("drive-token")
+        assertThat(form.driveFolderId).isEqualTo("folder-1")
+        assertThat(form.bucket).isEqualTo("folder-1")
+    }
+
+    @Test
+    fun `load maps webdav config to the url and credentials`() = runTest(dispatcher) {
+        val service = FakeBackupService().apply {
+            snapshot = BackupSettingsSnapshot(
+                config = config(enabled = false).copy(
+                    backend = BackupBackend.WEBDAV,
+                    endpoint = "https://dav.example.com/dav",
+                    region = null,
+                    bucket = "",
+                ),
+                credentials = BackupCredentials(
+                    webdavUsername = "dav-user",
+                    webdavPassword = "dav-pass",
+                ),
+            )
+        }
+
+        val viewModel = BackupViewModel(service)
+        advanceUntilIdle()
+
+        val form = viewModel.state.value.form
+        assertThat(form.backend).isEqualTo(BackupBackend.WEBDAV)
+        assertThat(form.endpoint).isEqualTo("https://dav.example.com/dav")
+        assertThat(form.bucket).isEmpty()
+        assertThat(form.webdavUsername).isEqualTo("dav-user")
+        assertThat(form.webdavPassword).isEqualTo("dav-pass")
+    }
+
+    @Test
     fun `test connection validates required fields before calling the service`() = runTest(dispatcher) {
         val service = FakeBackupService()
         val viewModel = BackupViewModel(service)

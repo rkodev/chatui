@@ -69,7 +69,7 @@ The phase 2 gate is open. Start `M5-01.1` next.
 | 19 | [M5-06.2 Web scheduling and platform constraints](M5-06.2-web-scheduling.md) | Complete | M5-05.1 | web scheduling | M5-06.1, M5-06.3 |
 | 20 | [M5-06.3 Rust desktop scheduling and documentation](M5-06.3-rust-scheduling.md) | Complete | M5-05.3 | rust scheduling | M5-06.1, M5-06.2 |
 | 21 | [M5-07.1 Web Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.1-web-additional-backends.md) | Complete | M5-03.1, M5-04.1 | web backend | M5-07.2, M5-07.3 |
-| 22 | [M5-07.2 Android Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.2-android-additional-backends.md) | Not started | M5-03.2, M5-04.2 | android backend | M5-07.1, M5-07.3 |
+| 22 | [M5-07.2 Android Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.2-android-additional-backends.md) | Complete | M5-03.2, M5-04.2 | android backend | M5-07.1, M5-07.3 |
 | 23 | [M5-07.3 Rust Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.3-rust-additional-backends.md) | Not started | M5-03.3, M5-04.3 | rust backend | M5-07.1, M5-07.2 |
 | 24 | [M5-07.4 Parity, cross-client restore, and exit evidence](M5-07.4-parity-cross-client-evidence.md) | Not started | M5-06.1, M5-06.2, M5-06.3, M5-07.1, M5-07.2, M5-07.3 | evidence | none; final gate |
 

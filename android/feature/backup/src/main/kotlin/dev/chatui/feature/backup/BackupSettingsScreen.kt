@@ -57,6 +57,14 @@ object BackupSettingsTestTags {
     const val Prefix = "backup-prefix"
     const val AccessKey = "backup-access-key"
     const val SecretKey = "backup-secret-key"
+    const val AccountName = "backup-account-name"
+    const val AccountKey = "backup-account-key"
+    const val SasToken = "backup-sas-token"
+    const val ServiceAccountJson = "backup-service-account-json"
+    const val AccessToken = "backup-access-token"
+    const val DriveFolder = "backup-drive-folder"
+    const val WebDavUsername = "backup-webdav-username"
+    const val WebDavPassword = "backup-webdav-password"
     const val Passphrase = "backup-passphrase"
     const val TestConnection = "backup-test-connection"
     const val Enable = "backup-enable"
@@ -205,8 +213,8 @@ fun BackupSettingsScreen(
             GroupedList {
                 GroupedSection(
                     title = "Backend",
-                    footer = "Only S3-compatible storage is available in this release. " +
-                        "Other backends arrive in a later update.",
+                    footer = "Choose the storage provider. Credentials stay on this device " +
+                        "and backup objects are encrypted before upload.",
                 ) {
                     BackendSelector(
                         backend = form.backend,
@@ -216,57 +224,13 @@ fun BackupSettingsScreen(
                 Spacer(Modifier.height(dimens.sectionGap))
                 GroupedSection(
                     title = "Storage",
-                    footer = "The endpoint, region, bucket, and prefix identify where " +
-                        "encrypted backup objects are stored.",
+                    footer = storageFooter(form.backend),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(dimens.cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(dimens.space3),
-                    ) {
-                        BackupTextField(
-                            value = form.endpoint,
-                            onValueChange = { onFormChanged(form.copy(endpoint = it)) },
-                            label = "Endpoint",
-                            tag = BackupSettingsTestTags.Endpoint,
-                            enabled = !busy,
-                        )
-                        BackupTextField(
-                            value = form.region,
-                            onValueChange = { onFormChanged(form.copy(region = it)) },
-                            label = "Region",
-                            tag = BackupSettingsTestTags.Region,
-                            enabled = !busy,
-                        )
-                        BackupTextField(
-                            value = form.bucket,
-                            onValueChange = { onFormChanged(form.copy(bucket = it)) },
-                            label = "Bucket",
-                            tag = BackupSettingsTestTags.Bucket,
-                            enabled = !busy,
-                        )
-                        BackupTextField(
-                            value = form.prefix,
-                            onValueChange = { onFormChanged(form.copy(prefix = it)) },
-                            label = "Prefix (optional)",
-                            tag = BackupSettingsTestTags.Prefix,
-                            enabled = !busy,
-                        )
-                        BackupTextField(
-                            value = form.accessKeyId,
-                            onValueChange = { onFormChanged(form.copy(accessKeyId = it)) },
-                            label = "Access key ID",
-                            tag = BackupSettingsTestTags.AccessKey,
-                            enabled = !busy,
-                        )
-                        BackupTextField(
-                            value = form.secretAccessKey,
-                            onValueChange = { onFormChanged(form.copy(secretAccessKey = it)) },
-                            label = "Secret access key",
-                            tag = BackupSettingsTestTags.SecretKey,
-                            enabled = !busy,
-                            password = true,
-                        )
-                    }
+                    StorageFields(
+                        form = form,
+                        busy = busy,
+                        onFormChanged = onFormChanged,
+                    )
                 }
                 Spacer(Modifier.height(dimens.sectionGap))
                 GroupedSection(
@@ -484,6 +448,209 @@ fun BackupSettingsScreen(
 }
 
 @Composable
+private fun StorageFields(
+    form: BackupFormValues,
+    busy: Boolean,
+    onFormChanged: (BackupFormValues) -> Unit,
+) {
+    val dimens = LocalDimens.current
+    Column(
+        modifier = Modifier.padding(dimens.cardPadding),
+        verticalArrangement = Arrangement.spacedBy(dimens.space3),
+    ) {
+        when (form.backend) {
+            BackupBackend.S3 -> {
+                BackupTextField(
+                    value = form.endpoint,
+                    onValueChange = { onFormChanged(form.copy(endpoint = it)) },
+                    label = "Endpoint",
+                    tag = BackupSettingsTestTags.Endpoint,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.region,
+                    onValueChange = { onFormChanged(form.copy(region = it)) },
+                    label = "Region",
+                    tag = BackupSettingsTestTags.Region,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.bucket,
+                    onValueChange = { onFormChanged(form.copy(bucket = it)) },
+                    label = "Bucket",
+                    tag = BackupSettingsTestTags.Bucket,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.prefix,
+                    onValueChange = { onFormChanged(form.copy(prefix = it)) },
+                    label = "Prefix (optional)",
+                    tag = BackupSettingsTestTags.Prefix,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.accessKeyId,
+                    onValueChange = { onFormChanged(form.copy(accessKeyId = it)) },
+                    label = "Access key ID",
+                    tag = BackupSettingsTestTags.AccessKey,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.secretAccessKey,
+                    onValueChange = { onFormChanged(form.copy(secretAccessKey = it)) },
+                    label = "Secret access key",
+                    tag = BackupSettingsTestTags.SecretKey,
+                    enabled = !busy,
+                    password = true,
+                )
+            }
+
+            BackupBackend.AZURE_BLOB -> {
+                BackupTextField(
+                    value = form.accountName,
+                    onValueChange = { onFormChanged(form.copy(accountName = it)) },
+                    label = "Account name",
+                    tag = BackupSettingsTestTags.AccountName,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.accountKey,
+                    onValueChange = { onFormChanged(form.copy(accountKey = it)) },
+                    label = "Account key (optional with SAS)",
+                    tag = BackupSettingsTestTags.AccountKey,
+                    enabled = !busy,
+                    password = true,
+                )
+                BackupTextField(
+                    value = form.sasToken,
+                    onValueChange = { onFormChanged(form.copy(sasToken = it)) },
+                    label = "SAS token (optional with account key)",
+                    tag = BackupSettingsTestTags.SasToken,
+                    enabled = !busy,
+                    password = true,
+                )
+                BackupTextField(
+                    value = form.bucket,
+                    onValueChange = { onFormChanged(form.copy(bucket = it)) },
+                    label = "Container",
+                    tag = BackupSettingsTestTags.Bucket,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.endpoint,
+                    onValueChange = { onFormChanged(form.copy(endpoint = it)) },
+                    label = "Endpoint (optional)",
+                    tag = BackupSettingsTestTags.Endpoint,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.prefix,
+                    onValueChange = { onFormChanged(form.copy(prefix = it)) },
+                    label = "Prefix (optional)",
+                    tag = BackupSettingsTestTags.Prefix,
+                    enabled = !busy,
+                )
+            }
+
+            BackupBackend.GCS -> {
+                BackupTextField(
+                    value = form.bucket,
+                    onValueChange = { onFormChanged(form.copy(bucket = it)) },
+                    label = "Bucket",
+                    tag = BackupSettingsTestTags.Bucket,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.serviceAccountJson,
+                    onValueChange = { onFormChanged(form.copy(serviceAccountJson = it)) },
+                    label = "Service account JSON",
+                    tag = BackupSettingsTestTags.ServiceAccountJson,
+                    enabled = !busy,
+                    password = true,
+                )
+                BackupTextField(
+                    value = form.prefix,
+                    onValueChange = { onFormChanged(form.copy(prefix = it)) },
+                    label = "Prefix (optional)",
+                    tag = BackupSettingsTestTags.Prefix,
+                    enabled = !busy,
+                )
+            }
+
+            BackupBackend.GOOGLE_DRIVE -> {
+                BackupTextField(
+                    value = form.accessToken,
+                    onValueChange = { onFormChanged(form.copy(accessToken = it)) },
+                    label = "OAuth access token",
+                    tag = BackupSettingsTestTags.AccessToken,
+                    enabled = !busy,
+                    password = true,
+                )
+                BackupTextField(
+                    value = form.driveFolderId,
+                    onValueChange = { onFormChanged(form.copy(driveFolderId = it)) },
+                    label = "Folder ID (blank for app data folder)",
+                    tag = BackupSettingsTestTags.DriveFolder,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.prefix,
+                    onValueChange = { onFormChanged(form.copy(prefix = it)) },
+                    label = "Prefix (optional)",
+                    tag = BackupSettingsTestTags.Prefix,
+                    enabled = !busy,
+                )
+            }
+
+            BackupBackend.WEBDAV -> {
+                BackupTextField(
+                    value = form.endpoint,
+                    onValueChange = { onFormChanged(form.copy(endpoint = it)) },
+                    label = "WebDAV URL",
+                    tag = BackupSettingsTestTags.Endpoint,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.webdavUsername,
+                    onValueChange = { onFormChanged(form.copy(webdavUsername = it)) },
+                    label = "Username",
+                    tag = BackupSettingsTestTags.WebDavUsername,
+                    enabled = !busy,
+                )
+                BackupTextField(
+                    value = form.webdavPassword,
+                    onValueChange = { onFormChanged(form.copy(webdavPassword = it)) },
+                    label = "Password",
+                    tag = BackupSettingsTestTags.WebDavPassword,
+                    enabled = !busy,
+                    password = true,
+                )
+                BackupTextField(
+                    value = form.prefix,
+                    onValueChange = { onFormChanged(form.copy(prefix = it)) },
+                    label = "Prefix (optional)",
+                    tag = BackupSettingsTestTags.Prefix,
+                    enabled = !busy,
+                )
+            }
+        }
+    }
+}
+
+private fun storageFooter(backend: BackupBackend): String = when (backend) {
+    BackupBackend.S3 -> "The endpoint, region, bucket, and prefix identify where " +
+        "encrypted backup objects are stored."
+    BackupBackend.AZURE_BLOB -> "Use a shared account key or a SAS token. Objects are " +
+        "stored as block blobs in the container."
+    BackupBackend.GCS -> "Use a service account JSON key. The adapter exchanges a signed " +
+        "JWT for a short-lived OAuth2 token."
+    BackupBackend.GOOGLE_DRIVE -> "Use an OAuth access token. Leave the folder blank to " +
+        "use the app data folder."
+    BackupBackend.WEBDAV -> "Use the collection URL and Basic credentials. WebDAV has " +
+        "weaker consistency, so writes are re-read before they are trusted."
+}
+
+@Composable
 private fun BackendSelector(
     backend: BackupBackend,
     onBackendChanged: (BackupBackend) -> Unit,
@@ -514,12 +681,15 @@ private fun BackendSelector(
             listOf(
                 "Azure Blob" to BackupBackend.AZURE_BLOB,
                 "Google Cloud Storage" to BackupBackend.GCS,
+                "Google Drive" to BackupBackend.GOOGLE_DRIVE,
                 "WebDAV" to BackupBackend.WEBDAV,
             ).forEach { (name, value) ->
                 DropdownMenuItem(
-                    text = { Text("$name (coming soon)") },
-                    onClick = {},
-                    enabled = false,
+                    text = { Text(name) },
+                    onClick = {
+                        expanded = false
+                        onBackendChanged(value)
+                    },
                 )
             }
         }
@@ -626,6 +796,7 @@ private fun backendLabel(backend: BackupBackend): String = when (backend) {
     BackupBackend.S3 -> "S3-compatible"
     BackupBackend.AZURE_BLOB -> "Azure Blob"
     BackupBackend.GCS -> "Google Cloud Storage"
+    BackupBackend.GOOGLE_DRIVE -> "Google Drive"
     BackupBackend.WEBDAV -> "WebDAV"
 }
 
