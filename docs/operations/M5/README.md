@@ -61,7 +61,7 @@ The phase 2 gate is open. Start `M5-01.1` next.
 | 11 | [M5-03.3 Rust S3-compatible adapter and conditional writes](M5-03.3-rust-s3-adapter.md) | Complete | M5-02.3 | rust backend | M5-03.1, M5-03.2 |
 | 12 | [M5-04.1 Web sync engine, merge, and tombstones](M5-04.1-web-sync-engine.md) | Complete | M5-03.1 | web sync | M5-04.2, M5-04.3 |
 | 13 | [M5-04.2 Android sync engine, merge, and tombstones](M5-04.2-android-sync-engine.md) | Not started | M5-03.2 | android sync | M5-04.1, M5-04.3 |
-| 14 | [M5-04.3 Rust sync engine, merge, and tombstones](M5-04.3-rust-sync-engine.md) | Not started | M5-03.3 | rust sync | M5-04.1, M5-04.2 |
+| 14 | [M5-04.3 Rust sync engine, merge, and tombstones](M5-04.3-rust-sync-engine.md) | Complete | M5-03.3 | rust sync | M5-04.1, M5-04.2 |
 | 15 | [M5-05.1 Web backup/restore UI and settings](M5-05.1-web-backup-ui.md) | Not started | M5-04.1 | web UI | M5-05.2, M5-05.3 |
 | 16 | [M5-05.2 Android backup/restore UI and settings](M5-05.2-android-backup-ui.md) | Not started | M5-04.2 | android UI | M5-05.1, M5-05.3 |
 | 17 | [M5-05.3 Rust backup/restore UI and settings](M5-05.3-rust-backup-ui.md) | Not started | M5-04.3 | rust UI | M5-05.1, M5-05.2 |

@@ -12,7 +12,9 @@ pub mod conversation_payload;
 pub mod envelope;
 pub mod error;
 pub mod manifest;
+pub mod merge;
 pub mod storage;
+pub mod sync;
 
 pub use conversation_payload::{
     AttachmentReference, ConversationPayload, PayloadMessage, build_conversation_payload,
@@ -32,10 +34,22 @@ pub use manifest::{
     ManifestTombstone, attachment_object_key, build_manifest, conversation_object_key,
     parse_manifest, validate_manifest,
 };
+pub use merge::{
+    MergeConversationOptions, MergeError, MergedConversation, MergedManifest, MergedMessages,
+    compare_messages, merge_conversation, merge_manifests, merge_messages,
+};
 pub use storage::{
     ListObjectsOptions, ListObjectsResult, PutObjectOptions, S3StorageAdapter, S3StorageConfig,
     StorageAdapter, StorageError, StorageErrorCode, StorageObject,
 };
+pub use sync::{
+    BackupIdentity, DELETE_REMOTE_CONFIRMATION, MANIFEST_OBJECT_KEY, RestoreOptions, RestoreResult,
+    SyncEngine, SyncError, SyncResult,
+};
 
+#[cfg(test)]
+mod merge_tests;
+#[cfg(test)]
+mod sync_tests;
 #[cfg(test)]
 mod tests;

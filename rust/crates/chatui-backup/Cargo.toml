@@ -9,6 +9,7 @@ aes-gcm = "0.10"
 async-trait = "0.1"
 base64 = "0.22"
 chatui-domain = { version = "0.1.0", path = "../chatui-domain" }
+chatui-storage = { version = "0.1.0", path = "../chatui-storage" }
 flate2 = "1"
 hex = "0.4"
 hmac = "0.12"

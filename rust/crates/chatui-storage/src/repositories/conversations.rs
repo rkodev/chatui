@@ -30,6 +30,13 @@ pub trait ConversationRepository: Send + Sync {
     async fn update(&self, conversation: &Conversation) -> Result<(), StorageError>;
     /// Insert or replace a conversation by ID.
     async fn upsert(&self, conversation: &Conversation) -> Result<(), StorageError>;
+    /// Insert or replace a conversation by ID, preserving the supplied revision.
+    ///
+    /// Unlike [`upsert`], this does not increment the revision. Sync uses it to
+    /// write a merged revision that is already greater than both sides.
+    ///
+    /// [`upsert`]: ConversationRepository::upsert
+    async fn upsert_with_revision(&self, conversation: &Conversation) -> Result<(), StorageError>;
     /// Fetch one conversation.
     async fn get(&self, id: &str) -> Result<Option<Conversation>, StorageError>;
     /// List conversations with pin/archive filters.
@@ -194,6 +201,52 @@ impl ConversationRepository for SqliteConversationRepository {
              storage_key = CASE WHEN conversations.storage_key = '' \
                                 THEN excluded.storage_key ELSE conversations.storage_key END, \
              revision = conversations.revision + 1",
+        )
+        .bind(&row.id)
+        .bind(&row.title)
+        .bind(&row.system_prompt)
+        .bind(&row.provider_id)
+        .bind(&row.model_id)
+        .bind(&row.model_label)
+        .bind(&row.params_json)
+        .bind(row.pinned)
+        .bind(row.archived)
+        .bind(row.temporary)
+        .bind(&row.created_at)
+        .bind(&row.updated_at)
+        .bind(&row.last_message_at)
+        .bind(row.message_count)
+        .bind(&row.last_error_json)
+        .bind(&row.sync_state)
+        .bind(&row.storage_key)
+        .bind(row.revision)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    async fn upsert_with_revision(&self, conversation: &Conversation) -> Result<(), StorageError> {
+        let conversation = prepare_for_write(conversation)?;
+        let row = ConversationRow::from_domain(&conversation)?;
+        sqlx::query(
+            "INSERT INTO conversations \
+             (id, title, system_prompt, provider_id, model_id, model_label, params_json, pinned, \
+              archived, temporary, created_at, updated_at, last_message_at, message_count, \
+              last_error_json, sync_state, storage_key, revision) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT(id) DO UPDATE SET \
+             title = excluded.title, system_prompt = excluded.system_prompt, \
+             provider_id = excluded.provider_id, model_id = excluded.model_id, \
+             model_label = excluded.model_label, params_json = excluded.params_json, \
+             pinned = excluded.pinned, archived = excluded.archived, \
+             temporary = excluded.temporary, created_at = excluded.created_at, \
+             updated_at = excluded.updated_at, last_message_at = excluded.last_message_at, \
+             message_count = excluded.message_count, last_error_json = excluded.last_error_json, \
+             sync_state = excluded.sync_state, \
+             storage_key = CASE WHEN conversations.storage_key = '' \
+                                THEN excluded.storage_key ELSE conversations.storage_key END, \
+             revision = excluded.revision",
         )
         .bind(&row.id)
         .bind(&row.title)

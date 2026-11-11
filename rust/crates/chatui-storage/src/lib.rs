@@ -48,6 +48,7 @@ pub mod paths;
 pub mod recovery;
 pub mod repositories;
 pub mod search;
+pub mod sync;
 
 pub use attachments::{AttachmentLease, AttachmentService, AttachmentStore, sha256_hex};
 pub use db::{
@@ -78,6 +79,7 @@ pub use repositories::{
     SyncQueueRepository, TombstoneRepository, default_settings,
 };
 pub use search::{SearchHit, SearchOptions, SearchRepository, SqliteSearchRepository};
+pub use sync::{SqliteSyncLocalStore, SyncLocalStore};
 
 /// Application directory name used for the platform app-data path.
 pub const APP_DIR_NAME: &str = "chatui";
