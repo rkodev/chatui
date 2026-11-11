@@ -4,10 +4,10 @@
 - Milestone: [M5 Backup and sync](../../milestones/M5-backup-and-sync.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md) sections 6.2, 12, 13, 17 (M5), 21.5
 - Current parity: [contracts/parity.md](../../../contracts/parity.md)
-- Status: Planned - blocked on explicit phase 2 scope confirmation
+- Status: In progress - phase 2 authorized 2026-11-11
 - Last updated: 2026-11-11
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
-- Scope: encrypted, user-owned backup and sync. Web and Android are required. Rust desktop is conditional and does not block the web/Android gate.
+- Scope: encrypted, user-owned backup and sync. Web, Android, and Rust desktop are required (`M5-decisions.md` `DEC-M5-03`).
 - Platform rule: one task owns one client area. Do not span web, Android, and Rust in a single task.
 
 ## Entry gate
@@ -15,11 +15,11 @@
 Do not start any task until all of the following are true:
 
 - [x] M4 exit gate is met and phase 1 is released (`docs/operations/M4/M4-verification.md`, 2026-11-10).
-- [ ] The user explicitly confirms phase 2 scope and authorizes M5 work.
-- [ ] `M5-00.1` is `Complete` and freezes the envelope, manifest, and test vectors.
-- [ ] Rust release status is re-confirmed. Current decision: not shipping, so Rust tasks are optional.
+- [x] The user explicitly confirms phase 2 scope and authorizes M5 work (`M5-decisions.md` `DEC-M5-01`, 2026-11-11).
+- [x] `M5-00.1` is `Complete` and freezes the envelope, manifest, and test vectors.
+- [x] Rust release status is re-confirmed. Current decision: shipping and required (`M5-decisions.md` `DEC-M5-03`).
 
-If the phase 2 scope is not confirmed, leave `M5-00.1` as `Blocked` and do not start later tasks.
+The phase 2 gate is open. Start `M5-01.1` next.
 
 ## How to use these tasks
 
@@ -48,7 +48,7 @@ If the phase 2 scope is not confirmed, leave `M5-00.1` as `Blocked` and do not s
 
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [M5-00.1 Preflight, decisions, and cross-client test vectors](M5-00.1-preflight-decisions-vectors.md) | Blocked | none | preflight | none; blocks all |
+| 1 | [M5-00.1 Preflight, decisions, and cross-client test vectors](M5-00.1-preflight-decisions-vectors.md) | Complete | none | preflight | none; blocks all |
 | 2 | [M5-01.1 Contracts: envelope, manifest body, conversation payload, fixtures](M5-01.1-contracts-envelope-manifest.md) | Not started | M5-00.1 | contracts | none; blocks client codecs |
 | 3 | [M5-01.2 Web envelope codec and crypto tests](M5-01.2-web-envelope-codec.md) | Not started | M5-01.1 | web crypto | M5-01.3, M5-01.4 |
 | 4 | [M5-01.3 Android envelope codec and crypto tests](M5-01.3-android-envelope-codec.md) | Not started | M5-01.1 | android crypto | M5-01.2, M5-01.4 |
@@ -68,10 +68,10 @@ If the phase 2 scope is not confirmed, leave `M5-00.1` as `Blocked` and do not s
 | 18 | [M5-06.1 Android WorkManager scheduling](M5-06.1-android-workmanager.md) | Not started | M5-05.2 | android scheduling | M5-06.2, M5-06.3 |
 | 19 | [M5-06.2 Web scheduling and platform constraints](M5-06.2-web-scheduling.md) | Not started | M5-05.1 | web scheduling | M5-06.1, M5-06.3 |
 | 20 | [M5-06.3 Rust desktop scheduling and documentation](M5-06.3-rust-scheduling.md) | Not started | M5-05.3 | rust scheduling | M5-06.1, M5-06.2 |
-| 21 | [M5-07.1 Web Azure Blob, GCS, and WebDAV adapters](M5-07.1-web-additional-backends.md) | Not started | M5-03.1, M5-04.1 | web backend | M5-07.2, M5-07.3 |
-| 22 | [M5-07.2 Android Azure Blob, GCS, and WebDAV adapters](M5-07.2-android-additional-backends.md) | Not started | M5-03.2, M5-04.2 | android backend | M5-07.1, M5-07.3 |
-| 23 | [M5-07.3 Rust Azure Blob, GCS, and WebDAV adapters](M5-07.3-rust-additional-backends.md) | Not started | M5-03.3, M5-04.3 | rust backend | M5-07.1, M5-07.2 |
-| 24 | [M5-07.4 Parity, cross-client restore, and exit evidence](M5-07.4-parity-cross-client-evidence.md) | Not started | M5-06.1, M5-06.2, M5-07.1, M5-07.2 | evidence | none; final gate |
+| 21 | [M5-07.1 Web Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.1-web-additional-backends.md) | Not started | M5-03.1, M5-04.1 | web backend | M5-07.2, M5-07.3 |
+| 22 | [M5-07.2 Android Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.2-android-additional-backends.md) | Not started | M5-03.2, M5-04.2 | android backend | M5-07.1, M5-07.3 |
+| 23 | [M5-07.3 Rust Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.3-rust-additional-backends.md) | Not started | M5-03.3, M5-04.3 | rust backend | M5-07.1, M5-07.2 |
+| 24 | [M5-07.4 Parity, cross-client restore, and exit evidence](M5-07.4-parity-cross-client-evidence.md) | Not started | M5-06.1, M5-06.2, M5-06.3, M5-07.1, M5-07.2, M5-07.3 | evidence | none; final gate |
 
 ## Parallel execution groups
 
@@ -83,23 +83,20 @@ If the phase 2 scope is not confirmed, leave `M5-00.1` as `Blocked` and do not s
 - Group F: after each sync engine, run the matching UI task: `M5-05.1`, `M5-05.2`, `M5-05.3` in parallel.
 - Group G: after each UI task, run the matching scheduling task: `M5-06.1`, `M5-06.2`, `M5-06.3` in parallel.
 - Group H: after S3 and sync, run the additional backend tasks: `M5-07.1`, `M5-07.2`, `M5-07.3` in parallel.
-- Group I: `M5-07.4` is the final gate. It cannot start until every required web and Android task is `Complete`.
+- Group I: `M5-07.4` is the final gate. It cannot start until every required web, Android, and Rust task is `Complete`.
 
-## Conditional Rust work
+## Rust work
 
-Rust is `post-preview / parallel` per `M4-decisions.md` DEC-M4-01. Tasks
-`M5-01.4`, `M5-02.3`, `M5-03.3`, `M5-04.3`, `M5-05.3`, `M5-06.3`, and
-`M5-07.3` are conditional:
-
-- If Rust is shipping, they are required and must meet the same contracts and
-  security bar as web and Android.
-- If Rust is not shipping, mark them `Cancelled` with the reason and do not let
-  them block `M5-07.4`.
+Rust is shipping and required for M5 per `M5-decisions.md` `DEC-M5-03`, which
+supersedes `M4-decisions.md` `DEC-M4-01` for M5 onward. Tasks `M5-01.4`,
+`M5-02.3`, `M5-03.3`, `M5-04.3`, `M5-05.3`, `M5-06.3`, and `M5-07.3` are
+required and must meet the same contracts and security bar as web and Android.
+They block `M5-07.4`. Do not mark them `Cancelled` without a new dated decision.
 
 ## Completion rule
 
-M5 is complete only when every required web and Android task is `Complete` (or
-explicitly cancelled with an approved deferral), `docs/operations/M5/M5-verification.md`
+M5 is complete only when every required web, Android, and Rust task is `Complete`
+(or explicitly cancelled with an approved deferral), `docs/operations/M5/M5-verification.md`
 records the exit-gate evidence, `contracts/parity.md` backup rows are truthful,
 and the milestone exit gate in the source plan section 8 is fully checked.
 
