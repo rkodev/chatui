@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
@@ -38,20 +40,23 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.database.attachment.AttachmentInput
 import dev.chatui.core.database.attachment.MAX_IMAGE_BYTES
@@ -137,6 +142,41 @@ fun ChatScreen(
         { clipboard.setText(AnnotatedString(message.copyableText())) }
     }
 
+    // Publish the conversation title, model label, and header actions to the
+    // shell-owned app bar. The callbacks are wrapped in stable lambdas so the
+    // state update does not trigger a recomposition loop.
+    val topBarState = LocalChatTopBarState.current
+    val currentOnShare by rememberUpdatedState(onShareConversation)
+    val currentOnSettings by rememberUpdatedState(onOpenConversationSettings)
+    val currentOnProviders by rememberUpdatedState(onOpenProviders)
+    val shareCallback = remember {
+        { format: ConversationShareFormat ->
+            currentOnShare?.invoke(format)
+            Unit
+        }
+    }
+    val settingsCallback = remember { { currentOnSettings() } }
+    val providersCallback = remember { { currentOnProviders() } }
+    val modelLabel = state.conversation?.modelLabel
+        ?.takeIf { it.isNotBlank() }
+        ?: state.conversation?.modelId
+    SideEffect {
+        topBarState?.update(
+            title = state.conversation?.title,
+            subtitle = modelLabel,
+            onShare = if (state.conversation != null && onShareConversation != null) {
+                shareCallback
+            } else {
+                null
+            },
+            onOpenSettings = settingsCallback,
+            onOpenModelPicker = providersCallback,
+        )
+    }
+    DisposableEffect(topBarState) {
+        onDispose { topBarState?.clear() }
+    }
+
     // Register the existing stop and copy actions with the shell's root key
     // handler. The screen keeps ownership of streaming and message state; the
     // shell only invokes these callbacks.
@@ -199,6 +239,7 @@ fun ChatScreen(
                 offline = offline,
                 zoneId = zoneId,
                 dimensPadding = dimens.padding,
+                hostedInShell = topBarState != null,
             )
         }
     }
@@ -276,6 +317,7 @@ private fun ChatContent(
     offline: Boolean,
     zoneId: ZoneId,
     dimensPadding: androidx.compose.ui.unit.Dp,
+    hostedInShell: Boolean,
 ) {
     val dimens = LocalDimens.current
     val context = LocalContext.current
@@ -332,80 +374,85 @@ private fun ChatContent(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = dimensPadding, vertical = dimens.space2)
-                .testTag(ChatScreenTestTags.Header),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = state.conversation?.title ?: "Chat",
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                if (state.conversation != null) {
-                    Text(
-                        text = modelLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (state.conversation != null && onShareConversation != null) {
-                Box {
-                    TextButton(
-                        onClick = { shareMenuExpanded = true },
-                        modifier = Modifier
-                            .heightIn(min = dimens.touchTargetMin)
-                            .testTag(ChatScreenTestTags.Share)
-                            .semantics { contentDescription = "Share conversation" },
-                    ) {
-                        Text("Share")
-                    }
-                    DropdownMenu(
-                        expanded = shareMenuExpanded,
-                        onDismissRequest = { shareMenuExpanded = false },
-                        modifier = Modifier.testTag(ChatScreenTestTags.ShareMenu),
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Share as text") },
-                            onClick = {
-                                shareMenuExpanded = false
-                                onShareConversation(ConversationShareFormat.TEXT)
-                            },
-                            modifier = Modifier.testTag(ChatScreenTestTags.ShareText),
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Share as Markdown") },
-                            onClick = {
-                                shareMenuExpanded = false
-                                onShareConversation(ConversationShareFormat.MARKDOWN)
-                            },
-                            modifier = Modifier.testTag(ChatScreenTestTags.ShareMarkdown),
-                        )
-                    }
-                }
-            }
-            TextButton(
-                onClick = onOpenConversationSettings,
+        // When the shell hosts the screen, the conversation title, model, and
+        // share/settings actions live in the app bar. The standalone fallback
+        // keeps the header for previews and direct composition tests.
+        if (!hostedInShell) {
+            Row(
                 modifier = Modifier
-                    .heightIn(min = dimens.touchTargetMin)
-                    .testTag(ChatScreenTestTags.ConversationSettings),
+                    .fillMaxWidth()
+                    .padding(horizontal = dimensPadding, vertical = dimens.space2)
+                    .testTag(ChatScreenTestTags.Header),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Settings")
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = state.conversation?.title ?: "Chat",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    if (state.conversation != null) {
+                        Text(
+                            text = modelLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (state.conversation != null && onShareConversation != null) {
+                    Box {
+                        TextButton(
+                            onClick = { shareMenuExpanded = true },
+                            modifier = Modifier
+                                .heightIn(min = dimens.touchTargetMin)
+                                .testTag(ChatScreenTestTags.Share)
+                                .semantics { contentDescription = "Share conversation" },
+                        ) {
+                            Text("Share")
+                        }
+                        DropdownMenu(
+                            expanded = shareMenuExpanded,
+                            onDismissRequest = { shareMenuExpanded = false },
+                            modifier = Modifier.testTag(ChatScreenTestTags.ShareMenu),
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Share as text") },
+                                onClick = {
+                                    shareMenuExpanded = false
+                                    onShareConversation(ConversationShareFormat.TEXT)
+                                },
+                                modifier = Modifier.testTag(ChatScreenTestTags.ShareText),
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Share as Markdown") },
+                                onClick = {
+                                    shareMenuExpanded = false
+                                    onShareConversation(ConversationShareFormat.MARKDOWN)
+                                },
+                                modifier = Modifier.testTag(ChatScreenTestTags.ShareMarkdown),
+                            )
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = onOpenConversationSettings,
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatScreenTestTags.ConversationSettings),
+                ) {
+                    Text("Settings")
+                }
+                AssistChip(
+                    onClick = onOpenProviders,
+                    label = { Text(modelLabel) },
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatScreenTestTags.ModelChip),
+                )
             }
-            AssistChip(
-                onClick = onOpenProviders,
-                label = { Text(modelLabel) },
-                modifier = Modifier
-                    .heightIn(min = dimens.touchTargetMin)
-                    .testTag(ChatScreenTestTags.ModelChip),
-            )
-        }
 
-        HorizontalDivider()
+            HorizontalDivider()
+        }
 
         unavailable?.let { availabilityState ->
             AvailabilityBanner(
@@ -474,6 +521,23 @@ private fun ChatContent(
                 )
             }
         }
+
+        // Fade the message list into the composer so content scrolling under
+        // the floating composer stays legible. The composer itself sits above
+        // the IME and the shell-consumed navigation-bar inset.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(12.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.background,
+                        ),
+                    ),
+                ),
+        )
 
         Box(
             modifier = Modifier.dragAndDropTarget(

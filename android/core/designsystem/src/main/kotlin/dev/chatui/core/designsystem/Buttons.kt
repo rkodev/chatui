@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /** Filled accent button for the primary action on a screen. */
@@ -78,12 +80,14 @@ fun IconAction(
 ) {
     IconButton(
         onClick = onClick,
-        modifier = modifier.size(LocalDimens.current.touchTargetMin),
+        modifier = modifier
+            .size(LocalDimens.current.touchTargetMin)
+            .semantics { this.contentDescription = contentDescription },
         enabled = enabled,
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = contentDescription,
+            contentDescription = null,
             tint = tint,
         )
     }

@@ -4,19 +4,21 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Keyboard
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
@@ -32,9 +34,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -42,14 +41,19 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.EntryPointAccessors
 import dev.chatui.core.datastore.settings.AndroidSettings
+import dev.chatui.core.designsystem.ChatUiScaffold
 import dev.chatui.core.designsystem.ChatUiTheme
-import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.IconAction
 import dev.chatui.core.model.Density
 import dev.chatui.core.model.Theme
 import dev.chatui.feature.chat.ChatDrafts
 import dev.chatui.feature.chat.ChatEntryPoint
+import dev.chatui.feature.chat.ChatScreenTestTags
 import dev.chatui.feature.chat.ChatShortcutState
+import dev.chatui.feature.chat.ChatTopBarState
+import dev.chatui.feature.chat.ConversationShareFormat
 import dev.chatui.feature.chat.LocalChatShortcutState
+import dev.chatui.feature.chat.LocalChatTopBarState
 import dev.chatui.feature.conversations.ConversationEntryPoint
 import dev.chatui.feature.conversations.ConversationService
 import dev.chatui.feature.conversations.CreateConversationResult
@@ -67,6 +71,7 @@ object ShellTestTags {
     const val ShortcutHelpButton = "shell-shortcut-help-button"
     const val Sidebar = "shell-sidebar"
     const val Drawer = "shell-drawer"
+    const val NewChat = "shell-new-chat"
     const val MainContent = "shell-main-content"
     const val ExpandedLayout = "shell-expanded-layout"
     const val CompactLayout = "shell-compact-layout"
@@ -187,7 +192,6 @@ fun ShellScaffold(
     shortcutActions: ShellShortcutActions? = null,
 ) {
     val activity = LocalActivity.current
-    val dimens = LocalDimens.current
     val expanded = activity != null &&
         calculateWindowSizeClass(activity).widthSizeClass == WindowWidthSizeClass.Expanded
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -205,6 +209,11 @@ fun ShellScaffold(
         ?.arguments
         ?.getString(ChatDestination.ARG_CONVERSATION_ID)
     var helpOpen by remember { mutableStateOf(false) }
+    var shareMenuExpanded by remember { mutableStateOf(false) }
+    val topBarState = remember { ChatTopBarState() }
+    // Destinations do not expose their scroll state yet, so the large title
+    // follows a hoisted state. UX-03 can wire the chat list state into this.
+    val scrollState = rememberScrollState()
 
     val navigate: (String) -> Unit = { route ->
         scope.launch { drawerState.close() }
@@ -274,54 +283,92 @@ fun ShellScaffold(
         onNextConversation = { navigateConversation(1) },
     )
 
-    CompositionLocalProvider(LocalChatShortcutState provides shortcuts) {
+    CompositionLocalProvider(
+        LocalChatShortcutState provides shortcuts,
+        LocalChatTopBarState provides topBarState,
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .testTag(ShellTestTags.Root)
                 .shellShortcutHandler(actions),
         ) {
-            Scaffold(
+            ChatUiScaffold(
                 modifier = modifier.fillMaxSize(),
-                // Consume safe-drawing once at the shell boundary. The top app
-                // bar handles the top/status-bar and cutout insets; the content
-                // receives the remaining bottom and horizontal insets through
-                // `innerPadding`.
+                // Consume safe-drawing once at the shell boundary. The large
+                // title bar handles the top/status-bar and cutout insets; the
+                // content receives the remaining bottom and horizontal insets
+                // through `innerPadding`.
                 contentWindowInsets = windowInsets,
-                topBar = {
-                    TopAppBar(
-                        title = { Text(currentDestination?.title ?: "ChatUI") },
-                        windowInsets = windowInsets.only(
-                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
-                        ),
-                        navigationIcon = {
-                            if (!expanded) {
-                                IconButton(
-                                    onClick = { scope.launch { drawerState.open() } },
-                                    modifier = Modifier
-                                        .size(dimens.touchTargetMin)
-                                        .testTag(ShellTestTags.MenuButton)
-                                        .semantics {
-                                            contentDescription = "Open navigation"
-                                        },
-                                ) {
-                                    Text("☰", modifier = Modifier.clearAndSetSemantics {})
-                                }
-                            }
-                        },
-                        actions = {
-                            IconButton(
-                                onClick = { helpOpen = true },
-                                modifier = Modifier
-                                    .size(dimens.touchTargetMin)
-                                    .testTag(ShellTestTags.ShortcutHelpButton)
-                                    .semantics {
-                                        contentDescription = "Keyboard shortcuts"
-                                    },
+                title = topBarState.title ?: currentDestination?.title ?: "ChatUI",
+                subtitle = topBarState.subtitle,
+                scrollState = scrollState,
+                onSubtitleClick = topBarState.onOpenModelPicker,
+                subtitleTestTag = if (topBarState.subtitle != null) {
+                    ChatScreenTestTags.ModelChip
+                } else {
+                    null
+                },
+                navigationIcon = if (!expanded) {
+                    {
+                        IconAction(
+                            icon = Icons.Rounded.Menu,
+                            contentDescription = "Open navigation",
+                            onClick = { scope.launch { drawerState.open() } },
+                            modifier = Modifier.testTag(ShellTestTags.MenuButton),
+                        )
+                    }
+                } else {
+                    null
+                },
+                actions = {
+                    topBarState.onShare?.let { onShare ->
+                        Box {
+                            IconAction(
+                                icon = Icons.Rounded.Share,
+                                contentDescription = "Share conversation",
+                                onClick = { shareMenuExpanded = true },
+                                modifier = Modifier.testTag(ChatScreenTestTags.Share),
+                            )
+                            DropdownMenu(
+                                expanded = shareMenuExpanded,
+                                onDismissRequest = { shareMenuExpanded = false },
+                                modifier = Modifier.testTag(ChatScreenTestTags.ShareMenu),
                             ) {
-                                Text("⌨", modifier = Modifier.clearAndSetSemantics {})
+                                DropdownMenuItem(
+                                    text = { Text("Share as text") },
+                                    onClick = {
+                                        shareMenuExpanded = false
+                                        onShare(ConversationShareFormat.TEXT)
+                                    },
+                                    modifier = Modifier.testTag(ChatScreenTestTags.ShareText),
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Share as Markdown") },
+                                    onClick = {
+                                        shareMenuExpanded = false
+                                        onShare(ConversationShareFormat.MARKDOWN)
+                                    },
+                                    modifier = Modifier.testTag(ChatScreenTestTags.ShareMarkdown),
+                                )
                             }
-                        },
+                        }
+                    }
+                    topBarState.onOpenSettings?.let { onSettings ->
+                        IconAction(
+                            icon = Icons.Rounded.Settings,
+                            contentDescription = "Conversation settings",
+                            onClick = onSettings,
+                            modifier = Modifier.testTag(
+                                ChatScreenTestTags.ConversationSettings,
+                            ),
+                        )
+                    }
+                    IconAction(
+                        icon = Icons.Rounded.Keyboard,
+                        contentDescription = "Keyboard shortcuts",
+                        onClick = { helpOpen = true },
+                        modifier = Modifier.testTag(ShellTestTags.ShortcutHelpButton),
                     )
                 },
             ) { innerPadding ->
@@ -352,6 +399,7 @@ fun ShellScaffold(
                             currentRoute = currentRoute,
                             conversationService = service,
                             onNavigate = navigate,
+                            onNewChat = actions.onNewChat,
                         )
                     },
                     mainContent = {

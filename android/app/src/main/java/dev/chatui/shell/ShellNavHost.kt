@@ -1,5 +1,13 @@
 package dev.chatui.shell
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,6 +26,8 @@ import androidx.navigation.navArgument
 import dagger.hilt.android.EntryPointAccessors
 import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.datastore.settings.SettingsDataStore
+import dev.chatui.core.designsystem.LocalReducedMotion
+import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.model.Conversation
 import dev.chatui.feature.backup.BackupPlaceholder
 import dev.chatui.feature.chat.ChatEntryPoint
@@ -327,7 +337,20 @@ suspend fun resolveShellStartDestination(
     )
 }
 
-/** Navigation host for the shell. */
+/** True when [route] is a chat destination with a conversation argument. */
+private fun isChatRoute(route: String?): Boolean = route?.startsWith("chat/") == true
+
+/** True when [route] is one of the top-level shell destinations. */
+private fun isTopLevelRoute(route: String?): Boolean =
+    ShellDestination.entries.any { it.route == route }
+
+/**
+ * Navigation host for the shell.
+ *
+ * Lateral navigation uses a shared-axis X slide, top-level destination
+ * switches use a fade-through, and opening a chat uses a subtle scale + fade.
+ * Every transition snaps when the system disables animations.
+ */
 @Composable
 fun ShellNavHost(
     navController: NavHostController,
@@ -335,10 +358,70 @@ fun ShellNavHost(
     startDestination: String = ShellDestination.Conversations.route,
     conversationService: ConversationService? = null,
 ) {
+    val reducedMotion = LocalReducedMotion.current
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
+        enterTransition = {
+            when {
+                reducedMotion -> EnterTransition.None
+                isChatRoute(targetState.destination.route) ->
+                    scaleIn(
+                        initialScale = 0.96f,
+                        animationSpec = MotionSpecs.emphasized(),
+                    ) + fadeIn(animationSpec = MotionSpecs.emphasized())
+
+                isTopLevelRoute(initialState.destination.route) &&
+                    isTopLevelRoute(targetState.destination.route) ->
+                    fadeIn(animationSpec = MotionSpecs.fadeThrough())
+
+                else -> slideInHorizontally(
+                    initialOffsetX = { it / 4 },
+                    animationSpec = MotionSpecs.sharedAxis(),
+                ) + fadeIn(animationSpec = MotionSpecs.sharedAxis())
+            }
+        },
+        exitTransition = {
+            when {
+                reducedMotion -> ExitTransition.None
+                isChatRoute(initialState.destination.route) ->
+                    scaleOut(
+                        targetScale = 0.96f,
+                        animationSpec = MotionSpecs.emphasized(),
+                    ) + fadeOut(animationSpec = MotionSpecs.emphasized())
+
+                isTopLevelRoute(initialState.destination.route) &&
+                    isTopLevelRoute(targetState.destination.route) ->
+                    fadeOut(animationSpec = MotionSpecs.fadeThrough())
+
+                else -> slideOutHorizontally(
+                    targetOffsetX = { -it / 4 },
+                    animationSpec = MotionSpecs.sharedAxis(),
+                ) + fadeOut(animationSpec = MotionSpecs.sharedAxis())
+            }
+        },
+        popEnterTransition = {
+            if (reducedMotion) {
+                EnterTransition.None
+            } else {
+                slideInHorizontally(
+                    initialOffsetX = { -it / 4 },
+                    animationSpec = MotionSpecs.sharedAxis(),
+                ) + fadeIn(animationSpec = MotionSpecs.sharedAxis())
+            }
+        },
+        popExitTransition = {
+            if (reducedMotion) {
+                ExitTransition.None
+            } else {
+                slideOutHorizontally(
+                    targetOffsetX = { it / 4 },
+                    animationSpec = MotionSpecs.sharedAxis(),
+                ) + fadeOut(animationSpec = MotionSpecs.sharedAxis())
+            }
+        },
     ) {
         shellDestinations(navController, conversationService)
     }
