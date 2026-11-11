@@ -1,15 +1,43 @@
 package dev.chatui.feature.chat
 
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,6 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -33,11 +65,17 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
 import dev.chatui.core.database.attachment.formatAttachmentSize
+import dev.chatui.core.designsystem.BannerSeverity
+import dev.chatui.core.designsystem.BrandMark
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.LocalReducedMotion
+import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.bubbleAppear
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.Attachment
-import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.ContentPart
 import dev.chatui.core.model.Message
@@ -53,10 +91,12 @@ object ChatMessageTestTags {
     const val Reasoning = "chat-message-reasoning"
     const val ReasoningText = "chat-message-reasoning-text"
     const val Typing = "chat-message-typing"
+    const val Caret = "chat-message-caret"
     const val Cancelled = "chat-message-cancelled"
     const val Error = "chat-message-error"
     const val Retry = "chat-message-retry"
     const val Meta = "chat-message-meta"
+    const val Timestamp = "chat-message-timestamp"
     const val AttachmentImage = "chat-message-attachment-image"
     const val AttachmentFile = "chat-message-attachment-file"
 
@@ -67,6 +107,8 @@ object ChatMessageTestTags {
     fun errorDetails(id: String): String = "chat-message-error-details-$id"
 
     fun attachment(id: String): String = "chat-message-attachment-$id"
+
+    fun avatar(id: String): String = "chat-message-avatar-$id"
 }
 
 private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
@@ -104,7 +146,12 @@ private fun formatUsage(usage: Usage): String {
  * Text is rendered through the safe Markdown renderer, and persisted messages
  * expose copy/regenerate/edit actions. The item also renders cancelled,
  * interrupted, and inline error states.
+ *
+ * Grouping is driven by the caller: [isGroupStart] shows the avatar and adds
+ * the larger inter-group gap, while [isGroupEnd] shows the timestamp and the
+ * tail corner on the sender side.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatMessageItem(
     message: Message,
@@ -123,10 +170,15 @@ fun ChatMessageItem(
     onComposed: ((String) -> Unit)? = null,
     attachments: Map<String, Attachment> = emptyMap(),
     attachmentFile: (String) -> File? = { null },
+    isGroupStart: Boolean = true,
+    isGroupEnd: Boolean = true,
+    showTimestamp: Boolean = false,
 ) {
     SideEffect { onComposed?.invoke(message.id) }
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
+    val haptics = rememberHaptics()
+    val reducedMotion = LocalReducedMotion.current
     val isUser = message.role == MessageRole.USER
     val text = message.textParts()
     val reasoning = message.reasoningParts()
@@ -138,189 +190,195 @@ fun ChatMessageItem(
     val errorCopy = message.error?.let(::describeChatError)
     val bodyStyle: TextStyle = Typography.chatStyle(chatFontSize)
     val alignment = if (isUser) Alignment.End else Alignment.Start
-    val bubbleColor = if (isUser) colors.bgUserBubble else colors.bgSurfaceRaised
+    val bubbleColor = if (isUser) colors.bgUserBubble else colors.bgGrouped
     var reasoningExpanded by remember(message.id) { mutableStateOf(false) }
     var detailsExpanded by remember(message.id) { mutableStateOf(false) }
+    var timestampVisible by remember(message.id) { mutableStateOf(false) }
+    var contextMenuOpen by remember(message.id) { mutableStateOf(false) }
+
+    val waitingForFirstToken = isActiveStream && !hasContent
+    val bubbleShape = RoundedCornerShape(
+        topStart = dimens.bubbleRadius,
+        topEnd = dimens.bubbleRadius,
+        bottomStart = if (!isUser && isGroupEnd) dimens.bubbleTailRadius else dimens.bubbleRadius,
+        bottomEnd = if (isUser && isGroupEnd) dimens.bubbleTailRadius else dimens.bubbleRadius,
+    )
+    val bubbleBrush = if (waitingForFirstToken) {
+        rememberShimmerBrush(bubbleColor)
+    } else {
+        SolidColor(bubbleColor)
+    }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .padding(top = if (isGroupStart) 10.dp else 0.dp)
             .testTag(ChatMessageTestTags.message(message.id))
             .semantics { contentDescription = "${roleLabel(message.role)} message" },
         horizontalAlignment = alignment,
         verticalArrangement = Arrangement.spacedBy(dimens.space1),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = if (isUser) {
-                Arrangement.End
-            } else {
-                Arrangement.Start
-            },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = roleLabel(message.role),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = " · " + TIME_FORMATTER.format(message.createdAt.atZone(zoneId)),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color = bubbleColor,
-                    shape = RoundedCornerShape(dimens.radiusMd),
-                )
-                .padding(dimens.space3),
-            verticalArrangement = Arrangement.spacedBy(dimens.space2),
-        ) {
-            if (reasoning.isNotEmpty()) {
-                TextButton(
-                    onClick = { reasoningExpanded = !reasoningExpanded },
-                    modifier = Modifier
-                        .heightIn(min = dimens.touchTargetMin)
-                        .testTag(ChatMessageTestTags.Reasoning),
-                ) {
-                    Text(if (reasoningExpanded) "Hide reasoning" else "Show reasoning")
-                }
-
-                if (reasoningExpanded) {
-                    Text(
-                        text = reasoning.joinToString("\n"),
-                        style = bodyStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.testTag(ChatMessageTestTags.ReasoningText),
-                    )
-                }
-            }
-
-            text.forEach { part ->
-                ChatMarkdown(
-                    content = part,
-                    modifier = Modifier.testTag(ChatMessageTestTags.text(message.id)),
-                    chatFontSize = chatFontSize,
-                    loadRemoteImages = loadRemoteImages,
-                )
-            }
-
-            attachmentParts.forEach { part ->
-                when (part) {
-                    is ContentPart.Image -> MessageImageAttachment(
-                        part = part,
-                        attachment = attachments[part.attachmentId],
-                        file = attachmentFile(part.attachmentId),
-                    )
-
-                    is ContentPart.File -> MessageFileAttachment(
-                        part = part,
-                        attachment = attachments[part.attachmentId],
-                    )
-
-                    else -> Unit
-                }
-            }
-
-            if (!hasContent && message.status == MessageStatus.STREAMING && isActiveStream) {
-                Text(
-                    text = "…",
-                    style = bodyStyle,
-                    modifier = Modifier
-                        .testTag(ChatMessageTestTags.Typing)
-                        .semantics { contentDescription = "Assistant is typing" },
-                )
-            }
-
-            if (!hasContent && message.status == MessageStatus.COMPLETE) {
-                Text(
-                    text = "No content.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            if (message.status == MessageStatus.CANCELLED &&
-                message.interruptionExplanation() == null
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val maxBubbleWidth = maxWidth * 0.78f
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+                verticalAlignment = Alignment.Bottom,
             ) {
-                Text(
-                    text = "Response cancelled. Partial content is preserved.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag(ChatMessageTestTags.Cancelled),
-                )
-            }
+                if (!isUser && isGroupStart) {
+                    MessageAvatar(message = message)
+                    Box(modifier = Modifier.width(dimens.space2))
+                }
 
-            message.interruptionExplanation()?.let { explanation ->
-                Text(
-                    text = explanation,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag(ChatMessageTestTags.Cancelled),
-                )
-            }
-
-            if (errorCopy != null) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(ChatMessageTestTags.Error),
-                    verticalArrangement = Arrangement.spacedBy(dimens.space1),
-                ) {
-                    Text(
-                        text = errorCopy.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    Text(
-                        text = errorCopy.message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    errorCopy.details?.let { details ->
-                        TextButton(
-                            onClick = { detailsExpanded = !detailsExpanded },
-                            modifier = Modifier.heightIn(min = dimens.touchTargetMin),
-                        ) {
-                            Text(if (detailsExpanded) "Hide details" else "Details")
+                Box {
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = maxBubbleWidth)
+                            .bubbleAppear(message.id)
+                            .clip(bubbleShape)
+                            .background(brush = bubbleBrush, shape = bubbleShape)
+                            .pointerInput(message.id) {
+                                detectTapGestures(
+                                    onTap = { timestampVisible = !timestampVisible },
+                                    onLongPress = {
+                                        haptics.longPress()
+                                        contextMenuOpen = true
+                                    },
+                                )
+                            }
+                            .padding(
+                                horizontal = dimens.bubblePaddingH,
+                                vertical = dimens.bubblePaddingV,
+                            )
+                            .animateContentSize(
+                                animationSpec = if (reducedMotion) {
+                                    snap()
+                                } else {
+                                    MotionSpecs.springGentleSize
+                                },
+                            ),
+                        verticalArrangement = Arrangement.spacedBy(dimens.space2),
+                    ) {
+                        if (reasoning.isNotEmpty()) {
+                            ReasoningDisclosure(
+                                expanded = reasoningExpanded,
+                                onToggle = { reasoningExpanded = !reasoningExpanded },
+                                reasoning = reasoning.joinToString("\n"),
+                                bodyStyle = bodyStyle,
+                            )
                         }
-                        if (detailsExpanded) {
+
+                        text.forEach { part ->
+                            ChatMarkdown(
+                                content = part,
+                                modifier = Modifier.testTag(ChatMessageTestTags.text(message.id)),
+                                chatFontSize = chatFontSize,
+                                loadRemoteImages = loadRemoteImages,
+                            )
+                        }
+
+                        if (isActiveStream && hasText) {
+                            StreamingCaret()
+                        }
+
+                        attachmentParts.forEach { part ->
+                            when (part) {
+                                is ContentPart.Image -> MessageImageAttachment(
+                                    part = part,
+                                    attachment = attachments[part.attachmentId],
+                                    file = attachmentFile(part.attachmentId),
+                                )
+
+                                is ContentPart.File -> MessageFileAttachment(
+                                    part = part,
+                                    attachment = attachments[part.attachmentId],
+                                )
+
+                                else -> Unit
+                            }
+                        }
+
+                        if (waitingForFirstToken) {
+                            TypingIndicator()
+                        }
+
+                        if (!hasContent && message.status == MessageStatus.COMPLETE) {
                             Text(
-                                text = details,
-                                style = Typography.codeStyle,
+                                text = "No content.",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.testTag(
-                                    ChatMessageTestTags.errorDetails(message.id),
-                                ),
+                            )
+                        }
+
+                        if (message.status == MessageStatus.CANCELLED &&
+                            message.interruptionExplanation() == null
+                        ) {
+                            Text(
+                                text = "Response cancelled. Partial content is preserved.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.testTag(ChatMessageTestTags.Cancelled),
+                            )
+                        }
+
+                        message.interruptionExplanation()?.let { explanation ->
+                            Text(
+                                text = explanation,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.testTag(ChatMessageTestTags.Cancelled),
+                            )
+                        }
+
+                        if (errorCopy != null) {
+                            ErrorCard(
+                                message = message,
+                                errorCopy = errorCopy,
+                                detailsExpanded = detailsExpanded,
+                                onToggleDetails = { detailsExpanded = !detailsExpanded },
+                                onRetry = onRetry,
                             )
                         }
                     }
-                    if (onRetry != null) {
-                        TextButton(
-                            onClick = { onRetry(message) },
-                            modifier = Modifier
-                                .heightIn(min = dimens.touchTargetMin)
-                                .testTag(ChatMessageTestTags.Retry),
-                        ) {
-                            Text("Retry")
-                        }
+
+                    if (contextMenuOpen) {
+                        ChatMessageActions(
+                            message = message,
+                            canRegenerate = canRegenerate,
+                            canEditLastUser = canEditLastUser,
+                            onRegenerate = onRegenerate,
+                            onEditLastUser = onEditLastUser,
+                            inline = false,
+                            menuInitiallyOpen = true,
+                            onMenuDismiss = { contextMenuOpen = false },
+                        )
                     }
+                }
+
+                if (isUser && isGroupStart) {
+                    Box(modifier = Modifier.width(dimens.space2))
+                    MessageAvatar(message = message)
                 }
             }
         }
 
-        if (showActions) {
+        if (showActions && !contextMenuOpen) {
             ChatMessageActions(
                 message = message,
                 canRegenerate = canRegenerate,
                 canEditLastUser = canEditLastUser,
                 onRegenerate = onRegenerate,
                 onEditLastUser = onEditLastUser,
+                inline = canRegenerate,
+            )
+        }
+
+        if (showTimestamp || timestampVisible) {
+            Text(
+                text = TIME_FORMATTER.format(message.createdAt.atZone(zoneId)),
+                style = Typography.caption,
+                color = colors.fgMuted,
+                modifier = Modifier.testTag(ChatMessageTestTags.Timestamp),
             )
         }
 
@@ -338,12 +396,238 @@ fun ChatMessageItem(
         if (meta.isNotEmpty()) {
             Text(
                 text = meta.joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = Typography.caption,
+                color = colors.fgMuted,
                 modifier = Modifier.testTag(ChatMessageTestTags.Meta),
             )
         }
     }
+}
+
+@Composable
+private fun MessageAvatar(message: Message) {
+    val colors = LocalChatUiColors.current
+    if (message.role == MessageRole.ASSISTANT) {
+        BrandMark(
+            modifier = Modifier
+                .size(28.dp)
+                .testTag(ChatMessageTestTags.avatar(message.id)),
+            size = 28.dp,
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(colors.accentSoft)
+                .testTag(ChatMessageTestTags.avatar(message.id)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Y",
+                style = Typography.caption,
+                color = colors.onAccentSoft,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReasoningDisclosure(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    reasoning: String,
+    bodyStyle: TextStyle,
+) {
+    val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
+    val reduced = LocalReducedMotion.current
+    Column(
+        modifier = Modifier.animateContentSize(
+            animationSpec = if (reduced) snap() else MotionSpecs.springGentleSize,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = dimens.touchTargetMin)
+                .testTag(ChatMessageTestTags.Reasoning)
+                .combinedClickable(onClick = onToggle, onLongClick = onToggle),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(dimens.space1),
+        ) {
+            Icon(
+                imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = null,
+                tint = colors.fgMuted,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = "Reasoning",
+                style = Typography.footnote,
+                color = colors.fgMuted,
+            )
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = if (reduced) {
+                EnterTransition.None
+            } else {
+                fadeIn() + expandVertically()
+            },
+            exit = if (reduced) {
+                ExitTransition.None
+            } else {
+                fadeOut() + shrinkVertically()
+            },
+        ) {
+            Text(
+                text = reasoning,
+                style = bodyStyle,
+                color = colors.fgSecondary,
+                modifier = Modifier.testTag(ChatMessageTestTags.ReasoningText),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ErrorCard(
+    message: Message,
+    errorCopy: ChatErrorCopy,
+    detailsExpanded: Boolean,
+    onToggleDetails: () -> Unit,
+    onRetry: ((Message) -> Unit)?,
+) {
+    val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
+    InlineBanner(
+        severity = BannerSeverity.Error,
+        title = errorCopy.title,
+        body = errorCopy.message,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ChatMessageTestTags.Error),
+        action = {
+            Column(verticalArrangement = Arrangement.spacedBy(dimens.space1)) {
+                errorCopy.details?.let { details ->
+                    TextButton(
+                        onClick = onToggleDetails,
+                        modifier = Modifier.heightIn(min = dimens.touchTargetMin),
+                    ) {
+                        Text(if (detailsExpanded) "Hide details" else "Details")
+                    }
+                    if (detailsExpanded) {
+                        Text(
+                            text = details,
+                            style = Typography.codeStyle,
+                            color = colors.fgSecondary,
+                            modifier = Modifier.testTag(
+                                ChatMessageTestTags.errorDetails(message.id),
+                            ),
+                        )
+                    }
+                }
+                if (onRetry != null) {
+                    TextButton(
+                        onClick = { onRetry(message) },
+                        modifier = Modifier
+                            .heightIn(min = dimens.touchTargetMin)
+                            .testTag(ChatMessageTestTags.Retry),
+                    ) {
+                        Text("Retry")
+                    }
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun TypingIndicator(modifier: Modifier = Modifier) {
+    val colors = LocalChatUiColors.current
+    val reduced = LocalReducedMotion.current
+    val transition = rememberInfiniteTransition(label = "typing")
+    Row(
+        modifier = modifier
+            .testTag(ChatMessageTestTags.Typing)
+            .semantics { contentDescription = "Assistant is typing" },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(3) { index ->
+            val alpha = if (reduced) {
+                0.7f
+            } else {
+                val animated by transition.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 600, delayMillis = index * 120),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "typingDot$index",
+                )
+                animated
+            }
+            Box(
+                modifier = Modifier
+                    .offset(y = (-3 * alpha).dp)
+                    .size(6.dp)
+                    .background(colors.fgMuted.copy(alpha = alpha), CircleShape),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StreamingCaret(modifier: Modifier = Modifier) {
+    val colors = LocalChatUiColors.current
+    val reduced = LocalReducedMotion.current
+    val transition = rememberInfiniteTransition(label = "caret")
+    val alpha = if (reduced) {
+        1f
+    } else {
+        val animated by transition.animateFloat(
+            initialValue = 0.2f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = MotionSpecs.caretBlinkMillis / 2),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "caretAlpha",
+        )
+        animated
+    }
+    Box(
+        modifier = modifier
+            .size(width = 2.dp, height = 16.dp)
+            .background(colors.accent.copy(alpha = alpha))
+            .testTag(ChatMessageTestTags.Caret),
+    )
+}
+
+@Composable
+private fun rememberShimmerBrush(base: androidx.compose.ui.graphics.Color): Brush {
+    val colors = LocalChatUiColors.current
+    val reduced = LocalReducedMotion.current
+    if (reduced) return SolidColor(base)
+    val transition = rememberInfiniteTransition(label = "bubbleShimmer")
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1_200),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "bubbleShimmerProgress",
+    )
+    val x = progress * 1_000f
+    return Brush.linearGradient(
+        colors = listOf(base, colors.skeletonHighlight, base),
+        start = androidx.compose.ui.geometry.Offset(x, 0f),
+        end = androidx.compose.ui.geometry.Offset(x + 400f, 400f),
+    )
 }
 
 @Composable

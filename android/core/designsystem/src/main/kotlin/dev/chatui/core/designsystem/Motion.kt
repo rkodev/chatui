@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.SpringSpec
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
@@ -31,6 +32,11 @@ data class ChatUiMotion(
     val normalMillis: Int,
     val standardEasing: Easing,
     val reducedMotion: Boolean,
+    val springSnappy: SpringSpec<Float> = SpringSpec(stiffness = 500f, dampingRatio = 0.85f),
+    val springGentle: SpringSpec<Float> = SpringSpec(stiffness = 300f, dampingRatio = 0.9f),
+    val fadeThroughMillis: Int = 180,
+    val sharedAxisMillis: Int = 220,
+    val emphasizedMillis: Int = 300,
 ) {
     companion object {
         val Standard: ChatUiMotion = ChatUiMotion(
@@ -38,6 +44,9 @@ data class ChatUiMotion(
             normalMillis = 200,
             standardEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f),
             reducedMotion = false,
+            fadeThroughMillis = 180,
+            sharedAxisMillis = 220,
+            emphasizedMillis = 300,
         )
 
         val Reduced: ChatUiMotion = ChatUiMotion(
@@ -45,6 +54,9 @@ data class ChatUiMotion(
             normalMillis = 0,
             standardEasing = LinearEasing,
             reducedMotion = true,
+            fadeThroughMillis = 0,
+            sharedAxisMillis = 0,
+            emphasizedMillis = 0,
         )
 
         fun forReducedMotion(reducedMotion: Boolean): ChatUiMotion =

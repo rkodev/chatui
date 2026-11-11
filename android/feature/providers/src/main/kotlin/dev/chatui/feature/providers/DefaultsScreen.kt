@@ -8,6 +8,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import dev.chatui.core.designsystem.BannerSeverity
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.model.Model
 
@@ -67,9 +69,10 @@ fun DefaultsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 state.warning?.let { warning ->
-                    Text(
-                        text = warning,
-                        color = MaterialTheme.colorScheme.error,
+                    InlineBanner(
+                        severity = BannerSeverity.Warning,
+                        title = "Model unavailable",
+                        body = warning,
                         modifier = Modifier.testTag(DefaultsTestTags.Warning),
                     )
                 }

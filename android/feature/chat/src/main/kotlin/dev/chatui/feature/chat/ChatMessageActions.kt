@@ -1,11 +1,18 @@
 package dev.chatui.feature.chat
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -23,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.Message
 import kotlinx.coroutines.delay
 
@@ -32,6 +40,8 @@ object ChatMessageActionsTestTags {
     const val Copy = "chat-message-actions-copy"
     const val Regenerate = "chat-message-actions-regenerate"
     const val Edit = "chat-message-actions-edit"
+    const val Overflow = "chat-message-actions-overflow"
+    const val Menu = "chat-message-actions-menu"
     const val EditDialog = "chat-message-actions-edit-dialog"
     const val EditInput = "chat-message-actions-edit-input"
     const val EditConfirm = "chat-message-actions-edit-confirm"
@@ -45,6 +55,11 @@ object ChatMessageActionsTestTags {
  * the message as the last assistant or last user message. Editing always opens
  * a confirmation dialog because it truncates every later message in the
  * conversation; no branch is created.
+ *
+ * When [inline] is true the actions render as a compact row (used for the last
+ * assistant and last user messages). Otherwise they live behind a trailing
+ * overflow menu. [menuInitiallyOpen] lets a long-press on the bubble open the
+ * same menu without duplicating action tags.
  */
 @Composable
 fun ChatMessageActions(
@@ -55,13 +70,22 @@ fun ChatMessageActions(
     onRegenerate: ((Message) -> Unit)? = null,
     onEditLastUser: ((Message, String) -> Unit)? = null,
     onCopy: ((String) -> Unit)? = null,
+    inline: Boolean = true,
+    menuInitiallyOpen: Boolean = false,
+    onMenuDismiss: (() -> Unit)? = null,
 ) {
     val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
     var copied by remember(message.id) { mutableStateOf(false) }
     var editing by remember(message.id) { mutableStateOf(false) }
     var draft by remember(message.id) { mutableStateOf("") }
+    var menuOpen by remember(message.id) { mutableStateOf(menuInitiallyOpen) }
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
+
+    LaunchedEffect(menuInitiallyOpen) {
+        if (menuInitiallyOpen) menuOpen = true
+    }
 
     LaunchedEffect(copied) {
         if (copied) {
@@ -70,54 +94,120 @@ fun ChatMessageActions(
         }
     }
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(ChatMessageActionsTestTags.Row),
-        horizontalArrangement = Arrangement.spacedBy(dimens.space1),
-    ) {
-        TextButton(
-            onClick = {
-                val text = message.copyableText()
-                if (onCopy != null) {
-                    onCopy(text)
-                } else {
-                    clipboard.setText(AnnotatedString(text))
-                }
-                copied = true
-            },
-            modifier = Modifier
-                .heightIn(min = dimens.touchTargetMin)
-                .testTag(ChatMessageActionsTestTags.Copy)
-                .semantics { contentDescription = "Copy message" },
-        ) {
-            Text(if (copied) "Copied" else "Copy")
+    val copyAction: () -> Unit = {
+        val text = message.copyableText()
+        if (onCopy != null) {
+            onCopy(text)
+        } else {
+            clipboard.setText(AnnotatedString(text))
         }
+        haptics.confirm()
+        copied = true
+    }
+    val regenerateAction: () -> Unit = {
+        onRegenerate?.invoke(message)
+    }
+    val editAction: () -> Unit = {
+        draft = message.copyableText()
+        editing = true
+    }
 
-        if (canRegenerate && onRegenerate != null) {
+    if (inline) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .testTag(ChatMessageActionsTestTags.Row),
+            horizontalArrangement = Arrangement.spacedBy(dimens.space1),
+        ) {
             TextButton(
-                onClick = { onRegenerate(message) },
+                onClick = copyAction,
                 modifier = Modifier
                     .heightIn(min = dimens.touchTargetMin)
-                    .testTag(ChatMessageActionsTestTags.Regenerate)
-                    .semantics { contentDescription = "Regenerate response" },
+                    .testTag(ChatMessageActionsTestTags.Copy)
+                    .semantics { contentDescription = "Copy message" },
             ) {
-                Text("Regenerate")
+                Text(if (copied) "Copied" else "Copy")
+            }
+
+            if (canRegenerate && onRegenerate != null) {
+                TextButton(
+                    onClick = regenerateAction,
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatMessageActionsTestTags.Regenerate)
+                        .semantics { contentDescription = "Regenerate response" },
+                ) {
+                    Text("Regenerate")
+                }
+            }
+
+            if (canEditLastUser && onEditLastUser != null) {
+                TextButton(
+                    onClick = editAction,
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatMessageActionsTestTags.Edit)
+                        .semantics { contentDescription = "Edit last message" },
+                ) {
+                    Text("Edit")
+                }
             }
         }
-
-        if (canEditLastUser && onEditLastUser != null) {
-            TextButton(
-                onClick = {
-                    draft = message.copyableText()
-                    editing = true
+    } else {
+        Box(modifier = modifier) {
+            if (!menuInitiallyOpen) {
+                IconButton(
+                    onClick = { menuOpen = true },
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatMessageActionsTestTags.Overflow)
+                        .semantics { contentDescription = "Message actions" },
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreHoriz,
+                        contentDescription = null,
+                    )
+                }
+            }
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = {
+                    menuOpen = false
+                    onMenuDismiss?.invoke()
                 },
-                modifier = Modifier
-                    .heightIn(min = dimens.touchTargetMin)
-                    .testTag(ChatMessageActionsTestTags.Edit)
-                    .semantics { contentDescription = "Edit last message" },
+                modifier = Modifier.testTag(ChatMessageActionsTestTags.Menu),
             ) {
-                Text("Edit")
+                DropdownMenuItem(
+                    text = { Text(if (copied) "Copied" else "Copy") },
+                    onClick = {
+                        copyAction()
+                        menuOpen = false
+                        onMenuDismiss?.invoke()
+                    },
+                    modifier = Modifier.testTag(ChatMessageActionsTestTags.Copy),
+                )
+                if (canRegenerate && onRegenerate != null) {
+                    DropdownMenuItem(
+                        text = { Text("Regenerate") },
+                        onClick = {
+                            regenerateAction()
+                            menuOpen = false
+                            onMenuDismiss?.invoke()
+                        },
+                        modifier = Modifier.testTag(ChatMessageActionsTestTags.Regenerate),
+                    )
+                }
+                if (canEditLastUser && onEditLastUser != null) {
+                    DropdownMenuItem(
+                        text = { Text("Edit") },
+                        onClick = {
+                            editAction()
+                            menuOpen = false
+                            onMenuDismiss?.invoke()
+                        },
+                        modifier = Modifier.testTag(ChatMessageActionsTestTags.Edit),
+                    )
+                }
             }
         }
     }

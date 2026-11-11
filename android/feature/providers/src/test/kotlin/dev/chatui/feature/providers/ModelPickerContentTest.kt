@@ -1,13 +1,18 @@
 package dev.chatui.feature.providers
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.ModelCapability
@@ -51,7 +56,7 @@ class ModelPickerContentTest {
     )
 
     @Test
-    fun `shows search grouping price context modalities and free badge`() {
+    fun `shows search grouping price context and free badge`() {
         composeRule.setContent {
             ChatUiTheme {
                 ModelPickerContent(
@@ -69,19 +74,47 @@ class ModelPickerContentTest {
         }
 
         composeRule.onNodeWithTag(ModelPickerTestTags.Search).assertIsDisplayed()
+        composeRule.onNodeWithTag(ModelPickerTestTags.Filters).assertIsDisplayed()
         composeRule.onNodeWithTag(ModelPickerTestTags.group("provider-1")).assertIsDisplayed()
         composeRule.onNodeWithTag(ModelPickerTestTags.model("model-1")).assertIsDisplayed()
         composeRule.onNodeWithText("\$0.15 / M input · \$0.6 / M output").assertIsDisplayed()
-        composeRule.onNodeWithText("128K context · text in · text out").assertIsDisplayed()
+        composeRule.onNodeWithText("128K context").assertIsDisplayed()
         composeRule.onNodeWithText("Vision").assertIsDisplayed()
+        composeRule.onNodeWithTag(ModelPickerTestTags.check("model-1"), useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
 
         composeRule.onNodeWithTag(ModelPickerTestTags.Content)
-            .performScrollToNode(hasTestTag(ModelPickerTestTags.freeBadge("model-2")))
-        composeRule.onNodeWithTag(ModelPickerTestTags.freeBadge("model-2")).assertIsDisplayed()
+            .performScrollToNode(hasTestTag(ModelPickerTestTags.model("model-2")))
+        composeRule.onNodeWithTag(ModelPickerTestTags.freeBadge("model-2"), useUnmergedTree = true)
+            .assertIsDisplayed()
     }
 
     @Test
-    fun `pin and hide actions invoke callbacks`() {
+    fun `filter chips meet the 48 dp touch target`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ModelPickerContent(
+                    state = state(),
+                    onQueryChanged = {},
+                    onSelect = {},
+                    onPin = { _, _ -> },
+                    onHide = { _, _ -> },
+                    onManualRemoteIdChanged = {},
+                    onManualLabelChanged = {},
+                    onAddManual = {},
+                    onRefresh = {},
+                )
+            }
+        }
+
+        val bounds = composeRule.onNodeWithTag(ModelPickerTestTags.filter("all"))
+            .getUnclippedBoundsInRoot()
+        assertThat((bounds.bottom - bounds.top).value).isAtLeast(48f)
+    }
+
+    @Test
+    fun `pin and hide actions invoke callbacks from the trailing menu`() {
         var pinned: Pair<String, Boolean>? = null
         var hidden: Pair<String, Boolean>? = null
 
@@ -101,7 +134,9 @@ class ModelPickerContentTest {
             }
         }
 
+        composeRule.onNodeWithTag(ModelPickerTestTags.menu("model-1")).performClick()
         composeRule.onNodeWithTag(ModelPickerTestTags.pin("model-1")).performClick()
+        composeRule.onNodeWithTag(ModelPickerTestTags.menu("model-1")).performClick()
         composeRule.onNodeWithTag(ModelPickerTestTags.hide("model-1")).performClick()
 
         assertThat(pinned).isEqualTo("model-1" to true)
@@ -130,9 +165,90 @@ class ModelPickerContentTest {
 
         composeRule.onNodeWithTag(ModelPickerTestTags.Content)
             .performScrollToNode(hasTestTag(ModelPickerTestTags.model("model-2")))
-        composeRule.onNodeWithText("Select").performClick()
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("model-2"))
+            .performSemanticsAction(SemanticsActions.OnClick)
 
         assertThat(selected).isEqualTo("model-2")
+    }
+
+    @Test
+    fun `free filter hides paid models`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ModelPickerContent(
+                    state = state(),
+                    onQueryChanged = {},
+                    onSelect = {},
+                    onPin = { _, _ -> },
+                    onHide = { _, _ -> },
+                    onManualRemoteIdChanged = {},
+                    onManualLabelChanged = {},
+                    onAddManual = {},
+                    onRefresh = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.filter("free")).performClick()
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("model-2")).assertIsDisplayed()
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("model-1")).assertDoesNotExist()
+    }
+
+    @Test
+    fun `pinned filter shows only pinned models`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ModelPickerContent(
+                    state = state(
+                        models = listOf(
+                            testModel(id = "pinned", label = "Pinned", pinned = true),
+                            testModel(id = "regular", label = "Regular"),
+                        ),
+                        selectedModelId = null,
+                    ),
+                    onQueryChanged = {},
+                    onSelect = {},
+                    onPin = { _, _ -> },
+                    onHide = { _, _ -> },
+                    onManualRemoteIdChanged = {},
+                    onManualLabelChanged = {},
+                    onAddManual = {},
+                    onRefresh = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.filter("pinned")).performClick()
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("pinned")).assertIsDisplayed()
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("regular")).assertDoesNotExist()
+    }
+
+    @Test
+    fun `details disclosure expands from the trailing menu`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ModelPickerContent(
+                    state = state(),
+                    onQueryChanged = {},
+                    onSelect = {},
+                    onPin = { _, _ -> },
+                    onHide = { _, _ -> },
+                    onManualRemoteIdChanged = {},
+                    onManualLabelChanged = {},
+                    onAddManual = {},
+                    onRefresh = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.menu("model-1")).performClick()
+        composeRule.onNodeWithText("Details").performClick()
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.details("model-1"), useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
@@ -189,6 +305,59 @@ class ModelPickerContentTest {
         composeRule.onNodeWithTag(ModelPickerTestTags.AddManual).performClick()
 
         assertThat(addClicks).isEqualTo(1)
+    }
+
+    @Test
+    fun `error state shows retry and invokes refresh`() {
+        var refreshed = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ModelPickerContent(
+                    state = state().copy(error = "Catalog unavailable"),
+                    onQueryChanged = {},
+                    onSelect = {},
+                    onPin = { _, _ -> },
+                    onHide = { _, _ -> },
+                    onManualRemoteIdChanged = {},
+                    onManualLabelChanged = {},
+                    onAddManual = {},
+                    onRefresh = { refreshed = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.Error).assertIsDisplayed()
+        composeRule.onNodeWithText("Retry").performClick()
+
+        assertThat(refreshed).isTrue()
+    }
+
+    @Test
+    fun `pull to refresh invokes refresh`() {
+        var refreshed = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ModelPickerContent(
+                    state = state(),
+                    onQueryChanged = {},
+                    onSelect = {},
+                    onPin = { _, _ -> },
+                    onHide = { _, _ -> },
+                    onManualRemoteIdChanged = {},
+                    onManualLabelChanged = {},
+                    onAddManual = {},
+                    onRefresh = { refreshed = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.Content)
+            .performTouchInput { swipeDown() }
+        composeRule.waitForIdle()
+
+        assertThat(refreshed).isTrue()
     }
 
     @Test

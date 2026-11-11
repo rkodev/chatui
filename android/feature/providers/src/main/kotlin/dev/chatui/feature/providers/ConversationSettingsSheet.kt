@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
+import dev.chatui.core.designsystem.BannerSeverity
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.model.ReasoningEffort
 
@@ -135,20 +137,17 @@ fun ConversationSettingsSheet(
             }
 
             state.error?.let { error ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(ConversationSettingsTestTags.Error),
-                    )
-                    TextButton(onClick = onDismissError) { Text("Dismiss") }
-                }
+                InlineBanner(
+                    severity = BannerSeverity.Error,
+                    title = "Could not update conversation settings",
+                    body = error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(ConversationSettingsTestTags.Error),
+                    action = {
+                        TextButton(onClick = onDismissError) { Text("Dismiss") }
+                    },
+                )
             }
 
             HorizontalDivider()

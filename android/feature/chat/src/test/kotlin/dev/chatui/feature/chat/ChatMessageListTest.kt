@@ -4,9 +4,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollToIndex
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.ContentPart
@@ -213,5 +217,115 @@ class ChatMessageListTest {
 
         composeRule.onNodeWithTag(ChatMessageListTestTags.Streaming).assertExists()
         composeRule.onNodeWithTag(ChatMessageTestTags.message("message-c")).assertDoesNotExist()
+    }
+
+    @Test
+    fun `consecutive same-role messages share a group and show one avatar`() {
+        val first = testMessage(
+            id = "user-1",
+            sequence = 1,
+            role = MessageRole.USER,
+            text = "First",
+        )
+        val second = testMessage(
+            id = "user-2",
+            sequence = 2,
+            role = MessageRole.USER,
+            text = "Second",
+        )
+        val assistant = testMessage(
+            id = "assistant-1",
+            sequence = 3,
+            role = MessageRole.ASSISTANT,
+            text = "Answer",
+        )
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatMessageList(
+                    messages = listOf(first, second, assistant),
+                    streaming = null,
+                    zoneId = java.time.ZoneOffset.UTC,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(ChatMessageTestTags.avatar("user-1")).assertExists()
+        composeRule.onNodeWithTag(ChatMessageTestTags.avatar("user-2")).assertDoesNotExist()
+        composeRule.onNodeWithTag(ChatMessageTestTags.avatar("assistant-1")).assertExists()
+    }
+
+    @Test
+    fun `scroll to bottom fab appears when scrolled up during streaming`() {
+        val messages = (0 until 50).map { index ->
+            testMessage(
+                id = "message-$index",
+                sequence = index.toLong(),
+                role = if (index % 2 == 0) MessageRole.USER else MessageRole.ASSISTANT,
+                text = "Message $index",
+            )
+        }
+        val streaming = createStreamingState(
+            conversationId = "conversation-1",
+            messageId = "assistant-stream",
+            startedAt = now,
+        ).copy(text = "Streaming")
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatMessageList(
+                    messages = messages,
+                    streaming = streaming,
+                    zoneId = java.time.ZoneOffset.UTC,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(ChatMessageListTestTags.List).performScrollToIndex(0)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(ChatMessageListTestTags.ScrollToBottom)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `new message pill appears when content arrives off screen`() {
+        val messages = (0 until 50).map { index ->
+            testMessage(
+                id = "message-$index",
+                sequence = index.toLong(),
+                role = if (index % 2 == 0) MessageRole.USER else MessageRole.ASSISTANT,
+                text = "Message $index",
+            )
+        }
+        var streaming by mutableStateOf(
+            createStreamingState(
+                conversationId = "conversation-1",
+                messageId = "assistant-stream",
+                startedAt = now,
+            ).copy(text = "First"),
+        )
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatMessageList(
+                    messages = messages,
+                    streaming = streaming,
+                    zoneId = java.time.ZoneOffset.UTC,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(ChatMessageListTestTags.List).performScrollToIndex(0)
+        composeRule.waitForIdle()
+
+        streaming = streaming.copy(text = "First and second")
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(ChatMessageListTestTags.NewMessages)
+            .assertIsDisplayed()
     }
 }

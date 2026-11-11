@@ -14,6 +14,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
@@ -326,7 +327,10 @@ class ProviderDetailScreenTest {
         composeRule.onNodeWithTag(ProviderDetailTestTags.DocsLink).performClick()
 
         composeRule.onNodeWithTag(ProviderDetailTestTags.DocsError)
-            .assertTextContains("No browser is available to open this link.")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("No browser is available to open this link.")
+            .assertExists()
     }
 
     @Test

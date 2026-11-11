@@ -1,5 +1,8 @@
 package dev.chatui.feature.chat
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -61,6 +64,43 @@ class ChatMessageItemTest {
             .assertTextEquals("Private reasoning.")
         composeRule.onNodeWithText("The answer.", substring = true).assertExists()
         assertThat(message.copyableText()).isEqualTo("The answer.")
+    }
+
+    @Test
+    fun `streaming shows a typing indicator before the first token and a caret after`() {
+        val waiting = testMessage(
+            id = "assistant-waiting",
+            role = MessageRole.ASSISTANT,
+            status = MessageStatus.STREAMING,
+            text = "",
+        )
+        val streaming = testMessage(
+            id = "assistant-streaming",
+            role = MessageRole.ASSISTANT,
+            status = MessageStatus.STREAMING,
+            text = "Partial answer",
+        )
+
+        var current by mutableStateOf(waiting)
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatMessageItem(
+                    message = current,
+                    showActions = false,
+                    isActiveStream = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatMessageTestTags.Typing).assertExists()
+        composeRule.onNodeWithTag(ChatMessageTestTags.Caret).assertDoesNotExist()
+
+        current = streaming
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(ChatMessageTestTags.Caret).assertExists()
+        composeRule.onNodeWithTag(ChatMessageTestTags.Typing).assertDoesNotExist()
     }
 
     @Test

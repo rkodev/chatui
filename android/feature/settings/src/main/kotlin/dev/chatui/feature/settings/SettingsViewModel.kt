@@ -63,6 +63,10 @@ class SettingsViewModel(
 
     fun onLoadRemoteImagesChanged(load: Boolean) = persist { it.setLoadRemoteImages(load) }
 
+    fun onHapticFeedbackChanged(enabled: Boolean) = persist { it.setHapticFeedback(enabled) }
+
+    fun onDynamicColorChanged(enabled: Boolean) = persist { it.setDynamicColor(enabled) }
+
     fun onDefaultSystemPromptChanged(prompt: String) = persist {
         it.setDefaultSystemPrompt(prompt)
     }

@@ -45,6 +45,40 @@ class ChatMessageActionsTest {
     }
 
     @Test
+    fun `overflow menu exposes copy and regenerate`() {
+        var copied: String? = null
+        var regenerated: Message? = null
+        val message = testMessage(
+            id = "assistant-1",
+            role = MessageRole.ASSISTANT,
+            text = "Answer",
+        )
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatMessageActions(
+                    message = message,
+                    canRegenerate = true,
+                    onRegenerate = { regenerated = it },
+                    onCopy = { copied = it },
+                    inline = false,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Overflow).performClick()
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Copy).performClick()
+        composeRule.waitForIdle()
+
+        assertThat(copied).isEqualTo("Answer")
+
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Overflow).performClick()
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Regenerate).performClick()
+
+        assertThat(regenerated?.id).isEqualTo("assistant-1")
+    }
+
+    @Test
     fun `copies every text part with a blank line`() {
         var copied: String? = null
         val message = testMessage(text = "Hello").copy(

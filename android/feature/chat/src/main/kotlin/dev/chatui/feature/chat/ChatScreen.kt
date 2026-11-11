@@ -8,14 +8,23 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
@@ -23,8 +32,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -34,28 +41,42 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.database.attachment.AttachmentInput
 import dev.chatui.core.database.attachment.MAX_IMAGE_BYTES
+import dev.chatui.core.designsystem.BannerSeverity
+import dev.chatui.core.designsystem.BrandMark
+import dev.chatui.core.designsystem.InlineBanner
+import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.LocalReducedMotion
+import dev.chatui.core.designsystem.MotionSpecs
+import dev.chatui.core.designsystem.PrimaryButton
+import dev.chatui.core.designsystem.Skeleton
+import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.Message
 import dev.chatui.core.model.MessageRole
@@ -89,6 +110,9 @@ object ChatScreenTestTags {
     const val SendConfirmation = "chat-screen-send-confirmation"
     const val SendAnyway = "chat-screen-send-anyway"
     const val CancelSend = "chat-screen-cancel-send"
+    const val EmptyModelSelector = "chat-screen-empty-model-selector"
+
+    fun emptyPrompt(index: Int): String = "chat-screen-empty-prompt-$index"
 }
 
 /**
@@ -130,11 +154,50 @@ fun ChatScreen(
 ) {
     val dimens = LocalDimens.current
     val shortcutState = LocalChatShortcutState.current
+    val haptics = rememberHaptics()
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
     val lastAssistant = state.messages.lastOrNull { it.role == MessageRole.ASSISTANT }
     val copyLastResponse: (() -> Unit)? = lastAssistant?.let { message ->
-        { clipboard.setText(AnnotatedString(message.copyableText())) }
+        {
+            clipboard.setText(AnnotatedString(message.copyableText()))
+            haptics.confirm()
+        }
+    }
+
+    // Publish the conversation title, model label, and header actions to the
+    // shell-owned app bar. The callbacks are wrapped in stable lambdas so the
+    // state update does not trigger a recomposition loop.
+    val topBarState = LocalChatTopBarState.current
+    val currentOnShare by rememberUpdatedState(onShareConversation)
+    val currentOnSettings by rememberUpdatedState(onOpenConversationSettings)
+    val currentOnProviders by rememberUpdatedState(onOpenProviders)
+    val shareCallback = remember {
+        { format: ConversationShareFormat ->
+            currentOnShare?.invoke(format)
+            Unit
+        }
+    }
+    val settingsCallback = remember { { currentOnSettings() } }
+    val providersCallback = remember { { currentOnProviders() } }
+    val modelLabel = state.conversation?.modelLabel
+        ?.takeIf { it.isNotBlank() }
+        ?: state.conversation?.modelId
+    SideEffect {
+        topBarState?.update(
+            title = state.conversation?.title,
+            subtitle = modelLabel,
+            onShare = if (state.conversation != null && onShareConversation != null) {
+                shareCallback
+            } else {
+                null
+            },
+            onOpenSettings = settingsCallback,
+            onOpenModelPicker = providersCallback,
+        )
+    }
+    DisposableEffect(topBarState) {
+        onDispose { topBarState?.clear() }
     }
 
     // Register the existing stop and copy actions with the shell's root key
@@ -199,6 +262,7 @@ fun ChatScreen(
                 offline = offline,
                 zoneId = zoneId,
                 dimensPadding = dimens.padding,
+                hostedInShell = topBarState != null,
             )
         }
     }
@@ -206,18 +270,30 @@ fun ChatScreen(
 
 @Composable
 private fun LoadingState() {
-    Box(
+    val dimens = LocalDimens.current
+    Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(dimens.screenPadding)
             .testTag(ChatScreenTestTags.Loading),
-        contentAlignment = Alignment.Center,
+        verticalArrangement = Arrangement.spacedBy(dimens.space4),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Text(
-                text = "Loading conversation…",
-                modifier = Modifier.padding(top = 8.dp),
-            )
+        repeat(4) { index ->
+            val userBubble = index % 2 == 0
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = if (userBubble) {
+                    Arrangement.End
+                } else {
+                    Arrangement.Start
+                },
+            ) {
+                Skeleton(
+                    modifier = Modifier
+                        .fillMaxWidth(if (userBubble) 0.55f else 0.75f)
+                        .height(if (userBubble) 44.dp else 72.dp),
+                )
+            }
         }
     }
 }
@@ -276,6 +352,7 @@ private fun ChatContent(
     offline: Boolean,
     zoneId: ZoneId,
     dimensPadding: androidx.compose.ui.unit.Dp,
+    hostedInShell: Boolean,
 ) {
     val dimens = LocalDimens.current
     val context = LocalContext.current
@@ -332,80 +409,85 @@ private fun ChatContent(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = dimensPadding, vertical = dimens.space2)
-                .testTag(ChatScreenTestTags.Header),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = state.conversation?.title ?: "Chat",
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                if (state.conversation != null) {
-                    Text(
-                        text = modelLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (state.conversation != null && onShareConversation != null) {
-                Box {
-                    TextButton(
-                        onClick = { shareMenuExpanded = true },
-                        modifier = Modifier
-                            .heightIn(min = dimens.touchTargetMin)
-                            .testTag(ChatScreenTestTags.Share)
-                            .semantics { contentDescription = "Share conversation" },
-                    ) {
-                        Text("Share")
-                    }
-                    DropdownMenu(
-                        expanded = shareMenuExpanded,
-                        onDismissRequest = { shareMenuExpanded = false },
-                        modifier = Modifier.testTag(ChatScreenTestTags.ShareMenu),
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Share as text") },
-                            onClick = {
-                                shareMenuExpanded = false
-                                onShareConversation(ConversationShareFormat.TEXT)
-                            },
-                            modifier = Modifier.testTag(ChatScreenTestTags.ShareText),
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Share as Markdown") },
-                            onClick = {
-                                shareMenuExpanded = false
-                                onShareConversation(ConversationShareFormat.MARKDOWN)
-                            },
-                            modifier = Modifier.testTag(ChatScreenTestTags.ShareMarkdown),
-                        )
-                    }
-                }
-            }
-            TextButton(
-                onClick = onOpenConversationSettings,
+        // When the shell hosts the screen, the conversation title, model, and
+        // share/settings actions live in the app bar. The standalone fallback
+        // keeps the header for previews and direct composition tests.
+        if (!hostedInShell) {
+            Row(
                 modifier = Modifier
-                    .heightIn(min = dimens.touchTargetMin)
-                    .testTag(ChatScreenTestTags.ConversationSettings),
+                    .fillMaxWidth()
+                    .padding(horizontal = dimensPadding, vertical = dimens.space2)
+                    .testTag(ChatScreenTestTags.Header),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Settings")
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = state.conversation?.title ?: "Chat",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    if (state.conversation != null) {
+                        Text(
+                            text = modelLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (state.conversation != null && onShareConversation != null) {
+                    Box {
+                        TextButton(
+                            onClick = { shareMenuExpanded = true },
+                            modifier = Modifier
+                                .heightIn(min = dimens.touchTargetMin)
+                                .testTag(ChatScreenTestTags.Share)
+                                .semantics { contentDescription = "Share conversation" },
+                        ) {
+                            Text("Share")
+                        }
+                        DropdownMenu(
+                            expanded = shareMenuExpanded,
+                            onDismissRequest = { shareMenuExpanded = false },
+                            modifier = Modifier.testTag(ChatScreenTestTags.ShareMenu),
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Share as text") },
+                                onClick = {
+                                    shareMenuExpanded = false
+                                    onShareConversation(ConversationShareFormat.TEXT)
+                                },
+                                modifier = Modifier.testTag(ChatScreenTestTags.ShareText),
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Share as Markdown") },
+                                onClick = {
+                                    shareMenuExpanded = false
+                                    onShareConversation(ConversationShareFormat.MARKDOWN)
+                                },
+                                modifier = Modifier.testTag(ChatScreenTestTags.ShareMarkdown),
+                            )
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = onOpenConversationSettings,
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatScreenTestTags.ConversationSettings),
+                ) {
+                    Text("Settings")
+                }
+                AssistChip(
+                    onClick = onOpenProviders,
+                    label = { Text(modelLabel) },
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatScreenTestTags.ModelChip),
+                )
             }
-            AssistChip(
-                onClick = onOpenProviders,
-                label = { Text(modelLabel) },
-                modifier = Modifier
-                    .heightIn(min = dimens.touchTargetMin)
-                    .testTag(ChatScreenTestTags.ModelChip),
-            )
-        }
 
-        HorizontalDivider()
+            HorizontalDivider()
+        }
 
         unavailable?.let { availabilityState ->
             AvailabilityBanner(
@@ -415,31 +497,30 @@ private fun ChatContent(
         }
 
         state.error?.let { error ->
-            Column(
+            InlineBanner(
+                severity = BannerSeverity.Error,
+                title = "Something went wrong",
+                body = error.message,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = dimensPadding, vertical = dimens.space2)
                     .testTag(ChatScreenTestTags.Error),
-                verticalArrangement = Arrangement.spacedBy(dimens.space1),
-            ) {
-                Text(
-                    text = error.message,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                TextButton(
-                    onClick = onDismissError,
-                    modifier = Modifier.heightIn(min = dimens.touchTargetMin),
-                ) {
-                    Text("Dismiss")
-                }
-            }
+                action = {
+                    TextButton(
+                        onClick = onDismissError,
+                        modifier = Modifier.heightIn(min = dimens.touchTargetMin),
+                    ) {
+                        Text("Dismiss")
+                    }
+                },
+            )
         }
 
         state.attachmentWarning?.let { warning ->
-            Text(
-                text = warning,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+            InlineBanner(
+                severity = BannerSeverity.Warning,
+                title = "Attachment warning",
+                body = warning,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = dimensPadding, vertical = dimens.space1)
@@ -452,6 +533,8 @@ private fun ChatContent(
                 EmptyState(
                     modelLabel = modelLabel,
                     enabled = availability?.available != false,
+                    onPromptSelected = onDraftChange,
+                    onOpenProviders = onOpenProviders,
                 )
             } else {
                 ChatMessageList(
@@ -474,6 +557,23 @@ private fun ChatContent(
                 )
             }
         }
+
+        // Fade the message list into the composer so content scrolling under
+        // the floating composer stays legible. The composer itself sits above
+        // the IME and the shell-consumed navigation-bar inset.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(12.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.background,
+                        ),
+                    ),
+                ),
+        )
 
         Box(
             modifier = Modifier.dragAndDropTarget(
@@ -558,71 +658,140 @@ private fun AvailabilityBanner(
     onOpenProviders: () -> Unit,
 ) {
     val dimens = LocalDimens.current
-    val (tag, title, action) = when (availability.reason) {
-        ChatUnavailableReason.NO_PROVIDER -> Triple(
-            ChatScreenTestTags.NoProvider,
-            "No provider is configured. Add a provider before starting a chat.",
-            "Add provider",
+    val (tag, title, body, action) = when (availability.reason) {
+        ChatUnavailableReason.NO_PROVIDER -> AvailabilityCopy(
+            tag = ChatScreenTestTags.NoProvider,
+            title = "No provider configured",
+            body = "Add a provider before starting a chat.",
+            action = "Add provider",
         )
 
-        ChatUnavailableReason.MODEL_UNAVAILABLE -> Triple(
-            ChatScreenTestTags.ModelUnavailable,
-            availability.message ?: "The selected model is unavailable. Choose another model.",
-            "Choose another model",
+        ChatUnavailableReason.MODEL_UNAVAILABLE -> AvailabilityCopy(
+            tag = ChatScreenTestTags.ModelUnavailable,
+            title = "Model unavailable",
+            body = availability.message
+                ?: "The selected model is unavailable. Choose another model.",
+            action = "Choose another model",
         )
 
-        ChatUnavailableReason.NO_KEY -> Triple(
-            ChatScreenTestTags.NoKey,
-            availability.message ?: "The API key for this provider is unavailable.",
-            "Open providers",
+        ChatUnavailableReason.NO_KEY -> AvailabilityCopy(
+            tag = ChatScreenTestTags.NoKey,
+            title = "API key needed",
+            body = availability.message ?: "The API key for this provider is unavailable.",
+            action = "Open providers",
         )
 
-        null -> Triple(ChatScreenTestTags.Error, availability.message.orEmpty(), "Open providers")
+        null -> AvailabilityCopy(
+            tag = ChatScreenTestTags.Error,
+            title = "Chat unavailable",
+            body = availability.message.orEmpty(),
+            action = "Open providers",
+        )
     }
 
-    Column(
+    InlineBanner(
+        severity = BannerSeverity.Warning,
+        title = title,
+        body = body,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = dimens.padding, vertical = dimens.space2)
             .testTag(tag),
-        verticalArrangement = Arrangement.spacedBy(dimens.space1),
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.error,
-        )
-        Button(
-            onClick = onOpenProviders,
-            modifier = Modifier
-                .heightIn(min = dimens.touchTargetMin)
-                .testTag(ChatScreenTestTags.OpenProviders),
-        ) {
-            Text(action)
-        }
-    }
+        action = {
+            PrimaryButton(
+                text = action,
+                onClick = onOpenProviders,
+                modifier = Modifier.testTag(ChatScreenTestTags.OpenProviders),
+            )
+        },
+    )
 }
 
+private data class AvailabilityCopy(
+    val tag: String,
+    val title: String,
+    val body: String,
+    val action: String,
+)
+
+private val SUGGESTED_PROMPTS = listOf(
+    "Summarize a document",
+    "Brainstorm ideas",
+    "Explain a concept",
+)
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun EmptyState(modelLabel: String, enabled: Boolean) {
-    Column(
+private fun EmptyState(
+    modelLabel: String,
+    enabled: Boolean,
+    onPromptSelected: (String) -> Unit,
+    onOpenProviders: () -> Unit,
+) {
+    val colors = LocalChatUiColors.current
+    val dimens = LocalDimens.current
+    val reducedMotion = LocalReducedMotion.current
+    var visible by remember { mutableStateOf(reducedMotion) }
+    LaunchedEffect(Unit) { visible = true }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
+            .padding(dimens.sectionGap)
             .testTag(ChatScreenTestTags.Empty),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+        contentAlignment = Alignment.Center,
     ) {
-        Text("Start the conversation", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            text = if (enabled) {
-                "Send a message to $modelLabel."
+        AnimatedVisibility(
+            visible = visible,
+            enter = if (reducedMotion) {
+                EnterTransition.None
             } else {
-                "Fix the provider or model setup before sending a message."
+                fadeIn(tween(MotionSpecs.emphasizedMillis)) +
+                    slideInVertically(tween(MotionSpecs.emphasizedMillis)) { it / 6 }
             },
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
-        )
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(dimens.space3),
+            ) {
+                BrandMark(size = 64.dp)
+                Text(
+                    text = "How can I help?",
+                    style = Typography.title2,
+                    color = colors.fgPrimary,
+                )
+                Text(
+                    text = if (enabled) {
+                        "Ask anything, or start with a suggestion."
+                    } else {
+                        "Fix the provider or model setup before sending a message."
+                    },
+                    style = Typography.subhead,
+                    color = colors.fgSecondary,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(dimens.space2),
+                    verticalArrangement = Arrangement.spacedBy(dimens.space2),
+                ) {
+                    SUGGESTED_PROMPTS.forEachIndexed { index, prompt ->
+                        AssistChip(
+                            onClick = { onPromptSelected(prompt) },
+                            label = { Text(prompt) },
+                            modifier = Modifier
+                                .heightIn(min = dimens.touchTargetMin)
+                                .testTag(ChatScreenTestTags.emptyPrompt(index)),
+                        )
+                    }
+                }
+                AssistChip(
+                    onClick = onOpenProviders,
+                    label = { Text(modelLabel) },
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ChatScreenTestTags.EmptyModelSelector),
+                )
+            }
+        }
     }
 }
 

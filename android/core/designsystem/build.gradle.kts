@@ -16,9 +16,10 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.compose.animation)
     implementation("androidx.compose.ui:ui-text")
     implementation("androidx.compose.ui:ui-unit")
-    implementation("androidx.compose.animation:animation-core")
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

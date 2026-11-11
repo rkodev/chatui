@@ -3,10 +3,13 @@ package dev.chatui.feature.chat
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -189,6 +192,79 @@ class ChatComposerTest {
     }
 
     @Test
+    fun `focus returns to the attach trigger after the sheet closes`() {
+        var photos = 0
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    draft = "",
+                    onDraftChange = {},
+                    onSend = {},
+                    onStop = {},
+                    sendKey = SendKey.ENTER,
+                    enabled = true,
+                    streaming = false,
+                    sending = false,
+                    onAddPhoto = { photos += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.Attach).requestFocus()
+        composeRule.onNodeWithTag(ChatComposerTestTags.Attach).assertIsFocused()
+        composeRule.onNodeWithTag(ChatComposerTestTags.Attach).performClick()
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachPhoto).performClick()
+
+        assertThat(photos).isEqualTo(1)
+        composeRule.onNodeWithTag(ChatComposerTestTags.Attach).assertIsFocused()
+    }
+
+    @Test
+    fun `composer icon actions expose content descriptions`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    draft = "Hello",
+                    onDraftChange = {},
+                    onSend = {},
+                    onStop = {},
+                    sendKey = SendKey.ENTER,
+                    enabled = true,
+                    streaming = false,
+                    sending = false,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.Attach)
+            .assertContentDescriptionEquals("Add attachment")
+        composeRule.onNodeWithTag(ChatComposerTestTags.Send)
+            .assertContentDescriptionEquals("Send message")
+    }
+
+    @Test
+    fun `stop action exposes a content description while streaming`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    draft = "",
+                    onDraftChange = {},
+                    onSend = {},
+                    onStop = {},
+                    sendKey = SendKey.ENTER,
+                    enabled = true,
+                    streaming = true,
+                    sending = false,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.Stop)
+            .assertContentDescriptionEquals("Stop response")
+    }
+
+    @Test
     fun `attachments enable send and expose a remove action`() {
         var removed: String? = null
         val attachment = attachment()
@@ -213,10 +289,50 @@ class ChatComposerTest {
         composeRule.onNodeWithTag(ChatComposerTestTags.attachmentChip(attachment.id))
             .assertIsDisplayed()
         composeRule.onNodeWithTag(ChatComposerTestTags.Send).assertIsEnabled()
-        composeRule.onNodeWithTag(ChatComposerTestTags.removeAttachment(attachment.id))
-            .performClick()
+        val remove = composeRule.onNodeWithTag(
+            ChatComposerTestTags.removeAttachment(attachment.id),
+        )
+        val bounds = remove.getUnclippedBoundsInRoot()
+        assertThat((bounds.bottom - bounds.top).value).isAtLeast(48f)
+        assertThat((bounds.right - bounds.left).value).isAtLeast(48f)
+        remove.performClick()
 
         assertThat(removed).isEqualTo(attachment.id)
+    }
+
+    @Test
+    fun `attach button opens a sheet with photo file and paste`() {
+        var photos = 0
+        var files = 0
+        var pastes = 0
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    draft = "",
+                    onDraftChange = {},
+                    onSend = {},
+                    onStop = {},
+                    sendKey = SendKey.ENTER,
+                    enabled = true,
+                    streaming = false,
+                    sending = false,
+                    onAddPhoto = { photos += 1 },
+                    onAddFile = { files += 1 },
+                    onPasteImage = { pastes += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatComposerTestTags.Attach).performClick()
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachPhoto).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachFile).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.Paste).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachPhoto).performClick()
+
+        assertThat(photos).isEqualTo(1)
+        assertThat(files).isEqualTo(0)
+        assertThat(pastes).isEqualTo(0)
     }
 
     @Test

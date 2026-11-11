@@ -78,9 +78,29 @@ class ShellSidebarTest {
         assertThat(routes).containsExactly(ChatDestination.createRoute("new-conversation"))
     }
 
+    @Test
+    fun `sidebar header new chat invokes the shell action`() {
+        var newChats = 0
+        setSidebar(onNavigate = {}, onNewChat = { newChats += 1 })
+
+        composeRule.onNodeWithTag(ShellTestTags.NewChat).performClick()
+
+        assertThat(newChats).isEqualTo(1)
+    }
+
+    @Test
+    fun `sidebar groups destinations into chats library and settings`() {
+        setSidebar(onNavigate = {})
+
+        composeRule.onNodeWithText("CHATS").assertExists()
+        composeRule.onNodeWithText("LIBRARY").assertExists()
+        composeRule.onNodeWithText("SETTINGS").assertExists()
+    }
+
     private fun setSidebar(
         service: FakeConversationService = FakeConversationService(),
         onNavigate: (String) -> Unit,
+        onNewChat: () -> Unit = {},
     ) {
         composeRule.setContent {
             ChatUiTheme {
@@ -88,6 +108,7 @@ class ShellSidebarTest {
                     currentRoute = ShellDestination.Conversations.route,
                     conversationService = service,
                     onNavigate = onNavigate,
+                    onNewChat = onNewChat,
                 )
             }
         }

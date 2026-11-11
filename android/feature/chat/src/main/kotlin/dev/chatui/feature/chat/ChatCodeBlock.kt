@@ -4,32 +4,50 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.WrapText
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.BoldHighlight
 import dev.snipme.highlights.model.CodeHighlight
@@ -46,7 +64,7 @@ object ChatCodeBlockTestTags {
 }
 
 /**
- * Fenced code block with a language label, exact-text copy, and bounded
+ * Fenced code block with a language pill, exact-text copy, and bounded
  * highlighting.
  *
  * Copy uses the original source text, never the highlighted spans. Unknown
@@ -61,6 +79,8 @@ fun ChatCodeBlock(
     onCopy: ((String) -> Unit)? = null,
 ) {
     val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
+    val haptics = rememberHaptics()
     val darkMode = isSystemInDarkTheme()
     val normalized = remember(language) { normalizeCodeLanguage(language) }
     val highlighted = remember(code, normalized, darkMode) {
@@ -71,6 +91,7 @@ fun ChatCodeBlock(
     var wrapped by remember(code) { mutableStateOf(false) }
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
+    val shape = RoundedCornerShape(12.dp)
 
     LaunchedEffect(copied) {
         if (copied) {
@@ -83,69 +104,102 @@ fun ChatCodeBlock(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = dimens.space1)
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = MaterialTheme.shapes.small,
-            ),
+            .background(color = colors.bgCode, shape = shape),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = dimens.space3, end = dimens.space2, top = dimens.space1),
+                .padding(start = dimens.space3, end = dimens.space1, top = dimens.space1),
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .padding(top = dimens.space2)
-                    .testTag(ChatCodeBlockTestTags.Language),
-            )
+            Surface(
+                shape = RoundedCornerShape(percent = 50),
+                color = colors.bgSurfaceRaised,
+            ) {
+                Text(
+                    text = label,
+                    style = Typography.caption,
+                    color = colors.fgSecondary,
+                    modifier = Modifier
+                        .padding(horizontal = dimens.space2, vertical = 2.dp)
+                        .testTag(ChatCodeBlockTestTags.Language),
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(dimens.space1)) {
-                TextButton(
+                IconButton(
                     onClick = { wrapped = !wrapped },
                     modifier = Modifier
                         .heightIn(min = dimens.touchTargetMin)
-                        .testTag(ChatCodeBlockTestTags.Wrap),
+                        .testTag(ChatCodeBlockTestTags.Wrap)
+                        .semantics {
+                            contentDescription = if (wrapped) "Scroll" else "Wrap"
+                        },
                 ) {
-                    Text(if (wrapped) "Scroll" else "Wrap")
+                    Icon(
+                        imageVector = if (wrapped) Icons.Rounded.Code else Icons.Rounded.WrapText,
+                        contentDescription = null,
+                        tint = colors.fgSecondary,
+                    )
                 }
-                TextButton(
+                IconButton(
                     onClick = {
                         if (onCopy != null) {
                             onCopy(code)
                         } else {
                             clipboard.setText(AnnotatedString(code))
                         }
+                        haptics.confirm()
                         copied = true
                     },
                     modifier = Modifier
                         .heightIn(min = dimens.touchTargetMin)
-                        .testTag(ChatCodeBlockTestTags.Copy),
+                        .testTag(ChatCodeBlockTestTags.Copy)
+                        .semantics {
+                            contentDescription = if (copied) "Copied" else "Copy code"
+                        },
                 ) {
-                    Text(if (copied) "Copied" else "Copy code")
+                    Icon(
+                        imageVector = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
+                        contentDescription = null,
+                        tint = colors.fgSecondary,
+                    )
                 }
             }
         }
 
-        SelectionContainer {
-            val codeModifier = if (wrapped) {
-                Modifier
-                    .fillMaxWidth()
-                    .padding(dimens.space3)
-            } else {
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(dimens.space3)
+        Box(modifier = Modifier.fillMaxWidth()) {
+            SelectionContainer {
+                val codeModifier = if (wrapped) {
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(dimens.space3)
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(dimens.space3)
+                }
+                Text(
+                    text = highlighted ?: AnnotatedString(code),
+                    style = style,
+                    softWrap = wrapped,
+                    modifier = codeModifier.testTag(ChatCodeBlockTestTags.Code),
+                )
             }
-            Text(
-                text = highlighted ?: AnnotatedString(code),
-                style = style,
-                softWrap = wrapped,
-                modifier = codeModifier.testTag(ChatCodeBlockTestTags.Code),
-            )
+            if (!wrapped) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .width(24.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(Color.Transparent, colors.bgCode),
+                            ),
+                        ),
+                )
+            }
         }
     }
 }

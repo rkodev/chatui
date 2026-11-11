@@ -38,6 +38,8 @@ internal object SettingsKeys {
     val loadRemoteImages = booleanPreferencesKey("load_remote_images")
     val lastActiveConversationId = stringPreferencesKey("last_active_conversation_id")
     val onboardingCompleted = booleanPreferencesKey("onboarding_completed")
+    val hapticFeedback = booleanPreferencesKey("haptic_feedback")
+    val dynamicColor = booleanPreferencesKey("dynamic_color")
     val drafts = stringPreferencesKey("drafts_json")
 }
 
@@ -103,6 +105,12 @@ class SettingsDataStore(
 
     suspend fun setOnboardingCompleted(completed: Boolean) =
         update { it.copy(onboardingCompleted = completed) }
+
+    suspend fun setHapticFeedback(enabled: Boolean) =
+        update { it.copy(hapticFeedback = enabled) }
+
+    suspend fun setDynamicColor(enabled: Boolean) =
+        update { it.copy(dynamicColor = enabled) }
 
     /**
      * Reads the persisted per-conversation composer drafts.
@@ -177,6 +185,8 @@ private fun Preferences.toAndroidSettings(): AndroidSettings {
         loadRemoteImages = this[SettingsKeys.loadRemoteImages] ?: defaults.loadRemoteImages,
         lastActiveConversationId = this[SettingsKeys.lastActiveConversationId],
         onboardingCompleted = this[SettingsKeys.onboardingCompleted] ?: defaults.onboardingCompleted,
+        hapticFeedback = this[SettingsKeys.hapticFeedback] ?: defaults.hapticFeedback,
+        dynamicColor = this[SettingsKeys.dynamicColor] ?: defaults.dynamicColor,
     )
 }
 
@@ -194,6 +204,8 @@ private fun MutablePreferences.write(settings: AndroidSettings) {
     this[SettingsKeys.loadRemoteImages] = settings.loadRemoteImages
     writeNullable(SettingsKeys.lastActiveConversationId, settings.lastActiveConversationId)
     this[SettingsKeys.onboardingCompleted] = settings.onboardingCompleted
+    this[SettingsKeys.hapticFeedback] = settings.hapticFeedback
+    this[SettingsKeys.dynamicColor] = settings.dynamicColor
 }
 
 private fun MutablePreferences.writeNullable(

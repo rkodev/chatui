@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -190,7 +191,7 @@ class OnboardingScreenTest {
     }
 
     @Test
-    fun `catalog models are visible before validation and sending is disabled`() {
+    fun `catalog models are visible before validation and completion is hidden`() {
         composeRule.setContent {
             ChatUiTheme {
                 OnboardingScreen(
@@ -216,9 +217,7 @@ class OnboardingScreenTest {
         composeRule.onNodeWithTag(OnboardingTestTags.Screen)
             .performScrollToNode(hasText("openrouter/auto"))
         composeRule.onNodeWithText("openrouter/auto").assertIsDisplayed()
-        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
-            .performScrollToNode(hasTestTag(OnboardingTestTags.StartChattingButton))
-        composeRule.onNodeWithTag(OnboardingTestTags.StartChattingButton).assertIsNotEnabled()
+        composeRule.onNodeWithTag(OnboardingTestTags.StartChattingButton).assertDoesNotExist()
     }
 
     @Test
@@ -245,6 +244,8 @@ class OnboardingScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.TestingStatus))
         composeRule.onNodeWithTag(OnboardingTestTags.TestingStatus).assertIsDisplayed()
         composeRule.onNodeWithTag(OnboardingTestTags.ConnectButton).assertIsNotEnabled()
     }
@@ -330,10 +331,278 @@ class OnboardingScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.ConnectedStatus))
         composeRule.onNodeWithTag(OnboardingTestTags.ConnectedStatus).assertIsDisplayed()
         composeRule.onNodeWithTag(OnboardingTestTags.Screen)
             .performScrollToNode(hasTestTag(OnboardingTestTags.StartChattingButton))
         composeRule.onNodeWithTag(OnboardingTestTags.StartChattingButton).assertIsEnabled()
+    }
+
+    @Test
+    fun `step indicator is visible on both steps`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.StepIndicator).assertIsDisplayed()
+        composeRule.onNodeWithText("Welcome").assertIsDisplayed()
+        composeRule.onNodeWithText("Connect").assertIsDisplayed()
+    }
+
+    @Test
+    fun `provider card exposes selection semantics`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.providerOption("openrouter"))
+            .assertIsSelected()
+    }
+
+    @Test
+    fun `key entry exposes show hide paste and help affordances`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.KEY_ENTRY,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.ShowKeyToggle).assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.PasteKey).assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.HelpLink).assertIsDisplayed()
+    }
+
+    @Test
+    fun `catalog shows a skeleton while loading`() {
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.KEY_ENTRY,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Loading,
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.CatalogLoading))
+        composeRule.onNodeWithTag(OnboardingTestTags.CatalogLoading).assertIsDisplayed()
+    }
+
+    @Test
+    fun `catalog error shows a retry action`() {
+        var retried = false
+
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.KEY_ENTRY,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Error("Catalog unavailable"),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = { retried = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.CatalogError))
+        composeRule.onNodeWithTag(OnboardingTestTags.CatalogError).assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.RetryCatalog).performClick()
+
+        assertThat(retried).isTrue()
+    }
+
+    @Test
+    fun `catalog empty state explains that models load after validation`() {
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.KEY_ENTRY,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.CatalogEmpty))
+        composeRule.onNodeWithTag(OnboardingTestTags.CatalogEmpty).assertIsDisplayed()
+        composeRule.onNodeWithText("No models returned").assertIsDisplayed()
+    }
+
+    @Test
+    fun `catalog collapses by default and expands with the disclosure`() {
+        val models = (1..5).map { index ->
+            CatalogModel("openrouter/model-$index", "Model $index", 128_000, index == 1)
+        }
+
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.KEY_ENTRY,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(models),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Model 4").assertDoesNotExist()
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.CatalogDisclosure))
+        composeRule.onNodeWithTag(OnboardingTestTags.CatalogDisclosure).performClick()
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasText("Model 4"))
+        composeRule.onNodeWithText("Model 4").assertIsDisplayed()
+    }
+
+    @Test
+    fun `connected connect button morphs to a success check`() {
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.KEY_ENTRY,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        apiKey = "sk-good",
+                        connected = true,
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.ConnectButton)
+            .assertTextContains("Connected")
+    }
+
+    @Test
+    fun `completion state starts chatting`() {
+        var startClicks = 0
+
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.KEY_ENTRY,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        apiKey = "sk-good",
+                        connected = true,
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                    onStartChatting = { startClicks += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.Completion))
+        composeRule.onNodeWithTag(OnboardingTestTags.Completion).assertIsDisplayed()
+        composeRule.onNodeWithText("You're all set").assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.StartChattingButton))
+        composeRule.onNodeWithTag(OnboardingTestTags.StartChattingButton).performClick()
+
+        assertThat(startClicks).isEqualTo(1)
     }
 }
 
