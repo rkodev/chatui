@@ -2,7 +2,7 @@
 
 - Plan: [Android UI/UX Polish Implementation Plan](../android-ux-implementation-plan.md)
 - Design review: [android-ux.md](../../android-ux.md)
-- Status: Not started
+- Status: Complete
 - Order: 2
 - Depends on: UX-00
 - Parallel-safe: no; blocks every screen task
@@ -131,19 +131,19 @@ Create these under `android/core/designsystem/src/main/kotlin/dev/chatui/core/de
 
 ## Acceptance criteria
 
-- [ ] Icons dependency is available and builds.
-- [ ] `ChatUiColors`, `Dimens`, `Typography`, and `Motion` expose the new tokens
+- [x] Icons dependency is available and builds.
+- [x] `ChatUiColors`, `Dimens`, `Typography`, and `Motion` expose the new tokens
       with defaults; no existing field is removed.
-- [ ] `Haptics`, `SoftShadow`, `MotionSpecs`, `ChatUiScaffold`, `GroupedList`,
+- [x] `Haptics`, `SoftShadow`, `MotionSpecs`, `ChatUiScaffold`, `GroupedList`,
       `Buttons`, `StateKit`, `SegmentedControl`, `Stepper`, `LabeledSlider`, and
       `BrandMark` exist and have tests.
-- [ ] `AndroidSettings` has `hapticFeedback` and `dynamicColor`; DataStore
+- [x] `AndroidSettings` has `hapticFeedback` and `dynamicColor`; DataStore
       persists them; tests pass.
-- [ ] `ChatUiTheme` supports dynamic color and haptics.
-- [ ] Dark theme resources and the brand mark exist.
-- [ ] `DesignSystemTest` is updated and passes.
-- [ ] A contrast test passes for both themes.
-- [ ] No screen is redesigned in this task.
+- [x] `ChatUiTheme` supports dynamic color and haptics.
+- [x] Dark theme resources and the brand mark exist.
+- [x] `DesignSystemTest` is updated and passes.
+- [x] A contrast test passes for both themes.
+- [x] No screen is redesigned in this task.
 
 ## Verification
 
@@ -160,8 +160,47 @@ cd android && ./gradlew :core:designsystem:testDebugUnitTest
 - Performance measurement (UX-11).
 - Golden regeneration (UX-12).
 
+## Completion record
+
+- Status: Complete on 2026-11-11.
+- Added `material-icons-extended` and `androidx.compose.animation:animation` to
+  the version catalog, `core:designsystem`, and the app module.
+- Extended `ChatUiColors`, `Dimens`, `Typography`, and `ChatUiMotion` with
+  defaulted tokens; no existing field was removed or renamed.
+- Added `Haptics`, `SoftShadow`, `MotionSpecs`, `ChatUiScaffold`, `GroupedList`,
+  `Buttons`, `StateKit`, `SegmentedControl`, `Stepper`, `LabeledSlider`, and
+  `BrandMark`.
+- Added `hapticFeedback` (default true) and `dynamicColor` (default false) to
+  `AndroidSettings`, DataStore keys, setters, and tests.
+- `ChatUiTheme` now accepts `dynamicColor` and `hapticsEnabled` and provides
+  `LocalHaptics`.
+- Added `values-night/themes.xml` and replaced `ic_splash.xml` with the brand
+  mark.
+- Verification: `make android-lint`, `make android-test`,
+  `make android-assemble`, and
+  `cd android && ./gradlew :core:designsystem:testDebugUnitTest` all passed.
+
 ## Handoff notes
 
-- List every test that had to be updated for the token retune.
-- Record the final token values and any deviation from the design review.
-- Note whether dynamic color is opt-in and how it is toggled.
+- Tests updated for the token retune: `DesignSystemTest` (all exact ARGB, dp,
+  sp, and motion assertions). No feature test asserted exact token values, so
+  no feature test needed changes.
+- New tests: `HapticsTest`, `MotionSpecsTest`, `ComponentsTest`, and the
+  `SettingsDataStoreTest` haptic/dynamic-color cases.
+- Final palette: light canvas `#FFFFFF`, grouped `#F2F2F7`, raised `#FFFFFF`,
+  separator `#E5E5EA`, accent `#007AFF`; dark canvas `#0B0B0F`, grouped
+  `#1C1C1E`, raised `#2C2C2E`, separator `#38383A`, accent `#0A84FF`. Status
+  colors were retuned to iOS-like values but remain fixed under dynamic color.
+- Deviation from the design review: `bgInput` is not specified there; it uses
+  the grouped background in both themes. `accentHover` under dynamic color
+  reuses the dynamic primary because Material You does not expose a hover role.
+- Dynamic color is opt-in: `AndroidSettings.dynamicColor` defaults to false and
+  is passed to `ChatUiTheme(dynamicColor = ...)`. It only takes effect on API
+  31+; status colors stay fixed. The settings UI toggle is owned by UX-07.
+- Haptics default on: `AndroidSettings.hapticFeedback` defaults to true and is
+  passed to `ChatUiTheme(hapticsEnabled = ...)`; `rememberHaptics()` is a no-op
+  when the local is false.
+- `ChatUiScaffold` accepts either a `ScrollState` or a `LazyListState`; the
+  large-title bar collapses over the first 64 dp of scroll.
+- UX-02 through UX-07 can now compose the new primitives. UX-12 must regenerate
+  the 44 goldens because the palette and Material typography changed.

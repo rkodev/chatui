@@ -36,7 +36,7 @@
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | [UX-00 Preflight, decisions, and baseline capture](UX-00-preflight-decisions-baseline.md) | Complete | none | preflight | none; blocks all |
-| 2 | [UX-01 Design-system foundation](UX-01-design-system-foundation.md) | Not started | UX-00 | foundation | none; blocks screens |
+| 2 | [UX-01 Design-system foundation](UX-01-design-system-foundation.md) | Complete | UX-00 | foundation | none; blocks screens |
 | 3 | [UX-02 Shell and navigation](UX-02-shell-and-navigation.md) | Not started | UX-01 | shell | UX-06, UX-07 |
 | 4 | [UX-03 Chat experience](UX-03-chat-experience.md) | Not started | UX-01, UX-02 | chat | UX-04, UX-05 |
 | 5 | [UX-04 Conversations](UX-04-conversations.md) | Not started | UX-01, UX-02 | conversations | UX-03, UX-05 |

@@ -61,6 +61,37 @@ class SettingsDataStoreTest {
     }
 
     @Test
+    fun `haptics are enabled and dynamic color is disabled by default`() = runTest {
+        val loaded = store.settings.first()
+
+        assertThat(loaded.hapticFeedback).isTrue()
+        assertThat(loaded.dynamicColor).isFalse()
+    }
+
+    @Test
+    fun `haptic and dynamic color settings persist`() = runTest {
+        store.setHapticFeedback(false)
+        store.setDynamicColor(true)
+
+        val loaded = store.settings.first()
+
+        assertThat(loaded.hapticFeedback).isFalse()
+        assertThat(loaded.dynamicColor).isTrue()
+    }
+
+    @Test
+    fun `haptic and dynamic color settings round trip through save`() = runTest {
+        val settings = AndroidSettings(
+            hapticFeedback = false,
+            dynamicColor = true,
+        )
+
+        store.save(settings)
+
+        assertThat(store.settings.first()).isEqualTo(settings)
+    }
+
+    @Test
     fun `save and read typed settings`() = runTest {
         val settings = AndroidSettings(
             theme = Theme.DARK,

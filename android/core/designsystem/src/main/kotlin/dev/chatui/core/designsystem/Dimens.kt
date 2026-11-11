@@ -36,6 +36,19 @@ data class Dimens(
     val gap: Dp = space3,
     val padding: Dp = space4,
     val touchTargetMin: Dp = 48.dp,
+    val screenPadding: Dp = 20.dp,
+    val sectionGap: Dp = 28.dp,
+    val rowMinHeight: Dp = 52.dp,
+    val cardPadding: Dp = 16.dp,
+    val bubblePaddingH: Dp = 14.dp,
+    val bubblePaddingV: Dp = 10.dp,
+    val radiusXs: Dp = 8.dp,
+    val radiusXl: Dp = 28.dp,
+    val bubbleRadius: Dp = 20.dp,
+    val bubbleTailRadius: Dp = 4.dp,
+    val elevation1: Dp = 1.dp,
+    val elevation2: Dp = 3.dp,
+    val elevation3: Dp = 8.dp,
 )
 
 /** Comfortable density: the default spacing scale. */

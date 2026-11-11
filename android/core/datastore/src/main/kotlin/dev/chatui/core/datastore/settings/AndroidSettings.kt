@@ -28,6 +28,8 @@ data class AndroidSettings(
     val loadRemoteImages: Boolean = true,
     val lastActiveConversationId: String? = null,
     val onboardingCompleted: Boolean = false,
+    val hapticFeedback: Boolean = true,
+    val dynamicColor: Boolean = false,
 ) {
     companion object {
         /**
