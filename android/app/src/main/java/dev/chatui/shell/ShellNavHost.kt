@@ -29,7 +29,9 @@ import dev.chatui.core.datastore.settings.SettingsDataStore
 import dev.chatui.core.designsystem.LocalReducedMotion
 import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.model.Conversation
-import dev.chatui.feature.backup.BackupPlaceholder
+import dev.chatui.feature.backup.BackupEntryPoint
+import dev.chatui.feature.backup.BackupSettingsRoute
+import dev.chatui.feature.backup.BackupSettingsService
 import dev.chatui.feature.chat.ChatEntryPoint
 import dev.chatui.feature.chat.ChatPlaceholder
 import dev.chatui.feature.chat.ChatRoute
@@ -225,6 +227,8 @@ fun NavGraphBuilder.shellDestinations(
                     providerService = rememberProviderManagementService(),
                     dataControlsService = rememberDataControlsService(),
                 )
+            } else if (section == SettingsSection.BACKUP) {
+                BackupSettingsRoute(service = rememberBackupSettingsService())
             } else {
                 SettingsRoute(
                     section = section,
@@ -245,7 +249,9 @@ fun NavGraphBuilder.shellDestinations(
             }
         }
     }
-    composable(ShellDestination.Backup.route) { BackupPlaceholder() }
+    composable(ShellDestination.Backup.route) {
+        BackupSettingsRoute(service = rememberBackupSettingsService())
+    }
 }
 
 @Composable
@@ -278,6 +284,17 @@ private fun rememberDataControlsService(): DataControlsService {
             context.applicationContext,
             SettingsEntryPoint::class.java,
         ).dataControlsService()
+    }
+}
+
+@Composable
+private fun rememberBackupSettingsService(): BackupSettingsService {
+    val context = LocalContext.current
+    return remember(context.applicationContext) {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            BackupEntryPoint::class.java,
+        ).backupSettingsService()
     }
 }
 
