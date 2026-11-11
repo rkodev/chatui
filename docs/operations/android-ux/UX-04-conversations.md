@@ -2,7 +2,7 @@
 
 - Plan: [Android UI/UX Polish Implementation Plan](../android-ux-implementation-plan.md)
 - Design review: [android-ux.md](../../android-ux.md)
-- Status: Not started
+- Status: Complete
 - Order: 5
 - Depends on: UX-01, UX-02
 - Parallel-safe: yes, with UX-03 and UX-05
@@ -71,16 +71,16 @@ search, pin, archive, delete, and undo behavior.
 
 ## Acceptance criteria
 
-- [ ] Conversation rows are grouped, compact, and show a preview and timestamp.
-- [ ] Swipe actions work and have menu equivalents.
-- [ ] Delete undo uses a snackbar.
-- [ ] Search is in the app bar with a clear button and match highlighting.
-- [ ] Group headers are sticky.
-- [ ] Empty state and segmented Chats/Archived are implemented.
-- [ ] List changes animate.
-- [ ] All existing conversation test tags are preserved or tests are updated
+- [x] Conversation rows are grouped, compact, and show a preview and timestamp.
+- [x] Swipe actions work and have menu equivalents.
+- [x] Delete undo uses a snackbar.
+- [x] Search is in the app bar with a clear button and match highlighting.
+- [x] Group headers are sticky.
+- [x] Empty state and segmented Chats/Archived are implemented.
+- [x] List changes animate.
+- [x] All existing conversation test tags are preserved or tests are updated
       deliberately.
-- [ ] No grouping, search, pin, archive, delete, or undo behavior changed.
+- [x] No grouping, search, pin, archive, delete, or undo behavior changed.
 
 ## Verification
 
@@ -96,8 +96,44 @@ cd android && ./gradlew :feature:conversations:testDebugUnitTest
 - Global state kit adoption (UX-08).
 - Motion tuning (UX-09).
 
+## Completion record
+
+- Status: Complete on 2026-11-11.
+- Verification:
+  - `make android-lint` - passed.
+  - `make android-test` - passed.
+  - `make android-assemble` - passed.
+  - `cd android && ./gradlew :feature:conversations:testDebugUnitTest` - passed.
+- Changed files:
+  - `android/feature/conversations/src/main/kotlin/dev/chatui/feature/conversations/ConversationListScreen.kt`
+  - `android/feature/conversations/src/test/kotlin/dev/chatui/feature/conversations/ConversationListScreenTest.kt`
+  - `docs/operations/android-ux/UX-04-conversations.md`
+  - `docs/operations/android-ux/README.md`
+
 ## Handoff notes
 
-- Record the swipe thresholds and haptic behavior.
-- Note whether search lives in the shell app bar or the list header.
-- List any test that had to change and why.
+- Swipe thresholds: a swipe must cross 40% of the row width. Swipe right pins,
+  swipe left archives. The haptic `confirm()` fires when the threshold is
+  crossed. Both actions snap the row back and remain available in the overflow
+  menu. Delete stays in the overflow menu so a destructive action is never a
+  single accidental swipe.
+- Search lives at the top of the list, not in a shell app bar. The shell owns
+  the sidebar and has no search slot, so the list header keeps the field with
+  the new styling, a clear button, and match highlighting. `SearchField`,
+  `SearchLoading`, `SearchEmpty`, `SearchError`, and `SearchRetry` are
+  preserved.
+- The snackbar auto-dismisses after the ViewModel's 5 s undo window and shows a
+  progress ring. The dismiss delay runs off the composition test dispatcher so
+  Robolectric does not advance it before the snackbar can be asserted.
+- Preview text uses the model label (or message count when the label is blank)
+  because `Conversation` has no last-message text and the ViewModel/service are
+  out of scope.
+- Tests changed deliberately:
+  - `archive toggle switches the view` now clicks the "Archived" segment text
+    because `SegmentedControl` tags the whole control with `ArchivedToggle`.
+  - Added `segmented control switches back to chats`, `swipe right pins and
+    swipe left archives`, `search clear button clears the query`, and `empty
+    state start chat button invokes the intent`.
+  - `undo bar restores a buffered delete` waits for idle before asserting the
+    snackbar.
+- New tags: `EmptyStartChat` and `SearchClear`. All existing tags are preserved.

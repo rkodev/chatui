@@ -1,55 +1,92 @@
 package dev.chatui.feature.conversations
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarData
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import dev.chatui.core.designsystem.BrandMark
+import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.PrimaryButton
+import dev.chatui.core.designsystem.SegmentedControl
+import dev.chatui.core.designsystem.Typography
+import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.Conversation
 import dev.chatui.core.model.MessageRole
 import java.time.Instant
 import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /** Test tags exposed by the conversation list and drawer. */
 object ConversationListTestTags {
     const val Screen = "conversation-list-screen"
     const val Drawer = "conversation-drawer"
     const val NewChat = "conversation-list-new-chat"
+    const val EmptyStartChat = "conversation-list-empty-start-chat"
     const val Loading = "conversation-list-loading"
     const val Empty = "conversation-list-empty"
     const val Error = "conversation-list-error"
@@ -59,6 +96,7 @@ object ConversationListTestTags {
     const val DeleteDialog = "conversation-delete-dialog"
     const val DeleteConfirm = "conversation-delete-confirm"
     const val SearchField = "conversation-search-field"
+    const val SearchClear = "conversation-search-clear"
     const val SearchLoading = "conversation-search-loading"
     const val SearchEmpty = "conversation-search-empty"
     const val SearchError = "conversation-search-error"
@@ -96,6 +134,7 @@ object ConversationListTestTags {
  * composable is presentational; storage and navigation live in the ViewModel
  * and route.
  */
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationListScreen(
     state: ConversationListUiState,
@@ -115,8 +154,10 @@ fun ConversationListScreen(
     modifier: Modifier = Modifier,
     now: Instant = Instant.now(),
     zoneId: ZoneId = ZoneId.systemDefault(),
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
     var renameTarget by remember { mutableStateOf<Conversation?>(null) }
     var renameValue by remember { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
@@ -131,201 +172,239 @@ fun ConversationListScreen(
     val groups = if (archived) state.archivedGroups else state.groups
     val loading = if (archived) state.archivedLoading else state.loading
     val error = if (archived) state.archivedError else state.error
-    val emptyText = if (archived) "No archived conversations." else "No conversations yet."
     val loadingText = if (archived) {
         "Loading archived conversations…"
     } else {
         "Loading conversations…"
     }
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag(ConversationListTestTags.Screen),
-        contentPadding = PaddingValues(dimens.padding),
-        verticalArrangement = Arrangement.spacedBy(dimens.gap),
-    ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = if (archived) "Archived" else "Chats",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(
-                    onClick = {
-                        onViewChanged(
-                            if (archived) {
-                                ConversationListView.ACTIVE
-                            } else {
-                                ConversationListView.ARCHIVED
-                            },
-                        )
-                    },
-                    modifier = Modifier.testTag(ConversationListTestTags.ArchivedToggle),
-                ) {
-                    Text(if (archived) "Chats" else "Archived")
-                }
-                Button(
-                    onClick = onNewChat,
-                    modifier = Modifier.testTag(ConversationListTestTags.NewChat),
-                ) {
-                    Text("New chat")
-                }
-            }
+    LaunchedEffect(state.pendingUndo?.id) {
+        if (state.pendingUndo == null) {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            return@LaunchedEffect
         }
+        val result = snackbarHostState.showSnackbar(
+            message = "Conversation deleted",
+            actionLabel = "Undo",
+            duration = SnackbarDuration.Indefinite,
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            onUndoDelete()
+        }
+    }
 
-        state.pendingUndo?.let { target ->
+    // The snackbar mirrors the ViewModel's buffered-delete window. The delay
+    // runs off the composition's test dispatcher so the snackbar is not
+    // auto-dismissed by test-clock advancement before it can be asserted.
+    LaunchedEffect(state.pendingUndo?.id) {
+        if (state.pendingUndo != null) {
+            withContext(Dispatchers.Default) {
+                delay(ConversationListViewModel.UNDO_WINDOW_MS)
+            }
+            snackbarHostState.currentSnackbarData?.dismiss()
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag(ConversationListTestTags.Screen),
+            contentPadding = PaddingValues(
+                horizontal = dimens.screenPadding,
+                vertical = dimens.space3,
+            ),
+            verticalArrangement = Arrangement.spacedBy(dimens.space1),
+        ) {
             item {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(ConversationListTestTags.UndoBar),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(dimens.space2),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = "“${target.title}” deleted",
-                        modifier = Modifier.weight(1f),
+                    SegmentedControl(
+                        options = listOf("Chats", "Archived"),
+                        selectedIndex = if (archived) 1 else 0,
+                        onSelected = { index ->
+                            onViewChanged(
+                                if (index == 0) {
+                                    ConversationListView.ACTIVE
+                                } else {
+                                    ConversationListView.ARCHIVED
+                                },
+                            )
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(ConversationListTestTags.ArchivedToggle),
                     )
-                    TextButton(
-                        onClick = onUndoDelete,
-                        modifier = Modifier.testTag(ConversationListTestTags.UndoButton),
+                    Button(
+                        onClick = onNewChat,
+                        modifier = Modifier.testTag(ConversationListTestTags.NewChat),
                     ) {
-                        Text("Undo")
+                        Text("New chat")
                     }
                 }
             }
-        }
 
-        if (!archived) {
-            item {
-                OutlinedTextField(
-                    value = state.searchQuery,
-                    onValueChange = onSearchQueryChanged,
-                    label = { Text("Search conversations") },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(ConversationListTestTags.SearchField),
-                )
-            }
-        }
-
-        error?.let { message ->
-            item {
-                Column(
-                    modifier = Modifier.testTag(ConversationListTestTags.Error),
-                    verticalArrangement = Arrangement.spacedBy(dimens.space1),
-                ) {
-                    Text(
-                        text = message,
-                        color = MaterialTheme.colorScheme.error,
+            if (!archived) {
+                item {
+                    OutlinedTextField(
+                        value = state.searchQuery,
+                        onValueChange = onSearchQueryChanged,
+                        placeholder = { Text("Search conversations") },
+                        singleLine = true,
+                        trailingIcon = {
+                            AnimatedVisibility(visible = state.searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { onSearchQueryChanged("") },
+                                    modifier = Modifier
+                                        .testTag(ConversationListTestTags.SearchClear)
+                                        .semantics {
+                                            contentDescription = "Clear search"
+                                        },
+                                ) {
+                                    Text("×", modifier = Modifier.clearAndSetSemantics {})
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(ConversationListTestTags.SearchField),
                     )
-                    TextButton(onClick = onRetry) { Text("Retry") }
                 }
             }
-        }
 
-        if (!archived && state.searchQuery.isNotBlank()) {
-            val searchError = state.searchError
-
-            when {
-                searchError != null -> item {
+            error?.let { message ->
+                item {
                     Column(
-                        modifier = Modifier.testTag(ConversationListTestTags.SearchError),
+                        modifier = Modifier.testTag(ConversationListTestTags.Error),
                         verticalArrangement = Arrangement.spacedBy(dimens.space1),
                     ) {
                         Text(
-                            text = searchError,
+                            text = message,
                             color = MaterialTheme.colorScheme.error,
                         )
-                        TextButton(
-                            onClick = onSearchRetry,
-                            modifier = Modifier.testTag(
-                                ConversationListTestTags.SearchRetry,
-                            ),
+                        TextButton(onClick = onRetry) { Text("Retry") }
+                    }
+                }
+            }
+
+            if (!archived && state.searchQuery.isNotBlank()) {
+                val searchError = state.searchError
+
+                when {
+                    searchError != null -> item {
+                        Column(
+                            modifier = Modifier.testTag(ConversationListTestTags.SearchError),
+                            verticalArrangement = Arrangement.spacedBy(dimens.space1),
                         ) {
-                            Text("Retry")
+                            Text(
+                                text = searchError,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            TextButton(
+                                onClick = onSearchRetry,
+                                modifier = Modifier.testTag(
+                                    ConversationListTestTags.SearchRetry,
+                                ),
+                            ) {
+                                Text("Retry")
+                            }
+                        }
+                    }
+
+                    state.searchLoading -> item {
+                        Text(
+                            text = "Searching…",
+                            modifier = Modifier.testTag(ConversationListTestTags.SearchLoading),
+                        )
+                    }
+
+                    state.searchResults.isEmpty() -> item {
+                        Text(
+                            text = "No matches.",
+                            modifier = Modifier.testTag(ConversationListTestTags.SearchEmpty),
+                        )
+                    }
+
+                    else -> items(
+                        state.searchResults,
+                        key = { "search-${it.conversation.id}" },
+                    ) { result ->
+                        SearchResultRow(
+                            result = result,
+                            query = state.searchQuery,
+                            onSelect = { onSelect(result.conversation) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
+            } else {
+                when {
+                    loading && groups.isEmpty() -> item {
+                        Text(
+                            text = loadingText,
+                            modifier = Modifier.testTag(ConversationListTestTags.Loading),
+                        )
+                    }
+
+                    groups.isEmpty() -> item {
+                        ConversationEmptyState(
+                            archived = archived,
+                            onNewChat = onNewChat,
+                        )
+                    }
+
+                    else -> groups.forEach { group ->
+                        stickyHeader(key = "group-${group.key.name}") {
+                            Text(
+                                text = group.label.uppercase(),
+                                style = Typography.caption,
+                                color = colors.fgMuted,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(colors.bgGrouped)
+                                    .padding(
+                                        horizontal = dimens.cardPadding,
+                                        vertical = dimens.space2,
+                                    )
+                                    .testTag(
+                                        ConversationListTestTags.group(group.key),
+                                    ),
+                            )
+                        }
+
+                        items(group.conversations, key = { it.id }) { conversation ->
+                            ConversationRow(
+                                conversation = conversation,
+                                active = conversation.id == state.activeConversationId,
+                                now = now,
+                                zoneId = zoneId,
+                                onSelect = { onSelect(conversation) },
+                                onTogglePin = { onTogglePin(conversation) },
+                                onToggleArchive = { onToggleArchive(conversation) },
+                                onRename = {
+                                    renameTarget = conversation
+                                    renameValue = conversation.title
+                                    renameError = null
+                                },
+                                onDelete = { onDeleteRequested(conversation) },
+                                modifier = Modifier.animateItem(),
+                            )
                         }
                     }
                 }
-
-                state.searchLoading -> item {
-                    Text(
-                        text = "Searching…",
-                        modifier = Modifier.testTag(ConversationListTestTags.SearchLoading),
-                    )
-                }
-
-                state.searchResults.isEmpty() -> item {
-                    Text(
-                        text = "No matches.",
-                        modifier = Modifier.testTag(ConversationListTestTags.SearchEmpty),
-                    )
-                }
-
-                else -> items(
-                    state.searchResults,
-                    key = { "search-${it.conversation.id}" },
-                ) { result ->
-                    SearchResultRow(
-                        result = result,
-                        onSelect = { onSelect(result.conversation) },
-                    )
-                }
             }
-        } else {
-            when {
-                loading && groups.isEmpty() -> item {
-                    Text(
-                        text = loadingText,
-                        modifier = Modifier.testTag(ConversationListTestTags.Loading),
-                    )
-                }
+        }
 
-                groups.isEmpty() -> item {
-                    Text(
-                        text = emptyText,
-                        modifier = Modifier.testTag(ConversationListTestTags.Empty),
-                    )
-                }
-
-                else -> groups.forEach { group ->
-                    item(key = "group-${group.key.name}") {
-                        Text(
-                            text = group.label,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.testTag(
-                                ConversationListTestTags.group(group.key),
-                            ),
-                        )
-                    }
-
-                    items(group.conversations, key = { it.id }) { conversation ->
-                        ConversationRow(
-                            conversation = conversation,
-                            active = conversation.id == state.activeConversationId,
-                            now = now,
-                            zoneId = zoneId,
-                            onSelect = { onSelect(conversation) },
-                            onTogglePin = { onTogglePin(conversation) },
-                            onToggleArchive = { onToggleArchive(conversation) },
-                            onRename = {
-                                renameTarget = conversation
-                                renameValue = conversation.title
-                                renameError = null
-                            },
-                            onDelete = { onDeleteRequested(conversation) },
-                        )
-                    }
-                }
-            }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(dimens.padding),
+        ) { data ->
+            UndoSnackbar(data = data)
         }
     }
 
@@ -418,6 +497,7 @@ fun ConversationDrawer(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConversationRow(
     conversation: Conversation,
@@ -429,49 +509,133 @@ private fun ConversationRow(
     onToggleArchive: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
+    val haptics = rememberHaptics()
     var menuExpanded by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    haptics.confirm()
+                    onTogglePin()
+                    false
+                }
+
+                SwipeToDismissBoxValue.EndToStart -> {
+                    haptics.confirm()
+                    onToggleArchive()
+                    false
+                }
+
+                SwipeToDismissBoxValue.Settled -> false
+            }
+        },
+        positionalThreshold = { distance -> distance * SWIPE_THRESHOLD_FRACTION },
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier
             .fillMaxWidth()
             .testTag(ConversationListTestTags.item(conversation.id)),
-        colors = CardDefaults.cardColors(
-            containerColor = if (active) {
-                MaterialTheme.colorScheme.secondaryContainer
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            val direction = dismissState.dismissDirection
+            val background = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> colors.accent
+                SwipeToDismissBoxValue.EndToStart -> colors.warning
+                SwipeToDismissBoxValue.Settled -> Color.Transparent
+            }
+            val label = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> "Pin"
+                SwipeToDismissBoxValue.EndToStart -> "Archive"
+                SwipeToDismissBoxValue.Settled -> ""
+            }
+            val alignment = if (direction == SwipeToDismissBoxValue.StartToEnd) {
+                Alignment.CenterStart
             } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
+                Alignment.CenterEnd
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(background)
+                    .padding(horizontal = dimens.cardPadding),
+                contentAlignment = alignment,
+            ) {
+                if (label.isNotEmpty()) {
+                    Text(
+                        text = label,
+                        style = Typography.subhead,
+                        color = colors.fgOnAccent,
+                    )
+                }
+            }
+        },
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(dimens.space3),
+                .heightIn(min = dimens.rowMinHeight)
+                .background(if (active) colors.accentSoft else Color.Transparent)
+                .clickable(onClick = onSelect)
+                .padding(
+                    horizontal = dimens.cardPadding,
+                    vertical = dimens.space2,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .semantics(mergeDescendants = true) {}
-                    .clickable(onClick = onSelect),
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = conversation.title,
+                        style = Typography.body.copy(fontWeight = FontWeight.SemiBold),
+                        color = colors.fgPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (conversation.pinned) {
+                        Spacer(Modifier.width(dimens.space1))
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(colors.accent, CircleShape)
+                                .semantics { contentDescription = "Pinned" },
+                        )
+                    }
+                }
                 Text(
-                    text = conversation.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = conversationPreview(conversation),
+                    style = Typography.footnote,
+                    color = colors.fgSecondary,
                     maxLines = 1,
-                )
-                Text(
-                    text = formatConversationTimestamp(
-                        instant = conversation.lastMessageAt,
-                        now = now,
-                        zoneId = zoneId,
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+
+            Spacer(Modifier.width(dimens.space2))
+            Text(
+                text = formatConversationTimestamp(
+                    instant = conversation.lastMessageAt,
+                    now = now,
+                    zoneId = zoneId,
+                ),
+                style = Typography.caption,
+                color = colors.fgMuted,
+            )
+            Spacer(Modifier.width(dimens.space1))
+            Text(
+                text = "›",
+                style = Typography.title3,
+                color = colors.fgMuted,
+                modifier = Modifier.clearAndSetSemantics {},
+            )
 
             Box {
                 IconButton(
@@ -540,53 +704,187 @@ private fun ConversationRow(
 }
 
 @Composable
-private fun SearchResultRow(
-    result: ConversationSearchResult,
-    onSelect: () -> Unit,
+private fun ConversationEmptyState(
+    archived: Boolean,
+    onNewChat: () -> Unit,
 ) {
     val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
 
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag(ConversationListTestTags.searchResult(result.conversation.id)),
+            .testTag(ConversationListTestTags.Empty)
+            .padding(dimens.sectionGap),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(dimens.space3),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics(mergeDescendants = true) {}
-                .clickable(onClick = onSelect)
-                .padding(dimens.space3),
-            verticalArrangement = Arrangement.spacedBy(dimens.space1),
-        ) {
-            Text(
-                text = result.conversation.title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
+        BrandMark(size = 56.dp)
+        Text(
+            text = if (archived) "No archived conversations" else "No conversations yet",
+            style = Typography.title3,
+            color = colors.fgPrimary,
+        )
+        if (!archived) {
+            PrimaryButton(
+                text = "Start a chat",
+                onClick = onNewChat,
+                modifier = Modifier.testTag(ConversationListTestTags.EmptyStartChat),
             )
+        }
+    }
+}
 
-            if (result.titleMatched) {
-                Text(
-                    text = "Title match",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+@Composable
+private fun SearchResultRow(
+    result: ConversationSearchResult,
+    query: String,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
+    val highlight = SpanStyle(
+        background = colors.accentSoft,
+        color = colors.fgPrimary,
+        fontWeight = FontWeight.SemiBold,
+    )
 
-            result.messageMatches.take(3).forEach { match ->
-                Text(
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(ConversationListTestTags.searchResult(result.conversation.id))
+            .clickable(onClick = onSelect)
+            .padding(dimens.cardPadding),
+        verticalArrangement = Arrangement.spacedBy(dimens.space1),
+    ) {
+        Text(
+            text = highlightMatches(result.conversation.title, query, highlight),
+            style = Typography.body.copy(fontWeight = FontWeight.SemiBold),
+            color = colors.fgPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        if (result.titleMatched) {
+            Text(
+                text = "Title match",
+                style = Typography.caption,
+                color = colors.accent,
+            )
+        }
+
+        result.messageMatches.take(3).forEach { match ->
+            Text(
+                text = highlightMatches(
                     text = "${roleLabel(match.role)}: ${match.snippet}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    modifier = Modifier.testTag(
-                        ConversationListTestTags.searchResultMessage(
-                            result.conversation.id,
-                            match.messageId,
-                        ),
+                    query = query,
+                    style = highlight,
+                ),
+                style = Typography.footnote,
+                color = colors.fgSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag(
+                    ConversationListTestTags.searchResultMessage(
+                        result.conversation.id,
+                        match.messageId,
                     ),
-                )
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UndoSnackbar(data: SnackbarData) {
+    val colors = LocalChatUiColors.current
+    val dimens = LocalDimens.current
+    val progress = remember { Animatable(1f) }
+
+    LaunchedEffect(data) {
+        progress.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(
+                durationMillis = ConversationListViewModel.UNDO_WINDOW_MS.toInt(),
+                easing = LinearEasing,
+            ),
+        )
+    }
+
+    Snackbar(
+        modifier = Modifier.testTag(ConversationListTestTags.UndoBar),
+        action = {
+            data.visuals.actionLabel?.let { label ->
+                TextButton(
+                    onClick = { data.performAction() },
+                    modifier = Modifier.testTag(ConversationListTestTags.UndoButton),
+                ) {
+                    Text(label)
+                }
             }
+        },
+    ) {
+        CircularProgressIndicator(
+            progress = { progress.value },
+            modifier = Modifier.size(16.dp),
+            strokeWidth = 2.dp,
+            color = colors.accent,
+        )
+        Spacer(Modifier.width(dimens.space2))
+        Text(data.visuals.message)
+    }
+}
+
+private fun conversationPreview(conversation: Conversation): String = when {
+    conversation.messageCount == 0 -> "No messages yet"
+    conversation.modelLabel.isNotBlank() -> conversation.modelLabel
+    else -> "${conversation.messageCount} messages"
+}
+
+private fun highlightMatches(
+    text: String,
+    query: String,
+    style: SpanStyle,
+): AnnotatedString {
+    if (query.isBlank()) return AnnotatedString(text)
+
+    val tokens = query.split(Regex("\\s+")).filter { it.isNotBlank() }
+    val ranges = mutableListOf<IntRange>()
+
+    tokens.forEach { token ->
+        var index = text.indexOf(token, ignoreCase = true)
+        while (index >= 0) {
+            ranges += index until index + token.length
+            index = text.indexOf(token, index + token.length, ignoreCase = true)
+        }
+    }
+
+    if (ranges.isEmpty()) return AnnotatedString(text)
+
+    val merged = mutableListOf<IntRange>()
+    ranges.sortedBy { it.first }.forEach { range ->
+        val last = merged.lastOrNull()
+        if (last != null && range.first <= last.last + 1) {
+            merged[merged.lastIndex] = last.first..maxOf(last.last, range.last)
+        } else {
+            merged += range
+        }
+    }
+
+    return buildAnnotatedString {
+        var cursor = 0
+        merged.forEach { range ->
+            if (range.first > cursor) {
+                append(text.substring(cursor, range.first))
+            }
+            withStyle(style) {
+                append(text.substring(range.first, range.last + 1))
+            }
+            cursor = range.last + 1
+        }
+        if (cursor < text.length) {
+            append(text.substring(cursor))
         }
     }
 }
@@ -669,3 +967,6 @@ private fun DeleteDialog(
         },
     )
 }
+
+/** Fraction of the row width a swipe must cross before its action fires. */
+private const val SWIPE_THRESHOLD_FRACTION = 0.4f

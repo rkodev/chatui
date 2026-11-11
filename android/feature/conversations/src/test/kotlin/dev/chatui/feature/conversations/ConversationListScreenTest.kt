@@ -15,6 +15,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.Conversation
@@ -541,9 +544,42 @@ class ConversationListScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(ConversationListTestTags.ArchivedToggle).performClick()
+        composeRule.onNodeWithTag(ConversationListTestTags.ArchivedToggle).assertIsDisplayed()
+        composeRule.onNodeWithText("Archived").performClick()
 
         assertThat(view).isEqualTo(ConversationListView.ARCHIVED)
+    }
+
+    @Test
+    fun `segmented control switches back to chats`() {
+        var view: ConversationListView? = null
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        view = ConversationListView.ARCHIVED,
+                        loading = false,
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    onViewChanged = { view = it },
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Chats").performClick()
+
+        assertThat(view).isEqualTo(ConversationListView.ACTIVE)
     }
 
     @Test
@@ -666,9 +702,116 @@ class ConversationListScreenTest {
             }
         }
 
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag(ConversationListTestTags.UndoBar).assertIsDisplayed()
         composeRule.onNodeWithTag(ConversationListTestTags.UndoButton).performClick()
 
         assertThat(undone).isTrue()
+    }
+
+    @Test
+    fun `swipe right pins and swipe left archives`() {
+        val conversation = testConversation(id = "conversation-1", title = "First chat")
+        var pinned: Conversation? = null
+        var archived: Conversation? = null
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        groups = listOf(
+                            ConversationGroup(
+                                key = ConversationGroupKey.TODAY,
+                                label = "Today",
+                                conversations = listOf(conversation),
+                            ),
+                        ),
+                        loading = false,
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    onTogglePin = { pinned = it },
+                    onToggleArchive = { archived = it },
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.item("conversation-1"))
+            .performTouchInput { swipeRight() }
+        composeRule.waitForIdle()
+        assertThat(pinned).isEqualTo(conversation)
+
+        composeRule.onNodeWithTag(ConversationListTestTags.item("conversation-1"))
+            .performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+        assertThat(archived).isEqualTo(conversation)
+    }
+
+    @Test
+    fun `search clear button clears the query`() {
+        var query = "kotlin"
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        loading = false,
+                        searchQuery = "kotlin",
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = { query = it },
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.SearchClear).performClick()
+
+        assertThat(query).isEmpty()
+    }
+
+    @Test
+    fun `empty state start chat button invokes the intent`() {
+        var clicks = 0
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(loading = false),
+                    onNewChat = { clicks += 1 },
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.EmptyStartChat).performClick()
+
+        assertThat(clicks).isEqualTo(1)
     }
 }
