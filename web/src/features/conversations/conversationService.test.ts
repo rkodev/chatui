@@ -223,6 +223,8 @@ describe('ConversationService', () => {
       temporary: false,
       messageCount: 0,
       lastError: null,
+      storageKey: '0123456789abcdef0123456789abcdef',
+      revision: 1,
       sync: null,
     })
     expect(await service.getConversation(result.conversation.id)).toEqual(result.conversation)

@@ -18,3 +18,17 @@ export function newId(): string {
 export function isUuidV7(value: string): boolean {
   return UUID_V7_PATTERN.test(value)
 }
+
+const STORAGE_KEY_BYTES = 16
+
+/**
+ * Generate a random 128-bit backup storage key as 32 lowercase hex characters.
+ *
+ * The key is independent of the conversation UUID so remote object names do
+ * not leak conversation identity or creation order.
+ */
+export function newStorageKey(): string {
+  const bytes = new Uint8Array(STORAGE_KEY_BYTES)
+  globalThis.crypto.getRandomValues(bytes)
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}

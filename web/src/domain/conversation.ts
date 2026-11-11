@@ -16,12 +16,12 @@ export interface ChatParams {
 }
 
 /**
- * Provisional sync metadata.
+ * Local sync metadata.
  *
- * The spec references `SyncMeta` and `syncState` without defining their final
- * shape. M0 only needs a documented placeholder so `Conversation.sync` has a
- * type; no sync behavior is implemented. M5 owns the final shape, including
- * conflict resolution, tombstones, and remote revision semantics.
+ * `state` tracks the local sync lifecycle, `lastSyncedAt` records the last
+ * successful upload, and `remoteRevision` is an opaque remote identifier. The
+ * durable merge ordering lives in `Conversation.revision`; this object is
+ * bookkeeping only and never contains secrets.
  */
 export interface SyncMeta {
   /** Local sync state for this conversation. */
@@ -49,4 +49,12 @@ export interface Conversation {
   messageCount: number
   lastError: ChatError | null
   sync: SyncMeta | null
+  /**
+   * Random 128-bit backup object key as 32 lowercase hex characters. It is
+   * independent of `id` so remote object names do not leak conversation
+   * identity or creation order.
+   */
+  storageKey: string
+  /** Monotonic local revision, starting at 1 and incremented on every change. */
+  revision: number
 }

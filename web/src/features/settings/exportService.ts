@@ -350,7 +350,11 @@ function cloneParams(params: ChatParams): ChatParams {
 }
 
 function cloneConversation(conversation: Conversation): Conversation {
-  return { ...conversation, params: cloneParams(conversation.params) }
+  const clone: Conversation = { ...conversation, params: cloneParams(conversation.params) }
+  // Sync-only fields are not part of the export contract.
+  delete (clone as Partial<Conversation>).storageKey
+  delete (clone as Partial<Conversation>).revision
+  return clone
 }
 
 function cloneMessage(message: Message): Message {

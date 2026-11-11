@@ -218,6 +218,8 @@ const conversation: Conversation = {
   lastMessageAt: now,
   messageCount: 2,
   lastError: null,
+  storageKey: '0123456789abcdef0123456789abcdef',
+  revision: 1,
   sync: null,
 }
 

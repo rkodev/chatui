@@ -106,6 +106,7 @@ export class MessageRepository {
               ? message.createdAt
               : conversation.lastMessageAt,
           messageCount: existingMessage ? conversation.messageCount : conversation.messageCount + 1,
+          revision: conversation.revision + 1,
           updatedAt: nowIso(),
         }
 
@@ -167,6 +168,7 @@ export class MessageRepository {
           ...conversation,
           messageCount: remaining,
           lastMessageAt: lastCursor ? lastCursor.value.createdAt : conversation.createdAt,
+          revision: conversation.revision + 1,
           updatedAt: nowIso(),
         }
 

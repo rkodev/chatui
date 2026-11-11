@@ -30,3 +30,26 @@ export {
   type VerificationTokenOptions,
   type VerifyPassphraseOptions,
 } from './envelope'
+export {
+  MANIFEST_FORMAT_VERSION,
+  ManifestError,
+  buildManifest,
+  mergeManifestIndexes,
+  parseManifest,
+  type BuildManifestOptions,
+  type ManifestAttachmentEntry,
+  type ManifestBody,
+  type ManifestConversationEntry,
+  type ManifestErrorCode,
+  type ManifestIndexes,
+  type ManifestTombstone,
+} from './manifest'
+export {
+  ConversationPayloadError,
+  buildConversationPayload,
+  parseConversationPayload,
+  type ConversationPayload,
+  type ConversationPayloadAttachment,
+  type ConversationPayloadErrorCode,
+  type ConversationPayloadMessage,
+} from './conversationPayload'
