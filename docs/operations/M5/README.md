@@ -58,7 +58,7 @@ The phase 2 gate is open. Start `M5-01.1` next.
 | 8 | [M5-02.3 Rust manifest, storage keys, and SQLite migration](M5-02.3-rust-manifest-storage-keys-migration.md) | Complete | M5-01.4 | rust data model | M5-02.1, M5-02.2 |
 | 9 | [M5-03.1 Web S3-compatible adapter, conditional writes, and CORS docs](M5-03.1-web-s3-adapter.md) | Complete | M5-02.1 | web backend | M5-03.2, M5-03.3 |
 | 10 | [M5-03.2 Android S3-compatible adapter and conditional writes](M5-03.2-android-s3-adapter.md) | Complete | M5-02.2 | android backend | M5-03.1, M5-03.3 |
-| 11 | [M5-03.3 Rust S3-compatible adapter and conditional writes](M5-03.3-rust-s3-adapter.md) | Not started | M5-02.3 | rust backend | M5-03.1, M5-03.2 |
+| 11 | [M5-03.3 Rust S3-compatible adapter and conditional writes](M5-03.3-rust-s3-adapter.md) | Complete | M5-02.3 | rust backend | M5-03.1, M5-03.2 |
 | 12 | [M5-04.1 Web sync engine, merge, and tombstones](M5-04.1-web-sync-engine.md) | Not started | M5-03.1 | web sync | M5-04.2, M5-04.3 |
 | 13 | [M5-04.2 Android sync engine, merge, and tombstones](M5-04.2-android-sync-engine.md) | Not started | M5-03.2 | android sync | M5-04.1, M5-04.3 |
 | 14 | [M5-04.3 Rust sync engine, merge, and tombstones](M5-04.3-rust-sync-engine.md) | Not started | M5-03.3 | rust sync | M5-04.1, M5-04.2 |

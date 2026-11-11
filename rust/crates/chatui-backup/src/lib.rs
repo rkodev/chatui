@@ -12,6 +12,7 @@ pub mod conversation_payload;
 pub mod envelope;
 pub mod error;
 pub mod manifest;
+pub mod storage;
 
 pub use conversation_payload::{
     AttachmentReference, ConversationPayload, PayloadMessage, build_conversation_payload,
@@ -30,6 +31,10 @@ pub use manifest::{
     AttachmentIndexEntry, ConversationIndexEntry, MANIFEST_FORMAT_VERSION, ManifestBody,
     ManifestTombstone, attachment_object_key, build_manifest, conversation_object_key,
     parse_manifest, validate_manifest,
+};
+pub use storage::{
+    ListObjectsOptions, ListObjectsResult, PutObjectOptions, S3StorageAdapter, S3StorageConfig,
+    StorageAdapter, StorageError, StorageErrorCode, StorageObject,
 };
 
 #[cfg(test)]
