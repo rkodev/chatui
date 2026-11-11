@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -545,7 +546,10 @@ private fun AttachmentChip(
                 onClick = onRemove,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .size(28.dp)
+                    .sizeIn(
+                        minWidth = dimens.touchTargetMin,
+                        minHeight = dimens.touchTargetMin,
+                    )
                     .testTag(ChatComposerTestTags.removeAttachment(attachment.id))
                     .semantics { contentDescription = "Remove ${attachment.name}" },
             ) {

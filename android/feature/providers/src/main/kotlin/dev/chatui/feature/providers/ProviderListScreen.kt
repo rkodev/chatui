@@ -98,6 +98,8 @@ object ProviderListTestTags {
 
     fun presetOption(id: String): String = "provider-list-preset-option-$id"
 
+    fun authOption(id: String): String = "provider-list-auth-option-$id"
+
     fun customHeaderName(index: Int): String = "provider-list-custom-header-name-$index"
 
     fun customHeaderValue(index: Int): String = "provider-list-custom-header-value-$index"
@@ -331,7 +333,7 @@ private fun ProviderRow(
                         text = provider.label,
                         style = Typography.headline,
                         color = colors.fgPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
@@ -342,7 +344,7 @@ private fun ProviderRow(
                     text = subtitle,
                     style = Typography.footnote,
                     color = colors.fgSecondary,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -621,9 +623,11 @@ private fun PresetProviderForm(
                     selected = option.id == form.presetId,
                     onClick = { onPresetSelected(option.id) },
                     label = { Text(option.label) },
-                    modifier = Modifier.testTag(
-                        ProviderListTestTags.presetOption(option.id),
-                    ),
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(
+                            ProviderListTestTags.presetOption(option.id),
+                        ),
                 )
             }
         }
@@ -775,9 +779,33 @@ private fun CustomProviderForm(
             modifier = Modifier.testTag(ProviderListTestTags.CustomAuthType),
             horizontalArrangement = Arrangement.spacedBy(dimens.space1),
         ) {
-            AuthChip("Bearer", ProviderAuthType.BEARER, form.authType, onAuthTypeChanged)
-            AuthChip("x-api-key", ProviderAuthType.X_API_KEY, form.authType, onAuthTypeChanged)
-            AuthChip("None", ProviderAuthType.NONE, form.authType, onAuthTypeChanged)
+            AuthChip(
+                label = "Bearer",
+                value = ProviderAuthType.BEARER,
+                selected = form.authType,
+                onSelected = onAuthTypeChanged,
+                modifier = Modifier.testTag(
+                    ProviderListTestTags.authOption(ProviderAuthType.BEARER.name),
+                ),
+            )
+            AuthChip(
+                label = "x-api-key",
+                value = ProviderAuthType.X_API_KEY,
+                selected = form.authType,
+                onSelected = onAuthTypeChanged,
+                modifier = Modifier.testTag(
+                    ProviderListTestTags.authOption(ProviderAuthType.X_API_KEY.name),
+                ),
+            )
+            AuthChip(
+                label = "None",
+                value = ProviderAuthType.NONE,
+                selected = form.authType,
+                onSelected = onAuthTypeChanged,
+                modifier = Modifier.testTag(
+                    ProviderListTestTags.authOption(ProviderAuthType.NONE.name),
+                ),
+            )
         }
 
         if (form.authType != ProviderAuthType.NONE) {
@@ -882,10 +910,13 @@ private fun AuthChip(
     value: ProviderAuthType,
     selected: ProviderAuthType,
     onSelected: (ProviderAuthType) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val dimens = LocalDimens.current
     FilterChip(
         selected = selected == value,
         onClick = { onSelected(value) },
         label = { Text(label) },
+        modifier = modifier.heightIn(min = dimens.touchTargetMin),
     )
 }

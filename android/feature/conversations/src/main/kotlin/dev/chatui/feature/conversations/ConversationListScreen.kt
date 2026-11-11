@@ -630,7 +630,7 @@ private fun ConversationRow(
                         text = conversation.title,
                         style = Typography.body.copy(fontWeight = FontWeight.SemiBold),
                         color = colors.fgPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
@@ -648,7 +648,7 @@ private fun ConversationRow(
                     text = conversationPreview(conversation),
                     style = Typography.footnote,
                     color = colors.fgSecondary,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

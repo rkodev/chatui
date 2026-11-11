@@ -1,8 +1,12 @@
 package dev.chatui.feature.settings
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.google.common.truth.Truth.assertThat
@@ -103,6 +107,32 @@ class SettingsScreensTest {
 
         assertThat(haptics).isFalse()
         assertThat(dynamicColor).isTrue()
+    }
+
+    @Test
+    fun `haptic feedback setting is reachable and announced as a toggle`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                AppearanceSettingsScreen(
+                    settings = AndroidSettings(),
+                    onThemeChanged = {},
+                    onDensityChanged = {},
+                    onChatFontSizeChanged = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Haptic feedback")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(SettingsTestTags.HapticFeedback)
+            .performScrollTo()
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.ToggleableState,
+                    androidx.compose.ui.state.ToggleableState.On,
+                ),
+            )
     }
 
     @Test

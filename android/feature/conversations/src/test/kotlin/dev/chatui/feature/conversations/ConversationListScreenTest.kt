@@ -3,9 +3,11 @@ package dev.chatui.feature.conversations
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -18,6 +20,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.unit.Density
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.Conversation
@@ -149,6 +152,52 @@ class ConversationListScreenTest {
         }
 
         composeRule.onNodeWithTag(ConversationListTestTags.Empty).assertIsDisplayed()
+    }
+
+    @Test
+    fun `conversation rows reflow at 200 percent font scale`() {
+        val conversation = testConversation(
+            id = "conversation-1",
+            title = "A very long conversation title that should wrap instead of clipping",
+        )
+
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale = 2f),
+            ) {
+                ChatUiTheme {
+                    ConversationListScreen(
+                        state = ConversationListUiState(
+                            groups = listOf(
+                                ConversationGroup(
+                                    key = ConversationGroupKey.TODAY,
+                                    label = "Today",
+                                    conversations = listOf(conversation),
+                                ),
+                            ),
+                            loading = false,
+                        ),
+                        onNewChat = {},
+                        onSelect = {},
+                        onRename = { _, _ -> },
+                        onDeleteRequested = {},
+                        onDeleteDismissed = {},
+                        onDeleteConfirmed = {},
+                        onRetry = {},
+                        onSearchQueryChanged = {},
+                        onSearchRetry = {},
+                        now = now,
+                        zoneId = zone,
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(
+            ConversationListTestTags.item("conversation-1"),
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(conversation.title).assertIsDisplayed()
     }
 
     @Test

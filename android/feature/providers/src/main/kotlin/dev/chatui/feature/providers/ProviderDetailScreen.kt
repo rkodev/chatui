@@ -274,7 +274,7 @@ private fun ProviderHeaderCard(
                         text = provider.label,
                         style = Typography.title2,
                         color = colors.fgPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(

@@ -1,5 +1,6 @@
 package dev.chatui.core.designsystem
 
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -129,6 +130,43 @@ class DesignSystemTest {
             .isAtLeast(4.5)
         assertThat(contrastRatio(DarkColors.fgPrimary, DarkColors.bgCanvas))
             .isAtLeast(4.5)
+    }
+
+    @Test
+    fun `body text meets contrast on every surface in both themes`() {
+        listOf(LightColors, DarkColors).forEach { colors ->
+            listOf(colors.bgCanvas, colors.bgSurface, colors.bgSurfaceRaised).forEach { surface ->
+                assertThat(contrastRatio(colors.fgPrimary, surface)).isAtLeast(4.5)
+                assertThat(contrastRatio(colors.fgSecondary, surface)).isAtLeast(4.5)
+            }
+        }
+    }
+
+    @Test
+    fun `body text meets contrast with dynamic color in both themes`() {
+        val lightScheme = lightColorScheme(
+            primary = Color(0xFF6750A4),
+            onPrimary = Color(0xFFFFFFFF),
+            primaryContainer = Color(0xFFEADDFF),
+            onPrimaryContainer = Color(0xFF21005D),
+        )
+        val darkScheme = darkColorScheme(
+            primary = Color(0xFFD0BCFF),
+            onPrimary = Color(0xFF381E72),
+            primaryContainer = Color(0xFF4F378B),
+            onPrimaryContainer = Color(0xFFEADDFF),
+        )
+
+        listOf(
+            LightColors.withDynamicAccent(lightScheme),
+            DarkColors.withDynamicAccent(darkScheme),
+        ).forEach { colors ->
+            listOf(colors.bgCanvas, colors.bgSurface, colors.bgSurfaceRaised).forEach { surface ->
+                assertThat(contrastRatio(colors.fgPrimary, surface)).isAtLeast(4.5)
+                assertThat(contrastRatio(colors.fgSecondary, surface)).isAtLeast(4.5)
+            }
+            assertThat(contrastRatio(colors.onAccentSoft, colors.accentSoft)).isAtLeast(4.5)
+        }
     }
 
     @Test

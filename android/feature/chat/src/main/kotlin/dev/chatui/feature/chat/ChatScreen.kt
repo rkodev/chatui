@@ -777,7 +777,9 @@ private fun EmptyState(
                         AssistChip(
                             onClick = { onPromptSelected(prompt) },
                             label = { Text(prompt) },
-                            modifier = Modifier.testTag(ChatScreenTestTags.emptyPrompt(index)),
+                            modifier = Modifier
+                                .heightIn(min = dimens.touchTargetMin)
+                                .testTag(ChatScreenTestTags.emptyPrompt(index)),
                         )
                     }
                 }

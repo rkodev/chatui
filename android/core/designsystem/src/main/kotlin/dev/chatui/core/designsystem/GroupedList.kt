@@ -142,7 +142,7 @@ fun SettingsRow(
                     text = value,
                     style = Typography.body,
                     color = colors.fgSecondary,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

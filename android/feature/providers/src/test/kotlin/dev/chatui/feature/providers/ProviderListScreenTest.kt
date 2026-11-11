@@ -2,6 +2,7 @@ package dev.chatui.feature.providers
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -162,6 +163,47 @@ class ProviderListScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithTag(ProviderListTestTags.presetOption("google"))
             .assertDoesNotExist()
+    }
+
+    @Test
+    fun `preset chips meet the 48 dp touch target`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state(),
+                    onOpenProvider = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        openAddSheet()
+        composeRule.onNodeWithTag(ProviderListTestTags.providerOption("openai"))
+            .performClick()
+
+        val preset = composeRule.onNodeWithTag(ProviderListTestTags.presetOption("openai"))
+            .getUnclippedBoundsInRoot()
+        assertThat((preset.bottom - preset.top).value).isAtLeast(48f)
+    }
+
+    @Test
+    fun `auth chips meet the 48 dp touch target`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state(),
+                    onOpenProvider = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        openCustomForm()
+
+        val auth = composeRule.onNodeWithTag(
+            ProviderListTestTags.authOption("BEARER"),
+        ).getUnclippedBoundsInRoot()
+        assertThat((auth.bottom - auth.top).value).isAtLeast(48f)
     }
 
     @Test

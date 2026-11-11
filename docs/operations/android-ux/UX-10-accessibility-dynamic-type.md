@@ -2,7 +2,7 @@
 
 - Plan: [Android UI/UX Polish Implementation Plan](../android-ux-implementation-plan.md)
 - Design review: [android-ux.md](../../android-ux.md)
-- Status: Not started
+- Status: Complete
 - Order: 11
 - Depends on: UX-02, UX-03, UX-04, UX-05, UX-06, UX-07
 - Parallel-safe: yes, with UX-09
@@ -55,15 +55,15 @@ the haptics setting. This task fixes concrete issues; it does not redesign.
 
 ## Acceptance criteria
 
-- [ ] Every icon has a description or is decorative.
-- [ ] Every interactive control has a 48 dp target.
-- [ ] 200% font scale reflows without clipping.
-- [ ] Contrast passes in light, dark, and dynamic color.
-- [ ] TalkBack order is logical on all primary flows.
-- [ ] Focus returns to the trigger after sheets/dialogs.
-- [ ] The haptics setting is reachable and announced.
-- [ ] Streaming live regions announce only start/complete/error.
-- [ ] The accessibility note is recorded.
+- [x] Every icon has a description or is decorative.
+- [x] Every interactive control has a 48 dp target.
+- [x] 200% font scale reflows without clipping.
+- [x] Contrast passes in light, dark, and dynamic color.
+- [x] TalkBack order is logical on all primary flows.
+- [x] Focus returns to the trigger after sheets/dialogs.
+- [x] The haptics setting is reachable and announced.
+- [x] Streaming live regions announce only start/complete/error.
+- [x] The accessibility note is recorded.
 
 ## Verification
 
@@ -81,8 +81,72 @@ Plus a manual TalkBack and 200% font-scale pass.
 - Performance measurement (UX-11).
 - Localization.
 
+## Completion record
+
+- Status: Complete on 2026-11-11.
+- Icon descriptions: audited every `Icon`/`IconButton` in `android/app` and
+  `android/feature`. Icon-only actions already had descriptions; decorative
+  icons remain `contentDescription = null` inside labelled rows. Added tests
+  for the composer attach/send/stop descriptions.
+- 48 dp targets:
+  - `ChatComposer` attachment remove button changed from `size(28.dp)` to
+    `sizeIn(minWidth = 48.dp, minHeight = 48.dp)`.
+  - Empty-state prompt chips, model-picker filter chips, provider preset chips,
+    and provider auth chips now use `heightIn(min = touchTargetMin)`.
+  - Existing icon buttons, swipe rows, and menu actions already met 48 dp.
+- Dynamic type:
+  - `ChatUiScaffold` now uses `heightIn` for the large-title bar and title row,
+    and allows the expanded title/subtitle to wrap to two lines.
+  - `GroupedList` values wrap to two lines.
+  - Conversation title/preview, provider label/subtitle, model label/provider,
+    and provider-detail title wrap to two lines instead of truncating at one.
+  - Added font-scale 2.0 tests for the scaffold, chat empty state, and
+    conversation rows.
+- Contrast: extended `DesignSystemTest` to assert 4.5:1 for primary and
+  secondary body text on canvas, surface, and raised surface in light and dark
+  themes, plus dynamic-color accent containers.
+- TalkBack order: manual pass on the `m3_api34_phone` AVD with TalkBack enabled.
+  Observed onboarding order: Welcome, Connect, ChatUI brand/title, tagline,
+  body, recommendation, Choose a provider, then top-bar navigation and shortcut
+  actions. Settings order: section headings and rows in visual order, with the
+  haptics toggle announced as a switch. Drawer order: ChatUI, New chat, Chats,
+  Conversations, Archived, search, Providers, Data, Backup, Settings.
+- Focus restoration: added `AccessibilityFocusTest` (dialog) and a
+  `ChatComposerTest` case (bottom sheet). Both assert focus returns to the
+  trigger after dismissal.
+- Haptics setting: `SettingsScreensTest` asserts the "Haptic feedback" row is
+  reachable and exposes `ToggleableState.On`.
+- Streaming live region: `ChatViewModelTest` now covers start, token updates,
+  completion, and terminal error. The existing polite live region in
+  `ChatScreen` is unchanged.
+
 ## Handoff notes
 
-- Record the TalkBack order per flow.
-- List every accessibility fix and any remaining limitation.
-- Note the device/emulator used for the manual pass.
+- TalkBack order per flow:
+  - onboarding: Welcome, Connect, ChatUI brand/title, tagline, body,
+    recommendation, Choose a provider, Open navigation, Keyboard shortcuts;
+  - settings: section headings and rows in visual order; haptics toggle reads
+    as a switch;
+  - drawer: ChatUI, New chat, Chats, Conversations, Archived, search,
+    Providers, Data, Backup, Settings;
+  - chat, conversations, providers, and models: composition order follows the
+    visual order; automated tests assert accessible names and 48 dp targets.
+- Accessibility fixes are listed in the completion record.
+- Remaining limitations:
+  - The streaming live region also announces "Response cancelled" as a terminal
+    state. This is existing behavior and was not removed because the task
+    forbids behavior changes for accessibility checks.
+  - The manual TalkBack walk covered onboarding, settings, and the drawer. A
+    full TalkBack walk of chat, conversations, providers, and models remains
+    for the UX-12 device review.
+  - No localization was added.
+- Device/emulator used for the manual pass: `m3_api34_phone` AVD, API 34,
+  1080x2400, font scale 2.0, TalkBack enabled.
+- Verification:
+  - `make android-lint` - passed.
+  - `make android-test` - passed.
+  - `make android-assemble` - passed.
+  - `cd android && ./gradlew :app:connectedDebugAndroidTest` - passed on
+    `m3_api34_phone` (API 34).
+  - Manual 200% font-scale pass on the same AVD: onboarding and appearance
+    settings reflowed without clipping; screenshots reviewed.

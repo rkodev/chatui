@@ -258,6 +258,51 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `announcements include a terminal error but not token updates`() = runTest(dispatcher) {
+        val adapter = FakeProviderAdapter()
+        val store = FakeChatMessageStore()
+        val viewModel = ChatViewModel(
+            conversationId = "conversation-1",
+            conversations = FakeChatConversationSource(),
+            messages = store,
+            contextResolver = FakeChatContextResolver(),
+            adapter = adapter,
+            clock = clock,
+            newId = { "id-1" },
+        )
+
+        viewModel.onDraftChange("Hello")
+        viewModel.onSend()
+        runCurrent()
+        adapter.started.await()
+        runCurrent()
+
+        adapter.events.send(StreamEvent.TextDelta("Hi"))
+        runCurrent()
+        assertThat(viewModel.state.value.announcement).isEqualTo("Response started")
+
+        adapter.events.send(
+            StreamEvent.ErrorEvent(
+                ChatError(
+                    code = ChatErrorCode.NETWORK,
+                    message = "Network unavailable",
+                    providerId = null,
+                    status = null,
+                    retryable = true,
+                    retryAfterSeconds = null,
+                    requestId = null,
+                    details = null,
+                    at = now,
+                ),
+            ),
+        )
+        adapter.events.close()
+        runCurrent()
+
+        assertThat(viewModel.state.value.announcement).startsWith("Response failed.")
+    }
+
+    @Test
     fun `per-conversation drafts are restored and cleared after a successful send`() =
         runTest(dispatcher) {
             val adapter = FakeProviderAdapter()

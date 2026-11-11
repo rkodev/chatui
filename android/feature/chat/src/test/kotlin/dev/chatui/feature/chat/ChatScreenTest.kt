@@ -1,6 +1,8 @@
 package dev.chatui.feature.chat
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -16,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
@@ -127,6 +130,50 @@ class ChatScreenTest {
         composeRule.onNodeWithTag(ChatScreenTestTags.emptyPrompt(0)).performClick()
 
         assertThat(draft).isEqualTo("Summarize a document")
+    }
+
+    @Test
+    fun `chat screen reflows at 200 percent font scale`() {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale = 2f),
+            ) {
+                ChatUiTheme {
+                    ChatScreen(
+                        state = state(),
+                        onDraftChange = {},
+                        onSend = {},
+                        onStop = {},
+                        onLoadOlder = {},
+                        onRetryMessage = {},
+                        onDismissError = {},
+                        onRegenerateMessage = {},
+                        onEditLastUser = { _, _ -> },
+                        onOpenProviders = {},
+                        onOpenConversationSettings = {},
+                        onShareConversation = null,
+                        onConfirmSend = {},
+                        onCancelSendConfirmation = {},
+                        zoneId = java.time.ZoneOffset.UTC,
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(ChatScreenTestTags.Empty).assertIsDisplayed()
+        composeRule.onNodeWithText("How can I help?").assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.Composer).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `empty state prompt chips meet the 48 dp touch target`() {
+        screen(state())
+
+        val bounds = composeRule.onNodeWithTag(ChatScreenTestTags.emptyPrompt(0))
+            .getUnclippedBoundsInRoot()
+        assertThat((bounds.bottom - bounds.top).value).isAtLeast(48f)
     }
 
     @Test

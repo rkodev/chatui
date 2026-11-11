@@ -10,10 +10,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -21,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -271,6 +274,33 @@ class ComponentsTest {
 
         composeRule.onNodeWithText("Chats").assertIsDisplayed()
         composeRule.onNodeWithText("3 conversations").assertIsDisplayed()
+        composeRule.onNodeWithText("Body").assertIsDisplayed()
+    }
+
+    @Test
+    fun `chat ui scaffold reflows at 200 percent font scale`() {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale = 2f),
+            ) {
+                ChatUiTheme(reducedMotion = true) {
+                    ChatUiScaffold(
+                        title = "A long screen title that wraps",
+                        subtitle = "A subtitle that also needs room",
+                        scrollState = rememberScrollState(),
+                    ) { padding ->
+                        Text(
+                            text = "Body",
+                            modifier = Modifier.padding(padding),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("A long screen title that wraps").assertIsDisplayed()
+        composeRule.onNodeWithText("A subtitle that also needs room").assertIsDisplayed()
         composeRule.onNodeWithText("Body").assertIsDisplayed()
     }
 

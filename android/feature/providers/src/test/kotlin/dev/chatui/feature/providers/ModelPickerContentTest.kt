@@ -1,6 +1,7 @@
 package dev.chatui.feature.providers
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -87,6 +88,29 @@ class ModelPickerContentTest {
             .performScrollToNode(hasTestTag(ModelPickerTestTags.model("model-2")))
         composeRule.onNodeWithTag(ModelPickerTestTags.freeBadge("model-2"), useUnmergedTree = true)
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun `filter chips meet the 48 dp touch target`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ModelPickerContent(
+                    state = state(),
+                    onQueryChanged = {},
+                    onSelect = {},
+                    onPin = { _, _ -> },
+                    onHide = { _, _ -> },
+                    onManualRemoteIdChanged = {},
+                    onManualLabelChanged = {},
+                    onAddManual = {},
+                    onRefresh = {},
+                )
+            }
+        }
+
+        val bounds = composeRule.onNodeWithTag(ModelPickerTestTags.filter("all"))
+            .getUnclippedBoundsInRoot()
+        assertThat((bounds.bottom - bounds.top).value).isAtLeast(48f)
     }
 
     @Test

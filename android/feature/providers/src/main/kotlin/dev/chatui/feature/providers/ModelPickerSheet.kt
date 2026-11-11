@@ -361,7 +361,9 @@ private fun ModelFilterRow(
                 selected = filter == selected,
                 onClick = { onSelected(filter) },
                 label = { Text(filter.label) },
-                modifier = Modifier.testTag(ModelPickerTestTags.filter(filter.key)),
+                modifier = Modifier
+                    .heightIn(min = dimens.touchTargetMin)
+                    .testTag(ModelPickerTestTags.filter(filter.key)),
             )
         }
     }
@@ -406,14 +408,14 @@ private fun ModelRow(
                         text = model.label,
                         style = Typography.headline,
                         color = colors.fgPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = providerLabel,
                         style = Typography.footnote,
                         color = colors.fgSecondary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }

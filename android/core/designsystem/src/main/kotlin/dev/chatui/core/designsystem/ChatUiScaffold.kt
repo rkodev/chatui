@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
@@ -119,14 +119,14 @@ private fun LargeTitleBar(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(barHeight)
+                    .heightIn(min = barHeight)
                     .statusBarsPadding()
                     .padding(horizontal = dimens.screenPadding),
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(collapsedHeight),
+                        .heightIn(min = collapsedHeight),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     navigationIcon?.invoke()
@@ -134,7 +134,7 @@ private fun LargeTitleBar(
                         text = title,
                         style = if (collapsed) Typography.headline else Typography.largeTitle,
                         color = colors.fgPrimary,
-                        maxLines = 1,
+                        maxLines = if (collapsed) 1 else 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
@@ -148,7 +148,7 @@ private fun LargeTitleBar(
                         text = subtitle,
                         style = Typography.subhead,
                         color = colors.fgSecondary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .then(
