@@ -153,6 +153,14 @@ impl ServiceRuntime {
         &self.pool
     }
 
+    /// A handle to the shared runtime for spawning background tasks.
+    ///
+    /// The handle keeps the runtime alive only while the runtime itself is
+    /// alive. Callers must not use it after [`ServiceRuntime`] is dropped.
+    pub fn handle(&self) -> tokio::runtime::Handle {
+        self.runtime.handle().clone()
+    }
+
     /// Borrow the shared attachment byte store.
     pub fn attachment_store(&self) -> &AttachmentStore {
         &self.attachments
