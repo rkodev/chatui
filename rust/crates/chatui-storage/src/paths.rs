@@ -8,6 +8,8 @@
 
 use std::path::{Path, PathBuf};
 
+use rand::RngCore;
+
 use crate::StorageError;
 
 /// Directory name under the app-data directory.
@@ -15,6 +17,39 @@ pub const ATTACHMENTS_DIR_NAME: &str = "attachments";
 
 /// Length of a SHA-256 digest in lowercase hexadecimal.
 pub const STORAGE_KEY_LEN: usize = 64;
+
+/// Length of a conversation backup storage key in lowercase hexadecimal.
+pub const CONVERSATION_STORAGE_KEY_LEN: usize = 32;
+
+/// Generate a random 128-bit conversation backup storage key.
+///
+/// The key is independent of the conversation ID so object names do not leak
+/// conversation counts or creation times.
+pub fn new_conversation_storage_key() -> String {
+    let mut bytes = [0u8; 16];
+    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    hex::encode(bytes)
+}
+
+/// Returns true when `value` is a 32-character lowercase hexadecimal
+/// conversation storage key.
+pub fn is_valid_conversation_storage_key(value: &str) -> bool {
+    value.len() == CONVERSATION_STORAGE_KEY_LEN
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Validates a conversation storage key.
+pub fn validate_conversation_storage_key(value: &str) -> Result<(), StorageError> {
+    if is_valid_conversation_storage_key(value) {
+        Ok(())
+    } else {
+        Err(StorageError::InvalidInput(format!(
+            "invalid conversation storage key {value:?}: expected 32 lowercase hexadecimal characters"
+        )))
+    }
+}
 
 /// Returns the attachment directory under the platform app-data directory.
 pub fn attachments_dir() -> Result<PathBuf, StorageError> {
@@ -129,5 +164,35 @@ mod tests {
             attachment_path_in("/tmp/chatui", "../../etc/passwd"),
             Err(StorageError::InvalidInput(_))
         ));
+    }
+
+    #[test]
+    fn conversation_storage_keys_are_32_lowercase_hex_characters() {
+        let first = new_conversation_storage_key();
+        let second = new_conversation_storage_key();
+
+        assert_eq!(first.len(), CONVERSATION_STORAGE_KEY_LEN);
+        assert!(is_valid_conversation_storage_key(&first));
+        assert!(is_valid_conversation_storage_key(&second));
+        assert_ne!(first, second);
+        assert!(validate_conversation_storage_key(&first).is_ok());
+    }
+
+    #[test]
+    fn conversation_storage_key_validation_rejects_bad_values() {
+        for value in [
+            String::new(),
+            "a".repeat(31),
+            "a".repeat(33),
+            "A".repeat(32),
+            "g".repeat(32),
+            "conversations/00112233445566778899aabbccddeeff".to_owned(),
+        ] {
+            assert!(!is_valid_conversation_storage_key(&value));
+            assert!(matches!(
+                validate_conversation_storage_key(&value),
+                Err(StorageError::InvalidInput(_))
+            ));
+        }
     }
 }

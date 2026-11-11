@@ -885,7 +885,9 @@ version = "0.1.0"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
+ "chatui-domain",
  "flate2",
+ "jsonschema",
  "pbkdf2",
  "rand 0.8.8",
  "serde",
@@ -1007,6 +1009,7 @@ dependencies = [
  "chatui-domain",
  "directories",
  "hex",
+ "rand 0.8.8",
  "serde",
  "serde_json",
  "sha2",

@@ -12,6 +12,7 @@ pub mod providers;
 pub mod secrets;
 pub mod settings;
 pub mod sync_queue;
+pub mod tombstones;
 
 #[cfg(test)]
 mod tests;
@@ -25,6 +26,7 @@ pub use providers::{ProviderRepository, SqliteProviderRepository};
 pub use secrets::{SecretRepository, SqliteSecretRepository};
 pub use settings::{SettingsRepository, SqliteSettingsRepository, default_settings};
 pub use sync_queue::{SqliteSyncQueueRepository, SyncQueueRepository};
+pub use tombstones::{SqliteTombstoneRepository, TombstoneRepository};
 
 pub use crate::mappers::{SecretRecord, SettingRecord, SyncQueueEntry};
 

@@ -289,6 +289,13 @@ impl ExportService {
 
         let providers = providers.into_iter().map(sanitize_provider).collect();
 
+        // The plaintext export contract predates backup sync metadata. Keep its
+        // existing shape by stripping the sync-only fields before validation.
+        for conversation in &mut conversations {
+            conversation.storage_key.clear();
+            conversation.revision = 0;
+        }
+
         let export = ChatExport::new(
             exported_at,
             app_version,
@@ -487,6 +494,8 @@ mod tests {
             message_count: 0,
             last_error: None,
             sync: None,
+            storage_key: String::new(),
+            revision: 1,
         }
     }
 

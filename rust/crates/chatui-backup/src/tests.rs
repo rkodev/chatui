@@ -1,5 +1,9 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use chatui_domain::{
+    Attachment, AttachmentKind, ChatParams, ContentPart, Conversation, Message, MessageRole,
+    MessageStatus, Timestamp, Tombstone, Usage,
+};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -488,4 +492,211 @@ fn malformed_envelopes_are_rejected() {
         decode_envelope(&too_short).expect_err("missing tag"),
         EnvelopeError::MalformedEnvelope
     );
+}
+
+fn timestamp(value: &str) -> Timestamp {
+    Timestamp::parse(value).expect("valid timestamp")
+}
+
+fn conversation() -> Conversation {
+    Conversation {
+        id: "0190f5a0-7a00-7000-8000-000000000001".to_owned(),
+        title: "Synthetic backup conversation".to_owned(),
+        system_prompt: "You are a synthetic test assistant.".to_owned(),
+        provider_id: "openrouter".to_owned(),
+        model_id: "synthetic/model-1".to_owned(),
+        model_label: "Synthetic Model 1".to_owned(),
+        params: ChatParams::default(),
+        pinned: false,
+        archived: false,
+        temporary: false,
+        created_at: timestamp("2026-01-01T00:00:00.000Z"),
+        updated_at: timestamp("2026-01-01T00:05:00.000Z"),
+        last_message_at: timestamp("2026-01-01T00:03:00.000Z"),
+        message_count: 2,
+        last_error: None,
+        sync: None,
+        storage_key: "00112233445566778899aabbccddeeff".to_owned(),
+        revision: 3,
+    }
+}
+
+fn message(id: &str, sequence: u64, text: &str) -> Message {
+    Message {
+        id: id.to_owned(),
+        conversation_id: conversation().id,
+        sequence,
+        role: MessageRole::User,
+        parts: vec![ContentPart::Text {
+            text: text.to_owned(),
+        }],
+        status: MessageStatus::Complete,
+        provider_id: Some("openrouter".to_owned()),
+        model_id: Some("synthetic/model-1".to_owned()),
+        model_label: Some("Synthetic Model 1".to_owned()),
+        usage: Some(Usage {
+            input_tokens: Some(12),
+            output_tokens: Some(8),
+            total_tokens: Some(20),
+            cost_usd: Some(0.0001),
+            estimated: false,
+        }),
+        finish_reason: None,
+        error: None,
+        latency_ms: Some(120),
+        first_token_ms: Some(40),
+        created_at: timestamp("2026-01-01T00:01:00.000Z"),
+        updated_at: timestamp("2026-01-01T00:01:00.000Z"),
+        deleted_at: None,
+    }
+}
+
+fn attachment() -> Attachment {
+    Attachment {
+        id: "0190f5a0-7a00-7000-8000-000000000020".to_owned(),
+        message_id: Some("0190f5a0-7a00-7000-8000-000000000011".to_owned()),
+        kind: AttachmentKind::Image,
+        mime_type: "image/png".to_owned(),
+        name: "synthetic.png".to_owned(),
+        size: 1234,
+        sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_owned(),
+        storage_key: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_owned(),
+        width: None,
+        height: None,
+        created_at: timestamp("2026-01-01T00:01:00.000Z"),
+    }
+}
+
+fn tombstone() -> Tombstone {
+    Tombstone {
+        id: "tombstone-1".to_owned(),
+        conversation_id: "0190f5a0-7a00-7000-8000-000000000002".to_owned(),
+        message_id: None,
+        deleted_at: timestamp("2026-01-01T00:04:00.000Z"),
+        device_id: "device-synthetic-0001".to_owned(),
+    }
+}
+
+#[test]
+fn manifest_builds_and_round_trips() {
+    let body = build_manifest(
+        "device-synthetic-0001",
+        timestamp("2026-01-01T00:00:00.000Z"),
+        timestamp("2026-01-01T00:05:00.000Z"),
+        &[conversation()],
+        &[attachment()],
+        &[tombstone()],
+    )
+    .expect("build manifest");
+
+    assert_eq!(body.format_version, MANIFEST_FORMAT_VERSION);
+    assert_eq!(body.conversations.len(), 1);
+    assert_eq!(
+        body.conversations[0].object_key,
+        "conversations/00112233445566778899aabbccddeeff.enc"
+    );
+    assert_eq!(
+        body.attachments[0].object_key,
+        "attachments/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.enc"
+    );
+    assert_eq!(body.tombstones.len(), 1);
+
+    let bytes = serde_json::to_vec(&body).expect("serialize manifest");
+    let parsed = parse_manifest(&bytes).expect("parse manifest");
+    assert_eq!(parsed, body);
+}
+
+#[test]
+fn manifest_fixture_parses_and_validates() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../contracts/fixtures/backup/manifest.json"
+    );
+    let bytes = std::fs::read(path).expect("read manifest fixture");
+    let body = parse_manifest(&bytes).expect("parse manifest fixture");
+    assert_eq!(body.format_version, 1);
+    assert_eq!(body.conversations.len(), 1);
+    assert_eq!(body.attachments.len(), 1);
+    assert_eq!(body.tombstones.len(), 1);
+}
+
+#[test]
+fn manifest_rejects_unsupported_version_and_bad_keys() {
+    let mut body = build_manifest(
+        "device-synthetic-0001",
+        timestamp("2026-01-01T00:00:00.000Z"),
+        timestamp("2026-01-01T00:05:00.000Z"),
+        &[conversation()],
+        &[],
+        &[],
+    )
+    .expect("build manifest");
+    body.format_version = 2;
+    let bytes = serde_json::to_vec(&body).expect("serialize manifest");
+    assert_eq!(
+        parse_manifest(&bytes).expect_err("version must fail"),
+        BackupDataError::UnsupportedVersion
+    );
+
+    let mut invalid = conversation();
+    invalid.storage_key = "not-hex".to_owned();
+    assert!(matches!(
+        build_manifest(
+            "device-synthetic-0001",
+            timestamp("2026-01-01T00:00:00.000Z"),
+            timestamp("2026-01-01T00:05:00.000Z"),
+            &[invalid],
+            &[],
+            &[],
+        ),
+        Err(BackupDataError::Invalid(_))
+    ));
+}
+
+#[test]
+fn conversation_payload_builds_and_round_trips() {
+    let payload = build_conversation_payload(
+        &conversation(),
+        &[
+            message("0190f5a0-7a00-7000-8000-000000000010", 0, "hello"),
+            message("0190f5a0-7a00-7000-8000-000000000011", 1, "world"),
+        ],
+        &[attachment()],
+    )
+    .expect("build payload");
+
+    assert_eq!(payload.storage_key, "00112233445566778899aabbccddeeff");
+    assert_eq!(payload.revision, 3);
+    assert_eq!(payload.messages.len(), 2);
+    assert_eq!(payload.attachments.len(), 1);
+
+    let bytes = serde_json::to_vec(&payload).expect("serialize payload");
+    let parsed = parse_conversation_payload(&bytes).expect("parse payload");
+    assert_eq!(parsed, payload);
+}
+
+#[test]
+fn conversation_payload_fixture_parses_and_validates() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../contracts/fixtures/backup/conversation.json"
+    );
+    let bytes = std::fs::read(path).expect("read conversation fixture");
+    let payload = parse_conversation_payload(&bytes).expect("parse conversation fixture");
+    assert_eq!(payload.id, "0190f5a0-7a00-7000-8000-000000000001");
+    assert_eq!(payload.messages.len(), 2);
+    assert_eq!(payload.attachments.len(), 1);
+}
+
+#[test]
+fn conversation_payload_excludes_secrets_and_provider_keys() {
+    let payload = build_conversation_payload(&conversation(), &[message("m1", 0, "hello")], &[])
+        .expect("build payload");
+    let json = serde_json::to_string(&payload).expect("serialize payload");
+    for forbidden in ["apiKey", "api_key", "secret", "Authorization", "password"] {
+        assert!(
+            !json.contains(forbidden),
+            "payload unexpectedly contains {forbidden}"
+        );
+    }
 }

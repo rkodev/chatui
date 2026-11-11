@@ -6,6 +6,7 @@ use sqlx::SqlitePool;
 
 use crate::StorageError;
 use crate::mappers::ConversationRow;
+use crate::paths::{new_conversation_storage_key, validate_conversation_storage_key};
 use crate::repositories::bounded_limit;
 use crate::search::delete_fts_for_conversation;
 
@@ -72,18 +73,35 @@ impl SqliteConversationRepository {
 
 const SELECT_COLUMNS: &str = "id, title, system_prompt, provider_id, model_id, model_label, \
      params_json, pinned, archived, temporary, created_at, updated_at, last_message_at, \
-     message_count, last_error_json, sync_state";
+     message_count, last_error_json, sync_state, storage_key, revision";
+
+fn prepare_for_write(conversation: &Conversation) -> Result<Conversation, StorageError> {
+    let mut conversation = conversation.clone();
+
+    if conversation.storage_key.is_empty() {
+        conversation.storage_key = new_conversation_storage_key();
+    } else {
+        validate_conversation_storage_key(&conversation.storage_key)?;
+    }
+
+    if conversation.revision == 0 {
+        conversation.revision = 1;
+    }
+
+    Ok(conversation)
+}
 
 #[async_trait]
 impl ConversationRepository for SqliteConversationRepository {
     async fn create(&self, conversation: &Conversation) -> Result<(), StorageError> {
-        let row = ConversationRow::from_domain(conversation)?;
+        let conversation = prepare_for_write(conversation)?;
+        let row = ConversationRow::from_domain(&conversation)?;
         sqlx::query(
             "INSERT INTO conversations \
              (id, title, system_prompt, provider_id, model_id, model_label, params_json, pinned, \
               archived, temporary, created_at, updated_at, last_message_at, message_count, \
-              last_error_json, sync_state) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              last_error_json, sync_state, storage_key, revision) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&row.id)
         .bind(&row.title)
@@ -101,6 +119,8 @@ impl ConversationRepository for SqliteConversationRepository {
         .bind(row.message_count)
         .bind(&row.last_error_json)
         .bind(&row.sync_state)
+        .bind(&row.storage_key)
+        .bind(row.revision)
         .execute(&self.pool)
         .await
         .map_err(|error| {
@@ -111,13 +131,16 @@ impl ConversationRepository for SqliteConversationRepository {
     }
 
     async fn update(&self, conversation: &Conversation) -> Result<(), StorageError> {
-        let row = ConversationRow::from_domain(conversation)?;
+        let conversation = prepare_for_write(conversation)?;
+        let row = ConversationRow::from_domain(&conversation)?;
         let result = sqlx::query(
             "UPDATE conversations SET \
              title = ?, system_prompt = ?, provider_id = ?, model_id = ?, model_label = ?, \
              params_json = ?, pinned = ?, archived = ?, temporary = ?, created_at = ?, \
              updated_at = ?, last_message_at = ?, message_count = ?, last_error_json = ?, \
-             sync_state = ? \
+             sync_state = ?, \
+             storage_key = CASE WHEN storage_key = '' THEN ? ELSE storage_key END, \
+             revision = revision + 1 \
              WHERE id = ?",
         )
         .bind(&row.title)
@@ -135,6 +158,7 @@ impl ConversationRepository for SqliteConversationRepository {
         .bind(row.message_count)
         .bind(&row.last_error_json)
         .bind(&row.sync_state)
+        .bind(&row.storage_key)
         .bind(&row.id)
         .execute(&self.pool)
         .await?;
@@ -150,13 +174,14 @@ impl ConversationRepository for SqliteConversationRepository {
     }
 
     async fn upsert(&self, conversation: &Conversation) -> Result<(), StorageError> {
-        let row = ConversationRow::from_domain(conversation)?;
+        let conversation = prepare_for_write(conversation)?;
+        let row = ConversationRow::from_domain(&conversation)?;
         sqlx::query(
             "INSERT INTO conversations \
              (id, title, system_prompt, provider_id, model_id, model_label, params_json, pinned, \
               archived, temporary, created_at, updated_at, last_message_at, message_count, \
-              last_error_json, sync_state) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+              last_error_json, sync_state, storage_key, revision) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
              ON CONFLICT(id) DO UPDATE SET \
              title = excluded.title, system_prompt = excluded.system_prompt, \
              provider_id = excluded.provider_id, model_id = excluded.model_id, \
@@ -165,7 +190,10 @@ impl ConversationRepository for SqliteConversationRepository {
              temporary = excluded.temporary, created_at = excluded.created_at, \
              updated_at = excluded.updated_at, last_message_at = excluded.last_message_at, \
              message_count = excluded.message_count, last_error_json = excluded.last_error_json, \
-             sync_state = excluded.sync_state",
+             sync_state = excluded.sync_state, \
+             storage_key = CASE WHEN conversations.storage_key = '' \
+                                THEN excluded.storage_key ELSE conversations.storage_key END, \
+             revision = conversations.revision + 1",
         )
         .bind(&row.id)
         .bind(&row.title)
@@ -183,6 +211,8 @@ impl ConversationRepository for SqliteConversationRepository {
         .bind(row.message_count)
         .bind(&row.last_error_json)
         .bind(&row.sync_state)
+        .bind(&row.storage_key)
+        .bind(row.revision)
         .execute(&self.pool)
         .await?;
 
@@ -250,7 +280,7 @@ impl ConversationRepository for SqliteConversationRepository {
 
     async fn set_pinned(&self, id: &str, pinned: bool) -> Result<(), StorageError> {
         let result =
-            sqlx::query("UPDATE conversations SET pinned = ?, updated_at = ? WHERE id = ?")
+            sqlx::query("UPDATE conversations SET pinned = ?, updated_at = ?, revision = revision + 1 WHERE id = ?")
                 .bind(i64::from(pinned))
                 .bind(Timestamp::now().to_rfc3339())
                 .bind(id)
@@ -266,7 +296,7 @@ impl ConversationRepository for SqliteConversationRepository {
 
     async fn set_archived(&self, id: &str, archived: bool) -> Result<(), StorageError> {
         let result =
-            sqlx::query("UPDATE conversations SET archived = ?, updated_at = ? WHERE id = ?")
+            sqlx::query("UPDATE conversations SET archived = ?, updated_at = ?, revision = revision + 1 WHERE id = ?")
                 .bind(i64::from(archived))
                 .bind(Timestamp::now().to_rfc3339())
                 .bind(id)
@@ -281,12 +311,14 @@ impl ConversationRepository for SqliteConversationRepository {
     }
 
     async fn rename(&self, id: &str, title: &str) -> Result<(), StorageError> {
-        let result = sqlx::query("UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?")
-            .bind(title)
-            .bind(Timestamp::now().to_rfc3339())
-            .bind(id)
-            .execute(&self.pool)
-            .await?;
+        let result = sqlx::query(
+            "UPDATE conversations SET title = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+        )
+        .bind(title)
+        .bind(Timestamp::now().to_rfc3339())
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
 
         if result.rows_affected() == 0 {
             return Err(StorageError::NotFound(format!("conversation {id}")));

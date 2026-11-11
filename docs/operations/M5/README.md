@@ -55,7 +55,7 @@ The phase 2 gate is open. Start `M5-01.1` next.
 | 5 | [M5-01.4 Rust envelope codec and crypto tests](M5-01.4-rust-envelope-codec.md) | Complete | M5-01.1 | rust crypto | M5-01.2, M5-01.3 |
 | 6 | [M5-02.1 Web manifest, storage keys, and DB v2 migration](M5-02.1-web-manifest-storage-keys-migration.md) | Complete | M5-01.2 | web data model | M5-02.2, M5-02.3 |
 | 7 | [M5-02.2 Android manifest, storage keys, and Room migration](M5-02.2-android-manifest-storage-keys-migration.md) | Complete | M5-01.3 | android data model | M5-02.1, M5-02.3 |
-| 8 | [M5-02.3 Rust manifest, storage keys, and SQLite migration](M5-02.3-rust-manifest-storage-keys-migration.md) | Not started | M5-01.4 | rust data model | M5-02.1, M5-02.2 |
+| 8 | [M5-02.3 Rust manifest, storage keys, and SQLite migration](M5-02.3-rust-manifest-storage-keys-migration.md) | Complete | M5-01.4 | rust data model | M5-02.1, M5-02.2 |
 | 9 | [M5-03.1 Web S3-compatible adapter, conditional writes, and CORS docs](M5-03.1-web-s3-adapter.md) | Not started | M5-02.1 | web backend | M5-03.2, M5-03.3 |
 | 10 | [M5-03.2 Android S3-compatible adapter and conditional writes](M5-03.2-android-s3-adapter.md) | Not started | M5-02.2 | android backend | M5-03.1, M5-03.3 |
 | 11 | [M5-03.3 Rust S3-compatible adapter and conditional writes](M5-03.3-rust-s3-adapter.md) | Not started | M5-02.3 | rust backend | M5-03.1, M5-03.2 |

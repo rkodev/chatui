@@ -8,9 +8,15 @@
 //! The codec only produces and consumes bytes. It never writes to storage, so
 //! callers cannot accidentally persist plaintext through it.
 
+pub mod conversation_payload;
 pub mod envelope;
 pub mod error;
+pub mod manifest;
 
+pub use conversation_payload::{
+    AttachmentReference, ConversationPayload, PayloadMessage, build_conversation_payload,
+    parse_conversation_payload, validate_conversation_payload,
+};
 pub use envelope::{
     ALG, DEFAULT_ITERATIONS, DecryptedObject, ENVELOPE_VERSION, EncryptOptions, EnvelopeHeader,
     EnvelopeParts, FORMAT_VERSION, HEADER_LENGTH_BYTES, IV_LEN, KDF, KEY_LEN, MAGIC,
@@ -19,7 +25,12 @@ pub use envelope::{
     create_verification_token, create_verification_token_with, decode_envelope, decrypt_object,
     encode_envelope, encrypt_object, verify_passphrase,
 };
-pub use error::EnvelopeError;
+pub use error::{BackupDataError, EnvelopeError};
+pub use manifest::{
+    AttachmentIndexEntry, ConversationIndexEntry, MANIFEST_FORMAT_VERSION, ManifestBody,
+    ManifestTombstone, attachment_object_key, build_manifest, conversation_object_key,
+    parse_manifest, validate_manifest,
+};
 
 #[cfg(test)]
 mod tests;

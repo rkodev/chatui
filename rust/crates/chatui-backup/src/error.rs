@@ -61,3 +61,20 @@ impl EnvelopeError {
         }
     }
 }
+
+/// Errors from manifest and conversation payload parsing.
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum BackupDataError {
+    /// The plaintext is not valid JSON.
+    #[error("backup data is not valid JSON: {0}")]
+    Json(String),
+    /// The plaintext does not satisfy the shared schema.
+    #[error("backup data does not satisfy the schema: {0}")]
+    Schema(String),
+    /// The payload format version is not supported by this build.
+    #[error("unsupported backup format version")]
+    UnsupportedVersion,
+    /// A value cannot be represented in the backup format.
+    #[error("invalid backup data: {0}")]
+    Invalid(String),
+}

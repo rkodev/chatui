@@ -121,6 +121,23 @@ pub struct Conversation {
     pub last_error: Option<ChatError>,
     /// Provisional sync metadata, or `null` when sync is not configured.
     pub sync: Option<SyncMeta>,
+    /// Random 128-bit backup storage key as 32 lowercase hexadecimal characters.
+    ///
+    /// This is sync-only metadata. It is omitted from the plaintext export
+    /// contract, which keeps its existing shape, and is carried by the backup
+    /// conversation payload instead.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub storage_key: String,
+    /// Monotonic local revision, starting at 1 and incremented on every change.
+    ///
+    /// Like [`Conversation::storage_key`], this is sync-only metadata and is
+    /// omitted from the plaintext export contract.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub revision: u64,
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 #[cfg(test)]
@@ -202,11 +219,46 @@ mod tests {
             message_count: 0,
             last_error: None,
             sync: None,
+            storage_key: String::new(),
+            revision: 0,
         };
 
         let json = serde_json::to_value(&conversation).expect("serialize conversation");
         assert_eq!(json["lastError"], Value::Null);
         assert_eq!(json["sync"], Value::Null);
+        assert!(json.get("storageKey").is_none());
+        assert!(json.get("revision").is_none());
+
+        let parsed: Conversation = serde_json::from_value(json).expect("deserialize conversation");
+        assert_eq!(parsed, conversation);
+    }
+
+    #[test]
+    fn sync_only_conversation_fields_serialize_when_present() {
+        let conversation = Conversation {
+            id: "conversation-1".to_owned(),
+            title: "Contract export".to_owned(),
+            system_prompt: String::new(),
+            provider_id: "provider-1".to_owned(),
+            model_id: "model-1".to_owned(),
+            model_label: "gpt-4o-mini".to_owned(),
+            params: ChatParams::default(),
+            pinned: false,
+            archived: false,
+            temporary: false,
+            created_at: fixed(),
+            updated_at: fixed(),
+            last_message_at: fixed(),
+            message_count: 0,
+            last_error: None,
+            sync: None,
+            storage_key: "00112233445566778899aabbccddeeff".to_owned(),
+            revision: 3,
+        };
+
+        let json = serde_json::to_value(&conversation).expect("serialize conversation");
+        assert_eq!(json["storageKey"], "00112233445566778899aabbccddeeff");
+        assert_eq!(json["revision"], 3);
 
         let parsed: Conversation = serde_json::from_value(json).expect("deserialize conversation");
         assert_eq!(parsed, conversation);

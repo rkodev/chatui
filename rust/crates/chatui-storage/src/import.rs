@@ -853,6 +853,14 @@ fn remap_conversation(conversation: &Conversation, plan: &ModelPlan) -> Conversa
         .get(&conversation.model_id)
         .cloned()
         .unwrap_or_else(|| conversation.model_id.clone());
+
+    if conversation.storage_key.is_empty() {
+        conversation.storage_key = crate::paths::new_conversation_storage_key();
+    }
+    if conversation.revision == 0 {
+        conversation.revision = 1;
+    }
+
     conversation
 }
 
@@ -1060,8 +1068,8 @@ async fn upsert_conversation(
         "INSERT INTO conversations \
          (id, title, system_prompt, provider_id, model_id, model_label, params_json, pinned, \
           archived, temporary, created_at, updated_at, last_message_at, message_count, \
-          last_error_json, sync_state) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+          last_error_json, sync_state, storage_key, revision) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
          ON CONFLICT(id) DO UPDATE SET \
          title = excluded.title, system_prompt = excluded.system_prompt, \
          provider_id = excluded.provider_id, model_id = excluded.model_id, \
@@ -1070,7 +1078,10 @@ async fn upsert_conversation(
          temporary = excluded.temporary, created_at = excluded.created_at, \
          updated_at = excluded.updated_at, last_message_at = excluded.last_message_at, \
          message_count = excluded.message_count, last_error_json = excluded.last_error_json, \
-         sync_state = excluded.sync_state",
+         sync_state = excluded.sync_state, \
+         storage_key = CASE WHEN conversations.storage_key = '' \
+                            THEN excluded.storage_key ELSE conversations.storage_key END, \
+         revision = conversations.revision + 1",
     )
     .bind(&row.id)
     .bind(&row.title)
@@ -1088,6 +1099,8 @@ async fn upsert_conversation(
     .bind(row.message_count)
     .bind(&row.last_error_json)
     .bind(&row.sync_state)
+    .bind(&row.storage_key)
+    .bind(row.revision)
     .execute(&mut *connection)
     .await?;
 
@@ -1305,6 +1318,8 @@ mod tests {
             message_count: 0,
             last_error: None,
             sync: None,
+            storage_key: String::new(),
+            revision: 1,
         }
     }
 
