@@ -22,6 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import dev.chatui.core.designsystem.BannerSeverity
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.model.Model
 
@@ -105,18 +107,28 @@ fun ConversationModelControl(
 
         if (!state.availability.available) {
             state.availability.message?.let { message ->
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
+                InlineBanner(
+                    severity = BannerSeverity.Warning,
+                    title = "Model unavailable",
+                    body = message,
                     modifier = Modifier.testTag(ConversationModelTestTags.Warning),
                 )
             }
         }
 
         state.error?.let { error ->
-            Text(text = error, color = MaterialTheme.colorScheme.error)
+            InlineBanner(
+                severity = BannerSeverity.Error,
+                title = "Could not update the model",
+                body = error,
+            )
         }
-        state.notice?.let { notice -> Text(notice) }
+        state.notice?.let { notice ->
+            InlineBanner(
+                severity = BannerSeverity.Info,
+                title = notice,
+            )
+        }
     }
 
     if (showPicker) {

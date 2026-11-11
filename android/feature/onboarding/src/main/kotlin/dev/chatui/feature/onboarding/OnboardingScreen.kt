@@ -68,6 +68,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.designsystem.BrandMark
+import dev.chatui.core.designsystem.EmptyState
+import dev.chatui.core.designsystem.ErrorState
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.LocalReducedMotion
@@ -744,23 +746,18 @@ private fun CatalogSection(
                 count = 3,
             )
 
-            is CatalogUiState.Error -> Column(
+            is CatalogUiState.Error -> ErrorState(
+                title = "Could not load models",
+                body = catalog.message,
+                onRetry = onRetryCatalog,
+                retryModifier = Modifier.testTag(OnboardingTestTags.RetryCatalog),
                 modifier = Modifier.testTag(OnboardingTestTags.CatalogError),
-                verticalArrangement = Arrangement.spacedBy(dimens.space1),
-            ) {
-                Text(catalog.message)
-                TextButton(
-                    onClick = onRetryCatalog,
-                    modifier = Modifier.testTag(OnboardingTestTags.RetryCatalog),
-                ) {
-                    Text("Retry")
-                }
-            }
+            )
 
             is CatalogUiState.Ready -> if (catalog.models.isEmpty()) {
-                Text(
-                    text = "No models were returned. You can still connect; " +
-                        "models will load after validation.",
+                EmptyState(
+                    title = "No models returned",
+                    body = "You can still connect; models will load after validation.",
                     modifier = Modifier.testTag(OnboardingTestTags.CatalogEmpty),
                 )
             } else {

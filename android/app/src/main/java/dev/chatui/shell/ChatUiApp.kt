@@ -18,6 +18,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
@@ -42,8 +43,10 @@ import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.EntryPointAccessors
 import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.designsystem.ChatUiScaffold
+import dev.chatui.core.designsystem.ChatUiSnackbarHost
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.designsystem.IconAction
+import dev.chatui.core.designsystem.LocalSnackbarHostState
 import dev.chatui.core.model.Density
 import dev.chatui.core.model.Theme
 import dev.chatui.feature.chat.ChatDrafts
@@ -211,6 +214,7 @@ fun ShellScaffold(
     var helpOpen by remember { mutableStateOf(false) }
     var shareMenuExpanded by remember { mutableStateOf(false) }
     val topBarState = remember { ChatTopBarState() }
+    val snackbarHostState = remember { SnackbarHostState() }
     // Destinations do not expose their scroll state yet, so the large title
     // follows a hoisted state. UX-03 can wire the chat list state into this.
     val scrollState = rememberScrollState()
@@ -286,6 +290,7 @@ fun ShellScaffold(
     CompositionLocalProvider(
         LocalChatShortcutState provides shortcuts,
         LocalChatTopBarState provides topBarState,
+        LocalSnackbarHostState provides snackbarHostState,
     ) {
         Box(
             modifier = Modifier
@@ -308,6 +313,9 @@ fun ShellScaffold(
                     ChatScreenTestTags.ModelChip
                 } else {
                     null
+                },
+                snackbarHost = {
+                    ChatUiSnackbarHost(hostState = snackbarHostState)
                 },
                 navigationIcon = if (!expanded) {
                     {

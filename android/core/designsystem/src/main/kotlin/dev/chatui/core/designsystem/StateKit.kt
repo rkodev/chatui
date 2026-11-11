@@ -145,6 +145,7 @@ fun ErrorState(
     body: String? = null,
     icon: ImageVector = Icons.Rounded.ErrorOutline,
     retryLabel: String = "Retry",
+    retryModifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
 ) {
     EmptyState(
@@ -154,7 +155,11 @@ fun ErrorState(
         icon = icon,
         action = onRetry?.let {
             {
-                PrimaryButton(text = retryLabel, onClick = it)
+                PrimaryButton(
+                    text = retryLabel,
+                    onClick = it,
+                    modifier = retryModifier,
+                )
             }
         },
     )

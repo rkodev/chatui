@@ -70,6 +70,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.chatui.core.database.attachment.formatAttachmentSize
+import dev.chatui.core.designsystem.BannerSeverity
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.Typography
@@ -197,34 +199,28 @@ fun ChatComposer(
         }
 
         attachmentWarning?.let { warning ->
-            Text(
-                text = warning,
-                style = Typography.footnote,
-                color = colors.warning,
+            InlineBanner(
+                severity = BannerSeverity.Warning,
+                title = "Attachment warning",
+                body = warning,
                 modifier = Modifier.testTag(ChatComposerTestTags.AttachmentWarning),
             )
         }
 
         attachmentError?.let { error ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = error,
-                    style = Typography.footnote,
-                    color = colors.danger,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag(ChatComposerTestTags.AttachmentError),
-                )
-                if (onDismissAttachmentError != null) {
-                    TextButton(onClick = onDismissAttachmentError) {
-                        Text("Dismiss")
+            InlineBanner(
+                severity = BannerSeverity.Error,
+                title = "Attachment failed",
+                body = error,
+                modifier = Modifier.testTag(ChatComposerTestTags.AttachmentError),
+                action = onDismissAttachmentError?.let { dismiss ->
+                    {
+                        TextButton(onClick = dismiss) {
+                            Text("Dismiss")
+                        }
                     }
-                }
-            }
+                },
+            )
         }
 
         Surface(

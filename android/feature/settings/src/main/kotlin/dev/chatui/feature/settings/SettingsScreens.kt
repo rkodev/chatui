@@ -33,7 +33,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -56,12 +55,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.datastore.settings.AndroidSettings
+import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.BrandMark
+import dev.chatui.core.designsystem.ChatUiSnackbarHost
 import dev.chatui.core.designsystem.GroupedList
 import dev.chatui.core.designsystem.GroupedSection
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LabeledSlider
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.LocalSnackbarHostState
 import dev.chatui.core.designsystem.SettingsRow
 import dev.chatui.core.designsystem.Stepper
 import dev.chatui.core.designsystem.Typography
@@ -199,16 +202,17 @@ fun AppearanceSettingsScreen(
     onHapticFeedbackChanged: (Boolean) -> Unit = {},
     onDynamicColorChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    snackbarHostState: SnackbarHostState? = LocalSnackbarHostState.current,
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
     val scope = rememberCoroutineScope()
+    val host = snackbarHostState ?: remember { SnackbarHostState() }
     var loaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(settings) {
         if (loaded) {
-            scope.launch { snackbarHostState.showSnackbar("Appearance saved") }
+            scope.launch { host.showSnackbar("Appearance saved") }
         }
         loaded = true
     }
@@ -327,10 +331,12 @@ fun AppearanceSettingsScreen(
                 }
             }
         }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        if (snackbarHostState == null) {
+            ChatUiSnackbarHost(
+                hostState = host,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
 }
 
@@ -352,13 +358,14 @@ fun ChatDefaultsSettingsScreen(
     onLoadRemoteImagesChanged: (Boolean) -> Unit,
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    snackbarHostState: SnackbarHostState? = LocalSnackbarHostState.current,
 ) {
     val settings = state.settings
     val params = settings.defaultParams
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
     val scope = rememberCoroutineScope()
+    val host = snackbarHostState ?: remember { SnackbarHostState() }
     var providerMenu by remember { mutableStateOf(false) }
     var modelMenu by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
@@ -371,7 +378,7 @@ fun ChatDefaultsSettingsScreen(
 
     LaunchedEffect(settings) {
         if (loaded) {
-            scope.launch { snackbarHostState.showSnackbar("Chat defaults saved") }
+            scope.launch { host.showSnackbar("Chat defaults saved") }
         }
         loaded = true
     }
@@ -385,22 +392,18 @@ fun ChatDefaultsSettingsScreen(
                 .testTag(SettingsTestTags.ChatDefaults),
         ) {
             state.error?.let { error ->
-                Row(
+                InlineBanner(
+                    severity = BannerSeverity.Error,
+                    title = "Could not save settings",
+                    body = error,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = dimens.screenPadding),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = error,
-                        color = colors.danger,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(SettingsTestTags.Error),
-                    )
-                    TextButton(onClick = onDismissError) { Text("Dismiss") }
-                }
+                        .padding(horizontal = dimens.screenPadding)
+                        .testTag(SettingsTestTags.Error),
+                    action = {
+                        TextButton(onClick = onDismissError) { Text("Dismiss") }
+                    },
+                )
                 Spacer(Modifier.height(dimens.space3))
             }
 
@@ -623,10 +626,12 @@ fun ChatDefaultsSettingsScreen(
                 }
             }
         }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        if (snackbarHostState == null) {
+            ChatUiSnackbarHost(
+                hostState = host,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
 }
 

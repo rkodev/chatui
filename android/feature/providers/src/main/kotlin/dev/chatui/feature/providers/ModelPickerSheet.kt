@@ -28,9 +28,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -45,8 +45,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.EmptyState
+import dev.chatui.core.designsystem.ErrorState
 import dev.chatui.core.designsystem.IconAction
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.SkeletonList
@@ -67,6 +70,7 @@ object ModelPickerTestTags {
     const val ManualLabel = "model-picker-manual-label"
     const val AddManual = "model-picker-add-manual"
     const val Refresh = "model-picker-refresh"
+    const val PullRefresh = "model-picker-pull-refresh"
     const val Loading = "model-picker-loading"
 
     fun group(key: String): String = "model-picker-group-$key"
@@ -145,7 +149,7 @@ fun ModelPickerSheet(
  * the same content works for global defaults, per-conversation overrides, and
  * model management.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ModelPickerContent(
     state: ModelPickerUiState,
@@ -166,14 +170,22 @@ fun ModelPickerContent(
     var filter by rememberSaveable { mutableStateOf(ModelFilter.All) }
     val groups = remember(state.groups, filter) { filterGroups(state.groups, filter) }
 
-    LazyColumn(
+    PullToRefreshBox(
+        isRefreshing = state.loading && state.groups.isNotEmpty(),
+        onRefresh = onRefresh,
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight()
-            .testTag(ModelPickerTestTags.Content),
-        contentPadding = PaddingValues(dimens.padding),
-        verticalArrangement = Arrangement.spacedBy(dimens.gap),
+            .testTag(ModelPickerTestTags.PullRefresh),
     ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .testTag(ModelPickerTestTags.Content),
+            contentPadding = PaddingValues(dimens.padding),
+            verticalArrangement = Arrangement.spacedBy(dimens.gap),
+        ) {
         item {
             Text(
                 text = title,
@@ -213,9 +225,10 @@ fun ModelPickerContent(
 
         state.error?.let { error ->
             item {
-                Text(
-                    text = error,
-                    color = MaterialTheme.colorScheme.error,
+                ErrorState(
+                    title = "Could not load models",
+                    body = error,
+                    onRetry = onRefresh,
                     modifier = Modifier.testTag(ModelPickerTestTags.Error),
                 )
             }
@@ -223,8 +236,9 @@ fun ModelPickerContent(
 
         state.notice?.let { notice ->
             item {
-                Text(
-                    text = notice,
+                InlineBanner(
+                    severity = BannerSeverity.Info,
+                    title = notice,
                     modifier = Modifier.testTag(ModelPickerTestTags.Notice),
                 )
             }
@@ -233,9 +247,10 @@ fun ModelPickerContent(
         if (!state.availability.available) {
             state.availability.message?.let { message ->
                 item {
-                    Text(
-                        text = message,
-                        color = MaterialTheme.colorScheme.error,
+                    InlineBanner(
+                        severity = BannerSeverity.Warning,
+                        title = "Model unavailable",
+                        body = message,
                         modifier = Modifier.testTag(ModelPickerTestTags.Warning),
                     )
                 }
@@ -306,6 +321,7 @@ fun ModelPickerContent(
             ) {
                 Text("Refresh models")
             }
+        }
         }
     }
 }

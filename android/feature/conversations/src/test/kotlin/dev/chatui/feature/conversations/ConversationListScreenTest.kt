@@ -788,6 +788,63 @@ class ConversationListScreenTest {
     }
 
     @Test
+    fun `loading state shows a skeleton instead of loading text`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(loading = true),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = {},
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.Loading).assertIsDisplayed()
+        composeRule.onNodeWithText("Loading conversations…").assertDoesNotExist()
+    }
+
+    @Test
+    fun `list error state shows retry and invokes the intent`() {
+        var retried = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ConversationListScreen(
+                    state = ConversationListUiState(
+                        loading = false,
+                        error = "Could not load conversations",
+                    ),
+                    onNewChat = {},
+                    onSelect = {},
+                    onRename = { _, _ -> },
+                    onDeleteRequested = {},
+                    onDeleteDismissed = {},
+                    onDeleteConfirmed = {},
+                    onRetry = { retried = true },
+                    onSearchQueryChanged = {},
+                    onSearchRetry = {},
+                    now = now,
+                    zoneId = zone,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationListTestTags.Error).assertIsDisplayed()
+        composeRule.onNodeWithText("Retry").performClick()
+
+        assertThat(retried).isTrue()
+    }
+
+    @Test
     fun `empty state start chat button invokes the intent`() {
         var clicks = 0
 

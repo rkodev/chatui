@@ -445,6 +445,66 @@ class OnboardingScreenTest {
     }
 
     @Test
+    fun `catalog error shows a retry action`() {
+        var retried = false
+
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.KEY_ENTRY,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Error("Catalog unavailable"),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = { retried = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.CatalogError))
+        composeRule.onNodeWithTag(OnboardingTestTags.CatalogError).assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.RetryCatalog).performClick()
+
+        assertThat(retried).isTrue()
+    }
+
+    @Test
+    fun `catalog empty state explains that models load after validation`() {
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.KEY_ENTRY,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.CatalogEmpty))
+        composeRule.onNodeWithTag(OnboardingTestTags.CatalogEmpty).assertIsDisplayed()
+        composeRule.onNodeWithText("No models returned").assertIsDisplayed()
+    }
+
+    @Test
     fun `catalog collapses by default and expands with the disclosure`() {
         val models = (1..5).map { index ->
             CatalogModel("openrouter/model-$index", "Model $index", 128_000, index == 1)

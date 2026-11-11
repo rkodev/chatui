@@ -107,6 +107,7 @@ class ChatScreenTest {
     fun `loading and not-found states render`() {
         screen(ChatUiState(conversationId = "conversation-1", loading = true))
         composeRule.onNodeWithTag(ChatScreenTestTags.Loading).assertIsDisplayed()
+        composeRule.onNodeWithText("Loading conversation…").assertDoesNotExist()
     }
 
     @Test

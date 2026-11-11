@@ -46,7 +46,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.ErrorState
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.SecureScreen
@@ -387,18 +389,18 @@ private fun KeyUsageSection(
             )
 
             state.cleartextWarning?.let { message ->
-                Text(
-                    text = message,
-                    style = Typography.footnote,
-                    color = colors.warning,
+                InlineBanner(
+                    severity = BannerSeverity.Warning,
+                    title = "Cleartext connection",
+                    body = message,
                     modifier = Modifier.testTag(ProviderDetailTestTags.CleartextWarning),
                 )
             }
             state.cleartextError?.let { message ->
-                Text(
-                    text = message,
-                    style = Typography.footnote,
-                    color = colors.danger,
+                InlineBanner(
+                    severity = BannerSeverity.Error,
+                    title = "Cleartext connection blocked",
+                    body = message,
                     modifier = Modifier.testTag(ProviderDetailTestTags.CleartextError),
                 )
             }
@@ -602,10 +604,10 @@ private fun DocsRow(
             )
         }
         docsError?.let { message ->
-            Text(
-                text = message,
-                style = Typography.footnote,
-                color = colors.danger,
+            InlineBanner(
+                severity = BannerSeverity.Error,
+                title = "Could not open documentation",
+                body = message,
                 modifier = Modifier.testTag(ProviderDetailTestTags.DocsError),
             )
         }

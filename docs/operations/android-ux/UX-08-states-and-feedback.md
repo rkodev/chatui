@@ -2,7 +2,7 @@
 
 - Plan: [Android UI/UX Polish Implementation Plan](../android-ux-implementation-plan.md)
 - Design review: [android-ux.md](../../android-ux.md)
-- Status: Not started
+- Status: Complete
 - Order: 9
 - Depends on: UX-01, UX-03, UX-04, UX-05, UX-06, UX-07
 - Parallel-safe: no; touches all screens
@@ -66,15 +66,15 @@ states inside the layouts delivered by UX-03 through UX-07.
 
 ## Acceptance criteria
 
-- [ ] No text-only "Loading…" remains in feature screens.
-- [ ] Errors use `ErrorState` or `InlineBanner` with a retry where applicable.
-- [ ] Empty states use `EmptyState` with a CTA where applicable.
-- [ ] A global snackbar reports transient results and supports actions.
-- [ ] Pull-to-refresh works where refresh exists.
-- [ ] Every async action has pending, success, and failure feedback.
-- [ ] State changes do not shift layout.
-- [ ] Existing test tags are preserved and tests pass.
-- [ ] No data loading, retry, or error-mapping behavior changed.
+- [x] No text-only "Loading…" remains in feature screens.
+- [x] Errors use `ErrorState` or `InlineBanner` with a retry where applicable.
+- [x] Empty states use `EmptyState` with a CTA where applicable.
+- [x] A global snackbar reports transient results and supports actions.
+- [x] Pull-to-refresh works where refresh exists.
+- [x] Every async action has pending, success, and failure feedback.
+- [x] State changes do not shift layout.
+- [x] Existing test tags are preserved and tests pass.
+- [x] No data loading, retry, or error-mapping behavior changed.
 
 ## Verification
 
@@ -92,8 +92,60 @@ states.
 - Accessibility audit (UX-10).
 - Performance measurement (UX-11).
 
+## Completion record
+
+- Status: Complete on 2026-11-11.
+- Verification:
+  - `make android-lint` - passed.
+  - `make android-test` - passed.
+  - `make android-assemble` - passed.
+  - Targeted feature tests (`chat`, `conversations`, `onboarding`, `providers`,
+    `settings`, `core:designsystem`) - passed.
+- Changed files:
+  - `android/core/designsystem/src/main/kotlin/dev/chatui/core/designsystem/Snackbar.kt`
+  - `android/core/designsystem/src/main/kotlin/dev/chatui/core/designsystem/StateKit.kt`
+  - `android/app/src/main/java/dev/chatui/shell/ChatUiApp.kt`
+  - `android/feature/chat/src/main/kotlin/dev/chatui/feature/chat/ChatScreen.kt`
+  - `android/feature/chat/src/main/kotlin/dev/chatui/feature/chat/ChatComposer.kt`
+  - `android/feature/chat/src/main/kotlin/dev/chatui/feature/chat/ChatMessageItem.kt`
+  - `android/feature/conversations/src/main/kotlin/dev/chatui/feature/conversations/ConversationListScreen.kt`
+  - `android/feature/onboarding/src/main/kotlin/dev/chatui/feature/onboarding/OnboardingScreen.kt`
+  - `android/feature/providers/src/main/kotlin/dev/chatui/feature/providers/ModelPickerSheet.kt`
+  - `android/feature/providers/src/main/kotlin/dev/chatui/feature/providers/ProviderListScreen.kt`
+  - `android/feature/providers/src/main/kotlin/dev/chatui/feature/providers/ProviderDetailScreen.kt`
+  - `android/feature/providers/src/main/kotlin/dev/chatui/feature/providers/ConversationModelControl.kt`
+  - `android/feature/providers/src/main/kotlin/dev/chatui/feature/providers/ConversationSettingsSheet.kt`
+  - `android/feature/providers/src/main/kotlin/dev/chatui/feature/providers/ConversationRoutingControls.kt`
+  - `android/feature/providers/src/main/kotlin/dev/chatui/feature/providers/DefaultsScreen.kt`
+  - `android/feature/settings/src/main/kotlin/dev/chatui/feature/settings/DataSettingsScreen.kt`
+  - `android/feature/settings/src/main/kotlin/dev/chatui/feature/settings/SettingsScreens.kt`
+  - Tests in `chat`, `conversations`, `onboarding`, `providers`, and `settings`.
+  - `docs/operations/android-ux/UX-08-states-and-feedback.md`
+  - `docs/operations/android-ux/README.md`
+
 ## Handoff notes
 
-- List every screen whose state presentation changed.
-- Record the snackbar host location and how actions are wired.
-- Note any state that could not be standardized and why.
+- Screens whose state presentation changed: chat (loading skeleton, attachment
+  banners, message error banner), conversations (list/search loading skeletons,
+  list/search errors, list/search empty states), onboarding catalog (error and
+  empty states), provider list (pull-to-refresh, form banners), provider detail
+  (cleartext and documentation banners), model picker (error/notice/warning
+  banners, pull-to-refresh), conversation model control and settings sheet
+  (banners), defaults (warning banner), data settings (usage/key skeletons,
+  error banner), and settings chat defaults (error banner).
+- The global snackbar host lives in `ShellScaffold` and is passed to
+  `ChatUiScaffold`'s `snackbarHost` slot. `LocalSnackbarHostState` is provided
+  around the shell so every screen shares one `SnackbarHostState`. Screens keep
+  a local fallback host when rendered outside the shell (tests, previews,
+  screenshots). Delete undo, export/import start, key actions, and save
+  confirmations all use the shared state.
+- `ErrorState` gained an optional `retryModifier` so existing retry test tags
+  (for example `RetryCatalog`) survive the adoption.
+- Pull-to-refresh uses Material 3 `PullToRefreshBox` on the provider list
+  (`onRetry`) and model picker (`onRefresh`). Both keep their existing refresh
+  buttons.
+- Banners are inline (`InlineBanner`) and reserve their own space; they never
+  overlay content. No data loading, retry, or error-mapping logic changed.
+- Field-level validation text (rename title, extras JSON) and destructive
+  labels remain as field supporting text / red labels because they are not
+  screen-level error states.

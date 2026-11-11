@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -73,6 +72,7 @@ import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.designsystem.PrimaryButton
+import dev.chatui.core.designsystem.Skeleton
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.Message
@@ -263,18 +263,30 @@ fun ChatScreen(
 
 @Composable
 private fun LoadingState() {
-    Box(
+    val dimens = LocalDimens.current
+    Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(dimens.screenPadding)
             .testTag(ChatScreenTestTags.Loading),
-        contentAlignment = Alignment.Center,
+        verticalArrangement = Arrangement.spacedBy(dimens.space4),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Text(
-                text = "Loading conversation…",
-                modifier = Modifier.padding(top = 8.dp),
-            )
+        repeat(4) { index ->
+            val userBubble = index % 2 == 0
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = if (userBubble) {
+                    Arrangement.End
+                } else {
+                    Arrangement.Start
+                },
+            ) {
+                Skeleton(
+                    modifier = Modifier
+                        .fillMaxWidth(if (userBubble) 0.55f else 0.75f)
+                        .height(if (userBubble) 44.dp else 72.dp),
+                )
+            }
         }
     }
 }
@@ -498,10 +510,10 @@ private fun ChatContent(
         }
 
         state.attachmentWarning?.let { warning ->
-            Text(
-                text = warning,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+            InlineBanner(
+                severity = BannerSeverity.Warning,
+                title = "Attachment warning",
+                body = warning,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = dimensPadding, vertical = dimens.space1)

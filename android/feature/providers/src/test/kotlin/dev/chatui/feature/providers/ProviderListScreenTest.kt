@@ -10,6 +10,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import kotlinx.serialization.json.buildJsonObject
@@ -328,6 +330,27 @@ class ProviderListScreenTest {
             .performClick()
 
         assertThat(opened).isEqualTo("provider-1")
+    }
+
+    @Test
+    fun `pull to refresh invokes retry`() {
+        var retried = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderListScreen(
+                    state = state(),
+                    onOpenProvider = {},
+                    onRetry = { retried = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ProviderListTestTags.Screen)
+            .performTouchInput { swipeDown() }
+        composeRule.waitForIdle()
+
+        assertThat(retried).isTrue()
     }
 
     @Test

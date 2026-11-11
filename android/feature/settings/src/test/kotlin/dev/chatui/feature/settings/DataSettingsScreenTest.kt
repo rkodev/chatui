@@ -223,9 +223,68 @@ class DataSettingsScreenTest {
         composeRule.onNodeWithText("Export started").assertIsDisplayed()
     }
 
+    @Test
+    fun `loading state shows skeletons instead of loading text`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                DataSettingsScreen(
+                    state = state(loading = true),
+                    onConfirmationPhraseChanged = {},
+                    onClearAll = {},
+                    onRequestRemoveKey = {},
+                    onCancelRemoveKey = {},
+                    onConfirmRemoveKey = {},
+                    onDismissError = {},
+                    onOpenProviders = {},
+                    onOpenBackup = {},
+                    onExportAll = {},
+                    onImportMerge = {},
+                    onImportReplace = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(DataSettingsTestTags.Usage)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Calculating storage usage...").assertDoesNotExist()
+        composeRule.onNodeWithText("Loading stored keys...").assertDoesNotExist()
+    }
+
+    @Test
+    fun `error state uses an inline banner with dismiss`() {
+        var dismissed = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                DataSettingsScreen(
+                    state = state(error = "Could not read storage"),
+                    onConfirmationPhraseChanged = {},
+                    onClearAll = {},
+                    onRequestRemoveKey = {},
+                    onCancelRemoveKey = {},
+                    onConfirmRemoveKey = {},
+                    onDismissError = { dismissed = true },
+                    onOpenProviders = {},
+                    onOpenBackup = {},
+                    onExportAll = {},
+                    onImportMerge = {},
+                    onImportReplace = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(DataSettingsTestTags.Error).assertIsDisplayed()
+        composeRule.onNodeWithText("Dismiss").performClick()
+
+        assertThat(dismissed).isTrue()
+    }
+
     private fun state(
         confirmationPhrase: String = "",
         confirmKeyId: String? = null,
+        loading: Boolean = false,
+        error: String? = null,
     ): DataSettingsUiState = DataSettingsUiState(
         usage = StorageUsage(
             conversations = StorageUsageEntry(1, 100),
@@ -244,7 +303,8 @@ class DataSettingsScreenTest {
                 keyLabel = "Team key",
             ),
         ),
-        loading = false,
+        loading = loading,
+        error = error,
         confirmKeyId = confirmKeyId,
         confirmationPhrase = confirmationPhrase,
     )

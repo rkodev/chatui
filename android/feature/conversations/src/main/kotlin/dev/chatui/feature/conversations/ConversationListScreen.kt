@@ -66,11 +66,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import dev.chatui.core.designsystem.BrandMark
+import dev.chatui.core.designsystem.BannerSeverity
+import dev.chatui.core.designsystem.EmptyState
+import dev.chatui.core.designsystem.ErrorState
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.LocalSnackbarHostState
 import dev.chatui.core.designsystem.PrimaryButton
 import dev.chatui.core.designsystem.SegmentedControl
+import dev.chatui.core.designsystem.SkeletonList
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.Conversation
@@ -154,10 +159,11 @@ fun ConversationListScreen(
     modifier: Modifier = Modifier,
     now: Instant = Instant.now(),
     zoneId: ZoneId = ZoneId.systemDefault(),
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    snackbarHostState: SnackbarHostState? = LocalSnackbarHostState.current,
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
+    val host = snackbarHostState ?: remember { SnackbarHostState() }
     var renameTarget by remember { mutableStateOf<Conversation?>(null) }
     var renameValue by remember { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
@@ -172,18 +178,13 @@ fun ConversationListScreen(
     val groups = if (archived) state.archivedGroups else state.groups
     val loading = if (archived) state.archivedLoading else state.loading
     val error = if (archived) state.archivedError else state.error
-    val loadingText = if (archived) {
-        "Loading archived conversations…"
-    } else {
-        "Loading conversations…"
-    }
 
     LaunchedEffect(state.pendingUndo?.id) {
         if (state.pendingUndo == null) {
-            snackbarHostState.currentSnackbarData?.dismiss()
+            host.currentSnackbarData?.dismiss()
             return@LaunchedEffect
         }
-        val result = snackbarHostState.showSnackbar(
+        val result = host.showSnackbar(
             message = "Conversation deleted",
             actionLabel = "Undo",
             duration = SnackbarDuration.Indefinite,
@@ -201,7 +202,7 @@ fun ConversationListScreen(
             withContext(Dispatchers.Default) {
                 delay(ConversationListViewModel.UNDO_WINDOW_MS)
             }
-            snackbarHostState.currentSnackbarData?.dismiss()
+            host.currentSnackbarData?.dismiss()
         }
     }
 
@@ -277,16 +278,12 @@ fun ConversationListScreen(
 
             error?.let { message ->
                 item {
-                    Column(
+                    ErrorState(
+                        title = "Could not load conversations",
+                        body = message,
+                        onRetry = onRetry,
                         modifier = Modifier.testTag(ConversationListTestTags.Error),
-                        verticalArrangement = Arrangement.spacedBy(dimens.space1),
-                    ) {
-                        Text(
-                            text = message,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        TextButton(onClick = onRetry) { Text("Retry") }
-                    }
+                    )
                 }
             }
 
@@ -295,36 +292,42 @@ fun ConversationListScreen(
 
                 when {
                     searchError != null -> item {
-                        Column(
-                            modifier = Modifier.testTag(ConversationListTestTags.SearchError),
-                            verticalArrangement = Arrangement.spacedBy(dimens.space1),
-                        ) {
-                            Text(
-                                text = searchError,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            TextButton(
-                                onClick = onSearchRetry,
-                                modifier = Modifier.testTag(
-                                    ConversationListTestTags.SearchRetry,
-                                ),
-                            ) {
-                                Text("Retry")
-                            }
-                        }
+                        InlineBanner(
+                            severity = BannerSeverity.Error,
+                            title = "Search failed",
+                            body = searchError,
+                            modifier = Modifier.testTag(
+                                ConversationListTestTags.SearchError,
+                            ),
+                            action = {
+                                TextButton(
+                                    onClick = onSearchRetry,
+                                    modifier = Modifier.testTag(
+                                        ConversationListTestTags.SearchRetry,
+                                    ),
+                                ) {
+                                    Text("Retry")
+                                }
+                            },
+                        )
                     }
 
                     state.searchLoading -> item {
-                        Text(
-                            text = "Searching…",
-                            modifier = Modifier.testTag(ConversationListTestTags.SearchLoading),
+                        SkeletonList(
+                            modifier = Modifier.testTag(
+                                ConversationListTestTags.SearchLoading,
+                            ),
+                            count = 3,
                         )
                     }
 
                     state.searchResults.isEmpty() -> item {
-                        Text(
-                            text = "No matches.",
-                            modifier = Modifier.testTag(ConversationListTestTags.SearchEmpty),
+                        EmptyState(
+                            title = "No matches",
+                            body = "Try a different search term.",
+                            modifier = Modifier.testTag(
+                                ConversationListTestTags.SearchEmpty,
+                            ),
                         )
                     }
 
@@ -343,9 +346,9 @@ fun ConversationListScreen(
             } else {
                 when {
                     loading && groups.isEmpty() -> item {
-                        Text(
-                            text = loadingText,
+                        SkeletonList(
                             modifier = Modifier.testTag(ConversationListTestTags.Loading),
+                            count = 5,
                         )
                     }
 
@@ -398,13 +401,15 @@ fun ConversationListScreen(
             }
         }
 
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(dimens.padding),
-        ) { data ->
-            UndoSnackbar(data = data)
+        if (snackbarHostState == null) {
+            SnackbarHost(
+                hostState = host,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(dimens.padding),
+            ) { data ->
+                UndoSnackbar(data = data)
+            }
         }
     }
 
@@ -708,31 +713,26 @@ private fun ConversationEmptyState(
     archived: Boolean,
     onNewChat: () -> Unit,
 ) {
-    val dimens = LocalDimens.current
-    val colors = LocalChatUiColors.current
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(ConversationListTestTags.Empty)
-            .padding(dimens.sectionGap),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(dimens.space3),
-    ) {
-        BrandMark(size = 56.dp)
-        Text(
-            text = if (archived) "No archived conversations" else "No conversations yet",
-            style = Typography.title3,
-            color = colors.fgPrimary,
-        )
-        if (!archived) {
-            PrimaryButton(
-                text = "Start a chat",
-                onClick = onNewChat,
-                modifier = Modifier.testTag(ConversationListTestTags.EmptyStartChat),
-            )
-        }
-    }
+    EmptyState(
+        title = if (archived) "No archived conversations" else "No conversations yet",
+        body = if (archived) {
+            "Archived conversations appear here."
+        } else {
+            "Start a chat to see it in your history."
+        },
+        modifier = Modifier.testTag(ConversationListTestTags.Empty),
+        action = if (archived) {
+            null
+        } else {
+            {
+                PrimaryButton(
+                    text = "Start a chat",
+                    onClick = onNewChat,
+                    modifier = Modifier.testTag(ConversationListTestTags.EmptyStartChat),
+                )
+            }
+        },
+    )
 }
 
 @Composable

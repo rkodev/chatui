@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,9 +49,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.EmptyState
 import dev.chatui.core.designsystem.ErrorState
 import dev.chatui.core.designsystem.IconAction
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.SkeletonList
@@ -62,6 +65,7 @@ import dev.chatui.core.providers.getProviderKeyMetadata
 /** Test tags exposed by the provider list. */
 object ProviderListTestTags {
     const val Screen = "provider-list-screen"
+    const val Refresh = "provider-list-refresh"
     const val Loading = "provider-list-loading"
     const val Empty = "provider-list-empty"
     const val Error = "provider-list-error"
@@ -137,13 +141,20 @@ fun ProviderListScreen(
     val connected = state.providers.filter { it.secretId != null }
     val available = state.providers.filter { it.secretId == null }
 
-    LazyColumn(
+    PullToRefreshBox(
+        isRefreshing = state.loading && state.providers.isNotEmpty(),
+        onRefresh = onRetry,
         modifier = modifier
             .fillMaxSize()
-            .testTag(ProviderListTestTags.Screen),
-        contentPadding = PaddingValues(dimens.padding),
-        verticalArrangement = Arrangement.spacedBy(dimens.gap),
+            .testTag(ProviderListTestTags.Refresh),
     ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag(ProviderListTestTags.Screen),
+            contentPadding = PaddingValues(dimens.padding),
+            verticalArrangement = Arrangement.spacedBy(dimens.gap),
+        ) {
         item {
             ProviderListHeader(onAdd = { addStep = AddProviderStep.Choose })
         }
@@ -204,6 +215,7 @@ fun ProviderListScreen(
                     }
                 }
             }
+        }
         }
     }
 
@@ -634,9 +646,10 @@ private fun PresetProviderForm(
         }
 
         form.error?.let { message ->
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.error,
+            InlineBanner(
+                severity = BannerSeverity.Error,
+                title = "Could not add provider",
+                body = message,
                 modifier = Modifier.testTag(ProviderListTestTags.PresetError),
             )
         }
@@ -725,17 +738,19 @@ private fun CustomProviderForm(
         )
 
         form.cleartextWarning?.let { message ->
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.tertiary,
+            InlineBanner(
+                severity = BannerSeverity.Warning,
+                title = "Cleartext connection",
+                body = message,
                 modifier = Modifier.testTag(ProviderListTestTags.CustomCleartextWarning),
             )
         }
 
         form.cleartextError?.let { message ->
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.error,
+            InlineBanner(
+                severity = BannerSeverity.Error,
+                title = "Cleartext connection blocked",
+                body = message,
                 modifier = Modifier.testTag(ProviderListTestTags.CustomCleartextError),
             )
         }
@@ -814,16 +829,18 @@ private fun CustomProviderForm(
         }
 
         form.error?.let { message ->
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.error,
+            InlineBanner(
+                severity = BannerSeverity.Error,
+                title = "Could not add provider",
+                body = message,
                 modifier = Modifier.testTag(ProviderListTestTags.CustomError),
             )
         }
 
         notice?.let { message ->
-            Text(
-                text = message,
+            InlineBanner(
+                severity = BannerSeverity.Info,
+                title = message,
                 modifier = Modifier.testTag(ProviderListTestTags.CustomNotice),
             )
         }

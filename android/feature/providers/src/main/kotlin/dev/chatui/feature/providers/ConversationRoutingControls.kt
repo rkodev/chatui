@@ -14,6 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import dev.chatui.core.designsystem.BannerSeverity
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalDimens
 
 /** Test tags exposed by the conversation routing controls. */
@@ -135,9 +137,10 @@ fun ConversationRoutingControls(
         }
 
         state.error?.let { error ->
-            Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
+            InlineBanner(
+                severity = BannerSeverity.Error,
+                title = "Could not update routing",
+                body = error,
                 modifier = Modifier.testTag(ConversationRoutingTestTags.Error),
             )
         }

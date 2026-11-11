@@ -62,7 +62,9 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
 import dev.chatui.core.database.attachment.formatAttachmentSize
+import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.BrandMark
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.LocalReducedMotion
@@ -468,63 +470,46 @@ private fun ErrorCard(
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
-    Column(
+    InlineBanner(
+        severity = BannerSeverity.Error,
+        title = errorCopy.title,
+        body = errorCopy.message,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(dimens.radiusMd))
-            .background(colors.danger.copy(alpha = 0.08f))
-            .padding(dimens.space3)
             .testTag(ChatMessageTestTags.Error),
-        verticalArrangement = Arrangement.spacedBy(dimens.space1),
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(dimens.space2),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.ErrorOutline,
-                contentDescription = null,
-                tint = colors.danger,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                text = errorCopy.title,
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.danger,
-            )
-        }
-        Text(
-            text = errorCopy.message,
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.fgSecondary,
-        )
-        errorCopy.details?.let { details ->
-            TextButton(
-                onClick = onToggleDetails,
-                modifier = Modifier.heightIn(min = dimens.touchTargetMin),
-            ) {
-                Text(if (detailsExpanded) "Hide details" else "Details")
+        action = {
+            Column(verticalArrangement = Arrangement.spacedBy(dimens.space1)) {
+                errorCopy.details?.let { details ->
+                    TextButton(
+                        onClick = onToggleDetails,
+                        modifier = Modifier.heightIn(min = dimens.touchTargetMin),
+                    ) {
+                        Text(if (detailsExpanded) "Hide details" else "Details")
+                    }
+                    if (detailsExpanded) {
+                        Text(
+                            text = details,
+                            style = Typography.codeStyle,
+                            color = colors.fgSecondary,
+                            modifier = Modifier.testTag(
+                                ChatMessageTestTags.errorDetails(message.id),
+                            ),
+                        )
+                    }
+                }
+                if (onRetry != null) {
+                    TextButton(
+                        onClick = { onRetry(message) },
+                        modifier = Modifier
+                            .heightIn(min = dimens.touchTargetMin)
+                            .testTag(ChatMessageTestTags.Retry),
+                    ) {
+                        Text("Retry")
+                    }
+                }
             }
-            if (detailsExpanded) {
-                Text(
-                    text = details,
-                    style = Typography.codeStyle,
-                    color = colors.fgSecondary,
-                    modifier = Modifier.testTag(ChatMessageTestTags.errorDetails(message.id)),
-                )
-            }
-        }
-        if (onRetry != null) {
-            TextButton(
-                onClick = { onRetry(message) },
-                modifier = Modifier
-                    .heightIn(min = dimens.touchTargetMin)
-                    .testTag(ChatMessageTestTags.Retry),
-            ) {
-                Text("Retry")
-            }
-        }
-    }
+        },
+    )
 }
 
 @Composable

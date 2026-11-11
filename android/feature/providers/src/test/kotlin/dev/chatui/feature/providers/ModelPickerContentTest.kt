@@ -10,6 +10,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.ModelCapability
@@ -279,6 +281,59 @@ class ModelPickerContentTest {
         composeRule.onNodeWithTag(ModelPickerTestTags.AddManual).performClick()
 
         assertThat(addClicks).isEqualTo(1)
+    }
+
+    @Test
+    fun `error state shows retry and invokes refresh`() {
+        var refreshed = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ModelPickerContent(
+                    state = state().copy(error = "Catalog unavailable"),
+                    onQueryChanged = {},
+                    onSelect = {},
+                    onPin = { _, _ -> },
+                    onHide = { _, _ -> },
+                    onManualRemoteIdChanged = {},
+                    onManualLabelChanged = {},
+                    onAddManual = {},
+                    onRefresh = { refreshed = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.Error).assertIsDisplayed()
+        composeRule.onNodeWithText("Retry").performClick()
+
+        assertThat(refreshed).isTrue()
+    }
+
+    @Test
+    fun `pull to refresh invokes refresh`() {
+        var refreshed = false
+
+        composeRule.setContent {
+            ChatUiTheme {
+                ModelPickerContent(
+                    state = state(),
+                    onQueryChanged = {},
+                    onSelect = {},
+                    onPin = { _, _ -> },
+                    onHide = { _, _ -> },
+                    onManualRemoteIdChanged = {},
+                    onManualLabelChanged = {},
+                    onAddManual = {},
+                    onRefresh = { refreshed = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ModelPickerTestTags.Content)
+            .performTouchInput { swipeDown() }
+        composeRule.waitForIdle()
+
+        assertThat(refreshed).isTrue()
     }
 
     @Test

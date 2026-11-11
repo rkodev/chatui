@@ -23,7 +23,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,11 +38,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import dev.chatui.core.designsystem.BannerSeverity
+import dev.chatui.core.designsystem.ChatUiSnackbarHost
 import dev.chatui.core.designsystem.GroupedList
 import dev.chatui.core.designsystem.GroupedSection
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.LocalSnackbarHostState
 import dev.chatui.core.designsystem.SettingsRow
+import dev.chatui.core.designsystem.Skeleton
 import dev.chatui.core.designsystem.Typography
 import java.util.Locale
 import kotlinx.coroutines.launch
@@ -120,18 +124,19 @@ fun DataSettingsScreen(
     onImportMerge: () -> Unit,
     onImportReplace: () -> Unit,
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    snackbarHostState: SnackbarHostState? = LocalSnackbarHostState.current,
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
     val scope = rememberCoroutineScope()
+    val host = snackbarHostState ?: remember { SnackbarHostState() }
     var showClearSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.status) {
-        state.status?.let { snackbarHostState.showSnackbar(it) }
+        state.status?.let { host.showSnackbar(it) }
     }
     LaunchedEffect(state.error) {
-        state.error?.let { snackbarHostState.showSnackbar(it) }
+        state.error?.let { host.showSnackbar(it) }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -143,22 +148,18 @@ fun DataSettingsScreen(
                 .testTag(DataSettingsTestTags.Root),
         ) {
             state.error?.let { error ->
-                Row(
+                InlineBanner(
+                    severity = BannerSeverity.Error,
+                    title = "Data operation failed",
+                    body = error,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = dimens.screenPadding),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = error,
-                        color = colors.danger,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(DataSettingsTestTags.Error),
-                    )
-                    TextButton(onClick = onDismissError) { Text("Dismiss") }
-                }
+                        .padding(horizontal = dimens.screenPadding)
+                        .testTag(DataSettingsTestTags.Error),
+                    action = {
+                        TextButton(onClick = onDismissError) { Text("Dismiss") }
+                    },
+                )
                 Spacer(Modifier.height(dimens.space3))
             }
 
@@ -186,11 +187,13 @@ fun DataSettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(dimens.space2),
                     ) {
                         if (state.loading) {
-                            Text(
-                                text = "Calculating storage usage...",
-                                style = Typography.body,
-                                color = colors.fgSecondary,
-                            )
+                            repeat(4) {
+                                Skeleton(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(20.dp),
+                                )
+                            }
                         } else {
                             val usage = state.usage
                             if (usage != null) {
@@ -235,11 +238,13 @@ fun DataSettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(dimens.space2),
                     ) {
                         if (state.loading) {
-                            Text(
-                                text = "Loading stored keys...",
-                                style = Typography.body,
-                                color = colors.fgSecondary,
-                            )
+                            repeat(2) {
+                                Skeleton(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(20.dp),
+                                )
+                            }
                         } else {
                             val storedKeys = state.keys.filter { it.hasKey }
                             if (storedKeys.isEmpty()) {
@@ -285,7 +290,7 @@ fun DataSettingsScreen(
                         onClick = {
                             onExportAll()
                             scope.launch {
-                                snackbarHostState.showSnackbar("Export started")
+                                host.showSnackbar("Export started")
                             }
                         },
                         modifier = Modifier.testTag(DataSettingsTestTags.ExportButton),
@@ -305,7 +310,7 @@ fun DataSettingsScreen(
                         onClick = {
                             onImportMerge()
                             scope.launch {
-                                snackbarHostState.showSnackbar("Import started")
+                                host.showSnackbar("Import started")
                             }
                         },
                         modifier = Modifier.testTag(DataSettingsTestTags.ImportMerge),
@@ -317,7 +322,7 @@ fun DataSettingsScreen(
                         onClick = {
                             onImportReplace()
                             scope.launch {
-                                snackbarHostState.showSnackbar("Import started")
+                                host.showSnackbar("Import started")
                             }
                         },
                         modifier = Modifier.testTag(DataSettingsTestTags.ImportReplace),
@@ -342,10 +347,12 @@ fun DataSettingsScreen(
                 }
             }
         }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        if (snackbarHostState == null) {
+            ChatUiSnackbarHost(
+                hostState = host,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
 
     if (showClearSheet) {
