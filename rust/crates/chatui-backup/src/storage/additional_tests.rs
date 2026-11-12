@@ -21,12 +21,12 @@ const ENCRYPTED_BYTES: &[u8] = &[
 fn gcs_private_key() -> &'static str {
     use std::sync::OnceLock;
 
+    use rsa::Generate;
     use rsa::pkcs8::{EncodePrivateKey, LineEnding};
 
     static KEY: OnceLock<String> = OnceLock::new();
     KEY.get_or_init(|| {
-        let mut rng = rand::thread_rng();
-        let key = rsa::RsaPrivateKey::new(&mut rng, 2048).expect("generate test key");
+        let key = rsa::PrivateKey::try_generate().expect("generate test key");
         key.to_pkcs8_pem(LineEnding::LF)
             .expect("encode test key")
             .to_string()

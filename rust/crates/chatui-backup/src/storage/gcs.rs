@@ -10,12 +10,12 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use reqwest::Method;
-use rsa::RsaPrivateKey;
+use rsa::PrivateKey;
 use rsa::pkcs1v15::SigningKey;
 use rsa::pkcs8::DecodePrivateKey;
+use rsa::sha2::Sha256;
 use rsa::signature::{SignatureEncoding, Signer};
 use serde::Deserialize;
-use sha2::Sha256;
 use url::Url;
 
 use crate::storage::common::{
@@ -256,7 +256,7 @@ impl GcsStorageAdapter {
         let signing_input = format!("{header}.{claims}");
 
         let key =
-            RsaPrivateKey::from_pkcs8_pem(&self.service_account.private_key).map_err(|error| {
+            PrivateKey::from_pkcs8_pem(&self.service_account.private_key).map_err(|error| {
                 StorageError::Auth {
                     message: format!("Failed to parse GCS private key: {error}"),
                     status: None,
