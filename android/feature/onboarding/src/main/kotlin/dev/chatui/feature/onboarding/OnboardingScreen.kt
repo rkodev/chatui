@@ -26,16 +26,20 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.SettingsBrightness
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -43,6 +47,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -52,6 +57,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -150,20 +156,24 @@ fun OnboardingScreen(
     modifier: Modifier = Modifier,
 ) {
     val content: @Composable () -> Unit = {
-        OnboardingContent(
-            state = state,
-            onApiKeyChanged = onApiKeyChanged,
-            onLabelChanged = onLabelChanged,
-            onProviderSelected = onProviderSelected,
-            onThemeSelected = onThemeSelected,
-            onContinue = onContinue,
-            onBack = onBack,
-            onConnect = onConnect,
-            onRetryCatalog = onRetryCatalog,
-            onStartChatting = onStartChatting,
-            backupService = backupService,
-            modifier = modifier,
-        )
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            CompositionLocalProvider(LocalContentColor provides LocalChatUiColors.current.fgPrimary) {
+                OnboardingContent(
+                    state = state,
+                    onApiKeyChanged = onApiKeyChanged,
+                    onLabelChanged = onLabelChanged,
+                    onProviderSelected = onProviderSelected,
+                    onThemeSelected = onThemeSelected,
+                    onContinue = onContinue,
+                    onBack = onBack,
+                    onConnect = onConnect,
+                    onRetryCatalog = onRetryCatalog,
+                    onStartChatting = onStartChatting,
+                    backupService = backupService,
+                    modifier = Modifier.widthIn(max = 560.dp).fillMaxSize(),
+                )
+            }
+        }
     }
 
     if (state.step == OnboardingStep.WELCOME) {
@@ -200,48 +210,59 @@ private fun OnboardingContent(
 
     val dimens = LocalDimens.current
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag(OnboardingTestTags.Screen),
-        contentPadding = PaddingValues(dimens.padding),
-        verticalArrangement = Arrangement.spacedBy(dimens.gap),
-    ) {
-        item { StepIndicator(state.step) }
+    Column(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .testTag(OnboardingTestTags.Screen),
+            contentPadding = PaddingValues(dimens.screenPadding),
+            verticalArrangement = Arrangement.spacedBy(dimens.space5),
+        ) {
+            item { StepIndicator(state.step) }
 
-        when (state.step) {
-            OnboardingStep.WELCOME -> {
-                item { WelcomeHero() }
-                item { ThemeSelector(state.theme, onThemeSelected) }
-                item { ProviderPicker(state, onProviderSelected) }
-                item {
-                    Button(
-                        onClick = onContinue,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = dimens.touchTargetMin)
-                            .testTag(OnboardingTestTags.ContinueButton),
-                    ) {
-                        Text("Get started")
+            when (state.step) {
+                OnboardingStep.WELCOME -> {
+                    item { WelcomeHero() }
+                    item { ThemeSelector(state.theme, onThemeSelected) }
+                    item { ProviderPicker(state, onProviderSelected) }
+                }
+
+                OnboardingStep.KEY_ENTRY -> {
+                    item { KeyEntryHeader(state) }
+                    item {
+                        KeyEntryForm(
+                            state = state,
+                            onApiKeyChanged = onApiKeyChanged,
+                            onLabelChanged = onLabelChanged,
+                            onConnect = onConnect,
+                            onBack = onBack,
+                        )
                     }
+                    item { CatalogSection(state.catalog, onRetryCatalog) }
                 }
-            }
 
-            OnboardingStep.KEY_ENTRY -> {
-                item { KeyEntryHeader(state) }
-                item {
-                    KeyEntryForm(
-                        state = state,
-                        onApiKeyChanged = onApiKeyChanged,
-                        onLabelChanged = onLabelChanged,
-                        onConnect = onConnect,
-                        onBack = onBack,
-                    )
-                }
-                item { CatalogSection(state.catalog, onRetryCatalog) }
+                OnboardingStep.BACKUP -> Unit
             }
-
-            OnboardingStep.BACKUP -> Unit
+        }
+        if (state.step == OnboardingStep.WELCOME) {
+            HorizontalDivider(color = LocalChatUiColors.current.separator)
+            Button(
+                onClick = onContinue,
+                modifier = Modifier
+                    .padding(horizontal = dimens.screenPadding, vertical = dimens.space3)
+                    .fillMaxWidth()
+                    .heightIn(min = dimens.rowMinHeight)
+                    .testTag(OnboardingTestTags.ContinueButton),
+            ) {
+                Text("Get started", style = Typography.headline)
+                Spacer(Modifier.width(dimens.space2))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
@@ -270,7 +291,7 @@ private fun StepIndicator(step: OnboardingStep) {
         modifier = Modifier
             .fillMaxWidth()
             .testTag(OnboardingTestTags.StepIndicator),
-        verticalArrangement = Arrangement.spacedBy(dimens.space1),
+        verticalArrangement = Arrangement.spacedBy(dimens.space2),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.space2)) {
             StepLabel(
@@ -289,15 +310,21 @@ private fun StepIndicator(step: OnboardingStep) {
                 modifier = Modifier.weight(1f),
             )
         }
-        LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(4.dp)
-                .clip(RoundedCornerShape(dimens.radiusFull)),
-            color = colors.accent,
-            trackColor = colors.separator,
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(dimens.space2)) {
+            repeat(3) { index ->
+                LinearProgressIndicator(
+                    progress = { (progress * 3 - index).coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(3.dp)
+                        .clip(CircleShape),
+                    color = colors.accent,
+                    trackColor = colors.separator,
+                    gapSize = 0.dp,
+                    drawStopIndicator = {},
+                )
+            }
+        }
     }
 }
 
@@ -339,34 +366,51 @@ private fun WelcomeHero() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(dimens.space3),
         ) {
-            BrandMark(size = 88.dp)
-            Text(
-                text = "ChatUI",
-                style = Typography.largeTitle,
-                color = colors.fgPrimary,
-                textAlign = TextAlign.Center,
-            )
+            Row(
+                modifier = Modifier.padding(top = dimens.space2, bottom = dimens.space2),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(dimens.space3),
+            ) {
+                BrandMark(size = 48.dp)
+                Text(
+                    text = "ChatUI",
+                    style = Typography.title2,
+                    color = colors.fgPrimary,
+                )
+            }
             Text(
                 text = "Your keys. Your device. Your conversations.",
-                style = Typography.title2,
+                style = Typography.title1,
                 color = colors.fgPrimary,
                 textAlign = TextAlign.Center,
             )
             Text(
-                text = "ChatUI is bring-your-own-key (BYOK). You connect your own " +
-                    "OpenRouter API key, and your conversations, settings, and key " +
-                    "stay on this device. Nothing is sent to a ChatUI server.",
-                style = Typography.body,
+                text = "Bring your own API key to chat with the models you choose.",
+                style = Typography.callout,
                 color = colors.fgSecondary,
                 textAlign = TextAlign.Center,
             )
-            Text(
-                text = "OpenRouter is recommended for this preview. You can add " +
-                    "other providers from Providers after setup.",
-                style = Typography.subhead,
-                color = colors.fgMuted,
-                textAlign = TextAlign.Center,
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.bgSurface, RoundedCornerShape(dimens.radiusLg))
+                    .padding(dimens.space3),
+                horizontalArrangement = Arrangement.spacedBy(dimens.space3),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Lock,
+                    contentDescription = null,
+                    tint = colors.accent,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = "Chats and keys stay on this device. Requests go directly " +
+                        "to your provider, never a ChatUI server.",
+                    style = Typography.footnote,
+                    color = colors.fgSecondary,
+                )
+            }
         }
     }
 }
@@ -379,12 +423,19 @@ private fun ProviderPicker(
     val dimens = LocalDimens.current
 
     Column(
-        modifier = Modifier.testTag(OnboardingTestTags.ProviderPicker),
+        modifier = Modifier
+            .selectableGroup()
+            .testTag(OnboardingTestTags.ProviderPicker),
         verticalArrangement = Arrangement.spacedBy(dimens.space2),
     ) {
         Text(
             text = "Choose a provider",
-            style = MaterialTheme.typography.titleMedium,
+            style = Typography.headline,
+        )
+        Text(
+            text = "You can add other providers from Providers after setup.",
+            style = Typography.footnote,
+            color = LocalChatUiColors.current.fgSecondary,
         )
 
         state.providers.forEach { option ->
@@ -425,6 +476,7 @@ private fun ProviderCard(
             .selectable(
                 selected = selected,
                 enabled = option.enabled,
+                role = Role.RadioButton,
                 onClick = {
                     haptics.tick()
                     onClick()
@@ -433,18 +485,19 @@ private fun ProviderCard(
             .testTag(OnboardingTestTags.providerOption(option.id)),
         colors = CardDefaults.cardColors(containerColor = container),
         border = BorderStroke(
-            width = if (selected) 2.dp else 1.dp,
+            width = 1.dp,
             color = if (selected) colors.accent else colors.borderSubtle,
         ),
+        shape = RoundedCornerShape(dimens.radiusLg),
     ) {
         Row(
-            modifier = Modifier.padding(dimens.cardPadding),
+            modifier = Modifier.padding(horizontal = dimens.cardPadding, vertical = dimens.space3),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(dimens.space3),
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .background(
                         color = if (selected) colors.accent else colors.bgSurface,
                         shape = CircleShape,
@@ -464,13 +517,13 @@ private fun ProviderCard(
                 Text(
                     text = option.label,
                     style = Typography.headline,
-                    color = colors.fgPrimary,
+                    color = if (option.enabled) colors.fgPrimary else colors.fgMuted,
                 )
                 if (option.recommended) {
                     Box(
                         modifier = Modifier
                             .background(
-                                color = colors.accent,
+                                color = colors.bgSurfaceRaised,
                                 shape = RoundedCornerShape(dimens.radiusFull),
                             )
                             .padding(horizontal = dimens.space2, vertical = 2.dp),
@@ -478,11 +531,11 @@ private fun ProviderCard(
                         Text(
                             text = "Recommended",
                             style = Typography.caption,
-                            color = colors.fgOnAccent,
+                            color = colors.fgSecondary,
                         )
                     }
                 }
-                option.statusLabel?.let { status ->
+                option.statusLabel?.takeUnless { option.recommended && it == "Recommended" }?.let { status ->
                     Text(
                         text = status,
                         style = Typography.footnote,
@@ -504,6 +557,7 @@ private fun ProviderCard(
 @Composable
 private fun KeyEntryHeader(state: OnboardingUiState) {
     val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
 
     Column(
         modifier = Modifier.testTag(OnboardingTestTags.KeyEntry),
@@ -511,11 +565,14 @@ private fun KeyEntryHeader(state: OnboardingUiState) {
     ) {
         Text(
             text = "Connect OpenRouter",
-            style = MaterialTheme.typography.headlineSmall,
+            style = Typography.title1,
+            color = colors.fgPrimary,
         )
         Text(
             text = "Your key is stored on this device and is never sent to a " +
                 "ChatUI server.",
+            style = Typography.callout,
+            color = colors.fgSecondary,
         )
         state.selectedProvider?.let { provider ->
             Text(
@@ -890,12 +947,13 @@ private fun ThemeSelector(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .selectableGroup()
             .testTag(OnboardingTestTags.ThemeSelector),
         verticalArrangement = Arrangement.spacedBy(dimens.space2),
     ) {
         Text(
             text = "Appearance",
-            style = MaterialTheme.typography.titleMedium,
+            style = Typography.headline,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -943,7 +1001,7 @@ private fun ThemeOption(
     val haptics = rememberHaptics()
     val shape = RoundedCornerShape(dimens.radiusMd)
 
-    Column(
+    Row(
         modifier = modifier
             .heightIn(min = dimens.touchTargetMin)
             .clip(shape)
@@ -953,7 +1011,7 @@ private fun ThemeOption(
             )
             .border(
                 border = BorderStroke(
-                    width = if (selected) 2.dp else 1.dp,
+                    width = 1.dp,
                     color = if (selected) colors.accent else colors.borderSubtle,
                 ),
                 shape = shape,
@@ -966,15 +1024,16 @@ private fun ThemeOption(
                     onClick()
                 },
             )
-            .padding(vertical = dimens.space3, horizontal = dimens.space2)
+            .padding(vertical = dimens.space2, horizontal = dimens.space1)
             .testTag(OnboardingTestTags.themeOption(theme)),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(dimens.space1),
+        horizontalArrangement = Arrangement.spacedBy(dimens.space1, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = if (selected) colors.accent else colors.fgSecondary,
+            modifier = Modifier.size(18.dp),
         )
         Text(
             text = label,

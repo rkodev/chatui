@@ -88,6 +88,8 @@ class OnboardingScreenTest {
 
         composeRule.onNodeWithText("coming later", substring = true, ignoreCase = true)
             .assertDoesNotExist()
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.ProviderPicker))
         composeRule.onNodeWithText(
             "You can add other providers from Providers after setup.",
             substring = true,
@@ -190,6 +192,8 @@ class OnboardingScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.ConnectButton))
         composeRule.onNodeWithTag(OnboardingTestTags.ConnectButton).performClick()
 
         assertThat(connectClicks).isEqualTo(1)
@@ -632,6 +636,35 @@ class OnboardingScreenTest {
         composeRule.onNodeWithTag(OnboardingTestTags.BackupSkip).performClick()
 
         assertThat(startClicks).isEqualTo(1)
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h480dp")
+    fun `get started stays visible while scrolling a compact welcome screen`() {
+        var continueClicks = 0
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                OnboardingScreen(
+                    state = OnboardingUiState(providers = providers()),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = { continueClicks += 1 },
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.ContinueButton).assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.providerOption("openai")))
+        composeRule.onNodeWithTag(OnboardingTestTags.ContinueButton)
+            .assertIsDisplayed()
+            .performClick()
+
+        assertThat(continueClicks).isEqualTo(1)
     }
 
     @Test
