@@ -15,12 +15,18 @@ mod runtime;
 mod secrets;
 mod sync;
 
+pub mod backup;
+pub mod backup_scheduler;
 pub mod data;
 pub mod models;
 pub mod onboarding;
 pub mod providers;
 pub mod settings;
 
+pub use backup::BackupServiceAdapter;
+pub use backup_scheduler::{
+    BackupRunOutcome, BackupScheduler, DEFAULT_DUE_AFTER, DEFAULT_INTERVAL, ScheduledBackupService,
+};
 pub use runtime::{ServiceRuntime, ServiceRuntimeError};
 pub use secrets::{
     SecretStoreError, default_secret_store, select_secret_store, session_only_secret_store,

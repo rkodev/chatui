@@ -287,7 +287,7 @@ const modelSchema = z
 const backupConfigSchema = z
   .object({
     enabled: z.boolean(),
-    backend: z.enum(['s3', 'azure-blob', 'gcs', 'webdav']),
+    backend: z.enum(['s3', 'azure-blob', 'gcs', 'google-drive', 'webdav']),
     endpoint: z.string().nullable(),
     region: z.string().nullable(),
     bucket: z.string(),
@@ -350,7 +350,11 @@ function cloneParams(params: ChatParams): ChatParams {
 }
 
 function cloneConversation(conversation: Conversation): Conversation {
-  return { ...conversation, params: cloneParams(conversation.params) }
+  const clone: Conversation = { ...conversation, params: cloneParams(conversation.params) }
+  // Sync-only fields are not part of the export contract.
+  delete (clone as Partial<Conversation>).storageKey
+  delete (clone as Partial<Conversation>).revision
+  return clone
 }
 
 function cloneMessage(message: Message): Message {

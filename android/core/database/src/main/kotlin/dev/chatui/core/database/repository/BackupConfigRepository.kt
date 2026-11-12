@@ -15,4 +15,9 @@ class BackupConfigRepository(
 ) {
     suspend fun get(): BackupConfig? =
         dao.getById(BackupConfigDao.DEFAULT_ID)?.toDomain()
+
+    /** Insert or replace the single backup configuration row. */
+    suspend fun put(config: BackupConfig) {
+        dao.upsert(config.toEntity())
+    }
 }

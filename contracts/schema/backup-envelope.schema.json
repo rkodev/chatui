@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rkodev/chatui/contracts/schema/backup-envelope.schema.json",
+  "title": "ChatUI Backup Envelope Header",
+  "contractVersion": 1,
+  "description": "The UTF-8 canonical JSON header of a ChatUI backup envelope. This schema models the header JSON, not the binary envelope. Byte layout (M5-decisions.md DEC-M5-05): offset 0, 8 bytes ASCII magic \"CHATUI1\\n\" (43 48 41 54 55 49 31 0a); offset 8, 4 bytes big-endian uint32 headerLength; offset 12, headerLength bytes UTF-8 canonical JSON header; offset 12 + headerLength, 12 random IV bytes; offset 24 + headerLength, n bytes AES-256-GCM ciphertext; offset 24 + headerLength + n, 16 bytes AES-256-GCM tag. The envelope remainder after the IV is ciphertext || tag. headerLength must be greater than 0 and at most 65536 bytes. Canonical serialization is UTF-8 JSON with no insignificant whitespace and keys in the order v, formatVersion, alg, kdf, iterations, salt, objectType, objectKey.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "formatVersion",
+    "alg",
+    "kdf",
+    "iterations",
+    "salt",
+    "objectType",
+    "objectKey"
+  ],
+  "properties": {
+    "v": {
+      "type": "integer",
+      "const": 1,
+      "description": "Envelope format version. v1 clients reject any other value with unsupported-version before decrypting."
+    },
+    "formatVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Backup payload format version. v1 clients reject any other value with unsupported-version before decrypting."
+    },
+    "alg": {
+      "type": "string",
+      "const": "AES-256-GCM",
+      "description": "AEAD algorithm. v1 clients reject any other value with unsupported-alg."
+    },
+    "kdf": {
+      "type": "string",
+      "const": "pbkdf2-sha256",
+      "description": "Key-derivation function wire value. v1 uses PBKDF2-HMAC-SHA256. v1 clients reject any other value with unsupported-kdf."
+    },
+    "iterations": {
+      "type": "integer",
+      "const": 600000,
+      "description": "PBKDF2 iteration count for v1."
+    },
+    "salt": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{22}==$",
+      "description": "Standard base64 with padding of the 16-byte backup-set salt. The salt is repeated in every envelope header and must match the manifest salt."
+    },
+    "objectType": {
+      "type": "string",
+      "enum": [
+        "manifest",
+        "conversation",
+        "attachment"
+      ],
+      "description": "Backup object type. Other manifest schema values are reserved and are not valid in a v1 backup envelope."
+    },
+    "objectKey": {
+      "type": "string",
+      "pattern": "^(manifest\\.enc|conversations/[0-9a-f]{32}\\.enc|attachments/[0-9a-f]{64}\\.enc)$",
+      "description": "ASCII storage path bound by the AAD. Must match the object's actual storage path."
+    }
+  }
+}

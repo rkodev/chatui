@@ -85,7 +85,11 @@ jobs:
 
       - name: Run Android gates
         working-directory: android
-        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug
+        # Hilt/KSP multi-module builds can restore a stale javaPreCompile entry
+        # from the shared Gradle build cache, yielding NO-SOURCE and sporadic
+        # Dagger/MissingBinding failures (google/dagger#5148). Keep dependency
+        # caching but bypass task-output caching so this gate is deterministic.
+        run: ./gradlew --no-daemon --no-build-cache lintDebug testDebugUnitTest assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

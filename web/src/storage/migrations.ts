@@ -1,4 +1,5 @@
 import type { IDBPDatabase, IDBPTransaction, StoreNames } from 'idb'
+import { newStorageKey } from '../domain'
 import type { ChatUiDB } from './db'
 
 export interface MigrationContext {
@@ -55,11 +56,55 @@ function createV1({ db }: MigrationContext): void {
   db.createObjectStore('attachmentBlobs', { keyPath: 'sha256' })
 }
 
+/**
+ * Version 2 adds the durable sync fields and deletion tombstones.
+ *
+ * Existing conversations are backfilled in place. The migration never deletes
+ * or rewrites unrelated records, and it leaves already-valid values untouched.
+ */
+function createV2({ transaction }: MigrationContext): void {
+  const tombstones = transaction.db.createObjectStore('tombstones', { keyPath: 'id' })
+  tombstones.createIndex('conversationId', 'conversationId')
+  tombstones.createIndex('deletedAt', 'deletedAt')
+
+  const conversations = transaction.objectStore('conversations')
+
+  void (async () => {
+    let cursor = await conversations.openCursor()
+
+    while (cursor) {
+      const record = cursor.value
+      let changed = false
+
+      if (typeof record.storageKey !== 'string' || !/^[0-9a-f]{32}$/u.test(record.storageKey)) {
+        record.storageKey = newStorageKey()
+        changed = true
+      }
+
+      if (!Number.isInteger(record.revision) || record.revision < 1) {
+        record.revision = 1
+        changed = true
+      }
+
+      if (changed) {
+        await cursor.update(record)
+      }
+
+      cursor = await cursor.continue()
+    }
+  })()
+}
+
 export const migrations: readonly Migration[] = [
   {
     version: 1,
     description: 'Create the v1 chatui schema',
     up: createV1,
+  },
+  {
+    version: 2,
+    description: 'Add conversation storage keys, revisions, and tombstones',
+    up: createV2,
   },
 ]
 

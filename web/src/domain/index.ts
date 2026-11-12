@@ -8,6 +8,7 @@ export type {
   OutputModality,
 } from './model'
 export type { ChatParams, Conversation, ReasoningEffort, SyncMeta } from './conversation'
+export type { Tombstone } from './tombstone'
 export type {
   Attachment,
   ContentPart,
@@ -29,5 +30,5 @@ export type {
   Theme,
 } from './settings'
 export type { ChatError, ChatErrorCode } from './errors'
-export { isUuidV7, newId } from './ids'
+export { isUuidV7, newId, newStorageKey } from './ids'
 export { isIsoUtc, nowIso } from './time'

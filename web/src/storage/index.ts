@@ -71,3 +71,6 @@ export type {
   SyncQueueAttemptPatch,
   SyncQueueListOptions,
 } from './SyncQueueRepository'
+
+export { TombstoneRepository } from './TombstoneRepository'
+export type { NewTombstone } from './TombstoneRepository'

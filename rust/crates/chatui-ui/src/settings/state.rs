@@ -144,19 +144,6 @@ pub struct SettingDescriptor {
     pub availability: SettingAvailability,
 }
 
-/// Backup placeholder copy. Backup itself is M5.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BackupPlaceholder {
-    /// Section title.
-    pub title: &'static str,
-    /// Primary message.
-    pub message: &'static str,
-    /// Future-behavior detail.
-    pub detail: &'static str,
-    /// Whether backup is available in this release.
-    pub available: bool,
-}
-
 /// About and privacy copy.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AboutInfo {
@@ -344,16 +331,6 @@ impl SettingsViewModel {
         SettingsRoute::Data
     }
 
-    /// Backup placeholder copy.
-    pub const fn backup_placeholder(&self) -> BackupPlaceholder {
-        BackupPlaceholder {
-            title: "Backup",
-            message: "ChatUI does not back up or sync data in this release. Everything stays on this device until you export it.",
-            detail: "When backup arrives it will encrypt data before upload, keep provider keys out of backup metadata, and use a user-owned destination. No backup credentials are stored today.",
-            available: false,
-        }
-    }
-
     /// About and privacy copy.
     pub fn about(&self) -> AboutInfo {
         AboutInfo {
@@ -365,7 +342,7 @@ impl SettingsViewModel {
                 "No analytics or telemetry are sent by ChatUI.",
                 "Chat content is sent only to the provider you select. OpenRouter forwards requests to an upstream provider under its own data policy.",
                 "Remote images in model output are blocked until you allow them globally or load one image explicitly.",
-                "Conversations and settings stay on this device. Backup and sync are not available in this release.",
+                "Conversations and settings stay on this device. Optional backup encrypts data on this device before uploading it to a storage destination you choose.",
                 "Every network destination is visible in provider settings; ChatUI has no hidden endpoints.",
             ],
             docs_url: DOCS_URL,
@@ -449,9 +426,7 @@ impl SettingsViewModel {
             SettingDescriptor {
                 key: "backup",
                 label: "Backup",
-                availability: SettingAvailability::Future(
-                    "Backup and sync arrive in M5; no backup controls are active in this release.",
-                ),
+                availability: SettingAvailability::Supported,
             },
             SettingDescriptor {
                 key: "onboardingCompleted",
@@ -758,12 +733,11 @@ mod tests {
             .iter()
             .find(|control| control.key == "backup")
             .expect("backup control");
-        assert!(!backup.availability.is_supported());
-        assert!(backup.availability.reason().unwrap().contains("M5"));
+        assert!(backup.availability.is_supported());
     }
 
     #[test]
-    fn about_and_backup_copy_state_the_privacy_boundaries() {
+    fn about_copy_states_the_privacy_boundaries() {
         let view_model =
             SettingsViewModel::new(settings(), Vec::new(), Vec::new(), SettingsRoute::About);
         let about = view_model.about();
@@ -775,12 +749,13 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("No analytics or telemetry"))
         );
+        assert!(
+            about
+                .privacy
+                .iter()
+                .any(|line| line.contains("Optional backup encrypts"))
+        );
         assert!(about.docs_url.starts_with("https://"));
-
-        let backup = view_model.backup_placeholder();
-        assert!(!backup.available);
-        assert!(backup.message.contains("does not back up"));
-        assert!(backup.detail.contains("encrypt"));
     }
 
     #[test]

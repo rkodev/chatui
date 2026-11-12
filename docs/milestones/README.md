@@ -14,7 +14,7 @@ Milestones are intentionally not task lists. Concrete tasks are generated later,
 | M3 | Android depth | Complete | M2 | android |
 | M3.5 | Rust desktop client | Optional / parallel | M0, M1 | rust desktop |
 | M4 | Polish and release | Planned | M1, M2, M3, M3.5 if shipping | all enabled clients |
-| M5 | Backup and sync | Future | M4 | all shipping clients |
+| M5 | Backup and sync | Complete | M4 | all shipping clients |
 | M6 | Managed roksky hosting | Future | M4 (M5 for BYO storage) | web hosting |
 
 Repository bootstrap (root README, Makefile, ignore rules, directory skeleton) is complete. The completed record is [`docs/tasks/T000-foundations.md`](../tasks/T000-foundations.md). M0 is complete; the exit-gate evidence is in [`docs/operations/M0/M0-verification.md`](../operations/M0/M0-verification.md). M1 and M2 are also complete; their exit-gate evidence is in [`docs/operations/M1/M1-verification.md`](../operations/M1/M1-verification.md) and [`docs/operations/M2/M2-verification.md`](../operations/M2/M2-verification.md).
@@ -43,7 +43,7 @@ M0 ──> M1 ──> M2 ──> M3 ──┐
 | [M3-android-depth.md](M3-android-depth.md) | Android platform integration, recovery, tests, release configuration |
 | [M3.5-rust-desktop.md](M3.5-rust-desktop.md) | Optional Rust desktop workspace for Windows, macOS, and Linux, conformance, packaging |
 | [M4-polish-and-release.md](M4-polish-and-release.md) | Accessibility, PWA, performance, deployment, parity audit, release |
-| [M5-backup-and-sync.md](M5-backup-and-sync.md) | Encrypted user-owned backup and sync (future) |
+| [M5-backup-and-sync.md](M5-backup-and-sync.md) | Encrypted user-owned backup and sync (complete) |
 | [M6-managed-hosting.md](M6-managed-hosting.md) | Optional roksky-managed hosting (future) |
 
 ## Cross-cutting invariants

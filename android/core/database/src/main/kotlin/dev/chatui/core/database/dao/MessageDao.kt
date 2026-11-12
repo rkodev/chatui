@@ -139,7 +139,8 @@ abstract class MessageDao {
 
     @Query(
         "UPDATE conversations SET lastMessageAt = :lastMessageAt, " +
-            "messageCount = :messageCount, updatedAt = :updatedAt WHERE id = :id",
+            "messageCount = :messageCount, updatedAt = :updatedAt, " +
+            "revision = revision + 1 WHERE id = :id",
     )
     abstract suspend fun updateConversationMessageMetadata(
         id: String,
@@ -196,6 +197,7 @@ abstract class MessageDao {
             lastMessageAt = lastMessageAt,
             messageCount = messageCount,
             updatedAt = updatedAt,
+            revision = conversation.revision + 1,
         )
     }
 
@@ -252,7 +254,9 @@ abstract class MessageDao {
             "conversations.lastMessageAt AS conversation_lastMessageAt, " +
             "conversations.messageCount AS conversation_messageCount, " +
             "conversations.lastErrorJson AS conversation_lastErrorJson, " +
-            "conversations.syncState AS conversation_syncState " +
+            "conversations.syncState AS conversation_syncState, " +
+            "conversations.storage_key AS conversation_storage_key, " +
+            "conversations.revision AS conversation_revision " +
             "FROM messages " +
             "INNER JOIN messages_fts ON messages.id = messages_fts.messageId " +
             "INNER JOIN conversations ON conversations.id = messages.conversationId " +

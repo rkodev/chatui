@@ -6,11 +6,12 @@ import {
   type IDBPTransaction,
   type StoreNames,
 } from 'idb'
-import type { Attachment, BackupConfig, Conversation, Message, Model, Provider } from '../domain'
+import type { Attachment, BackupConfig, Conversation, Message, Model, Provider, Tombstone } from '../domain'
+import { newStorageKey } from '../domain'
 import { runMigrations } from './migrations'
 
 export const DB_NAME = 'chatui'
-export const DB_VERSION = 1
+export const DB_VERSION = 2
 
 /**
  * IndexedDB cannot index booleans, so the two indexed conversation flags are
@@ -151,6 +152,14 @@ export interface ChatUiDB extends DBSchema {
     key: string
     value: AttachmentBlobRecord
   }
+  tombstones: {
+    key: string
+    value: Tombstone
+    indexes: {
+      conversationId: string
+      deletedAt: string
+    }
+  }
 }
 
 export type ChatUiStoreName = StoreNames<ChatUiDB>
@@ -193,6 +202,13 @@ export async function runTransaction<T, Mode extends IDBTransactionMode = 'reado
 export function toConversationRecord(conversation: Conversation): ConversationRecord {
   return {
     ...conversation,
+    storageKey: /^[0-9a-f]{32}$/u.test(conversation.storageKey)
+      ? conversation.storageKey
+      : newStorageKey(),
+    revision:
+      Number.isInteger(conversation.revision) && conversation.revision >= 1
+        ? conversation.revision
+        : 1,
     archived: conversation.archived ? 1 : 0,
     pinned: conversation.pinned ? 1 : 0,
   }

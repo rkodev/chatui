@@ -1,0 +1,39 @@
+# M5-07.4 storage inspection (synthetic data)
+
+Bucket: chatui-m5-evidence (local MinIO, path-style)
+Prefix: (empty)
+
+## Object listing
+
+2026-11-12 05:02:45  288 Bytes attachments/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.enc
+2026-11-12 05:03:02  288 Bytes attachments/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.enc
+2026-11-12 05:02:45  731 Bytes conversations/11111111111111111111111111111111.enc
+2026-11-12 05:03:02  720 Bytes conversations/22222222222222222222222222222222.enc
+2026-11-12 05:03:02    1.3 KiB manifest.enc
+
+Total Objects: 5
+   Total Size: 3.3 KiB
+
+## Envelope magic and header prefix
+
+attachments/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.enc: 00000000: 4348 4154 5549 310a 0000 00f0 7b22 7622  CHATUI1.....{"v"
+attachments/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.enc: 00000000: 4348 4154 5549 310a 0000 00f0 7b22 7622  CHATUI1.....{"v"
+conversations/11111111111111111111111111111111.enc: 00000000: 4348 4154 5549 310a 0000 00d4 7b22 7622  CHATUI1.....{"v"
+conversations/22222222222222222222222222222222.enc: 00000000: 4348 4154 5549 310a 0000 00d4 7b22 7622  CHATUI1.....{"v"
+manifest.enc: 00000000: 4348 4154 5549 310a 0000 00aa 7b22 7622  CHATUI1.....{"v"
+
+## Plaintext and provider-secret scan
+
+$ grep -a -r -E "Synthetic|m5-synthetic-passphrase|minioadmin|accessKeyId|secretAccessKey|provider-1|model-1" bucket
+no plaintext markers found
+
+## Manifest HEAD metadata
+
+{
+    "AcceptRanges": "bytes",
+    "LastModified": "2026-11-12T05:03:02+00:00",
+    "ContentLength": 1341,
+    "ETag": "\"3a2ce785a43d3fd0a91a840e79a66fd7\"",
+    "ContentType": "application/octet-stream",
+    "Metadata": {}
+}

@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "formatVersion": 1,
+  "alg": "AES-128-GCM",
+  "kdf": "pbkdf2-sha256",
+  "iterations": 600000,
+  "salt": "AAECAwQFBgcICQoLDA0ODw==",
+  "objectType": "conversation",
+  "objectKey": "conversations/00112233445566778899aabbccddeeff.enc"
+}

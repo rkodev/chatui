@@ -111,6 +111,8 @@ export function createTestConversation(overrides: Partial<Conversation> = {}): C
     lastMessageAt: now,
     messageCount: 0,
     lastError: null,
+    storageKey: '0123456789abcdef0123456789abcdef',
+    revision: 1,
     sync: null,
     ...overrides,
   }

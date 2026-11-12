@@ -15,6 +15,7 @@ pub mod provider;
 pub mod settings;
 pub mod stream;
 pub mod time;
+pub mod tombstone;
 
 pub use attachment::{Attachment, AttachmentKind};
 pub use conversation::{ChatParams, Conversation, ReasoningEffort, SyncMeta, SyncState};
@@ -29,6 +30,7 @@ pub use settings::{
 };
 pub use stream::StreamEvent;
 pub use time::{Timestamp, format_rfc3339, is_rfc3339_utc, now_rfc3339, parse_rfc3339};
+pub use tombstone::Tombstone;
 
 #[cfg(test)]
 mod dependency_tests {

@@ -1,6 +1,6 @@
-# M5 - Backup and sync (future)
+# M5 - Backup and sync
 
-- Status: Future
+- Status: Complete
 - Target: 3-4 weeks
 - Depends on: M4 and a stable phase 1 release
 - Blocks: M6 BYO storage onboarding

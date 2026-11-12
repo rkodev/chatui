@@ -1,11 +1,13 @@
 package dev.chatui.core.database.repository
 
+import dev.chatui.core.database.dao.BackupConfigDao
 import dev.chatui.core.database.entity.ConversationEntity
 import dev.chatui.core.database.entity.AttachmentEntity
 import dev.chatui.core.database.entity.BackupConfigEntity
 import dev.chatui.core.database.entity.MessageEntity
 import dev.chatui.core.database.entity.ModelEntity
 import dev.chatui.core.database.entity.ProviderEntity
+import dev.chatui.core.database.entity.TombstoneEntity
 import dev.chatui.core.model.BackupBackend
 import dev.chatui.core.model.BackupConfig
 import dev.chatui.core.model.BackupEncryption
@@ -33,6 +35,7 @@ import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.model.ProviderKind
 import dev.chatui.core.model.SyncMeta
 import dev.chatui.core.model.SyncState
+import dev.chatui.core.model.Tombstone
 import dev.chatui.core.model.Usage
 import java.time.Instant
 import kotlinx.serialization.KSerializer
@@ -77,6 +80,8 @@ internal fun ConversationEntity.toDomain(): Conversation = Conversation(
             remoteRevision = null,
         )
     },
+    storageKey = storageKey,
+    revision = revision,
 )
 
 internal fun Conversation.toEntity(): ConversationEntity = ConversationEntity(
@@ -98,6 +103,8 @@ internal fun Conversation.toEntity(): ConversationEntity = ConversationEntity(
         ChatUiJson.encodeToString(ChatError.serializer(), it)
     },
     syncState = sync?.let { serialName(SyncState.serializer(), it.state) },
+    storageKey = storageKey,
+    revision = revision,
 )
 
 internal fun AttachmentEntity.toDomain(): Attachment = Attachment(
@@ -128,6 +135,22 @@ internal fun Attachment.toEntity(): AttachmentEntity = AttachmentEntity(
     createdAt = createdAt.toString(),
 )
 
+internal fun TombstoneEntity.toDomain(): Tombstone = Tombstone(
+    id = id,
+    conversationId = conversationId,
+    messageId = messageId,
+    deletedAt = Instant.parse(deletedAt),
+    deviceId = deviceId,
+)
+
+internal fun Tombstone.toEntity(): TombstoneEntity = TombstoneEntity(
+    id = id,
+    conversationId = conversationId,
+    messageId = messageId,
+    deletedAt = deletedAt.toString(),
+    deviceId = deviceId,
+)
+
 internal fun BackupConfigEntity.toDomain(): BackupConfig = BackupConfig(
     enabled = enabled,
     backend = parseSerialName(BackupBackend.serializer(), backend),
@@ -142,6 +165,24 @@ internal fun BackupConfigEntity.toDomain(): BackupConfig = BackupConfig(
     lastSyncAt = lastSyncAt?.let(Instant::parse),
     lastManifestEtag = lastManifestEtag,
     deviceId = deviceId,
+)
+
+internal fun BackupConfig.toEntity(): BackupConfigEntity = BackupConfigEntity(
+    id = BackupConfigDao.DEFAULT_ID,
+    enabled = enabled,
+    backend = serialName(BackupBackend.serializer(), backend),
+    endpoint = endpoint,
+    region = region,
+    bucket = bucket,
+    prefix = prefix,
+    credentialSecretId = credentialSecretId,
+    encryption = serialName(BackupEncryption.serializer(), encryption),
+    kdf = serialName(BackupKdf.serializer(), kdf),
+    kdfSalt = kdfSalt,
+    lastSyncAt = lastSyncAt?.toString(),
+    lastManifestEtag = lastManifestEtag,
+    deviceId = deviceId,
+    updatedAt = java.time.Instant.now().toString(),
 )
 
 internal fun MessageEntity.toDomain(): Message = Message(    id = id,

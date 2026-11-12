@@ -5,7 +5,7 @@ use chatui_domain::{
     BrowserCors, ChatError, ChatErrorCode, ChatFontSize, ChatParams, ContentPart, Conversation,
     Density, FinishReason, InputModality, Message, MessageRole, MessageStatus, Model,
     ModelCapability, ModelPricing, ModelSource, OutputModality, Provider, ProviderAuthType,
-    ProviderKind, SendKey, SyncMeta, SyncState, Theme, Timestamp, Usage,
+    ProviderKind, SendKey, SyncMeta, SyncState, Theme, Timestamp, Tombstone, Usage,
 };
 use serde_json::json;
 use sqlx::SqlitePool;
@@ -19,7 +19,7 @@ use crate::repositories::{
     SqliteAttachmentRepository, SqliteBackupConfigRepository, SqliteConversationRepository,
     SqliteMessageRepository, SqliteModelRepository, SqliteProviderRepository,
     SqliteSecretRepository, SqliteSettingsRepository, SqliteSyncQueueRepository,
-    SyncQueueRepository,
+    SqliteTombstoneRepository, SyncQueueRepository, TombstoneRepository,
 };
 use crate::search::{SearchOptions, SearchRepository, SqliteSearchRepository};
 
@@ -45,6 +45,8 @@ fn conversation(id: &str) -> Conversation {
         message_count: 0,
         last_error: None,
         sync: None,
+        storage_key: String::new(),
+        revision: 1,
     }
 }
 
@@ -259,11 +261,20 @@ async fn conversation_crud_round_trips() {
         .await
         .expect("get conversation")
         .expect("conversation exists");
-    assert_eq!(loaded, value);
+    assert_eq!(loaded.storage_key.len(), 32);
+    assert!(crate::paths::is_valid_conversation_storage_key(
+        &loaded.storage_key
+    ));
+    assert_eq!(loaded.revision, 1);
+    let mut expected = value.clone();
+    expected.storage_key = loaded.storage_key.clone();
+    expected.revision = 1;
+    assert_eq!(loaded, expected);
 
     let mut updated = loaded.clone();
     updated.title = "Renamed".to_owned();
     updated.pinned = true;
+    updated.revision += 1;
     conversations
         .update(&updated)
         .await
@@ -296,6 +307,145 @@ async fn conversation_crud_round_trips() {
             .await
             .expect("delete again")
     );
+}
+
+#[tokio::test]
+async fn conversation_storage_keys_are_unique_and_revisions_increment() {
+    let (
+        _pool,
+        conversations,
+        _messages,
+        _attachments,
+        _providers,
+        _models,
+        _secrets,
+        _settings,
+        _backup,
+        _sync,
+        _search,
+    ) = setup().await;
+
+    conversations
+        .create(&conversation("conversation-1"))
+        .await
+        .expect("create first");
+    conversations
+        .create(&conversation("conversation-2"))
+        .await
+        .expect("create second");
+
+    let first = conversations
+        .get("conversation-1")
+        .await
+        .expect("get first")
+        .expect("first exists");
+    let second = conversations
+        .get("conversation-2")
+        .await
+        .expect("get second")
+        .expect("second exists");
+
+    assert_eq!(first.storage_key.len(), 32);
+    assert_eq!(second.storage_key.len(), 32);
+    assert_ne!(first.storage_key, second.storage_key);
+    assert_eq!(first.revision, 1);
+    assert_eq!(second.revision, 1);
+
+    conversations
+        .rename("conversation-1", "Renamed")
+        .await
+        .expect("rename");
+    let renamed = conversations
+        .get("conversation-1")
+        .await
+        .expect("get renamed")
+        .expect("renamed exists");
+    assert_eq!(renamed.storage_key, first.storage_key);
+    assert_eq!(renamed.revision, 2);
+
+    conversations
+        .set_pinned("conversation-1", true)
+        .await
+        .expect("pin");
+    conversations
+        .set_archived("conversation-1", true)
+        .await
+        .expect("archive");
+    let mutated = conversations
+        .get("conversation-1")
+        .await
+        .expect("get mutated")
+        .expect("mutated exists");
+    assert_eq!(mutated.revision, 4);
+}
+
+#[tokio::test]
+async fn tombstone_repository_crud() {
+    let pool = open_in_memory().await.expect("open in-memory database");
+    let tombstones = SqliteTombstoneRepository::new(pool.clone());
+
+    let conversation = Tombstone {
+        id: "tombstone-1".to_owned(),
+        conversation_id: "conversation-1".to_owned(),
+        message_id: None,
+        deleted_at: timestamp(1),
+        device_id: "device-1".to_owned(),
+    };
+    let message = Tombstone {
+        id: "tombstone-2".to_owned(),
+        conversation_id: "conversation-1".to_owned(),
+        message_id: Some("message-1".to_owned()),
+        deleted_at: timestamp(2),
+        device_id: "device-1".to_owned(),
+    };
+    let other = Tombstone {
+        id: "tombstone-3".to_owned(),
+        conversation_id: "conversation-2".to_owned(),
+        message_id: None,
+        deleted_at: timestamp(3),
+        device_id: "device-2".to_owned(),
+    };
+
+    for tombstone in [&conversation, &message, &other] {
+        tombstones
+            .insert(tombstone)
+            .await
+            .expect("insert tombstone");
+    }
+
+    assert_eq!(
+        tombstones
+            .list_for_conversation("conversation-1")
+            .await
+            .expect("list conversation tombstones"),
+        vec![conversation.clone(), message.clone()]
+    );
+    assert_eq!(
+        tombstones.list_all().await.expect("list all tombstones"),
+        vec![conversation.clone(), message.clone(), other.clone()]
+    );
+
+    assert!(
+        tombstones
+            .delete("tombstone-2")
+            .await
+            .expect("delete tombstone")
+    );
+    assert!(
+        !tombstones
+            .delete("tombstone-2")
+            .await
+            .expect("delete missing tombstone")
+    );
+    assert_eq!(
+        tombstones
+            .list_all()
+            .await
+            .expect("list remaining tombstones"),
+        vec![conversation, other]
+    );
+
+    pool.close().await;
 }
 
 #[tokio::test]

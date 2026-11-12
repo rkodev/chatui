@@ -13,7 +13,7 @@
 
 use chatui_domain::{
     Attachment, BrowserCors, Conversation, Message, Model, ModelPricing, Provider, SyncMeta,
-    SyncState, Timestamp,
+    SyncState, Timestamp, Tombstone,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -112,6 +112,10 @@ pub struct ConversationRow {
     pub last_error_json: Option<String>,
     /// Sync state discriminant.
     pub sync_state: String,
+    /// Random backup storage key.
+    pub storage_key: String,
+    /// Monotonic local revision.
+    pub revision: i64,
 }
 
 impl ConversationRow {
@@ -141,6 +145,10 @@ impl ConversationRow {
             })?,
             last_error_json: conversation.last_error.as_ref().map(to_json).transpose()?,
             sync_state,
+            storage_key: conversation.storage_key.clone(),
+            revision: i64::try_from(conversation.revision).map_err(|_| {
+                StorageError::Mapping("conversation revision does not fit in i64".to_owned())
+            })?,
         })
     }
 
@@ -179,6 +187,49 @@ impl ConversationRow {
             })?,
             last_error: self.last_error_json.as_deref().map(from_json).transpose()?,
             sync,
+            storage_key: self.storage_key,
+            revision: u64::try_from(self.revision).map_err(|_| {
+                StorageError::Mapping("conversation revision is negative".to_owned())
+            })?,
+        })
+    }
+}
+
+/// Deletion tombstone row.
+#[derive(Debug, Clone, FromRow)]
+pub struct TombstoneRow {
+    /// Tombstone ID.
+    pub id: String,
+    /// Conversation the tombstone applies to.
+    pub conversation_id: String,
+    /// Message the tombstone applies to, or `null` for a conversation deletion.
+    pub message_id: Option<String>,
+    /// RFC 3339 deletion timestamp.
+    pub deleted_at: String,
+    /// Device that observed the deletion.
+    pub device_id: String,
+}
+
+impl TombstoneRow {
+    /// Build a row from a domain tombstone.
+    pub fn from_domain(tombstone: &Tombstone) -> Self {
+        Self {
+            id: tombstone.id.clone(),
+            conversation_id: tombstone.conversation_id.clone(),
+            message_id: tombstone.message_id.clone(),
+            deleted_at: tombstone.deleted_at.to_rfc3339(),
+            device_id: tombstone.device_id.clone(),
+        }
+    }
+
+    /// Convert the row into a domain tombstone.
+    pub fn into_domain(self) -> Result<Tombstone, StorageError> {
+        Ok(Tombstone {
+            id: self.id,
+            conversation_id: self.conversation_id,
+            message_id: self.message_id,
+            deleted_at: parse_timestamp(&self.deleted_at, "deleted_at")?,
+            device_id: self.device_id,
         })
     }
 }

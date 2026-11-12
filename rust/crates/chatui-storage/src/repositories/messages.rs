@@ -510,7 +510,8 @@ pub(crate) async fn refresh_conversation_stats(
                             WHERE conversation_id = ? AND deleted_at IS NULL), \
          updated_at = MAX(updated_at, COALESCE((SELECT MAX(updated_at) FROM messages \
                                                 WHERE conversation_id = ? AND deleted_at IS NULL), \
-                                               updated_at)) \
+                                               updated_at)), \
+         revision = revision + 1 \
          WHERE id = ?",
     )
     .bind(conversation_id)

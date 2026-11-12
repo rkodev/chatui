@@ -2,6 +2,7 @@ package dev.chatui.core.database.repository
 
 import dev.chatui.core.database.dao.ConversationDao
 import dev.chatui.core.model.Conversation
+import dev.chatui.core.model.newStorageKey
 import java.time.Clock
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +29,10 @@ class ConversationRepository(
 
     suspend fun get(id: String): Conversation? = dao.getById(id)?.toDomain()
 
+    /** Look up a conversation by its opaque backup storage key. */
+    suspend fun getByStorageKey(storageKey: String): Conversation? =
+        dao.getByStorageKey(storageKey)?.toDomain()
+
     /** Every conversation, including archived rows, for export. */
     suspend fun all(): List<Conversation> = dao.all().map { it.toDomain() }
 
@@ -53,18 +58,53 @@ class ConversationRepository(
     }
 
     suspend fun create(conversation: Conversation): Conversation {
-        dao.upsert(conversation.toEntity())
-        return conversation
+        val prepared = conversation.copy(
+            storageKey = conversation.storageKey.ifBlank { newStorageKey() },
+            revision = conversation.revision.coerceAtLeast(1),
+        )
+        dao.upsert(prepared.toEntity())
+        return prepared
     }
 
+    /**
+     * Insert or replace a conversation.
+     *
+     * Existing rows keep their storage key and advance the revision. New rows
+     * receive a random storage key and start at revision 1.
+     */
     suspend fun upsert(conversation: Conversation): Conversation {
-        dao.upsert(conversation.toEntity())
-        return conversation
+        val existing = dao.getById(conversation.id)
+        val prepared = if (existing == null) {
+            conversation.copy(
+                storageKey = conversation.storageKey.ifBlank { newStorageKey() },
+                revision = conversation.revision.coerceAtLeast(1),
+            )
+        } else {
+            conversation.copy(
+                storageKey = existing.storageKey.ifBlank {
+                    conversation.storageKey.ifBlank { newStorageKey() }
+                },
+                revision = maxOf(existing.revision + 1, conversation.revision),
+            )
+        }
+        dao.upsert(prepared.toEntity())
+        return prepared
     }
 
+    /**
+     * Update a conversation and advance its revision.
+     *
+     * The storage key is immutable once assigned.
+     */
     suspend fun update(conversation: Conversation): Conversation {
-        dao.update(conversation.toEntity())
-        return conversation
+        val existing = dao.getById(conversation.id)
+        val prepared = conversation.copy(
+            storageKey = existing?.storageKey?.takeIf { it.isNotBlank() }
+                ?: conversation.storageKey.ifBlank { newStorageKey() },
+            revision = maxOf((existing?.revision ?: 0L) + 1, conversation.revision),
+        )
+        dao.update(prepared.toEntity())
+        return prepared
     }
 
     suspend fun rename(

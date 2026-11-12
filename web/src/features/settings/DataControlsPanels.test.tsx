@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { createTestRouter } from '../providers/testRouter'
 import { BackupSettingsScreen } from './BackupSettingsScreen'
+import type { BackupSettingsServiceLike } from './backupSettingsService'
 import { DataClearPanel } from './DataClearPanel'
 import { DataKeysPanel } from './DataKeysPanel'
 import { DataSettingsScreen } from './DataSettingsScreen'
@@ -221,15 +222,44 @@ describe('DataSettingsScreen', () => {
 })
 
 describe('BackupSettingsScreen', () => {
-  it('remains a reachable placeholder with no configuration controls', async () => {
-    const router = createTestRouter(BackupSettingsScreen, 'settings/backup', '/settings/backup', [
+  it('renders the backup configuration form', async () => {
+    const service: BackupSettingsServiceLike = {
+      load: async () => ({ config: null, credentials: null }),
+      saveConfig: async () => {
+        throw new Error('not used')
+      },
+      setEnabled: async () => null,
+      testConnection: async () => undefined,
+      backupNow: async () => ({
+        uploadedConversations: [],
+        uploadedAttachments: [],
+        downloadedConversations: [],
+        manifestEtag: null,
+        drainedQueue: 0,
+      }),
+      restore: async () => ({ mergedConversations: [], replaced: false }),
+      deleteRemote: async () => undefined,
+      getStatus: async () => ({
+        enabled: false,
+        lastBackupAt: null,
+        pendingChanges: 0,
+        lastError: null,
+        storageUsageBytes: 0,
+      }),
+    }
+
+    function BackupRoute() {
+      return <BackupSettingsScreen service={service} />
+    }
+
+    const router = createTestRouter(BackupRoute, 'settings/backup', '/settings/backup', [
       'settings/data',
     ])
     render(<RouterProvider router={router} />)
 
     expect(await screen.findByRole('heading', { name: 'Backup' })).toBeInTheDocument()
-    expect(screen.getByText('Not configured')).toBeInTheDocument()
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(await screen.findByLabelText('Bucket')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Test connection' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Data settings' })).toBeInTheDocument()
   })
 })

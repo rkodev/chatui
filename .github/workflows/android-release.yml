@@ -106,7 +106,10 @@ jobs:
           ANDROID_VERSION_NAME: ${{ inputs.version_name }}
         run: |
           cd android
-          ./gradlew --no-daemon :app:lintRelease :app:assembleRelease :app:bundleRelease
+          # Bypass the shared task-output cache: stale javaPreCompile entries
+          # can cause NO-SOURCE and sporadic Hilt MissingBinding failures
+          # (google/dagger#5148).
+          ./gradlew --no-daemon --no-build-cache :app:lintRelease :app:assembleRelease :app:bundleRelease
 
       - name: Generate SHA-256 checksums
         run: |

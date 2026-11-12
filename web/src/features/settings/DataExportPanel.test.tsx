@@ -34,6 +34,8 @@ function conversation(id: string, title: string): Conversation {
     lastMessageAt: '2026-01-01T00:00:00.000Z',
     messageCount: 0,
     lastError: null,
+    storageKey: '0123456789abcdef0123456789abcdef',
+    revision: 1,
     sync: null,
   }
 }

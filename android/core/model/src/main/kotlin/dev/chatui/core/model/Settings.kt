@@ -65,6 +65,9 @@ enum class BackupBackend {
     @SerialName("gcs")
     GCS,
 
+    @SerialName("google-drive")
+    GOOGLE_DRIVE,
+
     @SerialName("webdav")
     WEBDAV,
 }

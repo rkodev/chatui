@@ -8,6 +8,7 @@ import dev.chatui.core.database.entity.ModelEntity
 import dev.chatui.core.database.entity.ProviderEntity
 import dev.chatui.core.database.entity.SecretEntity
 import dev.chatui.core.database.entity.SyncQueueEntity
+import dev.chatui.core.database.entity.TombstoneEntity
 
 /** Deterministic entity builders shared by the database tests. */
 internal object TestData {
@@ -20,6 +21,8 @@ internal object TestData {
         archived: Boolean = false,
         lastMessageAt: String = NOW,
         updatedAt: String = NOW,
+        storageKey: String = "",
+        revision: Long = 1,
     ): ConversationEntity = ConversationEntity(
         id = id,
         title = title,
@@ -37,6 +40,8 @@ internal object TestData {
         messageCount = 0,
         lastErrorJson = null,
         syncState = null,
+        storageKey = storageKey,
+        revision = revision,
     )
 
     fun message(
@@ -176,5 +181,19 @@ internal object TestData {
         lastError = null,
         createdAt = NOW,
         updatedAt = NOW,
+    )
+
+    fun tombstone(
+        id: String = "tombstone-1",
+        conversationId: String = "conversation-1",
+        messageId: String? = null,
+        deletedAt: String = NOW,
+        deviceId: String = "device-1",
+    ): TombstoneEntity = TombstoneEntity(
+        id = id,
+        conversationId = conversationId,
+        messageId = messageId,
+        deletedAt = deletedAt,
+        deviceId = deviceId,
     )
 }

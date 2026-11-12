@@ -22,7 +22,7 @@
 | Markdown + code + math | Required | Required | Required when enabled |
 | Attachments | Required | Required | Required when enabled |
 | Export/import | Required | Required | Required when enabled |
-| Backup/sync | Future | Future | Future |
+| Backup/sync | Complete (S3-compatible, Azure Blob, GCS, Google Drive, WebDAV) | Complete (S3-compatible, Azure Blob, GCS, Google Drive, WebDAV) | Complete (S3-compatible, Azure Blob, GCS, Google Drive, WebDAV) |
 | PWA install | Required | N/A | N/A |
 | Native share target | N/A | Required | Required on desktop |
 | Desktop packaging (installer/AppImage) | N/A | N/A | Required when enabled |
@@ -32,10 +32,10 @@
 
 - OpenRouter is the first release blocker. These rows are release-blocking on every published client: OpenRouter first-run onboarding, key introspection, catalog/pricing/modalities, streaming/reasoning/usage/cost, and provider routing preferences.
 - The Rust column may be `Optional` until the Rust desktop client is enabled for release. Once enabled and published, Rust must meet the same contracts, conformance, parity, and security bar as web and Android. The Rust client is desktop-only for Windows, macOS, and Linux; it is not an Android, iOS, or WASM client.
-- Current Rust status (2026-11-08): `Optional` and deferred. The M3.5 preview implementation is not enabled for release; no Rust row is marked complete or required. See [Implementation status (M3.5)](#implementation-status-m35-2026-11-08).
+- Current Rust status (2026-11-12): shipping and required for M5 onward (`M5-decisions.md` `DEC-M5-03`); the `Backup/sync` row is complete for Rust. The earlier M3.5 preview note is superseded.
 - No feature is complete at M0. Foundation-level persistence, routing placeholders, or design tokens do not satisfy a feature row.
 - This table records requirement and platform commitment, not current implementation status. Update it in the same change as any user-visible behavior change.
-- Allowed platform values are `Required`, `Required (release blocker)`, `Required when enabled`, `Required on desktop`, `Future`, `N/A`, and the platform-specific persistence descriptions shown above.
+- Allowed platform values are `Required`, `Required (release blocker)`, `Required when enabled`, `Required on desktop`, `Future`, `N/A`, `Complete`, and the platform-specific persistence descriptions shown above. The `Backup/sync` row records delivered status (`Complete`) per M5; the other rows record requirement and platform commitment.
 - Release is blocked if a feature is marked complete on one platform and absent on another without an approved exception recorded here.
 
 ## Release status (0.1.0, 2026-11-10)
@@ -110,6 +110,30 @@ Known limitations recorded by the audit: web case 23 has a manual code check
 rather than an automated 10,000-message test; case 28 shows the `Retry-After`
 delay as static copy rather than a ticking countdown; Android math uses the
 documented raw-source fallback. None is a release blocker.
+
+## Release status (M5, 2026-11-12)
+
+M5 delivers encrypted, user-owned backup and sync on web, Android, and Rust
+desktop. The `Backup/sync` row above records delivered status for all three
+clients. Format versioning and shared known-answer vectors are in
+`contracts/fixtures/backup/`; the encrypted object layout is
+`manifest.enc`, `conversations/<storageKey>.enc`, and
+`attachments/<sha256>.enc`.
+
+- **Backup/sync** - Web: Complete (S3-compatible, Azure Blob, GCS, Google
+  Drive, WebDAV; `SyncEngine`, scheduler, cross-client restore); Android:
+  Complete (same backends, Room sync engine, WorkManager constraints,
+  cross-client restore); Rust: Complete (same backends, desktop sync engine,
+  tokio interval scheduler, cross-client format round trip).
+- Cross-client restore passed in both directions on web and Android against a
+  local MinIO bucket. Conflict, tombstone, wrong-passphrase, tamper, and
+  interrupted-upload suites passed on all three clients.
+- Storage inspection found only opaque object names, authenticated ciphertext,
+  and no plaintext or provider keys in object metadata. A malicious provider
+  can still delete or roll back data; no Byzantine protection is claimed.
+- Full gate and evidence:
+  [M5-verification.md](../docs/operations/M5/M5-verification.md) and
+  [evidence/](../docs/operations/M5/evidence/README.md).
 
 ## Implementation status (M1, 2026-11-04)
 

@@ -33,6 +33,10 @@ abstract class ConversationDao {
     @Query("SELECT * FROM conversations WHERE id = :id")
     abstract suspend fun getById(id: String): ConversationEntity?
 
+    /** Look up a conversation by its opaque backup storage key. */
+    @Query("SELECT * FROM conversations WHERE storage_key = :storageKey")
+    abstract suspend fun getByStorageKey(storageKey: String): ConversationEntity?
+
     /** Every conversation, including archived rows, for export. */
     @Query("SELECT * FROM conversations")
     abstract suspend fun all(): List<ConversationEntity>
@@ -57,14 +61,27 @@ abstract class ConversationDao {
     @Update
     abstract suspend fun update(conversation: ConversationEntity)
 
-    @Query("UPDATE conversations SET title = :title, updatedAt = :updatedAt WHERE id = :id")
+    @Query(
+        "UPDATE conversations SET title = :title, updatedAt = :updatedAt, " +
+            "revision = revision + 1 WHERE id = :id",
+    )
     abstract suspend fun updateTitle(id: String, title: String, updatedAt: String)
 
-    @Query("UPDATE conversations SET pinned = :pinned, updatedAt = :updatedAt WHERE id = :id")
+    @Query(
+        "UPDATE conversations SET pinned = :pinned, updatedAt = :updatedAt, " +
+            "revision = revision + 1 WHERE id = :id",
+    )
     abstract suspend fun setPinned(id: String, pinned: Boolean, updatedAt: String)
 
-    @Query("UPDATE conversations SET archived = :archived, updatedAt = :updatedAt WHERE id = :id")
+    @Query(
+        "UPDATE conversations SET archived = :archived, updatedAt = :updatedAt, " +
+            "revision = revision + 1 WHERE id = :id",
+    )
     abstract suspend fun setArchived(id: String, archived: Boolean, updatedAt: String)
+
+    /** Increment the sync revision for a local mutation. */
+    @Query("UPDATE conversations SET revision = revision + 1 WHERE id = :id")
+    abstract suspend fun incrementRevision(id: String)
 
     @Query("DELETE FROM conversations WHERE id = :id")
     abstract suspend fun deleteById(id: String)

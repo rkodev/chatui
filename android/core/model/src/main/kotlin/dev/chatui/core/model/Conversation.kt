@@ -3,6 +3,7 @@
 package dev.chatui.core.model
 
 import java.time.Instant
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
@@ -94,4 +95,20 @@ data class Conversation(
     val messageCount: Int,
     val lastError: ChatError?,
     val sync: SyncMeta?,
+    /**
+     * Random 128-bit backup object key as 32 lowercase hex characters.
+     *
+     * Sync-only metadata. It is never encoded into the plaintext export
+     * contract; the backup conversation payload carries it explicitly.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val storageKey: String = "",
+    /**
+     * Monotonic revision starting at 1 and incremented on every local change
+     * that affects the conversation or its messages.
+     *
+     * Sync-only metadata, excluded from the plaintext export contract.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val revision: Long = 1,
 )

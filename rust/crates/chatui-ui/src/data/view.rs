@@ -1053,6 +1053,8 @@ mod tests {
             message_count: 0,
             last_error: None,
             sync: None,
+            storage_key: String::new(),
+            revision: 0,
         }
     }
 

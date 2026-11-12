@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   newId,
+  newStorageKey,
   nowIso,
   type ChatParams,
   type Conversation,
@@ -76,6 +77,8 @@ class MemoryConversationStore {
       updatedAt: input.updatedAt ?? now,
       lastMessageAt: input.lastMessageAt ?? input.createdAt ?? now,
       messageCount: input.messageCount ?? 0,
+      storageKey: input.storageKey ?? newStorageKey(),
+      revision: input.revision ?? 1,
     }
     this.values.set(conversation.id, conversation)
     return conversation

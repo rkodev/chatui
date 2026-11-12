@@ -13,6 +13,7 @@ import dev.chatui.core.database.dao.ModelDao
 import dev.chatui.core.database.dao.ProviderDao
 import dev.chatui.core.database.dao.SecretDao
 import dev.chatui.core.database.dao.SyncQueueDao
+import dev.chatui.core.database.dao.TombstoneDao
 import dev.chatui.core.database.entity.AttachmentEntity
 import dev.chatui.core.database.entity.BackupConfigEntity
 import dev.chatui.core.database.entity.ConversationEntity
@@ -22,6 +23,7 @@ import dev.chatui.core.database.entity.ModelEntity
 import dev.chatui.core.database.entity.ProviderEntity
 import dev.chatui.core.database.entity.SecretEntity
 import dev.chatui.core.database.entity.SyncQueueEntity
+import dev.chatui.core.database.entity.TombstoneEntity
 
 /**
  * Room database for spec 9.5.
@@ -43,6 +45,7 @@ import dev.chatui.core.database.entity.SyncQueueEntity
         BackupConfigEntity::class,
         SyncQueueEntity::class,
         MessageFtsEntity::class,
+        TombstoneEntity::class,
     ],
     version = CHATUI_DATABASE_VERSION,
     exportSchema = true,
@@ -63,6 +66,8 @@ abstract class ChatUiDatabase : RoomDatabase() {
     abstract fun backupConfigDao(): BackupConfigDao
 
     abstract fun syncQueueDao(): SyncQueueDao
+
+    abstract fun tombstoneDao(): TombstoneDao
 
     abstract fun importDao(): ImportDao
 

@@ -11,6 +11,7 @@ chatui-contracts = { version = "0.1.0", path = "../chatui-contracts" }
 chatui-domain = { version = "0.1.0", path = "../chatui-domain" }
 directories = "6"
 hex = "0.4"
+rand = "0.8"
 serde = "1"
 serde_json = "1"
 sha2 = "0.10"

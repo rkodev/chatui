@@ -15,6 +15,9 @@ use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use crate::chat::composer::ComposerState;
 use crate::chat::message_list::MessageListState;
 use crate::markdown::RenderOptions;
+use crate::settings::backup::{
+    BackupError, BackupService, BackupSettingsState, backend_from_index, backend_index,
+};
 use crate::settings::error::{SettingsError, describe_settings_error};
 use crate::settings::route::SettingsRoute;
 use crate::settings::service::SettingsService;
@@ -122,8 +125,31 @@ slint::slint! {
         in property <string> models-entry-text: "";
         in property <string> data-entry-text: "";
         in property <string> backup-title: "";
-        in property <string> backup-message: "";
-        in property <string> backup-detail: "";
+        in property <bool> backup-enabled: false;
+        in property <int> backup-backend-index: 0;
+        in-out property <string> backup-endpoint: "";
+        in-out property <string> backup-region: "";
+        in-out property <string> backup-bucket: "";
+        in-out property <string> backup-prefix: "";
+        in-out property <string> backup-access-key: "";
+        in-out property <string> backup-secret-key: "";
+        in-out property <string> backup-sas-token: "";
+        in-out property <string> backup-service-account-json: "";
+        in-out property <string> backup-access-token: "";
+        in-out property <string> backup-folder-id: "";
+        in-out property <string> backup-username: "";
+        in-out property <string> backup-password: "";
+        in-out property <string> backup-passphrase: "";
+        in property <string> backup-status-last: "";
+        in property <string> backup-status-pending: "";
+        in property <string> backup-status-error: "";
+        in property <string> backup-status-usage: "";
+        in property <string> backup-notice: "";
+        in property <string> backup-statement: "";
+        in property <string> backup-passphrase-warning: "";
+        in property <bool> backup-confirmation-visible: false;
+        in property <string> backup-confirmation-label: "";
+        in-out property <string> backup-confirmation-input: "";
         in property <string> about-title: "";
         in property <string> about-version: "";
         in property <string> about-body: "";
@@ -149,6 +175,29 @@ slint::slint! {
         callback open-providers();
         callback open-models();
         callback open-data();
+        callback backup-backend-changed(int);
+        callback backup-endpoint-changed(string);
+        callback backup-region-changed(string);
+        callback backup-bucket-changed(string);
+        callback backup-prefix-changed(string);
+        callback backup-access-key-changed(string);
+        callback backup-secret-key-changed(string);
+        callback backup-sas-token-changed(string);
+        callback backup-service-account-json-changed(string);
+        callback backup-access-token-changed(string);
+        callback backup-folder-id-changed(string);
+        callback backup-username-changed(string);
+        callback backup-password-changed(string);
+        callback backup-passphrase-changed(string);
+        callback backup-test-connection();
+        callback backup-enable();
+        callback backup-disable();
+        callback backup-now();
+        callback backup-restore();
+        callback backup-restore-replace();
+        callback backup-delete-remote();
+        callback backup-confirm();
+        callback backup-cancel-confirmation();
 
         in property <bool> dark: false;
 
@@ -388,9 +437,249 @@ slint::slint! {
                         spacing: 8px;
 
                         Text { text: root.backup-title; font-size: 20px; font-weight: 600; }
-                        Text { text: root.backup-message; wrap: word-wrap; }
+                        Text { text: root.backup-statement; wrap: word-wrap; }
+
+                        Text { text: "Backend"; }
+                        ComboBox {
+                            model: ["S3-compatible", "Azure Blob", "Google Cloud Storage", "Google Drive", "WebDAV"];
+                            accessible-label: "Backup backend";
+                            current-index: root.backup-backend-index;
+                            selected(value) => { root.backup-backend-changed(self.current-index); }
+                        }
+
+                        if (root.backup-backend-index == 0) : VerticalLayout {
+                            spacing: 8px;
+                            Text { text: "Endpoint"; }
+                            LineEdit {
+                                text: root.backup-endpoint;
+                                accessible-label: "Backup endpoint";
+                                edited(text) => { root.backup-endpoint-changed(text); }
+                            }
+                            Text { text: "Region"; }
+                            LineEdit {
+                                text: root.backup-region;
+                                accessible-label: "Backup region";
+                                edited(text) => { root.backup-region-changed(text); }
+                            }
+                            Text { text: "Bucket"; }
+                            LineEdit {
+                                text: root.backup-bucket;
+                                accessible-label: "Backup bucket";
+                                edited(text) => { root.backup-bucket-changed(text); }
+                            }
+                            Text { text: "Access key id"; }
+                            LineEdit {
+                                text: root.backup-access-key;
+                                accessible-label: "Backup access key id";
+                                edited(text) => { root.backup-access-key-changed(text); }
+                            }
+                            Text { text: "Secret access key"; }
+                            LineEdit {
+                                text: root.backup-secret-key;
+                                accessible-label: "Backup secret access key";
+                                input-type: InputType.password;
+                                edited(text) => { root.backup-secret-key-changed(text); }
+                            }
+                        }
+
+                        if (root.backup-backend-index == 1) : VerticalLayout {
+                            spacing: 8px;
+                            Text { text: "Endpoint (optional)"; }
+                            LineEdit {
+                                text: root.backup-endpoint;
+                                accessible-label: "Azure endpoint";
+                                edited(text) => { root.backup-endpoint-changed(text); }
+                            }
+                            Text { text: "Container"; }
+                            LineEdit {
+                                text: root.backup-bucket;
+                                accessible-label: "Azure container";
+                                edited(text) => { root.backup-bucket-changed(text); }
+                            }
+                            Text { text: "Account name"; }
+                            LineEdit {
+                                text: root.backup-access-key;
+                                accessible-label: "Azure account name";
+                                edited(text) => { root.backup-access-key-changed(text); }
+                            }
+                            Text { text: "Account key"; }
+                            LineEdit {
+                                text: root.backup-secret-key;
+                                accessible-label: "Azure account key";
+                                input-type: InputType.password;
+                                edited(text) => { root.backup-secret-key-changed(text); }
+                            }
+                            Text { text: "SAS token (used when no account key)"; }
+                            LineEdit {
+                                text: root.backup-sas-token;
+                                accessible-label: "Azure SAS token";
+                                input-type: InputType.password;
+                                edited(text) => { root.backup-sas-token-changed(text); }
+                            }
+                        }
+
+                        if (root.backup-backend-index == 2) : VerticalLayout {
+                            spacing: 8px;
+                            Text { text: "Endpoint (optional)"; }
+                            LineEdit {
+                                text: root.backup-endpoint;
+                                accessible-label: "GCS endpoint";
+                                edited(text) => { root.backup-endpoint-changed(text); }
+                            }
+                            Text { text: "Bucket"; }
+                            LineEdit {
+                                text: root.backup-bucket;
+                                accessible-label: "GCS bucket";
+                                edited(text) => { root.backup-bucket-changed(text); }
+                            }
+                            Text { text: "Service account JSON"; }
+                            TextEdit {
+                                text: root.backup-service-account-json;
+                                accessible-label: "GCS service account JSON";
+                                edited(text) => { root.backup-service-account-json-changed(text); }
+                                height: 100px;
+                                wrap: word-wrap;
+                            }
+                        }
+
+                        if (root.backup-backend-index == 3) : VerticalLayout {
+                            spacing: 8px;
+                            Text { text: "Endpoint (optional)"; }
+                            LineEdit {
+                                text: root.backup-endpoint;
+                                accessible-label: "Google Drive endpoint";
+                                edited(text) => { root.backup-endpoint-changed(text); }
+                            }
+                            Text { text: "Folder id (blank for app data folder)"; }
+                            LineEdit {
+                                text: root.backup-folder-id;
+                                accessible-label: "Google Drive folder id";
+                                edited(text) => { root.backup-folder-id-changed(text); }
+                            }
+                            Text { text: "OAuth access token"; }
+                            LineEdit {
+                                text: root.backup-access-token;
+                                accessible-label: "Google Drive access token";
+                                input-type: InputType.password;
+                                edited(text) => { root.backup-access-token-changed(text); }
+                            }
+                        }
+
+                        if (root.backup-backend-index == 4) : VerticalLayout {
+                            spacing: 8px;
+                            Text { text: "WebDAV URL"; }
+                            LineEdit {
+                                text: root.backup-endpoint;
+                                accessible-label: "WebDAV URL";
+                                edited(text) => { root.backup-endpoint-changed(text); }
+                            }
+                            Text { text: "Username"; }
+                            LineEdit {
+                                text: root.backup-username;
+                                accessible-label: "WebDAV username";
+                                edited(text) => { root.backup-username-changed(text); }
+                            }
+                            Text { text: "Password"; }
+                            LineEdit {
+                                text: root.backup-password;
+                                accessible-label: "WebDAV password";
+                                input-type: InputType.password;
+                                edited(text) => { root.backup-password-changed(text); }
+                            }
+                        }
+
+                        Text { text: "Prefix"; }
+                        LineEdit {
+                            text: root.backup-prefix;
+                            accessible-label: "Backup prefix";
+                            edited(text) => { root.backup-prefix-changed(text); }
+                        }
+
+                        Text { text: "Passphrase (never stored)"; }
+                        LineEdit {
+                            text: root.backup-passphrase;
+                            accessible-label: "Backup passphrase";
+                            input-type: InputType.password;
+                            edited(text) => { root.backup-passphrase-changed(text); }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Button {
+                                text: "Test connection";
+                                clicked => { root.backup-test-connection(); }
+                            }
+                            Button {
+                                text: root.backup-enabled ? "Disable backup" : "Enable backup";
+                                clicked => {
+                                    if (root.backup-enabled) {
+                                        root.backup-disable();
+                                    } else {
+                                        root.backup-enable();
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Button {
+                                text: "Back up now";
+                                clicked => { root.backup-now(); }
+                            }
+                            Button {
+                                text: "Restore from backup";
+                                clicked => { root.backup-restore(); }
+                            }
+                            Button {
+                                text: "Restore and replace local data";
+                                clicked => { root.backup-restore-replace(); }
+                            }
+                            Button {
+                                text: "Delete remote backup";
+                                clicked => { root.backup-delete-remote(); }
+                            }
+                        }
+
+                        Text { text: "Last backup: " + root.backup-status-last; }
+                        Text { text: "Pending changes: " + root.backup-status-pending; }
+                        Text { text: "Storage usage: " + root.backup-status-usage; }
+                        Text { text: "Last error: " + root.backup-status-error; }
+
+                        if (!root.backup-notice.is-empty) : Text {
+                            text: root.backup-notice;
+                            wrap: word-wrap;
+                        }
+
+                        if (root.backup-confirmation-visible) : Rectangle {
+                            background: root.dark ? #3b1d1d : #fde8e8;
+                            border-radius: 8px;
+
+                            VerticalLayout {
+                                padding: 8px;
+                                spacing: 4px;
+
+                                Text { text: root.backup-confirmation-label; wrap: word-wrap; }
+                                LineEdit {
+                                    text <=> root.backup-confirmation-input;
+                                    accessible-label: "Backup confirmation";
+                                }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    Button {
+                                        text: "Confirm";
+                                        clicked => { root.backup-confirm(); }
+                                    }
+                                    Button {
+                                        text: "Cancel";
+                                        clicked => { root.backup-cancel-confirmation(); }
+                                    }
+                                }
+                            }
+                        }
+
                         Text {
-                            text: root.backup-detail;
+                            text: root.backup-passphrase-warning;
                             color: root.dark ? #9ca3af : #5f6368;
                             wrap: word-wrap;
                         }
@@ -493,11 +782,7 @@ pub fn sync_window(window: &SettingsWindow, state: &SettingsViewModel) {
     window.set_providers_entry_text(state.providers_entry_text().into());
     window.set_models_entry_text(state.models_entry_text().into());
     window.set_data_entry_text(state.data_entry_text().into());
-
-    let backup = state.backup_placeholder();
-    window.set_backup_title(backup.title.into());
-    window.set_backup_message(backup.message.into());
-    window.set_backup_detail(backup.detail.into());
+    window.set_backup_title("Backup".into());
 
     let about = state.about();
     window.set_about_title(format!("About {}", about.app_name).into());
@@ -511,6 +796,42 @@ pub fn sync_window(window: &SettingsWindow, state: &SettingsViewModel) {
             .collect::<Vec<_>>(),
     )));
     window.set_docs_url(about.docs_url.into());
+}
+
+/// Push the backup form and status into a Slint window.
+pub fn sync_backup_window(window: &SettingsWindow, state: &BackupSettingsState) {
+    window.set_backup_enabled(state.status.enabled);
+    window.set_backup_backend_index(backend_index(state.form.backend) as i32);
+    window.set_backup_endpoint(state.form.endpoint.clone().into());
+    window.set_backup_region(state.form.region.clone().into());
+    window.set_backup_bucket(state.form.bucket.clone().into());
+    window.set_backup_prefix(state.form.prefix.clone().into());
+    window.set_backup_access_key(state.form.access_key_id.clone().into());
+    window.set_backup_secret_key(state.form.secret_access_key.clone().into());
+    window.set_backup_sas_token(state.form.sas_token.clone().into());
+    window.set_backup_service_account_json(state.form.service_account_json.clone().into());
+    window.set_backup_access_token(state.form.access_token.clone().into());
+    window.set_backup_folder_id(state.form.folder_id.clone().into());
+    window.set_backup_username(state.form.username.clone().into());
+    window.set_backup_password(state.form.password.clone().into());
+    window.set_backup_passphrase(state.form.passphrase.clone().into());
+    window.set_backup_status_last(state.status.last_backup_text().into());
+    window.set_backup_status_pending(state.status.pending_changes_text().into());
+    window.set_backup_status_error(state.status.last_error_text().into());
+    window.set_backup_status_usage(state.status.storage_usage_text().into());
+    window.set_backup_notice(
+        state
+            .notice
+            .clone()
+            .or_else(|| state.error.clone())
+            .unwrap_or_default()
+            .into(),
+    );
+    window.set_backup_statement(state.client_side_statement().into());
+    window.set_backup_passphrase_warning(state.passphrase_warning().into());
+    window.set_backup_confirmation_visible(state.confirmation_visible());
+    window.set_backup_confirmation_label(state.confirmation_label().into());
+    window.set_backup_confirmation_input(state.confirmation_input.clone().into());
 }
 
 fn optional_f64_text(value: Option<f64>) -> String {
@@ -610,6 +931,37 @@ fn set_error(
     }
 }
 
+fn sync_backup(state: &Rc<RefCell<BackupSettingsState>>, weak: &slint::Weak<SettingsWindow>) {
+    if let Some(window) = weak.upgrade() {
+        sync_backup_window(&window, &state.borrow());
+    }
+}
+
+fn backup_unavailable(state: &Rc<RefCell<BackupSettingsState>>) {
+    state.borrow_mut().error = Some("Backup is not available in this build.".to_owned());
+}
+
+fn run_backup_action<F>(
+    backup: &Rc<RefCell<Option<Arc<dyn BackupService>>>>,
+    state: &Rc<RefCell<BackupSettingsState>>,
+    weak: &slint::Weak<SettingsWindow>,
+    action: F,
+) where
+    F: FnOnce(&dyn BackupService, &mut BackupSettingsState) -> Result<(), BackupError>,
+{
+    let service = backup.borrow().clone();
+    match service {
+        Some(service) => {
+            let result = action(service.as_ref(), &mut state.borrow_mut());
+            if let Err(error) = result {
+                state.borrow_mut().error = Some(error.message().to_owned());
+            }
+        }
+        None => backup_unavailable(state),
+    }
+    sync_backup(state, weak);
+}
+
 fn update_params<F>(
     service: &SettingsService,
     state: &Rc<RefCell<SettingsViewModel>>,
@@ -636,6 +988,8 @@ struct SettingsHandlers {
 pub struct SettingsController {
     service: Arc<SettingsService>,
     state: Rc<RefCell<SettingsViewModel>>,
+    backup: Rc<RefCell<Option<Arc<dyn BackupService>>>>,
+    backup_state: Rc<RefCell<BackupSettingsState>>,
     window: SettingsWindow,
     handlers: Rc<RefCell<SettingsHandlers>>,
 }
@@ -661,10 +1015,30 @@ impl SettingsController {
         let controller = Self {
             service,
             state,
+            backup: Rc::new(RefCell::new(None)),
+            backup_state: Rc::new(RefCell::new(BackupSettingsState::new(
+                Default::default(),
+                Default::default(),
+            ))),
             window,
             handlers: Rc::new(RefCell::new(SettingsHandlers::default())),
         };
         controller.wire();
+        controller.sync();
+        Ok(controller)
+    }
+
+    /// Create the settings window with a backup service.
+    pub fn with_backup(
+        service: Arc<SettingsService>,
+        backup_service: Arc<dyn BackupService>,
+    ) -> Result<Self, slint::PlatformError> {
+        let controller = Self::new(service)?;
+        let config = backup_service.config().ok().flatten();
+        let status = backup_service.status().unwrap_or_default();
+        *controller.backup_state.borrow_mut() =
+            BackupSettingsState::from_config(config.as_ref(), status);
+        *controller.backup.borrow_mut() = Some(backup_service);
         controller.sync();
         Ok(controller)
     }
@@ -679,9 +1053,15 @@ impl SettingsController {
         self.state.borrow()
     }
 
+    /// Borrow the current backup state.
+    pub fn backup_state(&self) -> std::cell::Ref<'_, BackupSettingsState> {
+        self.backup_state.borrow()
+    }
+
     /// Push the current view model into the window.
     pub fn sync(&self) {
         sync_window(&self.window, &self.state.borrow());
+        sync_backup_window(&self.window, &self.backup_state.borrow());
     }
 
     /// Select a settings section and refresh the window.
@@ -922,6 +1302,186 @@ impl SettingsController {
                 sync_window(&window, &state.borrow());
             }
         });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_backend_changed(move |index| {
+            backup_state.borrow_mut().form.backend = backend_from_index(index as usize);
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_endpoint_changed(move |value| {
+            backup_state.borrow_mut().form.endpoint = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_region_changed(move |value| {
+            backup_state.borrow_mut().form.region = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_bucket_changed(move |value| {
+            backup_state.borrow_mut().form.bucket = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_prefix_changed(move |value| {
+            backup_state.borrow_mut().form.prefix = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_access_key_changed(move |value| {
+            backup_state.borrow_mut().form.access_key_id = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_secret_key_changed(move |value| {
+            backup_state.borrow_mut().form.secret_access_key = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_sas_token_changed(move |value| {
+            backup_state.borrow_mut().form.sas_token = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window
+            .on_backup_service_account_json_changed(move |value| {
+                backup_state.borrow_mut().form.service_account_json = value.to_string();
+                sync_backup(&backup_state, &weak);
+            });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_access_token_changed(move |value| {
+            backup_state.borrow_mut().form.access_token = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_folder_id_changed(move |value| {
+            backup_state.borrow_mut().form.folder_id = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_username_changed(move |value| {
+            backup_state.borrow_mut().form.username = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_password_changed(move |value| {
+            backup_state.borrow_mut().form.password = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_passphrase_changed(move |value| {
+            backup_state.borrow_mut().form.passphrase = value.to_string();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup = Rc::clone(&self.backup);
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_test_connection(move || {
+            run_backup_action(&backup, &backup_state, &weak, |service, state| {
+                state.test_connection(service)
+            });
+        });
+
+        let weak = self.window.as_weak();
+        let backup = Rc::clone(&self.backup);
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_enable(move || {
+            run_backup_action(&backup, &backup_state, &weak, |service, state| {
+                state.enable(service)
+            });
+        });
+
+        let weak = self.window.as_weak();
+        let backup = Rc::clone(&self.backup);
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_disable(move || {
+            run_backup_action(&backup, &backup_state, &weak, |service, state| {
+                state.disable(service)
+            });
+        });
+
+        let weak = self.window.as_weak();
+        let backup = Rc::clone(&self.backup);
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_now(move || {
+            run_backup_action(&backup, &backup_state, &weak, |service, state| {
+                state.backup_now(service)
+            });
+        });
+
+        let weak = self.window.as_weak();
+        let backup = Rc::clone(&self.backup);
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_restore(move || {
+            run_backup_action(&backup, &backup_state, &weak, |service, state| {
+                state.restore(service, false)
+            });
+        });
+
+        let weak = self.window.as_weak();
+        let backup = Rc::clone(&self.backup);
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_restore_replace(move || {
+            run_backup_action(&backup, &backup_state, &weak, |service, state| {
+                state.restore(service, true)
+            });
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_delete_remote(move || {
+            backup_state.borrow_mut().request_delete_remote();
+            sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup = Rc::clone(&self.backup);
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_confirm(move || {
+            if let Some(window) = weak.upgrade() {
+                backup_state.borrow_mut().confirmation_input =
+                    window.get_backup_confirmation_input().to_string();
+            }
+            run_backup_action(&backup, &backup_state, &weak, |service, state| {
+                state.confirm(service)
+            });
+        });
+
+        let weak = self.window.as_weak();
+        let backup_state = Rc::clone(&self.backup_state);
+        self.window.on_backup_cancel_confirmation(move || {
+            backup_state.borrow_mut().cancel_confirmation();
+            sync_backup(&backup_state, &weak);
+        });
     }
 }
 
@@ -993,6 +1553,234 @@ mod tests {
         ));
         let service = Arc::new(SettingsService::new(store, catalog));
         SettingsController::new(service).expect("settings window")
+    }
+
+    #[derive(Default)]
+    struct FakeBackupService {
+        calls: std::sync::Mutex<Vec<String>>,
+        status: std::sync::Mutex<crate::settings::backup::BackupStatus>,
+    }
+
+    impl FakeBackupService {
+        fn calls(&self) -> Vec<String> {
+            self.calls.lock().unwrap().clone()
+        }
+
+        fn record(&self, call: impl Into<String>) {
+            self.calls.lock().unwrap().push(call.into());
+        }
+    }
+
+    impl crate::settings::backup::BackupService for FakeBackupService {
+        fn config(&self) -> Result<Option<chatui_domain::BackupConfig>, BackupError> {
+            Ok(None)
+        }
+
+        fn status(&self) -> Result<crate::settings::backup::BackupStatus, BackupError> {
+            Ok(self.status.lock().unwrap().clone())
+        }
+
+        fn test_connection(
+            &self,
+            _form: &crate::settings::backup::BackupForm,
+        ) -> Result<(), BackupError> {
+            self.record("test_connection");
+            Ok(())
+        }
+
+        fn enable(
+            &self,
+            _form: &crate::settings::backup::BackupForm,
+        ) -> Result<crate::settings::backup::BackupStatus, BackupError> {
+            self.record("enable");
+            let mut status = self.status.lock().unwrap();
+            status.enabled = true;
+            Ok(status.clone())
+        }
+
+        fn disable(&self) -> Result<crate::settings::backup::BackupStatus, BackupError> {
+            self.record("disable");
+            let mut status = self.status.lock().unwrap();
+            status.enabled = false;
+            Ok(status.clone())
+        }
+
+        fn backup_now(
+            &self,
+            passphrase: &str,
+        ) -> Result<crate::settings::backup::BackupStatus, BackupError> {
+            self.record(format!("backup_now:{passphrase}"));
+            Ok(self.status.lock().unwrap().clone())
+        }
+
+        fn restore(
+            &self,
+            passphrase: &str,
+            replace: bool,
+        ) -> Result<crate::settings::backup::RestoreOutcome, BackupError> {
+            self.record(format!("restore:{passphrase}:{replace}"));
+            Ok(crate::settings::backup::RestoreOutcome {
+                merged_conversations: vec!["c1".to_owned()],
+                replaced: replace,
+            })
+        }
+
+        fn delete_remote(&self, passphrase: &str, confirmation: &str) -> Result<(), BackupError> {
+            self.record(format!("delete_remote:{passphrase}:{confirmation}"));
+            Ok(())
+        }
+    }
+
+    fn backup_controller() -> (SettingsController, Arc<FakeBackupService>) {
+        i_slint_backend_testing::init_no_event_loop();
+
+        let store = Arc::new(MemorySettingsStore::new());
+        let catalog = Arc::new(MemoryProviderModelCatalog::new(Vec::new(), Vec::new()));
+        let service = Arc::new(SettingsService::new(store, catalog));
+        let backup = Arc::new(FakeBackupService::default());
+        let controller = SettingsController::with_backup(service, backup.clone())
+            .expect("settings window with backup");
+        (controller, backup)
+    }
+
+    fn fill_backup_form(window: &SettingsWindow) {
+        window.invoke_backup_endpoint_changed("https://s3.example.com".into());
+        window.invoke_backup_region_changed("us-east-1".into());
+        window.invoke_backup_bucket_changed("chatui-backups".into());
+        window.invoke_backup_access_key_changed("AKIAEXAMPLE".into());
+        window.invoke_backup_secret_key_changed("super-secret".into());
+        window.invoke_backup_passphrase_changed("correct horse battery staple".into());
+    }
+
+    #[test]
+    fn backup_callbacks_update_the_form_and_call_the_service() {
+        let (controller, backup) = backup_controller();
+        let window = controller.window();
+
+        fill_backup_form(window);
+        {
+            let state = controller.backup_state();
+            assert_eq!(state.form.endpoint, "https://s3.example.com");
+            assert_eq!(state.form.bucket, "chatui-backups");
+            assert_eq!(state.form.passphrase, "correct horse battery staple");
+        }
+
+        window.invoke_backup_test_connection();
+        assert_eq!(backup.calls(), vec!["test_connection"]);
+        assert_eq!(window.get_backup_notice(), "Connection succeeded.");
+
+        window.invoke_backup_enable();
+        assert!(window.get_backup_enabled());
+        assert_eq!(backup.calls(), vec!["test_connection", "enable"]);
+
+        window.invoke_backup_now();
+        assert_eq!(
+            backup.calls(),
+            vec![
+                "test_connection",
+                "enable",
+                "backup_now:correct horse battery staple"
+            ]
+        );
+
+        window.invoke_backup_disable();
+        assert!(!window.get_backup_enabled());
+    }
+
+    #[test]
+    fn backup_backend_specific_fields_update_the_form() {
+        let (controller, _backup) = backup_controller();
+        let window = controller.window();
+
+        window.invoke_backup_backend_changed(1);
+        window.invoke_backup_sas_token_changed("sv=2021-12-02&sig=abc".into());
+        {
+            let state = controller.backup_state();
+            assert_eq!(state.form.backend, chatui_domain::BackupBackend::AzureBlob);
+            assert_eq!(state.form.sas_token, "sv=2021-12-02&sig=abc");
+        }
+
+        window.invoke_backup_backend_changed(2);
+        window.invoke_backup_service_account_json_changed("{\"client_email\":\"a\"}".into());
+        assert_eq!(
+            controller.backup_state().form.service_account_json,
+            "{\"client_email\":\"a\"}"
+        );
+
+        window.invoke_backup_backend_changed(3);
+        window.invoke_backup_access_token_changed("drive-token".into());
+        window.invoke_backup_folder_id_changed("folder-1".into());
+        {
+            let state = controller.backup_state();
+            assert_eq!(
+                state.form.backend,
+                chatui_domain::BackupBackend::GoogleDrive
+            );
+            assert_eq!(state.form.access_token, "drive-token");
+            assert_eq!(state.form.folder_id, "folder-1");
+        }
+
+        window.invoke_backup_backend_changed(4);
+        window.invoke_backup_username_changed("user".into());
+        window.invoke_backup_password_changed("pass".into());
+        {
+            let state = controller.backup_state();
+            assert_eq!(state.form.backend, chatui_domain::BackupBackend::Webdav);
+            assert_eq!(state.form.username, "user");
+            assert_eq!(state.form.password, "pass");
+        }
+    }
+
+    #[test]
+    fn backup_restore_and_delete_require_typed_confirmation() {
+        let (controller, backup) = backup_controller();
+        let window = controller.window();
+        fill_backup_form(window);
+
+        window.invoke_backup_restore();
+        assert_eq!(
+            backup.calls(),
+            vec!["restore:correct horse battery staple:false"]
+        );
+
+        window.invoke_backup_restore_replace();
+        assert!(window.get_backup_confirmation_visible());
+        assert!(
+            window
+                .get_backup_confirmation_label()
+                .contains("REPLACE LOCAL DATA")
+        );
+        assert_eq!(
+            backup.calls(),
+            vec!["restore:correct horse battery staple:false"]
+        );
+
+        window.set_backup_confirmation_input("wrong".into());
+        window.invoke_backup_confirm();
+        assert_eq!(
+            backup.calls(),
+            vec!["restore:correct horse battery staple:false"]
+        );
+
+        window.set_backup_confirmation_input("REPLACE LOCAL DATA".into());
+        window.invoke_backup_confirm();
+        assert_eq!(
+            backup.calls(),
+            vec![
+                "restore:correct horse battery staple:false",
+                "restore:correct horse battery staple:true"
+            ]
+        );
+        assert!(!window.get_backup_confirmation_visible());
+
+        window.invoke_backup_delete_remote();
+        assert!(window.get_backup_confirmation_visible());
+        window.set_backup_confirmation_input("DELETE REMOTE BACKUP".into());
+        window.invoke_backup_confirm();
+        assert_eq!(
+            backup.calls().last().map(String::as_str),
+            Some("delete_remote:correct horse battery staple:DELETE REMOTE BACKUP")
+        );
     }
 
     #[test]
@@ -1173,8 +1961,12 @@ mod tests {
 
         window.invoke_select_section(5);
         assert_eq!(window.get_backup_title(), "Backup");
-        assert!(window.get_backup_message().contains("does not back up"));
-        assert!(window.get_backup_detail().contains("encrypt"));
+        assert!(!window.get_backup_statement().is_empty());
+        assert!(!window.get_backup_passphrase_warning().is_empty());
+        assert_eq!(window.get_backup_status_last(), "Never");
+        assert_eq!(window.get_backup_status_pending(), "0 pending changes");
+        assert_eq!(window.get_backup_status_error(), "None");
+        assert!(!window.get_backup_confirmation_visible());
 
         window.invoke_select_section(6);
         assert_eq!(window.get_about_title(), "About ChatUI");

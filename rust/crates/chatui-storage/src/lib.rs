@@ -48,11 +48,13 @@ pub mod paths;
 pub mod recovery;
 pub mod repositories;
 pub mod search;
+pub mod sync;
 
 pub use attachments::{AttachmentLease, AttachmentService, AttachmentStore, sha256_hex};
 pub use db::{
-    BUSY_TIMEOUT_MS, PragmaState, open_database, open_default_database, open_in_memory,
-    read_pragmas, run_migrations, verify_fts5, verify_pragmas,
+    BUSY_TIMEOUT_MS, PragmaState, backfill_conversation_storage_keys, open_database,
+    open_default_database, open_in_memory, read_pragmas, run_migrations, verify_fts5,
+    verify_pragmas,
 };
 pub use export::{EXPORT_PLAINTEXT_WARNING, ExportOptions, ExportService, encode_export};
 pub use import::{
@@ -61,8 +63,10 @@ pub use import::{
     validate_import_archive,
 };
 pub use paths::{
-    ATTACHMENTS_DIR_NAME, STORAGE_KEY_LEN, attachment_path, attachments_dir, is_valid_storage_key,
-    storage_key_for_sha256, validate_storage_key,
+    ATTACHMENTS_DIR_NAME, CONVERSATION_STORAGE_KEY_LEN, STORAGE_KEY_LEN, attachment_path,
+    attachments_dir, is_valid_conversation_storage_key, is_valid_storage_key,
+    new_conversation_storage_key, storage_key_for_sha256, validate_conversation_storage_key,
+    validate_storage_key,
 };
 pub use recovery::{INTERRUPTION_NOTE, RecoveryFailure, RecoveryService, RecoverySummary};
 pub use repositories::{
@@ -71,10 +75,11 @@ pub use repositories::{
     SecretRepository, SettingRecord, SettingsRepository, SqliteAttachmentRepository,
     SqliteBackupConfigRepository, SqliteConversationRepository, SqliteMessageRepository,
     SqliteModelRepository, SqliteProviderRepository, SqliteSecretRepository,
-    SqliteSettingsRepository, SqliteSyncQueueRepository, SyncQueueEntry, SyncQueueRepository,
-    default_settings,
+    SqliteSettingsRepository, SqliteSyncQueueRepository, SqliteTombstoneRepository, SyncQueueEntry,
+    SyncQueueRepository, TombstoneRepository, default_settings,
 };
 pub use search::{SearchHit, SearchOptions, SearchRepository, SqliteSearchRepository};
+pub use sync::{SqliteSyncLocalStore, SyncLocalStore};
 
 /// Application directory name used for the platform app-data path.
 pub const APP_DIR_NAME: &str = "chatui";

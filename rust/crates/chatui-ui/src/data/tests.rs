@@ -82,6 +82,8 @@ fn conversation(id: &str, provider_id: &str, model_id: &str, created: u32) -> Co
         message_count: 0,
         last_error: None,
         sync: None,
+        storage_key: String::new(),
+        revision: 0,
     }
 }
 

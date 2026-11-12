@@ -6,6 +6,7 @@ members = [
   "crates/chatui-providers",
   "crates/chatui-storage",
   "crates/chatui-secrets",
+  "crates/chatui-backup",
   "crates/chatui-ui",
   "apps/desktop",
   "tests/conformance",

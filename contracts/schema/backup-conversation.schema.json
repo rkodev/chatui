@@ -1,0 +1,458 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rkodev/chatui/contracts/schema/backup-conversation.schema.json",
+  "title": "ChatUI Backup Conversation Payload",
+  "contractVersion": 1,
+  "description": "Self-contained conversation payload stored inside a conversation envelope. The plaintext is a gzip stream of this canonical JSON (M5-decisions.md DEC-M5-08). It contains conversation metadata, all messages, and attachment references. It must not contain provider API keys or other secrets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "systemPrompt",
+    "providerId",
+    "modelId",
+    "modelLabel",
+    "params",
+    "pinned",
+    "archived",
+    "temporary",
+    "createdAt",
+    "updatedAt",
+    "lastMessageAt",
+    "revision",
+    "storageKey",
+    "messages",
+    "attachments"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string"
+    },
+    "systemPrompt": {
+      "type": "string"
+    },
+    "providerId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "modelId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "modelLabel": {
+      "type": "string"
+    },
+    "params": {
+      "$ref": "#/$defs/chatParams"
+    },
+    "pinned": {
+      "type": "boolean"
+    },
+    "archived": {
+      "type": "boolean"
+    },
+    "temporary": {
+      "type": "boolean"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lastMessageAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "storageKey": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/message"
+      }
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/attachmentReference"
+      }
+    }
+  },
+  "$defs": {
+    "chatParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "temperature",
+        "topP",
+        "maxOutputTokens",
+        "stop",
+        "reasoningEffort",
+        "streaming",
+        "extra"
+      ],
+      "properties": {
+        "temperature": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 2
+        },
+        "topP": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maxOutputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "stop": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reasoningEffort": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            null
+          ]
+        },
+        "streaming": {
+          "type": "boolean"
+        },
+        "extra": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputTokens",
+        "outputTokens",
+        "totalTokens",
+        "costUsd",
+        "estimated"
+      ],
+      "properties": {
+        "inputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "totalTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "costUsd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "estimated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "contentPart": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "text"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "attachmentId",
+            "mimeType",
+            "alt"
+          ],
+          "properties": {
+            "type": {
+              "const": "image"
+            },
+            "attachmentId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mimeType": {
+              "type": "string",
+              "minLength": 1
+            },
+            "alt": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "attachmentId",
+            "mimeType",
+            "name"
+          ],
+          "properties": {
+            "type": {
+              "const": "file"
+            },
+            "attachmentId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mimeType": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "reasoning"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "name",
+            "argumentsJson"
+          ],
+          "properties": {
+            "type": {
+              "const": "tool-call"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "argumentsJson": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "toolCallId",
+            "content"
+          ],
+          "properties": {
+            "type": {
+              "const": "tool-result"
+            },
+            "toolCallId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "content": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sequence",
+        "role",
+        "parts",
+        "status",
+        "usage",
+        "createdAt",
+        "updatedAt",
+        "deletedAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "system",
+            "user",
+            "assistant",
+            "tool"
+          ]
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contentPart"
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "streaming",
+            "complete",
+            "cancelled",
+            "error"
+          ]
+        },
+        "usage": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/usage"
+            }
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deletedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "attachmentReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sha256",
+        "mimeType",
+        "name",
+        "size",
+        "storageKey"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "storageKey": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Content-addressed attachment key: the SHA-256 of the attachment bytes."
+        }
+      }
+    }
+  }
+}

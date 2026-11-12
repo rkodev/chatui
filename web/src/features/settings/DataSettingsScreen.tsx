@@ -32,7 +32,7 @@ function errorMessage(cause: unknown): string {
  *
  * Export, import, usage, clear-all, and per-key deletion share one IndexedDB
  * connection when created here. Import is merge-by-default; replace mode and
- * clear-all are confirmed in their panels. Backup remains a placeholder.
+ * clear-all are confirmed in their panels. Backup configuration lives on its own screen.
  */
 export function DataSettingsScreen({
   exportService,
@@ -136,8 +136,9 @@ export function DataSettingsScreen({
       <div className="settings-screen__panel">
         <h3>Related</h3>
         <p>
-          Backup configuration is a future feature. See <Link to="/settings/backup">Backup</Link>{' '}
-          for its current status, and <Link to="/settings/about">About</Link> for privacy details.
+          Backup configuration and restore are available in{' '}
+          <Link to="/settings/backup">Backup</Link>, and <Link to="/settings/about">About</Link>{' '}
+          covers privacy details.
         </p>
       </div>
     </section>

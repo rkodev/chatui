@@ -1,16 +1,18 @@
 import type { IDBPDatabase } from 'idb'
-import { newId, nowIso, type Conversation, type Message } from '../domain'
+import { newId, newStorageKey, nowIso, type Conversation, type Message } from '../domain'
 import { fromConversationRecord, runTransaction, toConversationRecord, type ChatUiDB } from './db'
 
 export interface NewConversation extends Omit<
   Conversation,
-  'id' | 'createdAt' | 'updatedAt' | 'lastMessageAt' | 'messageCount'
+  'id' | 'createdAt' | 'updatedAt' | 'lastMessageAt' | 'messageCount' | 'storageKey' | 'revision'
 > {
   id?: string
   createdAt?: string
   updatedAt?: string
   lastMessageAt?: string
   messageCount?: number
+  storageKey?: string
+  revision?: number
 }
 
 export interface ConversationListOptions {
@@ -151,6 +153,8 @@ export class ConversationRepository {
       updatedAt: input.updatedAt ?? now,
       lastMessageAt: input.lastMessageAt ?? input.createdAt ?? now,
       messageCount: input.messageCount ?? 0,
+      storageKey: input.storageKey ?? newStorageKey(),
+      revision: input.revision ?? 1,
     }
 
     await this.db.put('conversations', toConversationRecord(conversation))
@@ -342,11 +346,14 @@ export class ConversationRepository {
         throw new Error(`Conversation ${id} not found`)
       }
 
+      const existingConversation = fromConversationRecord(existing)
       const updated: Conversation = {
-        ...fromConversationRecord(existing),
+        ...existingConversation,
         ...patch,
         id,
         createdAt: existing.createdAt,
+        storageKey: patch.storageKey ?? existingConversation.storageKey,
+        revision: patch.revision ?? existingConversation.revision + 1,
         updatedAt: patch.updatedAt ?? nowIso(),
       }
 

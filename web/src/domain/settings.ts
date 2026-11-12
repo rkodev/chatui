@@ -11,7 +11,7 @@ export type ChatFontSize = 'sm' | 'md' | 'lg'
 
 export type SendKey = 'enter' | 'mod-enter'
 
-export type BackupBackend = 's3' | 'azure-blob' | 'gcs' | 'webdav'
+export type BackupBackend = 's3' | 'azure-blob' | 'gcs' | 'google-drive' | 'webdav'
 
 export type BackupEncryption = 'aes-256-gcm'
 

@@ -122,8 +122,56 @@ pub async fn open_in_memory() -> Result<SqlitePool, StorageError> {
 ///
 /// SQLx records applied versions and checksums in `_sqlx_migrations`, so calling
 /// this again is a no-op. There is no destructive fallback.
+///
+/// After the migration runner finishes, empty conversation storage keys are
+/// backfilled with random 128-bit values. SQLite cannot generate portable random
+/// defaults, so the backfill lives in Rust and is idempotent.
 pub async fn run_migrations(pool: &SqlitePool) -> Result<(), StorageError> {
     MIGRATOR.run(pool).await?;
+    backfill_conversation_storage_keys(pool).await?;
+    Ok(())
+}
+
+/// Backfill empty conversation storage keys with random 128-bit values.
+///
+/// The partial unique index on `conversations(storage_key)` rejects collisions.
+/// A collision is retried with a fresh random key; the loop is bounded so a
+/// persistent failure surfaces instead of spinning.
+pub async fn backfill_conversation_storage_keys(pool: &SqlitePool) -> Result<(), StorageError> {
+    let ids: Vec<String> =
+        sqlx::query_scalar("SELECT id FROM conversations WHERE storage_key = ''")
+            .fetch_all(pool)
+            .await?;
+
+    for id in ids {
+        let mut stored = false;
+        for _ in 0..8 {
+            let key = crate::paths::new_conversation_storage_key();
+            let result = sqlx::query(
+                "UPDATE conversations SET storage_key = ? WHERE id = ? AND storage_key = ''",
+            )
+            .bind(&key)
+            .bind(&id)
+            .execute(pool)
+            .await;
+
+            match result {
+                Ok(_) => {
+                    stored = true;
+                    break;
+                }
+                Err(sqlx::Error::Database(error)) if error.is_unique_violation() => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+
+        if !stored {
+            return Err(StorageError::Conflict(format!(
+                "could not allocate a unique storage key for conversation {id}"
+            )));
+        }
+    }
+
     Ok(())
 }
 
@@ -273,6 +321,87 @@ mod tests {
             fts_sql.to_ascii_uppercase().contains("VIRTUAL TABLE"),
             "messages_fts is not a virtual table: {fts_sql}"
         );
+
+        pool.close().await;
+    }
+
+    #[tokio::test]
+    async fn migration_0002_preserves_existing_data_and_backfills_storage_keys() {
+        let options = SqliteConnectOptions::new()
+            .in_memory(true)
+            .foreign_keys(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .min_connections(1)
+            .connect_with(options)
+            .await
+            .expect("open raw in-memory database");
+
+        sqlx::raw_sql(include_str!("../migrations/0001_initial.sql"))
+            .execute(&pool)
+            .await
+            .expect("apply 0001");
+
+        sqlx::query(
+            "INSERT INTO conversations \
+             (id, title, system_prompt, params_json, created_at, updated_at) \
+             VALUES ('conversation-1', 'Existing', 'Be concise.', '{}', \
+                     '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')",
+        )
+        .execute(&pool)
+        .await
+        .expect("insert pre-migration conversation");
+
+        sqlx::raw_sql(include_str!("../migrations/0002_backup_sync.sql"))
+            .execute(&pool)
+            .await
+            .expect("apply 0002");
+
+        let (title, storage_key, revision): (String, String, i64) = sqlx::query_as(
+            "SELECT title, storage_key, revision FROM conversations WHERE id = 'conversation-1'",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("read migrated conversation");
+        assert_eq!(title, "Existing");
+        assert_eq!(storage_key, "");
+        assert_eq!(revision, 1);
+
+        backfill_conversation_storage_keys(&pool)
+            .await
+            .expect("backfill storage keys");
+
+        let storage_key: String =
+            sqlx::query_scalar("SELECT storage_key FROM conversations WHERE id = 'conversation-1'")
+                .fetch_one(&pool)
+                .await
+                .expect("read backfilled key");
+        assert_eq!(storage_key.len(), 32);
+        assert!(crate::paths::is_valid_conversation_storage_key(
+            &storage_key
+        ));
+
+        sqlx::query(
+            "INSERT INTO conversations \
+             (id, title, system_prompt, params_json, created_at, updated_at) \
+             VALUES ('conversation-2', 'Second', '', '{}', \
+                     '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')",
+        )
+        .execute(&pool)
+        .await
+        .expect("insert second conversation");
+        backfill_conversation_storage_keys(&pool)
+            .await
+            .expect("backfill second storage key");
+
+        let keys: Vec<String> =
+            sqlx::query_scalar("SELECT storage_key FROM conversations ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .expect("read storage keys");
+        assert_eq!(keys.len(), 2);
+        assert_ne!(keys[0], keys[1]);
+        assert!(keys.iter().all(|key| key.len() == 32));
 
         pool.close().await;
     }

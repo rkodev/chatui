@@ -1,5 +1,6 @@
 package dev.chatui.core.database.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -37,4 +38,15 @@ data class ConversationEntity(
     val messageCount: Int,
     val lastErrorJson: String?,
     val syncState: String?,
+    /**
+     * Random 128-bit backup object key as 32 lowercase hex characters.
+     *
+     * The column default keeps the v1 -> v2 migration valid; the migration
+     * backfills existing rows with random keys in Kotlin.
+     */
+    @ColumnInfo(name = "storage_key", defaultValue = "''")
+    val storageKey: String = "",
+    /** Monotonic revision starting at 1. */
+    @ColumnInfo(defaultValue = "1")
+    val revision: Long = 1,
 )
