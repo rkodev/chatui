@@ -19,7 +19,7 @@ cache rules are provided for the supported static hosts.
 | `deploy/netlify.toml` | Netlify build, redirect, and header rules |
 | `deploy/vercel.json` | Vercel build, rewrite, and header rules |
 | `deploy/github-pages/README.md` | GitHub Pages fallback recipe and limitations |
-| `deploy/roksky.md` | roksky tenant recipe |
+| `deploy/chatui.md` | ChatUI tenant recipe |
 | `docs/operations/M4/evidence/deployment/README.md` | Recorded smoke evidence |
 
 ## Prerequisites
@@ -140,11 +140,11 @@ Follow `deploy/github-pages/README.md`. GitHub Pages cannot set response
 headers, so it does not meet the CSP/cache contract. Use it for previews or
 low-risk deployments only. Owner for the header gap: web deployment owner.
 
-### roksky hosting
+### ChatUI hosting
 
-Follow `deploy/roksky.md`. roksky serves the same static bundle on a tenant
+Follow `deploy/chatui.md`. ChatUI serves the same static bundle on a tenant
 subdomain or custom domain, manages TLS, and applies the shared header rules at
-the edge. Optional managed storage is for encrypted backups only; roksky support
+the edge. Optional managed storage is for encrypted backups only; ChatUI support
 never receives provider keys, plaintext chats, or backup passphrases.
 
 ## Verification

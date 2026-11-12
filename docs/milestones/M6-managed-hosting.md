@@ -1,4 +1,4 @@
-# M6 - Managed roksky hosting (future)
+# M6 - Managed ChatUI hosting (future)
 
 - Status: Future
 - Target: follow-on to M4/M5
@@ -9,13 +9,13 @@
 
 ## Objective
 
-Provide an optional roksky-managed hosting flow for the web client. roksky serves the static app and manages TLS; users bring provider keys and optionally their own object storage. roksky must have no access to keys, plaintext chats, or backup passphrases. This is a hosting and documentation milestone, not a backend application.
+Provide an optional ChatUI-managed hosting flow for the web client. ChatUI serves the static app and manages TLS; users bring provider keys and optionally their own object storage. ChatUI must have no access to keys, plaintext chats, or backup passphrases. This is a hosting and documentation milestone, not a backend application.
 
 ## Entry criteria
 
 - M4 exit gate is met: the static web build, container, headers, config contract, and release pipeline are stable.
 - M5 is complete if BYO encrypted storage onboarding is in scope.
-- The product name, domain, support model, and hosting brand questions from spec section 20 have owners.
+- The product name, domain, support model, and hosting brand questions from spec section 20 are decided (`DEC-M6-03`), and a hosting operator with staging access is named or recorded as a blocker (`DEC-M6-10`).
 
 ## Scope by workstream
 
@@ -34,7 +34,7 @@ Deliver:
 
 Deliver:
 
-- "Deploy to roksky" flow: choose subdomain and region, roksky serves the static app and manages TLS.
+- "Deploy to ChatUI" flow: choose subdomain and region, ChatUI serves the static app and manages TLS.
 - The user configures providers and keys in the browser after deployment.
 - Optional connection of user-owned object storage for encrypted backups via M5.
 - A clear "export everything" path.
@@ -47,7 +47,7 @@ Deliver:
 Deliver:
 
 - S3-compatible storage onboarding first, with CORS guidance and a connectivity test.
-- Explicit statement that storage credentials and the backup passphrase remain client-side and are never sent to roksky.
+- Explicit statement that storage credentials and the backup passphrase remain client-side and are never sent to ChatUI.
 - Links to backup/restore documentation from M5.
 - Failure states for invalid credentials, CORS, unreachable endpoints, and bucket permissions.
 
@@ -55,8 +55,8 @@ Deliver:
 
 Deliver:
 
-- Data-processing summary covering what roksky can and cannot see.
-- Logging and retention statement: no keys, prompts, responses, or plaintext chats in roksky logs.
+- Data-processing summary covering what ChatUI can and cannot see.
+- Logging and retention statement: no keys, prompts, responses, or plaintext chats in ChatUI logs.
 - Support-access statement: support cannot recover keys, read chats, or restore a lost passphrase.
 - Clear statement that the user is responsible for provider terms and for their own storage.
 - Documentation that the static app has no hidden network destinations.
@@ -66,7 +66,7 @@ Deliver:
 
 Deliver:
 
-- Templates under `deploy/roksky/` and tenant configuration docs under `docs/hosting/`.
+- Templates under `deploy/chatui/` and tenant configuration docs under `docs/hosting/`.
 - Static hosting path with SPA fallback and the security headers from section 14.1.
 - Header/CSP verification for deployed tenants.
 - Staging deployment and smoke test.
@@ -79,7 +79,7 @@ Deliver:
 - Header and CSP check against section 14.1.
 - Review tenant configuration for secrets.
 - Verify a tenant can export and self-host with the same public config.
-- Verify roksky has no path to read provider keys, plaintext chats, or passphrases.
+- Verify ChatUI has no path to read provider keys, plaintext chats, or passphrases.
 - Manual export/restore check using M5 if available.
 
 ## Out of scope
@@ -88,13 +88,13 @@ Deliver:
 - Changing the phase 1 static deployment contract (M4).
 - Provider resale, billing, usage metering, or prompt proxying.
 - Server-side key custody, server-side conversation storage, or cross-device sync.
-- A managed storage offering sold by roksky beyond BYO storage; any future partner storage must remain client-side encrypted and unreadable by roksky.
+- A managed storage offering sold by ChatUI beyond BYO storage; any future partner storage must remain client-side encrypted and unreadable by ChatUI.
 - Native Android or Rust desktop distribution.
 
 ## Exit gate
 
 - A tenant can be deployed with a custom domain and branding without server-side secrets.
-- roksky has no path to read provider keys, plaintext chats, or backup passphrases.
+- ChatUI has no path to read provider keys, plaintext chats, or backup passphrases.
 - The exported app remains self-hostable with the same `config.json` contract.
 - BYO storage onboarding works and clearly states that credentials and passphrase stay client-side.
 - Privacy and data-processing documentation is accurate and reviewed.
