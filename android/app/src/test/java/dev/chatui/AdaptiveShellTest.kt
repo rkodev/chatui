@@ -1,5 +1,6 @@
 package dev.chatui
 
+import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -7,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.navigation.compose.rememberNavController
 import dev.chatui.core.designsystem.ChatUiTheme
+import dev.chatui.shell.AdaptiveShell
 import dev.chatui.shell.ShellDestination
 import dev.chatui.shell.ShellScaffold
 import dev.chatui.shell.ShellTestTags
@@ -55,6 +57,43 @@ class AdaptiveShellTest {
         composeRule.onNodeWithTag(ShellTestTags.ExpandedLayout).assertExists()
         composeRule.onNodeWithTag(ShellTestTags.MenuButton).assertDoesNotExist()
         composeRule.onNodeWithTag(ShellTestTags.Drawer).assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w840dp-h1280dp")
+    fun `isolated layout hides the permanent sidebar`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                AdaptiveShell(
+                    expanded = true,
+                    sidebarVisible = false,
+                    sidebar = { Text("Navigation") },
+                    mainContent = { Text("Onboarding") },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ShellTestTags.Sidebar).assertDoesNotExist()
+        composeRule.onNodeWithTag(ShellTestTags.MainContent).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `isolated layout hides the modal drawer`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                AdaptiveShell(
+                    expanded = false,
+                    sidebarVisible = false,
+                    sidebar = { Text("Navigation") },
+                    mainContent = { Text("Onboarding") },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ShellTestTags.Drawer).assertDoesNotExist()
+        composeRule.onNodeWithTag(ShellTestTags.Sidebar).assertDoesNotExist()
+        composeRule.onNodeWithTag(ShellTestTags.MainContent).assertIsDisplayed()
     }
 
     private fun setShell() {
