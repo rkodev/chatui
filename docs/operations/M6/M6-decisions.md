@@ -9,15 +9,16 @@
 - Source: [M6 plan](../M6-managed-hosting-implementation-plan.md) sections 1.1,
   1.3, 4, and 10; [M6 milestone](../../milestones/M6-managed-hosting.md) entry
   criteria, risks, and out of scope; spec sections 13.8, 14.3, and 20 question 10
-- Status: Preflight record complete. The entry gate remains blocked on
-  `DEC-M6-03`, `DEC-M6-10`, `DEC-M6-11`, the retention part of `DEC-M6-12`, and
-  the branded-build part of `DEC-M6-13`. The M6 folder status stays `Planned`.
+- Status: Preflight record complete. The entry gate is blocked on `DEC-M6-10`
+  only: no external staging operator or staging tenant is assigned. The M6
+  folder status stays `Planned` until that is resolved.
 
 This file freezes the decisions that later M6 tasks depend on. A decision marked
-`Confirmed` is within the repository's authority or is already fixed by the M6
-plan, milestone, or spec. A decision marked `Blocked` needs a named external
-owner; it is not an invitation to guess. Change a decision only with a new dated
-entry and a matching update to the affected task files and the M6 README.
+`Confirmed` is within the repository's authority, was confirmed by the product
+owner, or is already fixed by the M6 plan, milestone, or spec. A decision marked
+`Blocked` needs a named external owner; it is not an invitation to guess. Change
+a decision only with a new dated entry and a matching update to the affected task
+files and the M6 README.
 
 No secret, real key, storage credential, backup passphrase, prompt, response, or
 conversation content is recorded here. Names that are not assigned are recorded
@@ -29,17 +30,17 @@ as `unassigned`, not invented.
 | --- | --- | --- | --- | --- |
 | `DEC-M6-01` | M6 is authorized as a hosting/documentation milestone, not a backend build | Confirmed for preflight | User/product owner | 2026-11-12 |
 | `DEC-M6-02` | Repository owns static artifacts, schemas, templates, docs, and evidence; external operator owns control plane, DNS, TLS, status, and support tooling | Confirmed | Repository maintainers / architecture owner | 2026-11-12 |
-| `DEC-M6-03` | Product name, domain, branding owner, and support model | Blocked | Product owner (unassigned) | 2026-11-12 |
+| `DEC-M6-03` | Final product and hosting brand is ChatUI; base domain `chatui.dev`; support is GitHub Issues, best effort, no SLA | Confirmed | Product owner (repository maintainer) | 2026-11-12 |
 | `DEC-M6-04` | Private operator manifest plus public app `config.json`; no secrets in either served artifact | Confirmed | Contracts/architecture owner | 2026-11-12 |
 | `DEC-M6-05` | Tenant manifest at `contracts/schema/hosting-tenant.schema.json` with fixtures under `contracts/fixtures/hosting/` | Confirmed | Contracts owner | 2026-11-12 |
 | `DEC-M6-06` | Expose no feature flags in M6; any future flag needs a typed allowlist and a new decision | Confirmed | Product/release owner with repository maintainers | 2026-11-12 |
 | `DEC-M6-07` | Subdomain policy is operator-enforced; region means static edge location only, with no data-residency claim | Confirmed for semantics; region list and residency claims remain operator/product/legal | Hosting operator with product/legal owner | 2026-11-12 |
-| `DEC-M6-08` | BYO storage only; no roksky-managed storage offering in M6 | Confirmed | Product/release owner (milestone scope) | 2026-11-12 |
+| `DEC-M6-08` | BYO storage only; no ChatUI-managed storage offering in M6 | Confirmed | Product/release owner (milestone scope) | 2026-11-12 |
 | `DEC-M6-09` | Support access is least privilege, audited, non-impersonating, and has no key/chat/passphrase access | Confirmed for the boundary; detailed roles and audit retention remain for M6-04.2 and privacy review | Security/privacy owner with hosting operator | 2026-11-12 |
 | `DEC-M6-10` | Named external staging operator, staging tenant, custom-domain test path, and TLS access | Blocked | Hosting operator (unassigned) | 2026-11-12 |
-| `DEC-M6-11` | Named privacy/legal reviewer and approval process | Blocked | Privacy/legal reviewer (unassigned) | 2026-11-12 |
-| `DEC-M6-12` | Logging fields and retention periods | Confirmed for fields; retention periods Blocked | Privacy/legal reviewer with hosting operator | 2026-11-12 |
-| `DEC-M6-13` | PWA install name/icons remain build-time and are not tenant-branded in M6 | Confirmed for the M6 limitation; branded-build requirement Blocked | Product owner with web/UI owner | 2026-11-12 |
+| `DEC-M6-11` | Named privacy/legal reviewer and approval process: product owner self-review with dated risk acceptance | Confirmed with recorded risk acceptance; not independent legal review | Product owner (self-reviewer) | 2026-11-12 |
+| `DEC-M6-12` | Logging fields: IP, user agent, path, status, timing, tenant/subdomain, request ID; retention: edge/error 30 days, audit/support 90 days; automated deletion | Confirmed | Privacy reviewer (product owner self-review) with hosting operator | 2026-11-12 |
+| `DEC-M6-13` | PWA install name/icons remain build-time ChatUI branding and are not tenant-branded in M6 | Confirmed; no branded build required | Product owner with web/UI owner | 2026-11-12 |
 | `DEC-M6-14` | External operator owns custom-domain DNS, TLS issuance/renewal, and failure handling | Confirmed for ownership; named operator and operational details Blocked by `DEC-M6-10` | Hosting operator with release/security owner | 2026-11-12 |
 | `DEC-M6-15` | Pin artifact digest and config hash together; roll back both; repository owns the runbook, operator executes | Confirmed | Release/security owner with hosting operator | 2026-11-12 |
 
@@ -62,9 +63,10 @@ build.**
   the M6 plan and milestone define M6 as hosting/documentation only.
 - Evidence: user request for this task; M6 plan section 1; milestone objective;
   M6 README scope and platform rule.
-- Consequence: `M6-01.2` and `M6-01.3` may proceed. Implementation tasks remain
-  gated by the unresolved entry items below. Any request to build a control
-  plane or backend in this repository is a separate approved scope, not M6.
+- Consequence: `M6-01.2` and `M6-01.3` may proceed once `M6-01.1` is
+  `Complete`. Implementation tasks remain gated by the unresolved entry items
+  below. Any request to build a control plane or backend in this repository is a
+  separate approved scope, not M6.
 
 ## DEC-M6-02 - Repository versus external-operator boundary
 
@@ -96,25 +98,31 @@ support tooling.**
 
 ## DEC-M6-03 - Product name, domain, branding owner, and support model
 
-**Decision: not yet decided. Working names only: "ChatUI" for the app and
-"roksky" for the hosting brand. Final product name, domain, branding owner, and
-support model are unassigned.**
+**Decision: the final product and managed-hosting brand is "ChatUI". The base
+domain is `chatui.dev`; tenant origins use `<tenant>.chatui.dev`. The branding
+owner is the product owner (repository maintainer). Support is provided through
+GitHub Issues on a best-effort basis, with no SLA, no guaranteed hours, no
+escalation commitment, and no paid support included in the M6 offering.**
 
-- Status: Blocked.
-- Owner: Product owner (unassigned).
+- Status: Confirmed.
+- Owner: Product owner (repository maintainer).
 - Date: 2026-11-12.
-- Rationale: spec section 20 question 10 is unresolved, and the milestone entry
-  criteria require named owners for the product name, domain, support model, and
-  hosting brand.
-- Evidence: spec section 20 question 10; milestone entry criteria; plan section
-  10 open decisions.
-- Blocked by: the product owner must name the final product name, the tenant
-  domain (including the base domain and subdomain pattern), the branding owner,
-  and the support model (channels, hours, escalation, and whether support is
-  included in the offering).
-- Consequence: branding templates, privacy/support copy, the staging domain, and
-  any public claim about the managed offering cannot be finalized. `M6-01.3`
-  may use clearly marked placeholders but must not publish final branding.
+- Rationale: this answers spec section 20 question 10 and satisfies the
+  milestone entry criteria. The product owner chose a single ChatUI brand and
+  retired "roksky" as a public hosting brand.
+- Evidence: product-owner answers recorded on 2026-11-12; this decision record.
+- Scope limits: this decision does not register the domain or transfer DNS, and
+  domain availability was not verified from the repository. Domain
+  registration/ownership, DNS, and TLS remain operator deliverables under
+  `DEC-M6-10` and `DEC-M6-14`. If `chatui.dev` cannot be owned or delegated, this
+  decision must be revised before staging.
+- Consequence: M6 plan, milestone, task breakdown, and task files use ChatUI and
+  planned paths under `deploy/chatui/`, including `deploy/chatui.md`. Branding
+  templates, support copy, and the staging domain may use ChatUI. Historical M4
+  and M5 records and the authoritative spec still contain "roksky" references;
+  those are historical and require a separate documentation/spec change. The
+  existing `deploy/chatui.md` recipe must still be corrected by `M6-02.1` to
+  remove the out-of-scope managed-storage claim.
 
 ## DEC-M6-04 - Tenant model
 
@@ -189,9 +197,9 @@ guarantee is made in M6.**
 
 ## DEC-M6-08 - BYO storage only
 
-**Decision: M6 supports BYO S3-compatible storage only. No roksky-managed
+**Decision: M6 supports BYO S3-compatible storage only. No ChatUI-managed
 storage offering is sold or claimed in M6. Storage credentials and backup
-passphrases remain client-side and are never sent to roksky.**
+passphrases remain client-side and are never sent to ChatUI.**
 
 - Status: Confirmed.
 - Owner: Product/release owner (milestone scope).
@@ -203,7 +211,7 @@ passphrases remain client-side and are never sent to roksky.**
 - Consequence: `M6-03.1`, `M6-03.2`, and `M6-03.3` document BYO only. No managed
   storage claim, partner storage claim, or server-side storage request may be
   added. Any future partner storage must remain client-side encrypted and
-  unreadable by roksky.
+  unreadable by ChatUI.
 
 ## DEC-M6-09 - Support-access model
 
@@ -225,7 +233,7 @@ metadata and operational logs only as defined by `DEC-M6-12`.**
 
 ## DEC-M6-10 - External staging operator and tenant
 
-**Decision: not yet assigned. No named external roksky operator, staging tenant,
+**Decision: not yet assigned. No named external ChatUI operator, staging tenant,
 custom-domain test path, or TLS/edge access is recorded.**
 
 - Status: Blocked.
@@ -243,60 +251,73 @@ custom-domain test path, or TLS/edge access is recorded.**
 
 ## DEC-M6-11 - Privacy/legal reviewer and approval process
 
-**Decision: not yet assigned. No named privacy/legal reviewer or approval
-process is recorded.**
+**Decision: the product owner (repository maintainer) is the named privacy/legal
+reviewer, using a documented self-review and dated risk acceptance. The approval
+process is: review `data-processing.md`, `privacy.md`,
+`logging-and-retention.md`, `support-access.md`, `provider-terms.md`, and
+`backup-and-restore.md`; record the sign-off in
+`docs/operations/M6/evidence/privacy-review.md` with the review scope, date,
+open items, and explicit risk acceptance; re-review before publication and after
+any material change to data flows, logging, retention, support access, storage,
+or subprocessors.**
 
-- Status: Blocked.
-- Owner: Privacy/legal reviewer (unassigned).
+- Status: Confirmed with recorded risk acceptance. This is not independent
+  legal review and does not satisfy a regulated-industry or jurisdiction-specific
+  legal requirement.
+- Owner: Product owner acting as privacy/legal reviewer.
 - Date: 2026-11-12.
-- Rationale: the exit gate requires reviewed privacy copy, and the repository
-  cannot self-approve legal claims.
-- Evidence: M6 README entry gate unchecked; plan section 10 open decisions.
-- Blocked by: name the privacy/legal reviewer and define the approval process:
-  review scope, sign-off artifact, approval date, and re-review trigger.
-- Consequence: `M6-04.3` cannot complete. Privacy, logging, retention,
-  support-access, and provider-terms copy cannot be published as approved.
+- Rationale: no external reviewer was available or named. The product owner chose
+  a documented self-review with explicit risk acceptance so documentation can
+  proceed without pretending that an independent review occurred.
+- Evidence: product-owner answer recorded on 2026-11-12; the dated sign-off
+  artifact is produced by `M6-04.3`.
+- Consequence: `M6-04.3` may complete when the sign-off records this limitation.
+  If an external reviewer is named later, that review supersedes this decision.
+  Claims that require legal advice, including data residency, subprocessors, and
+  regulated data, must not be published while unresolved.
 
 ## DEC-M6-12 - Logging fields and retention periods
 
 **Decision: edge logs may include IP address, user agent, request path, HTTP
 status, timing, tenant/subdomain, and request ID. Logs must never include request
 or response bodies, prompts, completions, provider keys, storage credentials,
-backup passphrases, or conversation content. Retention periods are not yet
-approved.**
+backup passphrases, or conversation content. Retention is 30 days for
+edge/access and error logs, and 90 days for audit and support-access records.
+Deletion is automatic at the end of each period by log rotation; the operator
+must not keep copies beyond these periods in downstream systems. A deletion
+request is handled by operator support and confirmed to the requester without
+accessing user content.**
 
-- Status: Confirmed for the allowed and forbidden fields. Retention periods are
-  Blocked.
-- Owner: Privacy/legal reviewer with hosting operator.
+- Status: Confirmed.
+- Owner: Privacy reviewer (product owner self-review) with hosting operator.
 - Date: 2026-11-12.
-- Rationale: plan section 4 recommended default; retention is a privacy decision
-  that requires the named reviewer.
-- Evidence: plan section 4; milestone logging requirement.
-- Blocked by: the privacy/legal reviewer must set retention periods for
-  edge/access logs, error logs, audit logs, and support-access records, and state
-  the deletion process.
-- Consequence: `M6-04.2` may draft the field list but must not publish retention
-  periods until approved. `M6-04.3` gates publication.
+- Rationale: plan section 4 requires an accurate logging statement; the product
+  owner set the shortest workable periods and an automated deletion path.
+- Evidence: product-owner answers recorded on 2026-11-12; plan section 4;
+  milestone logging requirement.
+- Consequence: `M6-04.2` may publish these field lists and retention periods, and
+  `M6-04.3` reviews them. The operator must configure rotation to match; if it
+  cannot, that is a new recorded blocker and the copy must not claim the period.
 
 ## DEC-M6-13 - PWA install name and icon branding
 
-**Decision: PWA install name and icons remain build-time and are not
-tenant-branded in M6. The limitation must be documented. A tenant-branded PWA
-build is not in M6 scope unless the product owner approves a separate build
-path.**
+**Decision: PWA install name and icons remain build-time ChatUI branding and are
+not tenant-branded in M6. The limitation must be documented. The product owner
+confirmed that tenant-branded install name/icons are not required. A
+tenant-branded PWA build is not in M6 scope unless the product owner approves a
+separate build path and a new decision.**
 
-- Status: Confirmed for the M6 limitation. Any branded-build requirement is
-  Blocked pending the product owner.
+- Status: Confirmed.
 - Owner: Product owner with web/UI owner.
 - Date: 2026-11-12.
 - Rationale: plan section 4 recommended default; it avoids scope creep, and the
-  static build already has a fixed manifest.
-- Evidence: plan section 4; existing web build and PWA manifest.
-- Blocked by: the product owner must confirm whether tenant-branded install
-  name/icons are required. If yes, a separate build path and decision are
-  needed.
+  static build already has a fixed manifest. The product owner confirmed no
+  branded build is needed.
+- Evidence: plan section 4; existing web build and PWA manifest; product-owner
+  answer recorded on 2026-11-12.
 - Consequence: `M6-01.3` and `M6-02.1` document the limitation. No
-  tenant-specific PWA manifest is generated in M6.
+  tenant-specific PWA manifest is generated in M6. A future branded-build
+  request is a new scope decision, not a defect in M6.
 
 ## DEC-M6-14 - Custom-domain and TLS ownership
 
@@ -349,13 +370,16 @@ prompts, responses, or conversation content may be recorded.**
 
 ## Blockers
 
-| ID | Blocker | Decision | Owner needed | Effect |
-| --- | --- | --- | --- | --- |
-| `B-M6-01` | Final product name, domain, branding owner, and support model | `DEC-M6-03` | Product owner | Branding, support copy, staging domain, and public claims cannot be finalized |
-| `B-M6-02` | Named external operator, staging tenant, custom-domain test path, and TLS/edge access | `DEC-M6-10` | Hosting operator | `M6-05.2`, `M6-05.3`, and `M6-06.3` cannot run or close |
-| `B-M6-03` | Named privacy/legal reviewer and approval process | `DEC-M6-11` | Privacy/legal reviewer | `M6-04.3` cannot complete; privacy copy cannot be published as approved |
-| `B-M6-04` | Log retention periods and deletion process | `DEC-M6-12` | Privacy/legal reviewer with operator | `M6-04.2` can draft fields but cannot publish retention |
-| `B-M6-05` | Whether tenant-branded PWA install name/icons are required | `DEC-M6-13` | Product owner | A branded build path would be a separate scope decision |
+Only `B-M6-02` remains open. The other blockers were resolved by product-owner
+decisions on 2026-11-12 and are kept here for traceability.
+
+| ID | Blocker | Decision | Owner needed | Status | Resolution or effect |
+| --- | --- | --- | --- | --- | --- |
+| `B-M6-01` | Final product name, domain, branding owner, and support model | `DEC-M6-03` | Product owner | Resolved 2026-11-12 | ChatUI, `chatui.dev`, product owner, GitHub Issues best effort |
+| `B-M6-02` | Named external operator, staging tenant, custom-domain test path, and TLS/edge access | `DEC-M6-10` | Hosting operator | Open | `M6-05.2`, `M6-05.3`, and `M6-06.3` cannot run or close |
+| `B-M6-03` | Named privacy/legal reviewer and approval process | `DEC-M6-11` | Product owner | Resolved 2026-11-12 with risk acceptance | Self-review is recorded; it is not independent legal review |
+| `B-M6-04` | Log retention periods and deletion process | `DEC-M6-12` | Product owner with operator | Resolved 2026-11-12 | 30-day edge/error, 90-day audit/support, automated deletion |
+| `B-M6-05` | Whether tenant-branded PWA install name/icons are required | `DEC-M6-13` | Product owner | Resolved 2026-11-12 | Not required in M6; build-time ChatUI branding only |
 
 ## Entry-gate status
 
@@ -364,15 +388,17 @@ prompts, responses, or conversation content may be recorded.**
 | M4 exit gate met and phase 1 released | Met | M4 verification, 2026-11-10 |
 | M5 complete, BYO encrypted storage onboarding exists | Met | M5 verification, 2026-11-12 |
 | User authorizes M6 work and confirms hosting/documentation scope | Met for preflight | `DEC-M6-01`; implementation tasks remain gated by the items below |
-| Product name, domain, and support model have named owners | Blocked | `DEC-M6-03`, `B-M6-01` |
-| A roksky hosting operator is named with staging tenant, subdomain, custom-domain test path, TLS, and edge access | Blocked | `DEC-M6-10`, `B-M6-02` |
-| A privacy/legal reviewer is named | Blocked | `DEC-M6-11`, `B-M6-03` |
+| Product name, domain, and support model have named owners | Met | `DEC-M6-03`: ChatUI, `chatui.dev`, product owner, GitHub Issues best effort |
+| A ChatUI hosting operator is named with staging tenant, subdomain, custom-domain test path, TLS, and edge access | Blocked | `DEC-M6-10`, `B-M6-02`; operator unassigned |
+| A privacy/legal reviewer is named | Met with recorded risk acceptance | `DEC-M6-11`: product owner self-review; not independent legal review |
 | Feature-flag decision made | Met | `DEC-M6-06`: expose none in M6 |
 | Tenant configuration boundary confirmed | Met | `DEC-M6-04`: private manifest plus public `config.json`, no secrets |
 | Evidence location agreed with synthetic data only | Met | Cross-cutting evidence decision |
 
-The M6 folder status stays `Planned` until every blocked item above is resolved.
-Do not start any M6 implementation task while the gate is blocked.
+The M6 folder status stays `Planned` until `B-M6-02` is resolved. Do not start any
+M6 implementation task while the gate is blocked. `DEC-M6-01` authorizes the
+M6-01 documentation/config scope, but the task ordering rule still blocks later
+tasks until `M6-01.1` is `Complete`.
 
 ## Dependency consistency check
 
@@ -385,15 +411,15 @@ dependency change.
 | `M6-01.3` | `M6-01.1` | `DEC-M6-04`, `DEC-M6-06`, `DEC-M6-13` | Yes |
 | `M6-01.4` | `M6-01.2`, `M6-01.3` | `DEC-M6-04`, `DEC-M6-05`, `DEC-M6-06` | Yes |
 | `M6-02.1` | `M6-01.4` | `DEC-M6-02`, `DEC-M6-07`, `DEC-M6-14` | Yes |
-| `M6-02.2` | `M6-02.1` | `DEC-M6-02`, `DEC-M6-03`, `DEC-M6-10` | Yes; product/support copy is blocked |
+| `M6-02.2` | `M6-02.1` | `DEC-M6-02`, `DEC-M6-03`, `DEC-M6-10` | Yes; product/support copy is confirmed, staging link still waits on `DEC-M6-10` |
 | `M6-02.3` | `M6-01.2`, `M6-01.4`, `M6-02.1` | `DEC-M6-07`, `DEC-M6-14` | Yes |
 | `M6-02.4` | `M6-01.2`, `M6-02.1` | `DEC-M6-15` | Yes |
 | `M6-03.1` | `M6-01.4` | `DEC-M6-08` | Yes |
 | `M6-03.2` | `M6-03.1` | `DEC-M6-08` | Yes |
 | `M6-03.3` | `M6-03.1` | `DEC-M6-08` | Yes |
-| `M6-04.1` | `M6-01.4`, `M6-02.1`, `M6-03.1` | `DEC-M6-07`, `DEC-M6-08`, `DEC-M6-09`, `DEC-M6-12` | Yes; privacy review is blocked |
-| `M6-04.2` | `M6-01.4`, `M6-02.1` | `DEC-M6-09`, `DEC-M6-12` | Yes; retention is blocked |
-| `M6-04.3` | `M6-02.3`, `M6-03.3`, `M6-04.1`, `M6-04.2` | `DEC-M6-11` | Yes; reviewer is blocked |
+| `M6-04.1` | `M6-01.4`, `M6-02.1`, `M6-03.1` | `DEC-M6-07`, `DEC-M6-08`, `DEC-M6-09`, `DEC-M6-12` | Yes; privacy review uses the recorded self-review risk acceptance |
+| `M6-04.2` | `M6-01.4`, `M6-02.1` | `DEC-M6-09`, `DEC-M6-12` | Yes; retention is confirmed |
+| `M6-04.3` | `M6-02.3`, `M6-03.3`, `M6-04.1`, `M6-04.2` | `DEC-M6-11` | Yes; reviewer is named by `DEC-M6-11` (self-review, risk accepted) |
 | `M6-05.1` | `M6-01.4`, `M6-02.1` | `DEC-M6-14`, `DEC-M6-15` | Yes |
 | `M6-05.2` | `M6-02.2`, `M6-02.3`, `M6-02.4`, `M6-03.2`, `M6-03.3`, `M6-04.3`, `M6-05.1` | `DEC-M6-10`, `DEC-M6-11` | Yes; staging is blocked |
 | `M6-05.3` | `M6-05.2` | `DEC-M6-15` | Yes |

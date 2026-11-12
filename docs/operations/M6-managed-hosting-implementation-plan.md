@@ -1,21 +1,22 @@
-# M6 Managed roksky Hosting Implementation Plan
+# M6 Managed ChatUI Hosting Implementation Plan
 
 - Source milestone: [M6-managed-hosting.md](../milestones/M6-managed-hosting.md)
 - Authoritative spec: [IMPLEMENTATION.md](../IMPLEMENTATION.md) sections 13.8, 14.2-14.3, 17 (M6), 19
 - Current baseline: [M4 verification](M4/M4-verification.md) (phase 1 gate passed 2026-11-10)
 - Backup baseline: [M5 verification](M5/M5-verification.md) (M5 complete 2026-11-12)
 - Current parity: [contracts/parity.md](../../contracts/parity.md)
-- Status: Planned - entry gate blocked on product, hosting-operator, and privacy-owner decisions
+- Status: Planned - entry gate blocked on the hosting-operator/staging decision (`DEC-M6-10` / `B-M6-02`)
 - Prepared: 2026-11-12
-- Scope: Optional roksky-managed static hosting for the web client, tenant configuration and branding, BYO encrypted storage onboarding, privacy documentation, deployment templates, runbooks, and staging validation
+- Last updated: 2026-11-12 (ChatUI brand rename; preflight decisions recorded)
+- Scope: Optional ChatUI-managed static hosting for the web client, tenant configuration and branding, BYO encrypted storage onboarding, privacy documentation, deployment templates, runbooks, and staging validation
 - Platforms: Web hosting only
 - Estimate: 1-2 weeks for repository artifacts and documentation; 2-4 weeks to close the gate with an external staging tenant, custom domain/TLS, and legal review
 - Hard constraint: No backend application, server-side prompt proxy, key custody, plaintext conversation storage, or backup-passphrase access
 
 ## 1. Summary
 
-M6 packages the already static web client for an optional roksky-managed hosting
-flow. roksky serves the same static bundle that the container and static-host
+M6 packages the already static web client for an optional ChatUI-managed hosting
+flow. ChatUI serves the same static bundle that the container and static-host
 recipes serve, manages tenant subdomains, custom domains, and TLS, and never
 proxies provider requests or stores user secrets. The user configures provider
 keys and optional BYO encrypted storage in the browser after deployment.
@@ -24,7 +25,7 @@ The repository already contains most of the web substrate M6 needs: a strict,
 public-only runtime `config.json`, the static container and host recipes, the
 section 14.1 header and cache contract, the `/healthz` endpoint, M5 S3-compatible
 storage adapters with a connectivity test, and M5 backup/restore evidence. It
-does **not** contain a tenant deployment model, a `deploy/roksky/` template
+does **not** contain a tenant deployment model, a `deploy/chatui/` template
 tree, `docs/hosting/` tenant documentation, privacy and data-processing copy, a
 tenant rollback runbook, or any staging-tenant validation. The remaining gap is
 mostly hosting operations and documentation, not client application code.
@@ -32,7 +33,7 @@ mostly hosting operations and documentation, not client application code.
 The largest risk is boundary creep: "managed hosting" can quietly become a
 backend, and support tooling can quietly become a data-access path. This plan
 keeps the repository's role to static artifacts, public tenant configuration,
-templates, runbooks, documentation, and evidence. Any actual roksky control
+templates, runbooks, documentation, and evidence. Any actual ChatUI control
 plane, DNS/TLS automation, billing, or support portal is an external operator
 deliverable. If that control plane must be built in this repository, M6 is no
 longer a hosting/documentation milestone and requires a separate approved scope.
@@ -40,19 +41,19 @@ longer a hosting/documentation milestone and requires a separate approved scope.
 | Workstream | Current completion | Assessment |
 | --- | --- | --- |
 | Tenant configuration and branding | Partial | Public app config and strict validation exist; no tenant manifest, templates, feature-flag decision, or hosting docs |
-| One-click hosting flow | Missing | Only a manual recipe in `deploy/roksky.md`; no "Deploy to roksky" entry point or tenant provisioning contract |
+| One-click hosting flow | Missing | Only a manual recipe in `deploy/chatui.md`; no "Deploy to ChatUI" entry point or tenant provisioning contract |
 | BYO storage onboarding | Partial | M5 UI, adapters, connectivity test, and CORS operations doc exist; no tenant-facing onboarding, links, or consolidated failure-state guide |
 | Privacy and data-processing documentation | Missing | No tenant data-processing summary, logging/retention statement, or support-access statement |
-| Deployment templates and runbooks | Partial | Generic static deployment is complete; no `deploy/roksky/`, tenant config review, health definitions, rollback runbook, or `docs/hosting/` |
+| Deployment templates and runbooks | Partial | Generic static deployment is complete; no `deploy/chatui/`, tenant config review, health definitions, rollback runbook, or `docs/hosting/` |
 | Validation and security review | Missing | M4 container smoke evidence exists; no staging tenant, tenant header/CSP evidence, config secret review, portability proof, or security sign-off |
 
 ### 1.1 Repository and external-operator boundary
 
-| Deliverable | Repository responsibility | External roksky operator responsibility |
+| Deliverable | Repository responsibility | External ChatUI operator responsibility |
 | --- | --- | --- |
 | Static app artifact | Build `web/dist`, publish the container and web artifact, keep the public config contract stable | Serve the artifact on the tenant origin and apply edge headers/cache rules |
 | Tenant model | Define and validate the tenant manifest and public `config.json` templates | Persist tenant records and enforce subdomain/domain/region policy |
-| One-click entry point | Document and template the flow; provide a link/action placeholder and validation contract | Provide the actual "Deploy to roksky" UI or API, DNS, TLS, and provisioning |
+| One-click entry point | Document and template the flow; provide a link/action placeholder and validation contract | Provide the actual "Deploy to ChatUI" UI or API, DNS, TLS, and provisioning |
 | Custom domains and TLS | Document required records, validation states, and rollback behavior | Issue/renew certificates and manage DNS and edge routing |
 | Health and status | Define checks, thresholds, expected responses, and operator/user status surfaces | Run checks, alert, and display tenant status |
 | BYO storage | Keep credentials and passphrases client-side; document S3/CORS/connectivity behavior | Make no server-side storage request and store no storage credentials |
@@ -89,13 +90,13 @@ Implementation may not start until all of the following are true:
 
 - [x] M4 exit gate is met and phase 1 is released (`M4/M4-verification.md`, 2026-11-10).
 - [x] M5 is complete, so BYO encrypted storage onboarding exists (`M5/M5-verification.md`, 2026-11-12).
-- [ ] The user explicitly authorizes M6 work and confirms it remains a hosting/documentation milestone, not a backend build.
-- [ ] The product name, domain, and support model from spec section 20 question 10 have named owners and recorded decisions.
-- [ ] A roksky hosting operator is named and can provide a staging tenant, subdomain, custom-domain test path, TLS, and edge configuration access.
-- [ ] A privacy/legal reviewer is named for the data-processing, logging, retention, and support-access copy.
-- [ ] The feature-flag decision is made: expose none in M6, or add a typed, allowlisted public flag shape.
-- [ ] The tenant configuration boundary is confirmed: private operator manifest plus public app `config.json`, with no secrets in either served artifact.
-- [ ] The M6 evidence location is agreed: `docs/operations/M6/evidence/` with synthetic data only.
+- [x] The user explicitly authorizes M6 work and confirms it remains a hosting/documentation milestone, not a backend build (`DEC-M6-01`, 2026-11-12).
+- [x] The product name, domain, and support model from spec section 20 question 10 are recorded (`DEC-M6-03`: ChatUI, `chatui.dev`, product owner, GitHub Issues best effort).
+- [ ] A ChatUI hosting operator is named and can provide a staging tenant, subdomain, custom-domain test path, TLS, and edge configuration access (`DEC-M6-10` / `B-M6-02`).
+- [x] A privacy reviewer is named for the data-processing, logging, retention, and support-access copy (`DEC-M6-11`: product owner self-review with risk acceptance; not independent legal review).
+- [x] The feature-flag decision is made: expose none in M6 (`DEC-M6-06`).
+- [x] The tenant configuration boundary is confirmed: private operator manifest plus public app `config.json`, with no secrets in either served artifact (`DEC-M6-04`).
+- [x] The M6 evidence location is agreed: `docs/operations/M6/evidence/` with synthetic data only (cross-cutting evidence decision).
 
 If an entry item is unresolved, record it as a blocker in `M6-01`; do not
 silently start a narrower implementation that cannot close the gate.
@@ -112,9 +113,9 @@ silently start a narrower implementation that cannot close the gate.
 | `deploy/Caddyfile` | SPA fallback, exact section 14.1 CSP/security headers, cache rules, static `/healthz` | Source of truth for tenant edge template and header verification |
 | `deploy/Dockerfile` | Builds `web/dist` and serves it with Caddy; no application secrets or environment variables | Reuse as the portability and self-host reference |
 | `deploy/docker-compose.yml` | One-command static deployment with `/healthz` healthcheck | Reuse for local staging baseline |
-| `deploy/cloudflare-pages/_headers` | Header/cache contract for Cloudflare Pages | Reuse or adapt for the roksky edge if Cloudflare is the substrate |
-| `deploy/netlify.toml`, `deploy/vercel.json` | SPA fallback and header rules for other static hosts | Keep as portability evidence; not the primary roksky template |
-| `deploy/roksky.md` | Manual tenant recipe: build, upload, subdomain/domain, edge headers, config, smoke commands | Consolidate into `deploy/roksky/`; correct the managed-storage-partner claim |
+| `deploy/cloudflare-pages/_headers` | Header/cache contract for Cloudflare Pages | Reuse or adapt for the ChatUI edge if Cloudflare is the substrate |
+| `deploy/netlify.toml`, `deploy/vercel.json` | SPA fallback and header rules for other static hosts | Keep as portability evidence; not the primary ChatUI template |
+| `deploy/chatui.md` | Manual tenant recipe: build, upload, subdomain/domain, edge headers, config, smoke commands | Consolidate into `deploy/chatui/`; correct the managed-storage-partner claim |
 | `docs/operations/M4/deployment.md` | Deployment, header, cache, config, and troubleshooting contract | Link as the canonical static contract from `docs/hosting/` |
 | `docs/operations/M4/evidence/deployment/README.md` | Recorded container headers, `/healthz`, SPA fallback, and image secret-pattern scan | Reuse method for tenant evidence; do not treat container evidence as tenant evidence |
 | `docs/operations/M5/web-s3-cors.md` | Required CORS, bucket policy, provider notes, troubleshooting, security notes | Re-export or link from tenant onboarding; add per-tenant origin guidance |
@@ -132,18 +133,18 @@ silently start a narrower implementation that cannot close the gate.
 | Tenant deployment manifest | Missing | No validated model for subdomain, region, custom domain, release pin, config hash, or status |
 | Tenant public config templates | Missing | One checked-in config only; no minimal/full example or placeholder policy for branding |
 | Feature-flag contract | Missing | The spec lists optional feature flags, but the strict public config has no such field |
-| `deploy/roksky/` templates | Missing | Tenant edge configuration, health checks, and rollback are not reproducible from the repository |
+| `deploy/chatui/` templates | Missing | Tenant edge configuration, health checks, and rollback are not reproducible from the repository |
 | `docs/hosting/` | Missing | Tenant operators and users have no onboarding, custom-domain, BYO storage, privacy, export, or rollback docs |
-| "Deploy to roksky" entry point | Missing | Only a manual recipe exists; there is no one-click action or documented external handoff |
+| "Deploy to ChatUI" entry point | Missing | Only a manual recipe exists; there is no one-click action or documented external handoff |
 | Custom-domain and TLS runbook | Missing | No DNS/domain verification, certificate state, renewal, or failure procedure |
 | Tenant status and health definitions | Partial | Static `/healthz` exists; no tenant-level status, alert thresholds, operator view, or user-visible status |
 | Rollback runbook | Missing | No previous-release/config rollback, cache invalidation, or post-rollback verification |
 | Tenant config review | Missing | No schema lint plus secret scan and approval step before publishing |
 | Automated tenant header/CSP check | Missing | The M4 recipe is manual `curl` commands; no repeatable pass/fail script for a tenant URL |
-| Privacy/data-processing docs | Missing | roksky cannot publish an accurate account of what it can and cannot see |
+| Privacy/data-processing docs | Missing | ChatUI cannot publish an accurate account of what it can and cannot see |
 | Logging/retention statement | Missing | Edge logs and retention are undefined for tenants |
 | Support-access statement and controls | Missing | No documented least-privilege/no-impersonation model or audit trail |
-| Existing managed-storage-partner claim | Incorrect/out of scope | `deploy/roksky.md` advertises an optional managed storage partner that M6 explicitly excludes |
+| Existing managed-storage-partner claim | Incorrect/out of scope | `deploy/chatui.md` advertises an optional managed storage partner that M6 explicitly excludes |
 | Tenant staging evidence | Missing | No tenant URL, header output, config hash, export/restore result, or rollback drill record |
 | Self-host/export portability proof | Missing | The config contract is shared, but no M6 evidence proves a tenant can export and re-host the same build/config |
 | Security/no-data-access review | Missing | No data-flow diagram, support-access review, edge-log inspection, or no-hidden-network verification for a tenant |
@@ -179,11 +180,11 @@ Status values:
 | ID | Required deliverable | Current | Gap | Resolution | Verification |
 | --- | --- | --- | --- | --- | --- |
 | T-01 | Tenant deployment manifest schema | Missing | No schema for subdomain, region, custom domain, release pin, config hash, status, or support contact | Add `contracts/schema/hosting-tenant.schema.json` plus fixtures under `contracts/fixtures/hosting/`; validate in `scripts/validate-contracts.mjs` | `make contracts-check`; broken-vector tests |
-| T-02 | Public config templates | Partial | Only `web/public/config.json`; no full/minimal tenant templates | Add `deploy/roksky/templates/config.full.json` and `config.minimal.json` using only the existing public fields | Template parses with `configSchema`; web config tests |
+| T-02 | Public config templates | Partial | Only `web/public/config.json`; no full/minimal tenant templates | Add `deploy/chatui/templates/config.full.json` and `config.minimal.json` using only the existing public fields | Template parses with `configSchema`; web config tests |
 | T-03 | Branding fields | Partial | `appName`, `defaultTheme`, presets, custom-provider allowance, OpenRouter attribution, docs URL, telemetry exist; feature flags do not | Keep existing fields; decide and document feature flags; do not add tenant-only fields to the served app config unless the app consumes them | Config schema tests; template review |
 | T-04 | Feature flags | Missing | Spec lists optional feature flags; strict schema rejects any unknown field | Prefer no flags in M6 and record that decision; if flags are required, add a typed allowlist object and tests, never an arbitrary map | Decision record; config tests |
 | T-05 | Subdomain and region constraints | Missing | No rules for name length, reserved names, region list, or collision behavior | Define constraints in the tenant schema and `docs/hosting/tenant-configuration.md`; operator enforces uniqueness | Schema fixtures; docs review |
-| T-06 | Custom domain and TLS metadata | Missing | No domain status, verification state, or certificate state in a tenant model | Add fields and states to the operator manifest; document that roksky owns DNS/TLS execution | Schema tests; runbook review |
+| T-06 | Custom domain and TLS metadata | Missing | No domain status, verification state, or certificate state in a tenant model | Add fields and states to the operator manifest; document that ChatUI owns DNS/TLS execution | Schema tests; runbook review |
 | T-07 | Public-only enforcement and secret review | Partial | App config is strict and public-only; no tenant-side review or scan | Add `scripts/validate-tenant-config.mjs` that validates schema, exact origin, `telemetry: false`, and secret patterns; require review before publish | Script tests; config review evidence |
 | T-08 | OpenRouter attribution origin per tenant | Partial | `openRouter.attributionOrigin` exists but defaults to `chat.example.com` | Template must use the actual tenant origin, including a custom domain; document the pairing with CORS | Config validation; header inspection |
 | T-09 | Self-host portability contract | Partial | The same config contract is intended, but no M6 proof exists | Document the export/self-host path and run the static container with the tenant config | Portability evidence in `M6-06` |
@@ -195,7 +196,7 @@ Status values:
 
 | ID | Required deliverable | Current | Gap | Resolution | Verification |
 | --- | --- | --- | --- | --- | --- |
-| H-01 | "Deploy to roksky" entry point | Missing | No deploy action, link, workflow, or documented external handoff | Document the flow in `docs/hosting/one-click.md`; add an external link/action template owned by the roksky operator; do not invent a repo backend | Link check; docs review; staging flow walkthrough |
+| H-01 | "Deploy to ChatUI" entry point | Missing | No deploy action, link, workflow, or documented external handoff | Document the flow in `docs/hosting/one-click.md`; add an external link/action template owned by the ChatUI operator; do not invent a repo backend | Link check; docs review; staging flow walkthrough |
 | H-02 | Static bundle transport | Present | CI uploads `web/dist` and publishes the container; no tenant handoff format | Reuse the artifact; add release-pin metadata to the tenant manifest | Artifact digest matches tenant record |
 | H-03 | Tenant provisioning record | Missing | No record of subdomain, region, release, config hash, or status | Use the M6-01 tenant manifest; operator stores it; repository provides examples only | Schema validation; staging record |
 | H-04 | TLS management | Missing | No certificate or renewal procedure | Document operator ownership, certificate states, expiry checks, and failure handling | Staging TLS check; certificate expiry inspection |
@@ -220,31 +221,31 @@ Status values:
 | S-06 | Failure-state matrix | Partial | Adapters map auth/permission/not_found/conflict/network/server errors; no consolidated user guide | Document invalid credentials, CORS, unreachable endpoint, bucket permission, and conflict behavior | Docs review; adapter tests |
 | S-07 | Backup/restore documentation links | Missing | No hosted onboarding links to M5 backup/restore behavior | Link `M5/README.md`, the backup settings screen, and M5 restore evidence | Docs link check |
 | S-08 | Provider terms and user responsibility | Missing | No tenant-facing statement that the user owns provider and storage terms | Add to BYO storage and privacy docs | Legal/privacy review |
-| S-09 | Managed storage partner claim | Wrong/out of scope | `deploy/roksky.md` says an optional managed storage partner can be enabled; M6 excludes that offering | Remove or mark as future/not offered in M6; keep BYO storage only | Docs review; milestone scope check |
+| S-09 | Managed storage partner claim | Wrong/out of scope | `deploy/chatui.md` says an optional managed storage partner can be enabled; M6 excludes that offering | Remove or mark as future/not offered in M6; keep BYO storage only | Docs review; milestone scope check |
 | S-10 | No server-side storage credentials | Present | Adapters and UI keep credentials in browser storage; no server endpoint exists | Preserve; include in data-flow review | Architecture review; network audit |
 
 ### 3.4 Privacy and data-processing documentation (P)
 
 | ID | Required deliverable | Current | Gap | Resolution | Verification |
 | --- | --- | --- | --- | --- | --- |
-| P-01 | Data-processing summary | Missing | No tenant-facing account of what roksky can and cannot see | Write `docs/hosting/data-processing.md` with a technical data-flow diagram and explicit non-access claims | Technical review; owner/legal sign-off |
+| P-01 | Data-processing summary | Missing | No tenant-facing account of what ChatUI can and cannot see | Write `docs/hosting/data-processing.md` with a technical data-flow diagram and explicit non-access claims | Technical review; owner/legal sign-off |
 | P-02 | Logging and retention statement | Missing | No statement for edge logs, IP/user-agent handling, or retention | Define log fields, exclusions, retention periods, access, and deletion; state no prompts/responses/keys/passphrases in logs | Review of actual edge log config; docs review |
 | P-03 | Support-access statement | Missing | No statement or control description | State support cannot recover keys, read chats, restore a passphrase, or access encrypted backups; document roles and audit | Support-access review in `M6-06` |
 | P-04 | Provider terms responsibility | Missing | No hosted statement that the user is responsible for provider terms and storage | Add to privacy and BYO storage docs | Docs review |
 | P-05 | No hidden network destinations | Partial | M4 verified the static app; no tenant-facing statement | Re-verify the tenant build and publish the statement with a link to the provider catalog | Network audit in `M6-06` |
 | P-06 | Technical attestation for privacy claims | Missing | Copy would otherwise be aspirational | Add a data-flow description: static edge, browser-direct provider calls, browser-direct storage calls, no request-body logging | Architecture review |
-| P-07 | Region and data residency statement | Missing | No residency statement tied to tenant region | Draft with the privacy owner; explain what region affects and what data roksky does not hold | Legal review |
+| P-07 | Region and data residency statement | Missing | No residency statement tied to tenant region | Draft with the privacy owner; explain what region affects and what data ChatUI does not hold | Legal review |
 | P-08 | Review and approval owner | Missing | No named reviewer | Record the privacy/legal reviewer and dated approval in `M6-04` and `M6-verification.md` | Signed review record |
 | P-09 | Passphrase recovery expectation | Partial | Backup UI warns that a lost passphrase is unrecoverable; hosted docs do not | Repeat prominently in tenant onboarding and support docs | Copy review |
-| P-10 | Subprocessors/third parties | Missing | May be required by legal review if roksky uses DNS, CDN, or logging vendors | List only actual providers after legal review; do not invent a list | Legal review |
+| P-10 | Subprocessors/third parties | Missing | May be required by legal review if ChatUI uses DNS, CDN, or logging vendors | List only actual providers after legal review; do not invent a list | Legal review |
 
 ### 3.5 Deployment templates and runbooks (D)
 
 | ID | Required deliverable | Current | Gap | Resolution | Verification |
 | --- | --- | --- | --- | --- | --- |
-| D-01 | `deploy/roksky/` template tree | Missing | No tenant edge template, manifest examples, or template README | Add a template tree that reproduces SPA fallback, headers, cache rules, `/healthz`, and config serving | Template diff against `deploy/Caddyfile`; staging verification |
+| D-01 | `deploy/chatui/` template tree | Missing | No tenant edge template, manifest examples, or template README | Add a template tree that reproduces SPA fallback, headers, cache rules, `/healthz`, and config serving | Template diff against `deploy/Caddyfile`; staging verification |
 | D-02 | `docs/hosting/` | Missing | No tenant-facing or operator-facing hosting docs | Add overview, tenant config, branding, one-click, custom domains, BYO storage, privacy, export, health, and rollback docs | Docs link check and review |
-| D-03 | Consolidate `deploy/roksky.md` | Partial | A standalone recipe exists with an out-of-scope managed-storage claim and M4 evidence path | Move the recipe into `deploy/roksky/README.md`; leave a pointer or update all links; correct scope claims | Link check; docs review |
+| D-03 | Consolidate `deploy/chatui.md` | Partial | A standalone recipe exists with an out-of-scope managed-storage claim and M4 evidence path | Move the recipe into `deploy/chatui/README.md`; leave a pointer or update all links; correct scope claims | Link check; docs review |
 | D-04 | Header/CSP verification procedure | Partial | Manual `curl` checks exist; no repeatable pass/fail script | Add `scripts/verify-hosted-deployment.mjs <url>` with exact assertions and nonzero exit on failure | Script run against staging |
 | D-05 | Staging deployment | Missing | No tenant staging environment or evidence | Deploy the static build and templates to staging with a subdomain and test custom domain | Staging smoke in `M6-05` |
 | D-06 | Rollback runbook | Missing | No previous-release/config rollback procedure | Document artifact/config rollback, cache purge, health/header verification, and incident record | Rollback drill |
@@ -283,7 +284,7 @@ the blocked items.
 | Hosting boundary | Repository owns static artifacts, tenant schema, templates, docs, and evidence; external operator owns control plane, DNS, TLS, status, and support tooling | Keeps M6 a hosting/documentation milestone and prevents an accidental backend |
 | Tenant model | Private operator manifest plus public app `config.json` | Separates operational metadata from the served public config and avoids secrets in the wrong place |
 | Tenant manifest location | `contracts/schema/hosting-tenant.schema.json` plus fixtures | Contracts remain the source of truth for validated formats |
-| Public config templates | Full and minimal examples under `deploy/roksky/templates/` | Operators can brand a tenant without inventing fields |
+| Public config templates | Full and minimal examples under `deploy/chatui/templates/` | Operators can brand a tenant without inventing fields |
 | Feature flags | Expose none in M6 unless a real reviewed flag is required; if required, add a typed allowlist | The current strict schema is safer than an arbitrary flag map |
 | Subdomain policy | Document reserved names, length, character set, and collision handling; operator enforces uniqueness | Clients and operators need one rule |
 | Region semantics | Region selects the static edge location only; no server-side user data store | Avoids implying data residency or storage that does not exist |
@@ -292,7 +293,7 @@ the blocked items.
 | Rollback | Pin immutable artifact digest and config hash; roll back both together; purge cache; re-run checks | A config/artifact mismatch can break a tenant even when the bundle is healthy |
 | Logging/retention | Edge logs may include IP, user-agent, path, status, and timing; never request bodies, prompts, keys, or passphrases; retention set by privacy owner | Needed for an accurate data-processing statement |
 | Support access | Least privilege, no impersonation, no browser data access, audited operator actions; no key/chat/passphrase recovery | Support must not become a data-access path |
-| BYO storage scope | S3-compatible first, then the M5-supported backends; no roksky-managed storage in M6 | M5 already delivers the client path; managed storage is explicitly out of scope |
+| BYO storage scope | S3-compatible first, then the M5-supported backends; no ChatUI-managed storage in M6 | M5 already delivers the client path; managed storage is explicitly out of scope |
 | Export path | Browser data export plus encrypted backup plus public config download and self-host recipe | Meets "export everything" without a server-side export service |
 | PWA branding | Document that install name/icons remain build-time; decide whether M6 needs a branded build | Avoid scope creep unless install branding is a product requirement |
 | Privacy reviewer | Name one owner and record a dated approval before publishing | The exit gate requires accurate, reviewed copy |
@@ -329,7 +330,7 @@ milestone task, and do not start any M6 task until the entry gate is open.
 - Add `contracts/schema/hosting-tenant.schema.json`, fixtures, and validator
   coverage. Do not put secrets or private credentials in the manifest.
 - Add full and minimal public config templates under
-  `deploy/roksky/templates/`. Use only fields the app consumes.
+  `deploy/chatui/templates/`. Use only fields the app consumes.
 - Decide feature flags. If M6 exposes none, record that; if it exposes any, add a
   typed allowlist to `web/src/app/config.ts`, tests, and an example.
 - Add `scripts/validate-tenant-config.mjs` for schema validation, exact
@@ -340,7 +341,7 @@ milestone task, and do not start any M6 task until the entry gate is open.
 
 #### M6-02 - Deployment templates, one-click flow, health checks, and rollback runbooks
 
-- Add `deploy/roksky/` with a README, edge configuration template that
+- Add `deploy/chatui/` with a README, edge configuration template that
   reproduces `deploy/Caddyfile` behavior, tenant manifest examples, and a
   release-pin example.
 - Define the one-click flow contract in `docs/hosting/one-click.md`: external
@@ -355,7 +356,7 @@ milestone task, and do not start any M6 task until the entry gate is open.
 - Write the rollback runbook in `docs/hosting/rollback.md`: artifact and config
   rollback, cache invalidation, health/header verification, communication, and
   incident record.
-- Move the existing recipe into `deploy/roksky/README.md` and remove or qualify
+- Move the existing recipe into `deploy/chatui/README.md` and remove or qualify
   the managed-storage-partner claim. Update references from
   `docs/operations/M4/deployment.md` and elsewhere.
 - Verify: template diff against `deploy/Caddyfile`, manifest validation, link
@@ -375,7 +376,7 @@ milestone task, and do not start any M6 task until the entry gate is open.
 - Add `docs/hosting/backup-and-restore.md` linking the in-app backup flow, M5
   restore behavior, passphrase-loss warning, and M5 evidence. Keep the
   statement that storage credentials and backup passphrases remain client-side
-  and are never sent to roksky.
+  and are never sent to ChatUI.
 - State that the user is responsible for provider terms and their own storage.
 - Remove the managed-storage-partner implication from all M6 docs.
 - Verify: docs review, adapter tests, a local MinIO connectivity run, and a
@@ -384,7 +385,7 @@ milestone task, and do not start any M6 task until the entry gate is open.
 #### M6-04 - Privacy, data-processing, logging, and support-access documentation
 
 - Add `docs/hosting/privacy.md` and `docs/hosting/data-processing.md` covering
-  what roksky can see, what it cannot see, provider-direct traffic, BYO storage
+  what ChatUI can see, what it cannot see, provider-direct traffic, BYO storage
   traffic, and the user's control over local data and backups.
 - Add `docs/hosting/logging-and-retention.md`: exact log fields, exclusions,
   retention periods, access controls, deletion, and incident handling. State
@@ -495,7 +496,7 @@ Mapped to the milestone exit gate. All boxes remain unchecked until `M6-05` and
 
 - [ ] A tenant can be deployed with a custom domain and branding without
       server-side secrets.
-- [ ] roksky has no path to read provider keys, plaintext chats, or backup
+- [ ] ChatUI has no path to read provider keys, plaintext chats, or backup
       passphrases.
 - [ ] The exported app remains self-hostable with the same `config.json`
       contract.
@@ -532,8 +533,8 @@ make release-check
 Tenant and artifact checks:
 
 ```bash
-node scripts/validate-tenant-config.mjs deploy/roksky/templates/config.full.json
-node scripts/verify-hosted-deployment.mjs https://chat.staging.<roksky-domain>
+node scripts/validate-tenant-config.mjs deploy/chatui/templates/config.full.json
+node scripts/verify-hosted-deployment.mjs https://chat.staging.<chatui-domain>
 
 make web-build
 docker build -f deploy/Dockerfile -t chatui-web:m6-portability .
@@ -562,13 +563,13 @@ Manual checks:
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | Brand, domain, or support model unresolved | M6 cannot close | Make the section 20 question 10 owners and decisions an entry-gate blocker |
-| No external roksky operator or staging tenant | Exit gate cannot be tested | Name the operator in `M6-01`; do not accept container evidence as tenant evidence |
+| No external ChatUI operator or staging tenant | Exit gate cannot be tested | Name the operator in `M6-01`; do not accept container evidence as tenant evidence |
 | Hosting creeps into a backend | Violates the milestone and privacy model | Keep the boundary table; reject prompt proxying, key custody, and server-side data stores |
 | Support tooling becomes a data-access path | High privacy harm | Least privilege, no impersonation, audit, and no key/chat/passphrase recovery |
 | Custom domain or TLS failure | Tenant outage or impersonation risk | DNS/TLS runbook, expiry monitoring, rollback, and staging custom-domain test |
 | Secret accidentally published in tenant config | Key compromise | Strict schema, tenant config validator, secret scan, and mandatory review |
 | Custom-domain origin mismatch with CORS or OpenRouter attribution | BYO storage or provider calls fail | Template the exact tenant origin into config and CORS guidance; test from the tenant origin |
-| Privacy copy overstates what roksky cannot see | Legal and trust risk | Technical data-flow review plus privacy/legal sign-off before publishing |
+| Privacy copy overstates what ChatUI cannot see | Legal and trust risk | Technical data-flow review plus privacy/legal sign-off before publishing |
 | Region implies data residency that does not exist | Misleading users | Define region as static edge location only and state it explicitly |
 | Rollback restores an incompatible config | Broken tenant | Pin artifact and config hash together and test the rollback drill |
 | Managed storage partner scope creep | Unapproved product/legal surface | Remove the claim now; keep BYO storage as the only M6 storage path |
@@ -576,28 +577,43 @@ Manual checks:
 | Evidence contains real keys or chat content | Secret exposure | Synthetic data only; scan evidence before committing |
 | PWA branding expectations | Perceived incomplete branding | Decide and document the install-name/icon limitation or add a branded build path |
 
-Open decisions to resolve in `M6-01`:
+Open decisions from this plan are tracked in
+[M6-decisions.md](M6/M6-decisions.md). Resolved by `M6-01.1` on 2026-11-12:
 
-- Final product name, domain, and support model.
-- External roksky operator, staging environment, and control-plane ownership.
-- Whether the repository or the operator owns the one-click entry point.
-- Whether M6 exposes any feature flags.
-- Whether install/PWA name and icons must be tenant-branded.
-- Region list and the data-residency statement.
-- Logging fields and retention periods.
-- Support roles, impersonation policy, and audit retention.
-- Whether custom domains are available to every tenant or a subset.
-- Public config template set and whether a tenant config export format is needed.
-- Privacy/legal reviewer and approval process.
+- Final product name, domain, branding owner, and support model: `DEC-M6-03`.
+- Repository versus operator ownership of the one-click entry point: `DEC-M6-02`.
+- Feature flags: `DEC-M6-06` (expose none).
+- Install/PWA name and icons: `DEC-M6-13` (build-time ChatUI branding only).
+- Logging fields and retention periods: `DEC-M6-12`.
+- Privacy reviewer and approval process: `DEC-M6-11` (product-owner self-review
+  with recorded risk acceptance; not independent legal review).
+- Region semantics and data-residency statement: `DEC-M6-07` (static edge
+  location only; no residency claim).
+- Support roles boundary and no-impersonation policy: `DEC-M6-09`; detailed
+  roles and audit retention remain for `M6-04.2`.
+- Tenant model and manifest location: `DEC-M6-04`, `DEC-M6-05`.
+- BYO storage scope: `DEC-M6-08`.
+- Release pinning and rollback ownership: `DEC-M6-15`.
+
+Still open:
+
+- External ChatUI operator, staging environment, and control-plane ownership:
+  `DEC-M6-10` / `B-M6-02` (blocked).
+- Custom-domain availability policy (all tenants versus a subset): operator
+  deliverable under `DEC-M6-10` and `DEC-M6-14`.
+- Region list, if the operator publishes one: operator/product deliverable; the
+  repository must not claim data residency (`DEC-M6-07`).
+- Public config template set and tenant config export format: task deliverables
+  in `M6-01.3`, `M6-01.4`, and `M6-02.1`, not a product decision.
 
 ## 11. File-Level Work Map
 
 | Area | Primary files |
 | --- | --- |
 | Tenant manifest contract | `contracts/schema/hosting-tenant.schema.json`, `contracts/fixtures/hosting/**`, `scripts/validate-contracts.mjs` |
-| Tenant config templates | `deploy/roksky/templates/config.full.json`, `deploy/roksky/templates/config.minimal.json`, `deploy/roksky/templates/tenant.example.json` |
-| Hosting templates | `deploy/roksky/README.md`, `deploy/roksky/edge/**`, `deploy/roksky/health/**`, `deploy/roksky/rollback/**` |
-| Existing recipe migration | `deploy/roksky.md` (pointer or removal), `docs/operations/M4/deployment.md` links |
+| Tenant config templates | `deploy/chatui/templates/config.full.json`, `deploy/chatui/templates/config.minimal.json`, `deploy/chatui/templates/tenant.example.json` |
+| Hosting templates | `deploy/chatui/README.md`, `deploy/chatui/edge/**`, `deploy/chatui/health/**`, `deploy/chatui/rollback/**` |
+| Existing recipe migration | `deploy/chatui.md` (pointer or removal), `docs/operations/M4/deployment.md` links |
 | Tenant docs | `docs/hosting/overview.md`, `tenant-configuration.md`, `branding.md`, `one-click.md`, `custom-domains.md`, `byo-storage.md`, `backup-and-restore.md`, `privacy.md`, `data-processing.md`, `logging-and-retention.md`, `support-access.md`, `export.md`, `health-and-status.md`, `rollback.md` |
 | Web config | `web/public/config.json`, `web/src/app/config.ts`, `web/src/app/config.test.ts` (only if feature flags are accepted) |
 | Validation scripts | `scripts/validate-tenant-config.mjs`, `scripts/verify-hosted-deployment.mjs` |
@@ -607,12 +623,12 @@ Open decisions to resolve in `M6-01`:
 
 ## 12. Out of Scope
 
-- Implementing a roksky backend, control plane, billing, usage metering, or
+- Implementing a ChatUI backend, control plane, billing, usage metering, or
   support portal in this repository.
 - Server-side prompt proxying, server-side key custody, server-side
-  conversation storage, or cross-device sync through roksky.
-- A roksky-managed storage offering beyond BYO storage. Any future partner
-  storage must remain client-side encrypted and unreadable by roksky.
+  conversation storage, or cross-device sync through ChatUI.
+- A ChatUI-managed storage offering beyond BYO storage. Any future partner
+  storage must remain client-side encrypted and unreadable by ChatUI.
 - Changes to backup encryption, sync, storage adapters, or the M5 format.
 - Changes to the M4 static deployment contract, header policy, or SPA fallback
   contract, except link and template reuse.
@@ -629,7 +645,7 @@ M6 is complete only when:
 1. Every task in section 5 is `Complete` or has an approved, recorded deferral.
 2. The entry-gate decisions for brand, domain, support, staging, privacy review,
    and the repository/external-operator boundary are resolved.
-3. `deploy/roksky/` templates and `docs/hosting/` documentation exist and link
+3. `deploy/chatui/` templates and `docs/hosting/` documentation exist and link
    to the canonical M4 deployment and M5 storage contracts.
 4. Tenant manifest and public config templates validate and contain no secrets.
 5. A staging tenant passes SPA fallback, header/CSP, cache, `/healthz`, config,

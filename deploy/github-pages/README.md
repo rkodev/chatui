@@ -30,4 +30,4 @@ paths, the app boots, and the client router reads the original URL.
   custom domain or a user/organization site at the domain root, or set Vite
   `base` and the router base to `/<repo>/` before building.
 - Owner for the header gap: web deployment owner. Use Cloudflare Pages, Netlify,
-  Vercel, the container, or roksky when the headers are required.
+  Vercel, the container, or ChatUI when the headers are required.

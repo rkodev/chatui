@@ -1,15 +1,15 @@
-# M6 Task Breakdown - Managed roksky hosting
+# M6 Task Breakdown - Managed ChatUI hosting
 
-- Source plan: [M6 Managed roksky Hosting Implementation Plan](../M6-managed-hosting-implementation-plan.md)
-- Milestone: [M6 Managed roksky hosting](../../milestones/M6-managed-hosting.md)
+- Source plan: [M6 Managed ChatUI Hosting Implementation Plan](../M6-managed-hosting-implementation-plan.md)
+- Milestone: [M6 Managed ChatUI hosting](../../milestones/M6-managed-hosting.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md) sections 13.8, 14.2-14.3, 17 (M6), 19
 - Current baseline: [M4 verification](../M4/M4-verification.md) (phase 1 gate passed 2026-11-10)
 - Backup baseline: [M5 verification](../M5/M5-verification.md) (M5 complete 2026-11-12)
 - Current parity: [contracts/parity.md](../../../contracts/parity.md)
-- Status: Planned - entry gate blocked on product, hosting-operator, and privacy-owner decisions (see [M6-decisions.md](M6-decisions.md))
+- Status: Planned - entry gate blocked on the hosting-operator/staging decision only (see [M6-decisions.md](M6-decisions.md))
 - Last updated: 2026-11-12
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
-- Scope: optional roksky-managed static hosting for the web client. Repository work is templates, public tenant configuration, documentation, runbooks, validation scripts, and evidence. The roksky control plane, DNS, TLS automation, billing, and support portal are external operator deliverables.
+- Scope: optional ChatUI-managed static hosting for the web client. Repository work is templates, public tenant configuration, documentation, runbooks, validation scripts, and evidence. The ChatUI control plane, DNS, TLS automation, billing, and support portal are external operator deliverables.
 - Platform rule: web hosting only. Do not add a backend, server-side prompt proxy, key custody, plaintext conversation storage, or backup-passphrase access.
 
 ## Entry gate
@@ -19,18 +19,20 @@ Do not start any task until all of the following are true:
 - [x] M4 exit gate is met and phase 1 is released (`docs/operations/M4/M4-verification.md`, 2026-11-10).
 - [x] M5 is complete, so BYO encrypted storage onboarding exists (`docs/operations/M5/M5-verification.md`, 2026-11-12).
 - [x] The user explicitly authorizes M6 work and confirms it remains a hosting/documentation milestone, not a backend build (`DEC-M6-01`, 2026-11-12; implementation tasks remain gated by the items below).
-- [ ] The product name, domain, and support model from spec section 20 question 10 have named owners. **Blocked:** `DEC-M6-03` / `B-M6-01`; product owner unassigned.
-- [ ] A roksky hosting operator is named and can provide a staging tenant, subdomain, custom-domain test path, TLS, and edge configuration access. **Blocked:** `DEC-M6-10` / `B-M6-02`; hosting operator unassigned.
-- [ ] A privacy/legal reviewer is named for data-processing, logging, retention, and support-access copy. **Blocked:** `DEC-M6-11` / `B-M6-03`; reviewer unassigned.
+- [x] The product name, domain, and support model from spec section 20 question 10 are decided: ChatUI, `chatui.dev`, product owner, GitHub Issues best effort, no SLA (`DEC-M6-03` / `B-M6-01` resolved 2026-11-12).
+- [ ] A ChatUI hosting operator is named and can provide a staging tenant, subdomain, custom-domain test path, TLS, and edge configuration access. **Blocked:** `DEC-M6-10` / `B-M6-02`; hosting operator unassigned.
+- [x] A privacy reviewer is named for data-processing, logging, retention, and support-access copy: product owner self-review with dated risk acceptance (`DEC-M6-11` / `B-M6-03` resolved 2026-11-12; not independent legal review).
+- [x] Log retention is decided: edge/error 30 days, audit/support-access 90 days, automated deletion (`DEC-M6-12` / `B-M6-04` resolved 2026-11-12).
+- [x] Tenant-branded PWA install name/icons are not required in M6; build-time ChatUI branding only (`DEC-M6-13` / `B-M6-05` resolved 2026-11-12).
 - [x] The feature-flag decision is made: expose none in M6 (`DEC-M6-06`).
 - [x] The tenant configuration boundary is confirmed: private operator manifest plus public app `config.json`, with no secrets in either served artifact (`DEC-M6-04`).
 - [x] `docs/operations/M6/evidence/` is agreed as the evidence location, using synthetic data only (cross-cutting evidence decision in `M6-decisions.md`).
 
 `M6-01.1` owns closing this gate and recording every unresolved item as a blocker.
-The preflight record is complete in [M6-decisions.md](M6-decisions.md), but the
-gate is not fully open: `DEC-M6-03`, `DEC-M6-10`, `DEC-M6-11`, the retention part
-of `DEC-M6-12`, and the branded-build part of `DEC-M6-13` remain blocked. Do not
-start any M6 implementation task until those blockers are resolved.
+The preflight record is complete in [M6-decisions.md](M6-decisions.md). Only
+`B-M6-02` remains open: the named hosting operator, staging tenant,
+custom-domain test path, and TLS/edge access. Do not start any M6 implementation
+task until that blocker is resolved and `M6-01.1` is `Complete`.
 
 ## How to use these tasks
 
@@ -108,7 +110,7 @@ start any M6 implementation task until those blockers are resolved.
 | Evidence | `M6-05.2`, `M6-05.3`, `M6-06.1`, `M6-06.2`, `M6-06.3` | Supplies the staging tenant and operator access |
 
 M6 cannot close on repository work alone. If the external staging tenant or
-privacy reviewer is unavailable, mark the affected task `Blocked`; do not
+operator access is unavailable, mark the affected task `Blocked`; do not
 fabricate evidence.
 
 ## Completion rule
