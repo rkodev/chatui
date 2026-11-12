@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.chatui.core.model.Theme
 import dev.chatui.core.network.ModelInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -47,6 +48,21 @@ class OnboardingViewModel(
 
     init {
         loadCatalog()
+        loadTheme()
+    }
+
+    fun onThemeSelected(theme: Theme) {
+        _state.update { it.copy(theme = theme) }
+        viewModelScope.launch {
+            try {
+                service.setTheme(theme)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                // The selected theme is already applied in the UI. Persisting
+                // is best-effort so a storage failure never blocks onboarding.
+            }
+        }
     }
 
     fun onContinue() {
@@ -137,6 +153,7 @@ class OnboardingViewModel(
                         testing = false,
                         connected = true,
                         notice = result.notice,
+                        step = OnboardingStep.BACKUP,
                     )
                 }
                 _events.tryEmit(OnboardingEvent.Connected)
@@ -149,6 +166,20 @@ class OnboardingViewModel(
                         error = describeOnboardingError(error, key),
                     )
                 }
+            }
+        }
+    }
+
+    private fun loadTheme() {
+        viewModelScope.launch {
+            try {
+                val theme = service.currentTheme()
+                _state.update { it.copy(theme = theme) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                // Keep the system default when the persisted preference is
+                // unavailable.
             }
         }
     }

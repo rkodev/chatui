@@ -72,6 +72,7 @@ fun NavGraphBuilder.shellDestinations(
 
         OnboardingRoute(
             service = service,
+            backupService = rememberBackupSettingsService(),
             onConnected = {
                 navController.navigate(ShellDestination.Conversations.route) {
                     popUpTo(ShellDestination.Onboarding.route) { inclusive = true }

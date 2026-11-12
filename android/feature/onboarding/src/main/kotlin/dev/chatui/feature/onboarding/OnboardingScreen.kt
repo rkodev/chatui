@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,6 +12,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +34,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.SettingsBrightness
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
@@ -49,7 +52,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,11 +59,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -79,6 +81,9 @@ import dev.chatui.core.designsystem.SecureScreen
 import dev.chatui.core.designsystem.SkeletonList
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.designsystem.rememberHaptics
+import dev.chatui.core.model.Theme
+import dev.chatui.feature.backup.BackupSettingsRoute
+import dev.chatui.feature.backup.BackupSettingsServiceLike
 
 /** Test tags exposed by the onboarding screen. */
 object OnboardingTestTags {
@@ -110,16 +115,24 @@ object OnboardingTestTags {
     const val Completion = "onboarding-completion"
     const val StartChattingButton = "onboarding-start-chatting"
     const val BackButton = "onboarding-back"
+    const val ThemeSelector = "onboarding-theme-selector"
+    const val BackupStep = "onboarding-backup-step"
+    const val BackupSkip = "onboarding-backup-skip"
+    const val BackupUnavailable = "onboarding-backup-unavailable"
 
     fun providerOption(id: String): String = "onboarding-provider-$id"
+
+    fun themeOption(theme: Theme): String =
+        "onboarding-theme-${theme.name.lowercase()}"
 }
 
 /**
  * Stateless onboarding screen.
  *
- * The welcome step explains BYOK/on-device storage and shows the provider
- * picker with OpenRouter preselected. The key-entry step shows the form, the
- * public catalog, and a completion card once validation succeeds.
+ * The welcome step explains BYOK/on-device storage, offers an appearance
+ * choice, and shows the provider picker with OpenRouter preselected. The
+ * key-entry step shows the form and public catalog. Successful validation moves
+ * to the optional encrypted-backup step before the user starts chatting.
  */
 @Composable
 fun OnboardingScreen(
@@ -131,37 +144,32 @@ fun OnboardingScreen(
     onBack: () -> Unit,
     onConnect: () -> Unit,
     onRetryCatalog: () -> Unit,
+    onThemeSelected: (Theme) -> Unit = {},
     onStartChatting: () -> Unit = {},
+    backupService: BackupSettingsServiceLike? = null,
     modifier: Modifier = Modifier,
 ) {
-    if (state.step == OnboardingStep.KEY_ENTRY) {
-        SecureScreen {
-            OnboardingContent(
-                state = state,
-                onApiKeyChanged = onApiKeyChanged,
-                onLabelChanged = onLabelChanged,
-                onProviderSelected = onProviderSelected,
-                onContinue = onContinue,
-                onBack = onBack,
-                onConnect = onConnect,
-                onRetryCatalog = onRetryCatalog,
-                onStartChatting = onStartChatting,
-                modifier = modifier,
-            )
-        }
-    } else {
+    val content: @Composable () -> Unit = {
         OnboardingContent(
             state = state,
             onApiKeyChanged = onApiKeyChanged,
             onLabelChanged = onLabelChanged,
             onProviderSelected = onProviderSelected,
+            onThemeSelected = onThemeSelected,
             onContinue = onContinue,
             onBack = onBack,
             onConnect = onConnect,
             onRetryCatalog = onRetryCatalog,
             onStartChatting = onStartChatting,
+            backupService = backupService,
             modifier = modifier,
         )
+    }
+
+    if (state.step == OnboardingStep.WELCOME) {
+        content()
+    } else {
+        SecureScreen(content = content)
     }
 }
 
@@ -171,13 +179,25 @@ private fun OnboardingContent(
     onApiKeyChanged: (String) -> Unit,
     onLabelChanged: (String) -> Unit,
     onProviderSelected: (String) -> Unit,
+    onThemeSelected: (Theme) -> Unit,
     onContinue: () -> Unit,
     onBack: () -> Unit,
     onConnect: () -> Unit,
     onRetryCatalog: () -> Unit,
     onStartChatting: () -> Unit,
+    backupService: BackupSettingsServiceLike?,
     modifier: Modifier = Modifier,
 ) {
+    if (state.step == OnboardingStep.BACKUP) {
+        OnboardingBackupStep(
+            state = state,
+            backupService = backupService,
+            onStartChatting = onStartChatting,
+            modifier = modifier,
+        )
+        return
+    }
+
     val dimens = LocalDimens.current
 
     LazyColumn(
@@ -192,6 +212,7 @@ private fun OnboardingContent(
         when (state.step) {
             OnboardingStep.WELCOME -> {
                 item { WelcomeHero() }
+                item { ThemeSelector(state.theme, onThemeSelected) }
                 item { ProviderPicker(state, onProviderSelected) }
                 item {
                     Button(
@@ -218,10 +239,9 @@ private fun OnboardingContent(
                     )
                 }
                 item { CatalogSection(state.catalog, onRetryCatalog) }
-                if (state.connected) {
-                    item { CompletionSection(onStartChatting) }
-                }
             }
+
+            OnboardingStep.BACKUP -> Unit
         }
     }
 }
@@ -231,7 +251,11 @@ private fun StepIndicator(step: OnboardingStep) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
     val reducedMotion = LocalReducedMotion.current
-    val target = if (step == OnboardingStep.WELCOME) 0.5f else 1f
+    val target = when (step) {
+        OnboardingStep.WELCOME -> 1f / 3f
+        OnboardingStep.KEY_ENTRY -> 2f / 3f
+        OnboardingStep.BACKUP -> 1f
+    }
     val progress by animateFloatAsState(
         targetValue = target,
         animationSpec = if (reducedMotion) {
@@ -251,12 +275,17 @@ private fun StepIndicator(step: OnboardingStep) {
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.space2)) {
             StepLabel(
                 text = "Welcome",
-                active = true,
+                active = step.ordinal >= OnboardingStep.WELCOME.ordinal,
                 modifier = Modifier.weight(1f),
             )
             StepLabel(
                 text = "Connect",
-                active = step == OnboardingStep.KEY_ENTRY,
+                active = step.ordinal >= OnboardingStep.KEY_ENTRY.ordinal,
+                modifier = Modifier.weight(1f),
+            )
+            StepLabel(
+                text = "Backup",
+                active = step == OnboardingStep.BACKUP,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -852,59 +881,199 @@ private fun CatalogModelRow(model: CatalogModel) {
 }
 
 @Composable
-private fun CompletionSection(onStartChatting: () -> Unit) {
-    val colors = LocalChatUiColors.current
+private fun ThemeSelector(
+    theme: Theme,
+    onThemeSelected: (Theme) -> Unit,
+) {
     val dimens = LocalDimens.current
-    val reducedMotion = LocalReducedMotion.current
-    var appeared by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (appeared) 1f else 0.6f,
-        animationSpec = if (reducedMotion) tween(0) else spring(dampingRatio = 0.6f, stiffness = 300f),
-        label = "completionCheckScale",
-    )
 
-    LaunchedEffect(Unit) {
-        appeared = true
-    }
-
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag(OnboardingTestTags.Completion),
-        colors = CardDefaults.cardColors(containerColor = colors.accentSoft),
+            .testTag(OnboardingTestTags.ThemeSelector),
+        verticalArrangement = Arrangement.spacedBy(dimens.space2),
+    ) {
+        Text(
+            text = "Appearance",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(dimens.space2),
+        ) {
+            ThemeOption(
+                theme = Theme.LIGHT,
+                icon = Icons.Rounded.LightMode,
+                label = "Light",
+                selected = theme == Theme.LIGHT,
+                onClick = { onThemeSelected(Theme.LIGHT) },
+                modifier = Modifier.weight(1f),
+            )
+            ThemeOption(
+                theme = Theme.DARK,
+                icon = Icons.Rounded.DarkMode,
+                label = "Dark",
+                selected = theme == Theme.DARK,
+                onClick = { onThemeSelected(Theme.DARK) },
+                modifier = Modifier.weight(1f),
+            )
+            ThemeOption(
+                theme = Theme.SYSTEM,
+                icon = Icons.Rounded.SettingsBrightness,
+                label = "System",
+                selected = theme == Theme.SYSTEM,
+                onClick = { onThemeSelected(Theme.SYSTEM) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemeOption(
+    theme: Theme,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalChatUiColors.current
+    val dimens = LocalDimens.current
+    val haptics = rememberHaptics()
+    val shape = RoundedCornerShape(dimens.radiusMd)
+
+    Column(
+        modifier = modifier
+            .heightIn(min = dimens.touchTargetMin)
+            .clip(shape)
+            .background(
+                color = if (selected) colors.accentSoft else colors.bgSurfaceRaised,
+                shape = shape,
+            )
+            .border(
+                border = BorderStroke(
+                    width = if (selected) 2.dp else 1.dp,
+                    color = if (selected) colors.accent else colors.borderSubtle,
+                ),
+                shape = shape,
+            )
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = {
+                    haptics.tick()
+                    onClick()
+                },
+            )
+            .padding(vertical = dimens.space3, horizontal = dimens.space2)
+            .testTag(OnboardingTestTags.themeOption(theme)),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(dimens.space1),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (selected) colors.accent else colors.fgSecondary,
+        )
+        Text(
+            text = label,
+            style = Typography.footnote,
+            color = if (selected) colors.accent else colors.fgSecondary,
+        )
+    }
+}
+
+@Composable
+private fun OnboardingBackupStep(
+    state: OnboardingUiState,
+    backupService: BackupSettingsServiceLike?,
+    onStartChatting: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalChatUiColors.current
+    val dimens = LocalDimens.current
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag(OnboardingTestTags.BackupStep),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(dimens.sectionGap),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(dimens.space3),
+                .padding(horizontal = dimens.padding, vertical = dimens.padding),
+            verticalArrangement = Arrangement.spacedBy(dimens.space2),
         ) {
-            Icon(
-                imageVector = Icons.Rounded.CheckCircle,
-                contentDescription = null,
-                tint = colors.success,
-                modifier = Modifier
-                    .size(56.dp)
-                    .scale(scale),
-            )
+            StepIndicator(state.step)
             Text(
-                text = "You're all set",
+                text = "Back up your conversations",
                 style = Typography.title2,
                 color = colors.fgPrimary,
-                textAlign = TextAlign.Center,
             )
             Text(
-                text = "Your key is saved on this device. Start chatting whenever " +
-                    "you're ready.",
+                text = "Optional. Add encrypted remote backup now, or skip and set it " +
+                    "up later in Settings → Backup. Your passphrase never leaves this device.",
                 style = Typography.body,
                 color = colors.fgSecondary,
-                textAlign = TextAlign.Center,
             )
+            state.notice?.let { notice ->
+                Text(
+                    text = notice,
+                    style = Typography.footnote,
+                    color = colors.fgMuted,
+                    modifier = Modifier.testTag(OnboardingTestTags.Notice),
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+        ) {
+            if (backupService != null) {
+                BackupSettingsRoute(
+                    service = backupService,
+                    setupMode = true,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag(OnboardingTestTags.BackupUnavailable),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Backup setup is unavailable right now. You can configure " +
+                            "it later in Settings → Backup.",
+                        style = Typography.body,
+                        color = colors.fgSecondary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(dimens.padding),
+            horizontalArrangement = Arrangement.spacedBy(dimens.space2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(
+                onClick = onStartChatting,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = dimens.touchTargetMin)
+                    .testTag(OnboardingTestTags.BackupSkip),
+            ) {
+                Text("Skip for now")
+            }
             Button(
                 onClick = onStartChatting,
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .weight(1f)
                     .heightIn(min = dimens.touchTargetMin)
                     .testTag(OnboardingTestTags.StartChattingButton),
             ) {

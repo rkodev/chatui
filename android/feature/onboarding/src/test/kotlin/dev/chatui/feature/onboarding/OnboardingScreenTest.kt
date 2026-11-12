@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
+import dev.chatui.core.model.Theme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,6 +55,8 @@ class OnboardingScreenTest {
         }
 
         composeRule.onNodeWithTag(OnboardingTestTags.Welcome).assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.providerOption("openrouter")))
         composeRule.onNodeWithText("Recommended").assertIsDisplayed()
         composeRule.onNodeWithTag(OnboardingTestTags.providerOption("openrouter"))
             .assertIsDisplayed()
@@ -114,6 +117,8 @@ class OnboardingScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.providerOption("openrouter")))
         composeRule.onNodeWithTag(OnboardingTestTags.providerOption("openrouter"))
             .performClick()
 
@@ -308,12 +313,12 @@ class OnboardingScreenTest {
     }
 
     @Test
-    fun `connected state enables start chatting`() {
+    fun `backup step enables start chatting`() {
         composeRule.setContent {
             ChatUiTheme {
                 OnboardingScreen(
                     state = OnboardingUiState(
-                        step = OnboardingStep.KEY_ENTRY,
+                        step = OnboardingStep.BACKUP,
                         providers = providers(),
                         selectedProviderId = "openrouter",
                         apiKey = "sk-good",
@@ -331,16 +336,13 @@ class OnboardingScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
-            .performScrollToNode(hasTestTag(OnboardingTestTags.ConnectedStatus))
-        composeRule.onNodeWithTag(OnboardingTestTags.ConnectedStatus).assertIsDisplayed()
-        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
-            .performScrollToNode(hasTestTag(OnboardingTestTags.StartChattingButton))
+        composeRule.onNodeWithTag(OnboardingTestTags.BackupStep).assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.BackupUnavailable).assertIsDisplayed()
         composeRule.onNodeWithTag(OnboardingTestTags.StartChattingButton).assertIsEnabled()
     }
 
     @Test
-    fun `step indicator is visible on both steps`() {
+    fun `step indicator is visible across steps`() {
         composeRule.setContent {
             ChatUiTheme {
                 OnboardingScreen(
@@ -386,6 +388,8 @@ class OnboardingScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.providerOption("openrouter")))
         composeRule.onNodeWithTag(OnboardingTestTags.providerOption("openrouter"))
             .assertIsSelected()
     }
@@ -568,14 +572,14 @@ class OnboardingScreenTest {
     }
 
     @Test
-    fun `completion state starts chatting`() {
+    fun `backup step starts chatting`() {
         var startClicks = 0
 
         composeRule.setContent {
             ChatUiTheme(reducedMotion = true) {
                 OnboardingScreen(
                     state = OnboardingUiState(
-                        step = OnboardingStep.KEY_ENTRY,
+                        step = OnboardingStep.BACKUP,
                         providers = providers(),
                         selectedProviderId = "openrouter",
                         apiKey = "sk-good",
@@ -594,15 +598,79 @@ class OnboardingScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
-            .performScrollToNode(hasTestTag(OnboardingTestTags.Completion))
-        composeRule.onNodeWithTag(OnboardingTestTags.Completion).assertIsDisplayed()
-        composeRule.onNodeWithText("You're all set").assertIsDisplayed()
-        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
-            .performScrollToNode(hasTestTag(OnboardingTestTags.StartChattingButton))
         composeRule.onNodeWithTag(OnboardingTestTags.StartChattingButton).performClick()
 
         assertThat(startClicks).isEqualTo(1)
+    }
+
+    @Test
+    fun `backup step can be skipped`() {
+        var startClicks = 0
+
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        step = OnboardingStep.BACKUP,
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        connected = true,
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                    onStartChatting = { startClicks += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.BackupSkip).performClick()
+
+        assertThat(startClicks).isEqualTo(1)
+    }
+
+    @Test
+    fun `welcome step offers light dark and system appearance choices`() {
+        var selected: Theme? = null
+
+        composeRule.setContent {
+            ChatUiTheme {
+                OnboardingScreen(
+                    state = OnboardingUiState(
+                        providers = providers(),
+                        selectedProviderId = "openrouter",
+                        theme = Theme.SYSTEM,
+                        catalog = CatalogUiState.Ready(emptyList()),
+                    ),
+                    onApiKeyChanged = {},
+                    onLabelChanged = {},
+                    onProviderSelected = {},
+                    onContinue = {},
+                    onBack = {},
+                    onConnect = {},
+                    onRetryCatalog = {},
+                    onThemeSelected = { selected = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.ThemeSelector))
+        composeRule.onNodeWithTag(OnboardingTestTags.themeOption(Theme.LIGHT))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.themeOption(Theme.DARK))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.themeOption(Theme.SYSTEM))
+            .assertIsSelected()
+            .performClick()
+        composeRule.onNodeWithTag(OnboardingTestTags.themeOption(Theme.DARK)).performClick()
+
+        assertThat(selected).isEqualTo(Theme.DARK)
     }
 }
 

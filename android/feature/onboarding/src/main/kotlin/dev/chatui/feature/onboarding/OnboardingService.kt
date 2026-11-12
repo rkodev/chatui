@@ -2,6 +2,7 @@ package dev.chatui.feature.onboarding
 
 import dev.chatui.core.datastore.settings.SettingsDataStore
 import dev.chatui.core.model.Provider
+import dev.chatui.core.model.Theme
 import dev.chatui.core.network.ModelInfo
 import dev.chatui.core.network.ProviderContext
 import dev.chatui.core.network.ProviderPreset
@@ -50,6 +51,12 @@ interface OnboardingService {
     /** Provider presets shown in the picker. Only OpenRouter is enabled. */
     fun providerOptions(): List<ProviderOption>
 
+    /** Current persisted appearance preference. */
+    suspend fun currentTheme(): Theme
+
+    /** Persists the appearance preference chosen during onboarding. */
+    suspend fun setTheme(theme: Theme)
+
     /** Load the public OpenRouter catalog. No key is required or sent. */
     suspend fun loadCatalog(): List<ModelInfo>
 
@@ -88,6 +95,12 @@ class DefaultOnboardingService @Inject constructor(
                 statusLabel = if (availability.enabled) null else "Coming later",
             )
         }
+
+    override suspend fun currentTheme(): Theme = settings.current().theme
+
+    override suspend fun setTheme(theme: Theme) {
+        settings.setTheme(theme)
+    }
 
     override suspend fun loadCatalog(): List<ModelInfo> {
         val preset = registry.getPreset(ProviderService.OPENROUTER_PRESET_ID)

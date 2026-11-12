@@ -14,6 +14,7 @@ import dev.chatui.core.model.ChatErrorCode
 import dev.chatui.core.model.InputModality
 import dev.chatui.core.model.ModelCapability
 import dev.chatui.core.model.OutputModality
+import dev.chatui.core.model.Theme
 import dev.chatui.core.network.ModelInfo
 import dev.chatui.core.network.OpenRouterRequestException
 import dev.chatui.core.network.ProviderContext
@@ -132,6 +133,16 @@ class DefaultOnboardingServiceTest {
         assertThat(options.first { it.id == "anthropic" }.enabled).isTrue()
         assertThat(options.first { it.id == "google" }.enabled).isTrue()
         assertThat(options.first { it.id == "ollama" }.enabled).isTrue()
+    }
+
+    @Test
+    fun `theme preference is read and persisted`() = runTest {
+        assertThat(service.currentTheme()).isEqualTo(Theme.SYSTEM)
+
+        service.setTheme(Theme.DARK)
+
+        assertThat(service.currentTheme()).isEqualTo(Theme.DARK)
+        assertThat(settingsDataStore.current().theme).isEqualTo(Theme.DARK)
     }
 
     @Test
