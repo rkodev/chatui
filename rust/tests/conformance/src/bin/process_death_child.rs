@@ -57,6 +57,8 @@ async fn run(path: String) -> Result<(), Box<dyn std::error::Error>> {
             message_count: 0,
             last_error: None,
             sync: None,
+            storage_key: String::new(),
+            revision: 0,
         })
         .await?;
 

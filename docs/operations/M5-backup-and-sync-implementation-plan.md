@@ -428,23 +428,23 @@ Generate these under `docs/tasks/M5/` only after phase 2 scope is confirmed.
 
 Mapped to the milestone exit gate:
 
-- [ ] Cross-device restore works with encrypted data on every shipping client.
-- [ ] The storage provider cannot read conversation content, attachments, or
+- [x] Cross-device restore works with encrypted data on every shipping client.
+- [x] The storage provider cannot read conversation content, attachments, or
       metadata beyond opaque object names and sizes.
-- [ ] Conflict tests pass for concurrent edits, concurrent additions, and
+- [x] Conflict tests pass for concurrent edits, concurrent additions, and
       deletions.
-- [ ] A failed or interrupted sync never destroys local data.
-- [ ] Wrong passphrase and tampered ciphertext fail safely.
-- [ ] No provider API keys appear in backup metadata.
-- [ ] Android backup scheduling respects WorkManager constraints; web and Rust
+- [x] A failed or interrupted sync never destroys local data.
+- [x] Wrong passphrase and tampered ciphertext fail safely.
+- [x] No provider API keys appear in backup metadata.
+- [x] Android backup scheduling respects WorkManager constraints; web and Rust
       scheduling is documented.
-- [ ] Backup rows in parity are updated and reviewed.
-- [ ] Backup format is versioned and round-trip tested in every client.
-- [ ] `make contracts-check` validates backup fixtures.
-- [ ] No plaintext upload path exists when encryption is enabled.
-- [ ] Restore is non-destructive by default; replace requires explicit
+- [x] Backup rows in parity are updated and reviewed.
+- [x] Backup format is versioned and round-trip tested in every client.
+- [x] `make contracts-check` validates backup fixtures.
+- [x] No plaintext upload path exists when encryption is enabled.
+- [x] Restore is non-destructive by default; replace requires explicit
       confirmation.
-- [ ] Passphrase loss is stated as unrecoverable before enabling backup.
+- [x] Passphrase loss is stated as unrecoverable before enabling backup.
 
 ## 9. Verification
 

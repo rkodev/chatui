@@ -1,0 +1,55 @@
+# M5-07.4 scheduling evidence
+
+Date: 2026-11-12
+
+## Android WorkManager
+
+`android/feature/backup/src/main/kotlin/dev/chatui/feature/backup/work/BackupScheduler.kt`
+enqueues unique periodic work with:
+
+- `NetworkType.CONNECTED`
+- `setRequiresBatteryNotLow(true)`
+- exponential backoff starting at 30 seconds
+- 6-hour repeat interval (best-effort cadence; WorkManager may defer)
+- `ExistingPeriodicWorkPolicy.UPDATE` so repeated enable does not duplicate work
+
+The worker only calls the sync runner (`BackupWorkerTest > worker adds no input
+data and only calls the sync runner`).
+
+Tests passed:
+
+- `BackupSchedulerTest > schedule enqueues unique periodic work with network and battery constraints`
+- `BackupSchedulerTest > repeated enable does not duplicate work`
+- `BackupSchedulerTest > cancel removes scheduled work`
+- `BackupWorkerTest > successful sync maps to success`
+- `BackupWorkerTest > io failures map to retry`
+- `BackupWorkerTest > transient storage failures map to retry`
+- `BackupWorkerTest > permanent storage failures map to failure`
+- `BackupWorkerTest > unexpected failures map to failure`
+
+Device evidence: `./gradlew :app:connectedDebugAndroidTest` passed on
+`m3_api34_phone` (API 34).
+
+## Web
+
+`web/src/features/backup/scheduler.ts` implements a foreground interval,
+`visibilitychange` due check, optional Periodic Background Sync registration,
+and feature/permission detection. It never assumes background execution.
+Documented in [M5-06.2-web-scheduling.md](../M5-06.2-web-scheduling.md) and
+[M5 web scheduling](../web-scheduling.md).
+
+## Rust desktop
+
+`rust/apps/desktop` uses a `tokio` interval-based scheduler while the app runs,
+with explicit enable/disable and no OS background daemon. Documented in
+[M5-06.3-rust-scheduling.md](../M5-06.3-rust-scheduling.md) and
+[M5 Rust scheduling](../rust-scheduling.md).
+
+## Malicious-provider risk
+
+A storage provider can delete objects or serve an older manifest. The sync
+engine validates revisions, tombstones, envelope authentication, and
+`If-Match`/`If-None-Match` preconditions, but it cannot detect a provider that
+withholds or rolls back data while serving a consistent older view. No
+Byzantine fault tolerance is claimed. This is recorded in
+`docs/operations/M5/M5-decisions.md` and the M5 milestone.

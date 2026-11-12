@@ -1,0 +1,64 @@
+# M5-07.4 cross-client restore log (synthetic data)
+
+Date: 2026-11-12
+Bucket: local MinIO (`chatui-m5-evidence`), path-style, region `us-east-1`
+Prefix: empty
+Passphrase: synthetic test value; not recorded here
+
+Both clients used the shipped envelope, manifest, conversation-payload codecs,
+their shipped sync engines, and their shipped S3 adapters. Only synthetic
+conversation titles, message text, and an 8-byte synthetic PNG payload were
+used.
+
+## Procedure
+
+1. Start a local MinIO container and create the `chatui-m5-evidence` bucket.
+2. Web: seed one synthetic conversation with two messages and one image
+   attachment, then run `SyncEngine.sync()`.
+3. Android: run `SyncEngine.sync()` for a second synthetic conversation and
+   attachment into the same bucket.
+4. Web: run `SyncEngine.restore()` into an empty profile and verify the
+   Android-written conversation, message ordering/text, and attachment object.
+5. Android: run `SyncEngine.restore()` into an empty profile and verify the
+   Web-written conversation, message ordering/text, and attachment object.
+6. Inspect the bucket for object names, ciphertext, and plaintext leakage.
+
+## Results
+
+### Web backup (web -> bucket)
+
+```json
+{"client":"web","mode":"web-write","uploadedConversations":["conv-web-1"],"uploadedAttachments":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],"objects":["attachments/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.enc","conversations/11111111111111111111111111111111.enc","manifest.enc"]}
+```
+
+### Android backup (Android -> bucket)
+
+```json
+{"client":"android", "mode":"android-write", "uploadedConversations":["conv-android-1"], "uploadedAttachments":["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"], "objects":["attachments/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.enc", "attachments/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.enc", "conversations/11111111111111111111111111111111.enc", "conversations/22222222222222222222222222222222.enc", "manifest.enc"]}
+```
+
+### Android restore of the web-written conversation
+
+```json
+{"client":"android", "mode":"android-restore", "mergedConversations":["conv-android-1", "conv-web-1"], "conversationTitle":"Synthetic cross-client conversation", "messageSequences":[0, 1], "messageTexts":["Synthetic message 0", "Synthetic message 1"], "attachmentSha256":["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"], "attachmentBytesMatch":true, "manifestPresent":true}
+```
+
+Verified: conversation restored, two messages restored in sequence order with
+identical text, the web attachment object decrypted to the original 8-byte
+synthetic payload, and the manifest remained readable.
+
+### Web restore of the Android-written conversation
+
+```json
+{"client":"web","mode":"web-restore","mergedConversations":["conv-android-1","conv-web-1"],"conversationTitle":"Synthetic Android cross-client conversation","messageSequences":[0,1],"messageTexts":["Synthetic message 0","Synthetic message 1"],"attachmentSha256":["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],"attachmentBytesMatch":true,"manifestPresent":true}
+```
+
+Verified: conversation restored, two messages restored in sequence order with
+identical text, the Android attachment object decrypted to the original 8-byte
+synthetic payload, and the manifest remained readable.
+
+## Outcome
+
+Pass. Web-produced encrypted objects restore on Android, and Android-produced
+encrypted objects restore on web, without a shared plaintext staging area and
+without format translation.

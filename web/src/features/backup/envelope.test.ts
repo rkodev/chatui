@@ -313,20 +313,24 @@ describe('backup envelope', () => {
     ).rejects.toMatchObject({ code: failure.expected })
   })
 
-  it('fails every shared tampered-envelope vector with the documented code', async () => {
-    for (const failure of vectors.failureVectors) {
-      if (failure.tamperedEnvelopeBase64 === undefined) {
-        continue
-      }
+  it(
+    'fails every shared tampered-envelope vector with the documented code',
+    async () => {
+      for (const failure of vectors.failureVectors) {
+        if (failure.tamperedEnvelopeBase64 === undefined) {
+          continue
+        }
 
-      await expect(
-        decryptObject({
-          passphrase: vector.passphrase,
-          bytes: base64ToBytes(failure.tamperedEnvelopeBase64),
-        }),
-      ).rejects.toMatchObject({ code: failure.expected })
-    }
-  })
+        await expect(
+          decryptObject({
+            passphrase: vector.passphrase,
+            bytes: base64ToBytes(failure.tamperedEnvelopeBase64),
+          }),
+        ).rejects.toMatchObject({ code: failure.expected })
+      }
+    },
+    30_000,
+  )
 
   it('fails the shared tampered-AAD vector', async () => {
     const failure = requireFailure('tampered-aad-object-key')

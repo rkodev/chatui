@@ -1,0 +1,41 @@
+# M5-07.4 conflict and safe-failure test evidence
+
+Date: 2026-11-12
+Data: synthetic only.
+
+## Conflict resolution
+
+| Case | Web | Android | Rust |
+| --- | --- | --- | --- |
+| Concurrent additions kept and renumbered deterministically | `mergeConversation > keeps concurrent additions and renumbers sequences deterministically` | `MergeTest > concurrent additions keep both and renumber deterministically` | `merge_tests::concurrent_additions_keep_both_and_renumber_deterministically` |
+| Concurrent metadata edits: LWW then `deviceId` tiebreak | `mergeConversation > resolves metadata by last-write-wins and device ID tiebreak` | `MergeTest > metadata uses last write wins by updatedAt`; `metadata tie breaks by device id` | `merge_tests::conversation_metadata_uses_lww_then_device_id` |
+| Deletion tombstone vs older update | `mergeConversation > lets a deletion tombstone win over an older update` | `MergeTest > deletion tombstone wins over an older update` | `merge_tests::conversation_tombstone_wins_over_an_older_update` |
+| Newer update survives an older tombstone | `mergeConversation > drops a message only when its tombstone is at or after the update` | `MergeTest > newer message update survives an older tombstone` | `merge_tests::message_tombstone_does_not_remove_a_newer_update` |
+| Local messages never silently dropped | `mergeConversation > never drops local messages that are not tombstoned` | `MergeTest > manifest merge keeps the higher conversation revision` | `merge_tests::merge_never_drops_a_local_message_without_a_tombstone` |
+| Manifest conflict retry and re-read | `SyncEngine sync > retries and re-reads the manifest on a conflict` | `SyncEngineTest > manifest conflict retries and re-reads` | `sync_tests::manifest_conflict_retries_and_rereads` |
+
+All rows passed on every client.
+
+## Safe failure
+
+| Case | Web | Android | Rust |
+| --- | --- | --- | --- |
+| Wrong passphrase fails without local mutation | `SyncEngine sync > fails before any local mutation with a wrong passphrase`; `backup envelope > fails a wrong passphrase without returning plaintext` | `SyncEngineTest > wrong passphrase fails before any local mutation`; `BackupEnvelopeTest > wrong passphrase fails safely` | `sync_tests::wrong_passphrase_fails_before_local_mutation`; `tests::wrong_passphrase_fails` |
+| Tampered ciphertext fails | `backup envelope > rejects tampered IV, ciphertext, and tag`; `fails every shared tampered-envelope vector with the documented code` | `BackupEnvelopeTest > tampered ciphertext fails`; `failure vectors produce the documented codes` | `tests::tampered_ciphertext_fails`; `tests::tampered_iv_fails` |
+| Tampered AAD/header fails | `backup envelope > fails the shared tampered-AAD vector` | `BackupEnvelopeTest > tampered aad fails`; `tampered header json fails` | `tests::tampered_aad_fails`; `tests::tampered_header_fails` |
+| Interrupted upload leaves local data unchanged | `SyncEngine sync > leaves local data unchanged when an upload is interrupted` | `SyncEngineTest > interrupted upload leaves local data unchanged` | `sync_tests::interrupted_upload_leaves_local_data_unchanged` |
+| Restore is non-destructive by default | `SyncEngine restore > merges by default and never wipes local data` | `SyncEngineTest > restore merges by default and never wipes local data` | `sync_tests::restore_merges_by_default_and_never_wipes_local_data` |
+
+All rows passed on every client.
+
+## Raw commands
+
+```bash
+cd web && pnpm exec vitest run src/features/backup/envelope.test.ts src/features/backup/sync.test.ts --reporter=verbose
+cd android && ./gradlew :core:backup:testDebugUnitTest --rerun-tasks
+make rust-test
+```
+
+Web result: 37 passed. Android `:core:backup`: 124 tests, 0 failures across
+envelope, manifest, payload, sync, merge, and storage suites. Rust
+`chatui_backup`: 98 tests, 0 failures.

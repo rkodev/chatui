@@ -4,8 +4,8 @@
 - Milestone: [M5 Backup and sync](../../milestones/M5-backup-and-sync.md)
 - Authoritative spec: [IMPLEMENTATION.md](../../IMPLEMENTATION.md) sections 6.2, 12, 13, 17 (M5), 21.5
 - Current parity: [contracts/parity.md](../../../contracts/parity.md)
-- Status: In progress - phase 2 authorized 2026-11-11
-- Last updated: 2026-11-11
+- Status: Complete - exit gate passed 2026-11-12
+- Last updated: 2026-11-12
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
 - Scope: encrypted, user-owned backup and sync. Web, Android, and Rust desktop are required (`M5-decisions.md` `DEC-M5-03`).
 - Platform rule: one task owns one client area. Do not span web, Android, and Rust in a single task.
@@ -60,7 +60,7 @@ The phase 2 gate is open. Start `M5-01.1` next.
 | 10 | [M5-03.2 Android S3-compatible adapter and conditional writes](M5-03.2-android-s3-adapter.md) | Complete | M5-02.2 | android backend | M5-03.1, M5-03.3 |
 | 11 | [M5-03.3 Rust S3-compatible adapter and conditional writes](M5-03.3-rust-s3-adapter.md) | Complete | M5-02.3 | rust backend | M5-03.1, M5-03.2 |
 | 12 | [M5-04.1 Web sync engine, merge, and tombstones](M5-04.1-web-sync-engine.md) | Complete | M5-03.1 | web sync | M5-04.2, M5-04.3 |
-| 13 | [M5-04.2 Android sync engine, merge, and tombstones](M5-04.2-android-sync-engine.md) | Not started | M5-03.2 | android sync | M5-04.1, M5-04.3 |
+| 13 | [M5-04.2 Android sync engine, merge, and tombstones](M5-04.2-android-sync-engine.md) | Complete | M5-03.2 | android sync | M5-04.1, M5-04.3 |
 | 14 | [M5-04.3 Rust sync engine, merge, and tombstones](M5-04.3-rust-sync-engine.md) | Complete | M5-03.3 | rust sync | M5-04.1, M5-04.2 |
 | 15 | [M5-05.1 Web backup/restore UI and settings](M5-05.1-web-backup-ui.md) | Complete | M5-04.1 | web UI | M5-05.2, M5-05.3 |
 | 16 | [M5-05.2 Android backup/restore UI and settings](M5-05.2-android-backup-ui.md) | Complete | M5-04.2 | android UI | M5-05.1, M5-05.3 |
@@ -71,7 +71,7 @@ The phase 2 gate is open. Start `M5-01.1` next.
 | 21 | [M5-07.1 Web Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.1-web-additional-backends.md) | Complete | M5-03.1, M5-04.1 | web backend | M5-07.2, M5-07.3 |
 | 22 | [M5-07.2 Android Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.2-android-additional-backends.md) | Complete | M5-03.2, M5-04.2 | android backend | M5-07.1, M5-07.3 |
 | 23 | [M5-07.3 Rust Azure Blob, GCS, Google Drive, and WebDAV adapters](M5-07.3-rust-additional-backends.md) | Complete | M5-03.3, M5-04.3 | rust backend | M5-07.1, M5-07.2 |
-| 24 | [M5-07.4 Parity, cross-client restore, and exit evidence](M5-07.4-parity-cross-client-evidence.md) | Blocked | M5-06.1, M5-06.2, M5-06.3, M5-07.1, M5-07.2, M5-07.3 | evidence | none; final gate |
+| 24 | [M5-07.4 Parity, cross-client restore, and exit evidence](M5-07.4-parity-cross-client-evidence.md) | Complete | M5-06.1, M5-06.2, M5-06.3, M5-07.1, M5-07.2, M5-07.3 | evidence | none; final gate |
 
 ## Parallel execution groups
 
@@ -95,10 +95,10 @@ They block `M5-07.4`. Do not mark them `Cancelled` without a new dated decision.
 
 ## Completion rule
 
-M5 is complete only when every required web, Android, and Rust task is `Complete`
-(or explicitly cancelled with an approved deferral), `docs/operations/M5/M5-verification.md`
-records the exit-gate evidence, `contracts/parity.md` backup rows are truthful,
-and the milestone exit gate in the source plan section 8 is fully checked.
+M5 is complete. Every required web, Android, and Rust task is `Complete`,
+[docs/operations/M5/M5-verification.md](M5-verification.md) records the exit-gate
+evidence, `contracts/parity.md` backup rows are truthful, and the milestone exit
+gate in the source plan section 8 is fully checked.
 
 ## Task orchestration
 
