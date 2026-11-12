@@ -6,7 +6,7 @@
 - Current baseline: [M4 verification](../M4/M4-verification.md) (phase 1 gate passed 2026-11-10)
 - Backup baseline: [M5 verification](../M5/M5-verification.md) (M5 complete 2026-11-12)
 - Current parity: [contracts/parity.md](../../../contracts/parity.md)
-- Status: Planned - entry gate blocked on product, hosting-operator, and privacy-owner decisions
+- Status: Planned - entry gate blocked on product, hosting-operator, and privacy-owner decisions (see [M6-decisions.md](M6-decisions.md))
 - Last updated: 2026-11-12
 - Ordering: work through the `Order` column. A task may start only when every dependency is `Complete`.
 - Scope: optional roksky-managed static hosting for the web client. Repository work is templates, public tenant configuration, documentation, runbooks, validation scripts, and evidence. The roksky control plane, DNS, TLS automation, billing, and support portal are external operator deliverables.
@@ -18,16 +18,19 @@ Do not start any task until all of the following are true:
 
 - [x] M4 exit gate is met and phase 1 is released (`docs/operations/M4/M4-verification.md`, 2026-11-10).
 - [x] M5 is complete, so BYO encrypted storage onboarding exists (`docs/operations/M5/M5-verification.md`, 2026-11-12).
-- [ ] The user explicitly authorizes M6 work and confirms it remains a hosting/documentation milestone, not a backend build.
-- [ ] The product name, domain, and support model from spec section 20 question 10 have named owners.
-- [ ] A roksky hosting operator is named and can provide a staging tenant, subdomain, custom-domain test path, TLS, and edge configuration access.
-- [ ] A privacy/legal reviewer is named for data-processing, logging, retention, and support-access copy.
-- [ ] The feature-flag decision is made: expose none in M6, or add a typed, allowlisted public flag shape.
-- [ ] The tenant configuration boundary is confirmed: private operator manifest plus public app `config.json`, with no secrets in either served artifact.
-- [ ] `docs/operations/M6/evidence/` is agreed as the evidence location, using synthetic data only.
+- [x] The user explicitly authorizes M6 work and confirms it remains a hosting/documentation milestone, not a backend build (`DEC-M6-01`, 2026-11-12; implementation tasks remain gated by the items below).
+- [ ] The product name, domain, and support model from spec section 20 question 10 have named owners. **Blocked:** `DEC-M6-03` / `B-M6-01`; product owner unassigned.
+- [ ] A roksky hosting operator is named and can provide a staging tenant, subdomain, custom-domain test path, TLS, and edge configuration access. **Blocked:** `DEC-M6-10` / `B-M6-02`; hosting operator unassigned.
+- [ ] A privacy/legal reviewer is named for data-processing, logging, retention, and support-access copy. **Blocked:** `DEC-M6-11` / `B-M6-03`; reviewer unassigned.
+- [x] The feature-flag decision is made: expose none in M6 (`DEC-M6-06`).
+- [x] The tenant configuration boundary is confirmed: private operator manifest plus public app `config.json`, with no secrets in either served artifact (`DEC-M6-04`).
+- [x] `docs/operations/M6/evidence/` is agreed as the evidence location, using synthetic data only (cross-cutting evidence decision in `M6-decisions.md`).
 
-`M6-01.1` owns closing this gate and recording every unresolved item as a blocker. Do
-not start `M6-02.1`, `M6-03.1`, or `M6-04.1` until `M6-01.1` is `Complete`.
+`M6-01.1` owns closing this gate and recording every unresolved item as a blocker.
+The preflight record is complete in [M6-decisions.md](M6-decisions.md), but the
+gate is not fully open: `DEC-M6-03`, `DEC-M6-10`, `DEC-M6-11`, the retention part
+of `DEC-M6-12`, and the branded-build part of `DEC-M6-13` remain blocked. Do not
+start any M6 implementation task until those blockers are resolved.
 
 ## How to use these tasks
 
@@ -56,7 +59,7 @@ not start `M6-02.1`, `M6-03.1`, or `M6-04.1` until `M6-01.1` is `Complete`.
 
 | Order | Task | Status | Depends on | Area | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [M6-01.1 Preflight decisions and entry-gate closure](M6-01.1-preflight-decisions.md) | Not started | none | preflight | none; blocks all |
+| 1 | [M6-01.1 Preflight decisions and entry-gate closure](M6-01.1-preflight-decisions.md) | Blocked | none | preflight | none; blocks all |
 | 2 | [M6-01.2 Tenant manifest schema and fixtures](M6-01.2-tenant-manifest-schema.md) | Not started | M6-01.1 | contracts | M6-01.3 |
 | 3 | [M6-01.3 Public config templates and feature-flag handling](M6-01.3-public-config-templates.md) | Not started | M6-01.1 | config | M6-01.2 |
 | 4 | [M6-01.4 Tenant configuration validator and docs](M6-01.4-tenant-config-validator-docs.md) | Not started | M6-01.2, M6-01.3 | validation/docs | none; blocks hosting tasks |
