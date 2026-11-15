@@ -2,6 +2,7 @@ package dev.chatui.feature.onboarding
 
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.model.ChatErrorCode
+import dev.chatui.core.model.Theme
 import dev.chatui.core.network.ModelInfo
 import dev.chatui.core.network.OpenRouterRequestException
 import kotlinx.coroutines.Dispatchers
@@ -106,8 +107,31 @@ class OnboardingViewModelTest {
         val state = viewModel.state.value
         assertThat(state.testing).isFalse()
         assertThat(state.connected).isTrue()
+        assertThat(state.step).isEqualTo(OnboardingStep.BACKUP)
         assertThat(state.error).isNull()
         assertThat(service.lastApiKey).isEqualTo("sk-good")
+    }
+
+    @Test
+    fun `theme selection is persisted and reflected in state`() = runTest(dispatcher) {
+        val service = FakeOnboardingService()
+        val viewModel = OnboardingViewModel(service)
+        advanceUntilIdle()
+
+        viewModel.onThemeSelected(Theme.DARK)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.theme).isEqualTo(Theme.DARK)
+        assertThat(service.lastTheme).isEqualTo(Theme.DARK)
+    }
+
+    @Test
+    fun `persisted theme is loaded on first run`() = runTest(dispatcher) {
+        val service = FakeOnboardingService().apply { currentTheme = Theme.LIGHT }
+        val viewModel = OnboardingViewModel(service)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.theme).isEqualTo(Theme.LIGHT)
     }
 
     @Test
@@ -165,6 +189,8 @@ private class FakeOnboardingService : OnboardingService {
     var connectError: Throwable? = null
     var lastApiKey: String? = null
     var lastLabel: String? = null
+    var lastTheme: Theme? = null
+    var currentTheme: Theme = Theme.SYSTEM
     var loadCatalogCalls: Int = 0
 
     override fun providerOptions(): List<ProviderOption> = listOf(
@@ -183,6 +209,12 @@ private class FakeOnboardingService : OnboardingService {
             statusLabel = "Coming later",
         ),
     )
+
+    override suspend fun currentTheme(): Theme = currentTheme
+
+    override suspend fun setTheme(theme: Theme) {
+        lastTheme = theme
+    }
 
     override suspend fun loadCatalog(): List<ModelInfo> {
         loadCatalogCalls += 1

@@ -12,6 +12,8 @@ dependencies {
     implementation(project(":core:providers"))
     implementation(project(":core:datastore"))
     implementation(project(":core:network"))
+    implementation(project(":core:model"))
+    implementation(project(":feature:backup"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

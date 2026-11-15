@@ -54,6 +54,7 @@ fun ChatUiScaffold(
     contentWindowInsets: WindowInsets = WindowInsets.systemBars,
     onSubtitleClick: (() -> Unit)? = null,
     subtitleTestTag: String? = null,
+    showTopBar: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val scrollOffset = when {
@@ -79,15 +80,17 @@ fun ChatUiScaffold(
         modifier = modifier,
         contentWindowInsets = contentWindowInsets,
         topBar = {
-            LargeTitleBar(
-                title = title,
-                subtitle = subtitle,
-                navigationIcon = navigationIcon,
-                actions = actions,
-                collapseFraction = collapseFraction,
-                onSubtitleClick = onSubtitleClick,
-                subtitleTestTag = subtitleTestTag,
-            )
+            if (showTopBar) {
+                LargeTitleBar(
+                    title = title,
+                    subtitle = subtitle,
+                    navigationIcon = navigationIcon,
+                    actions = actions,
+                    collapseFraction = collapseFraction,
+                    onSubtitleClick = onSubtitleClick,
+                    subtitleTestTag = subtitleTestTag,
+                )
+            }
         },
         snackbarHost = snackbarHost,
         content = content,

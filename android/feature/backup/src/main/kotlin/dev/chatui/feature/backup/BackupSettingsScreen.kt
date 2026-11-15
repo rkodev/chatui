@@ -103,6 +103,7 @@ const val BACKUP_PASSPHRASE_WARNING: String =
 fun BackupSettingsRoute(
     service: BackupSettingsServiceLike,
     modifier: Modifier = Modifier,
+    setupMode: Boolean = false,
 ) {
     val viewModel: BackupViewModel = viewModel(
         factory = BackupViewModel.factory(service),
@@ -124,6 +125,7 @@ fun BackupSettingsRoute(
         onConfirmDeleteRemote = viewModel::onConfirmDeleteRemote,
         onDismissDialogs = viewModel::onDismissDialogs,
         onDismissError = viewModel::onDismissError,
+        setupMode = setupMode,
         modifier = modifier,
     )
 }
@@ -151,6 +153,7 @@ fun BackupSettingsScreen(
     onDismissDialogs: () -> Unit,
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier,
+    setupMode: Boolean = false,
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
@@ -304,91 +307,93 @@ fun BackupSettingsScreen(
                         }
                     }
                 }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(
-                    title = "Status",
-                    modifier = Modifier.testTag(BackupSettingsTestTags.Status),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(dimens.cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(dimens.space2),
+                if (!setupMode) {
+                    Spacer(Modifier.height(dimens.sectionGap))
+                    GroupedSection(
+                        title = "Status",
+                        modifier = Modifier.testTag(BackupSettingsTestTags.Status),
                     ) {
-                        StatusRow(
-                            label = "Last backup",
-                            value = formatBackupTimestamp(state.status?.lastBackupAt),
-                            tag = BackupSettingsTestTags.LastBackup,
-                        )
-                        StatusRow(
-                            label = "Pending changes",
-                            value = (state.status?.pendingChanges ?: 0).toString(),
-                            tag = BackupSettingsTestTags.PendingChanges,
-                        )
-                        StatusRow(
-                            label = "Storage usage",
-                            value = formatBackupBytes(state.status?.storageUsageBytes ?: 0),
-                            tag = BackupSettingsTestTags.StorageUsage,
-                        )
-                        StatusRow(
-                            label = "Last error",
-                            value = state.error ?: state.status?.lastError ?: "None",
-                            tag = BackupSettingsTestTags.LastError,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(
-                    title = "Actions",
-                    footer = "Restore merges remote data into this device by default. " +
-                        "Replace and delete require a typed confirmation.",
-                ) {
-                    Column(
-                        modifier = Modifier.padding(dimens.cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(dimens.space3),
-                    ) {
-                        PrimaryButton(
-                            text = if (state.busy == BackupAction.BACKUP) {
-                                "Backing up..."
-                            } else {
-                                "Back up now"
-                            },
-                            onClick = onBackupNow,
-                            enabled = !busy,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag(BackupSettingsTestTags.BackupNow),
-                        )
-                        SecondaryButton(
-                            text = if (state.busy == BackupAction.RESTORE) {
-                                "Restoring..."
-                            } else {
-                                "Restore from backup (merge)"
-                            },
-                            onClick = onRestoreMerge,
-                            enabled = !busy,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag(BackupSettingsTestTags.RestoreMerge),
-                        )
-                        SecondaryButton(
-                            text = "Restore and replace local data",
-                            onClick = onRequestRestoreReplace,
-                            enabled = !busy,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag(BackupSettingsTestTags.RestoreReplace),
-                        )
-                        TextButton(
-                            onClick = onRequestDeleteRemote,
-                            enabled = !busy,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = dimens.touchTargetMin)
-                                .testTag(BackupSettingsTestTags.DeleteRemote),
+                        Column(
+                            modifier = Modifier.padding(dimens.cardPadding),
+                            verticalArrangement = Arrangement.spacedBy(dimens.space2),
                         ) {
-                            Text(
-                                text = "Delete remote backup",
-                                color = colors.danger,
+                            StatusRow(
+                                label = "Last backup",
+                                value = formatBackupTimestamp(state.status?.lastBackupAt),
+                                tag = BackupSettingsTestTags.LastBackup,
                             )
+                            StatusRow(
+                                label = "Pending changes",
+                                value = (state.status?.pendingChanges ?: 0).toString(),
+                                tag = BackupSettingsTestTags.PendingChanges,
+                            )
+                            StatusRow(
+                                label = "Storage usage",
+                                value = formatBackupBytes(state.status?.storageUsageBytes ?: 0),
+                                tag = BackupSettingsTestTags.StorageUsage,
+                            )
+                            StatusRow(
+                                label = "Last error",
+                                value = state.error ?: state.status?.lastError ?: "None",
+                                tag = BackupSettingsTestTags.LastError,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(dimens.sectionGap))
+                    GroupedSection(
+                        title = "Actions",
+                        footer = "Restore merges remote data into this device by default. " +
+                            "Replace and delete require a typed confirmation.",
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(dimens.cardPadding),
+                            verticalArrangement = Arrangement.spacedBy(dimens.space3),
+                        ) {
+                            PrimaryButton(
+                                text = if (state.busy == BackupAction.BACKUP) {
+                                    "Backing up..."
+                                } else {
+                                    "Back up now"
+                                },
+                                onClick = onBackupNow,
+                                enabled = !busy,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag(BackupSettingsTestTags.BackupNow),
+                            )
+                            SecondaryButton(
+                                text = if (state.busy == BackupAction.RESTORE) {
+                                    "Restoring..."
+                                } else {
+                                    "Restore from backup (merge)"
+                                },
+                                onClick = onRestoreMerge,
+                                enabled = !busy,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag(BackupSettingsTestTags.RestoreMerge),
+                            )
+                            SecondaryButton(
+                                text = "Restore and replace local data",
+                                onClick = onRequestRestoreReplace,
+                                enabled = !busy,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag(BackupSettingsTestTags.RestoreReplace),
+                            )
+                            TextButton(
+                                onClick = onRequestDeleteRemote,
+                                enabled = !busy,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = dimens.touchTargetMin)
+                                    .testTag(BackupSettingsTestTags.DeleteRemote),
+                            ) {
+                                Text(
+                                    text = "Delete remote backup",
+                                    color = colors.danger,
+                                )
+                            }
                         }
                     }
                 }
@@ -412,7 +417,7 @@ fun BackupSettingsScreen(
         }
     }
 
-    if (state.showDeleteDialog) {
+    if (!setupMode && state.showDeleteDialog) {
         ConfirmationDialog(
             title = "Delete remote backup",
             body = "This deletes every encrypted backup object in the configured " +
@@ -429,7 +434,7 @@ fun BackupSettingsScreen(
         )
     }
 
-    if (state.showReplaceDialog) {
+    if (!setupMode && state.showReplaceDialog) {
         ConfirmationDialog(
             title = "Replace local data",
             body = "This clears local conversations and restores the remote backup. " +

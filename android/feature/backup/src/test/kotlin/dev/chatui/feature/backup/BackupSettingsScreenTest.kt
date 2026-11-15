@@ -82,6 +82,47 @@ class BackupSettingsScreenTest {
     }
 
     @Test
+    fun `setup mode hides management actions and status`() {
+        composeRule.setContent {
+            ChatUiTheme {
+                BackupSettingsScreen(
+                    state = state(),
+                    onFormChanged = {},
+                    onTestConnection = {},
+                    onEnableChanged = {},
+                    onBackupNow = {},
+                    onRestoreMerge = {},
+                    onRequestRestoreReplace = {},
+                    onReplaceConfirmationChanged = {},
+                    onConfirmRestoreReplace = {},
+                    onRequestDeleteRemote = {},
+                    onDeleteConfirmationChanged = {},
+                    onConfirmDeleteRemote = {},
+                    onDismissDialogs = {},
+                    onDismissError = {},
+                    setupMode = true,
+                )
+            }
+        }
+
+        listOf(
+            BackupSettingsTestTags.Status,
+            BackupSettingsTestTags.BackupNow,
+            BackupSettingsTestTags.RestoreMerge,
+            BackupSettingsTestTags.RestoreReplace,
+            BackupSettingsTestTags.DeleteRemote,
+        ).forEach { tag ->
+            composeRule.onNodeWithTag(tag).assertDoesNotExist()
+        }
+        composeRule.onNodeWithTag(BackupSettingsTestTags.Enable)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(BackupSettingsTestTags.Passphrase)
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun `enable switch reports changes`() {
         var enabled: Boolean? = null
         composeRule.setContent {

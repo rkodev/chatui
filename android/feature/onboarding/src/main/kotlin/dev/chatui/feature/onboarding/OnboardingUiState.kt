@@ -1,9 +1,12 @@
 package dev.chatui.feature.onboarding
 
+import dev.chatui.core.model.Theme
+
 /** Steps in the first-run flow. */
 enum class OnboardingStep {
     WELCOME,
     KEY_ENTRY,
+    BACKUP,
 }
 
 /** A provider preset shown in the onboarding picker. */
@@ -47,6 +50,7 @@ data class OnboardingErrorCopy(
  */
 data class OnboardingUiState(
     val step: OnboardingStep = OnboardingStep.WELCOME,
+    val theme: Theme = Theme.SYSTEM,
     val providers: List<ProviderOption> = emptyList(),
     val selectedProviderId: String = "openrouter",
     val apiKey: String = "",

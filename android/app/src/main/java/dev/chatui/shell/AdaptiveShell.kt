@@ -64,6 +64,7 @@ fun AdaptiveShell(
     mainContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed),
+    sidebarVisible: Boolean = true,
 ) {
     if (expanded) {
         Row(
@@ -71,15 +72,17 @@ fun AdaptiveShell(
                 .fillMaxSize()
                 .testTag(ShellTestTags.ExpandedLayout),
         ) {
-            Box(
-                modifier = Modifier
-                    .width(ShellSidebarWidth)
-                    .fillMaxHeight()
-                    .testTag(ShellTestTags.Sidebar),
-            ) {
-                sidebar()
+            if (sidebarVisible) {
+                Box(
+                    modifier = Modifier
+                        .width(ShellSidebarWidth)
+                        .fillMaxHeight()
+                        .testTag(ShellTestTags.Sidebar),
+                ) {
+                    sidebar()
+                }
+                VerticalDivider()
             }
-            VerticalDivider()
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -97,25 +100,28 @@ fun AdaptiveShell(
                 .fillMaxSize()
                 .testTag(ShellTestTags.CompactLayout),
             scrimColor = colors.fgPrimary.copy(alpha = 0.32f),
+            gesturesEnabled = sidebarVisible,
             drawerContent = {
-                ModalDrawerSheet(
-                    // The shell already consumed safe-drawing insets before
-                    // rendering the drawer, so the sheet must not add them
-                    // again.
-                    windowInsets = WindowInsets(0, 0, 0, 0),
-                    drawerShape = RoundedCornerShape(
-                        topEnd = 16.dp,
-                        bottomEnd = 16.dp,
-                    ),
-                    drawerContainerColor = colors.bgCanvas,
-                    modifier = Modifier.testTag(ShellTestTags.Drawer),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag(ShellTestTags.Sidebar),
+                if (sidebarVisible) {
+                    ModalDrawerSheet(
+                        // The shell already consumed safe-drawing insets before
+                        // rendering the drawer, so the sheet must not add them
+                        // again.
+                        windowInsets = WindowInsets(0, 0, 0, 0),
+                        drawerShape = RoundedCornerShape(
+                            topEnd = 16.dp,
+                            bottomEnd = 16.dp,
+                        ),
+                        drawerContainerColor = colors.bgCanvas,
+                        modifier = Modifier.testTag(ShellTestTags.Drawer),
                     ) {
-                        sidebar()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag(ShellTestTags.Sidebar),
+                        ) {
+                            sidebar()
+                        }
                     }
                 }
             },

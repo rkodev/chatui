@@ -13,6 +13,7 @@ import dev.chatui.shell.ChatDestination
 import dev.chatui.shell.ProviderDestination
 import dev.chatui.shell.SettingsDestination
 import dev.chatui.shell.ShellDestination
+import dev.chatui.shell.isIsolatedShellRoute
 import dev.chatui.shell.resolveShellStartDestination
 import dev.chatui.shell.shellDestinations
 import dev.chatui.shell.shellStartDestination
@@ -89,6 +90,14 @@ class ShellNavigationTest {
     fun `first run starts on onboarding`() {
         assertThat(shellStartDestination(AndroidSettings()))
             .isEqualTo(ShellDestination.Onboarding.route)
+    }
+
+    @Test
+    fun `onboarding is isolated from the shell chrome`() {
+        assertThat(isIsolatedShellRoute(ShellDestination.Onboarding.route)).isTrue()
+        assertThat(isIsolatedShellRoute(ShellDestination.Conversations.route)).isFalse()
+        assertThat(isIsolatedShellRoute("chat/conversation-1")).isFalse()
+        assertThat(isIsolatedShellRoute(null)).isFalse()
     }
 
     @Test

@@ -202,6 +202,10 @@ fun ShellScaffold(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val currentDestination = ShellDestination.entries.firstOrNull { it.matches(currentRoute) }
+    // Onboarding is a first-run, isolated experience: no top bar, menu button,
+    // sidebar, or drawer. The start destination is used until the NavHost has
+    // reported its first back-stack entry so the chrome never flashes on launch.
+    val isolated = isIsolatedShellRoute(currentRoute ?: startDestination)
     val service = conversationService ?: rememberConversationService()
     val shortcuts = chatShortcutState ?: remember { ChatShortcutState() }
     val conversationFlow = remember(service) { service.observeConversations() }
@@ -292,12 +296,12 @@ fun ShellScaffold(
         LocalChatTopBarState provides topBarState,
         LocalSnackbarHostState provides snackbarHostState,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag(ShellTestTags.Root)
-                .shellShortcutHandler(actions),
-        ) {
+        val rootModifier = Modifier
+            .fillMaxSize()
+            .testTag(ShellTestTags.Root)
+            .let { base -> if (isolated) base else base.shellShortcutHandler(actions) }
+
+        Box(modifier = rootModifier) {
             ChatUiScaffold(
                 modifier = modifier.fillMaxSize(),
                 // Consume safe-drawing once at the shell boundary. The large
@@ -305,6 +309,7 @@ fun ShellScaffold(
                 // content receives the remaining bottom and horizontal insets
                 // through `innerPadding`.
                 contentWindowInsets = windowInsets,
+                showTopBar = !isolated,
                 title = topBarState.title ?: currentDestination?.title ?: "ChatUI",
                 subtitle = topBarState.subtitle,
                 scrollState = scrollState,
@@ -317,7 +322,7 @@ fun ShellScaffold(
                 snackbarHost = {
                     ChatUiSnackbarHost(hostState = snackbarHostState)
                 },
-                navigationIcon = if (!expanded) {
+                navigationIcon = if (!expanded && !isolated) {
                     {
                         IconAction(
                             icon = Icons.Rounded.Menu,
@@ -330,54 +335,58 @@ fun ShellScaffold(
                     null
                 },
                 actions = {
-                    topBarState.onShare?.let { onShare ->
-                        Box {
-                            IconAction(
-                                icon = Icons.Rounded.Share,
-                                contentDescription = "Share conversation",
-                                onClick = { shareMenuExpanded = true },
-                                modifier = Modifier.testTag(ChatScreenTestTags.Share),
-                            )
-                            DropdownMenu(
-                                expanded = shareMenuExpanded,
-                                onDismissRequest = { shareMenuExpanded = false },
-                                modifier = Modifier.testTag(ChatScreenTestTags.ShareMenu),
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Share as text") },
-                                    onClick = {
-                                        shareMenuExpanded = false
-                                        onShare(ConversationShareFormat.TEXT)
-                                    },
-                                    modifier = Modifier.testTag(ChatScreenTestTags.ShareText),
+                    if (!isolated) {
+                        topBarState.onShare?.let { onShare ->
+                            Box {
+                                IconAction(
+                                    icon = Icons.Rounded.Share,
+                                    contentDescription = "Share conversation",
+                                    onClick = { shareMenuExpanded = true },
+                                    modifier = Modifier.testTag(ChatScreenTestTags.Share),
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("Share as Markdown") },
-                                    onClick = {
-                                        shareMenuExpanded = false
-                                        onShare(ConversationShareFormat.MARKDOWN)
-                                    },
-                                    modifier = Modifier.testTag(ChatScreenTestTags.ShareMarkdown),
-                                )
+                                DropdownMenu(
+                                    expanded = shareMenuExpanded,
+                                    onDismissRequest = { shareMenuExpanded = false },
+                                    modifier = Modifier.testTag(ChatScreenTestTags.ShareMenu),
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Share as text") },
+                                        onClick = {
+                                            shareMenuExpanded = false
+                                            onShare(ConversationShareFormat.TEXT)
+                                        },
+                                        modifier = Modifier.testTag(ChatScreenTestTags.ShareText),
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Share as Markdown") },
+                                        onClick = {
+                                            shareMenuExpanded = false
+                                            onShare(ConversationShareFormat.MARKDOWN)
+                                        },
+                                        modifier = Modifier.testTag(
+                                            ChatScreenTestTags.ShareMarkdown,
+                                        ),
+                                    )
+                                }
                             }
                         }
-                    }
-                    topBarState.onOpenSettings?.let { onSettings ->
+                        topBarState.onOpenSettings?.let { onSettings ->
+                            IconAction(
+                                icon = Icons.Rounded.Settings,
+                                contentDescription = "Conversation settings",
+                                onClick = onSettings,
+                                modifier = Modifier.testTag(
+                                    ChatScreenTestTags.ConversationSettings,
+                                ),
+                            )
+                        }
                         IconAction(
-                            icon = Icons.Rounded.Settings,
-                            contentDescription = "Conversation settings",
-                            onClick = onSettings,
-                            modifier = Modifier.testTag(
-                                ChatScreenTestTags.ConversationSettings,
-                            ),
+                            icon = Icons.Rounded.Keyboard,
+                            contentDescription = "Keyboard shortcuts",
+                            onClick = { helpOpen = true },
+                            modifier = Modifier.testTag(ShellTestTags.ShortcutHelpButton),
                         )
                     }
-                    IconAction(
-                        icon = Icons.Rounded.Keyboard,
-                        contentDescription = "Keyboard shortcuts",
-                        onClick = { helpOpen = true },
-                        modifier = Modifier.testTag(ShellTestTags.ShortcutHelpButton),
-                    )
                 },
             ) { innerPadding ->
                 // Fallback drawer handler. ModalNavigationDrawer registers its
@@ -396,6 +405,7 @@ fun ShellScaffold(
                 AdaptiveShell(
                     expanded = expanded,
                     drawerState = drawerState,
+                    sidebarVisible = !isolated,
                     modifier = Modifier
                         .padding(innerPadding)
                         // Mark the shell padding as consumed so descendants (for
@@ -426,6 +436,10 @@ fun ShellScaffold(
         }
     }
 }
+
+/** True when the shell should render only the destination content. */
+internal fun isIsolatedShellRoute(route: String?): Boolean =
+    route == ShellDestination.Onboarding.route
 
 @Composable
 private fun rememberConversationService(): ConversationService {

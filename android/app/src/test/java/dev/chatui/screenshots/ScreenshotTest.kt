@@ -260,7 +260,7 @@ class ScreenshotTest {
     fun onboardingCompletionPhone() = captureBoth("onboarding_completion_phone") {
         OnboardingScreen(
             state = onboardingState(
-                step = OnboardingStep.KEY_ENTRY,
+                step = OnboardingStep.BACKUP,
                 apiKey = "sk-or-v1-example-not-a-real-key",
                 connected = true,
                 catalog = CatalogUiState.Ready(
@@ -282,7 +282,7 @@ class ScreenshotTest {
     fun onboardingCompletionTablet() = captureBoth("onboarding_completion_tablet") {
         OnboardingScreen(
             state = onboardingState(
-                step = OnboardingStep.KEY_ENTRY,
+                step = OnboardingStep.BACKUP,
                 apiKey = "sk-or-v1-example-not-a-real-key",
                 connected = true,
                 catalog = CatalogUiState.Ready(
