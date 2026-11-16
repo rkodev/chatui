@@ -136,7 +136,7 @@ is read-only unless a tightly coupled integration fix is explicitly required.
 | Order | Task | Status | Depends on |
 | --- | --- | --- | --- |
 | 1 | [UX-00.1 Functional inventory and decisions](UX-00.1-functional-inventory.md) | Complete | none |
-| 2 | [UX-00.2 Fixtures and visual baseline](UX-00.2-fixtures-and-visual-baseline.md) | Not started | UX-00.1 |
+| 2 | [UX-00.2 Fixtures and visual baseline](UX-00.2-fixtures-and-visual-baseline.md) | Blocked | UX-00.1 |
 | 3 | [UX-00.3 Reference-device performance baseline](UX-00.3-device-performance-baseline.md) | Not started | UX-00.2 |
 | 4 | [UX-01.1 Semantic colors and contrast](UX-01.1-colors-and-contrast.md) | Not started | UX-00.3 |
 | 5 | [UX-01.2 Density, spacing, and touch targets](UX-01.2-density-and-touch-targets.md) | Not started | UX-00.3 |
