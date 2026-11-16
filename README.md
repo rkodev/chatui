@@ -64,6 +64,41 @@ make contracts-check
 Run `make help` for the full target list. Shared contracts are established in
 M0; `make contracts-check` validates providers, schemas, fixtures, and parity.
 
+## Task automation with Copilot
+
+With Python 3.10+ and an authenticated GitHub Copilot CLI on `PATH`, use the
+Copilot counterpart to `scripts\run-tasks` from PowerShell:
+
+```powershell
+# Preview the next eligible task without starting Copilot or changing files.
+python .\scripts\run-copilot-tasks.py .\docs\operations\android-minimalist-design-plan --dry-run
+
+# Execute one task, explicitly approving tool use.
+python .\scripts\run-copilot-tasks.py .\docs\operations\android-minimalist-design-plan --max-tasks 1 --allow-all-tools
+```
+
+The default model is **`gpt-6.1-sol`** (GPT-6.1). Override it with `--model`
+or `COPILOT_MODEL`; the command-line option takes precedence. The default task
+folder is `docs\operations\M0`. `--max-tasks` / `MAX_TASKS` limits attempts
+(`0` means unlimited); `--include-in-progress` / `INCLUDE_IN_PROGRESS=1`
+allows resuming eligible work.
+
+Each task gets a fresh noninteractive session, using the existing
+`next-task` dependency selector and the Markdown workflow in
+`.opencode\agent\task-runner.md`, including scoped per-task commits. No
+OpenCode agent installation is required. Tasks must finish as `Complete` or
+`Blocked`; both states are mirrored into the task index. Blocked dependencies
+are not bypassed, and failed or unfinished sessions stop the batch.
+
+No extra permissions or folder trust are granted by default. Review existing
+Copilot permissions before running; use repeatable `--allow-tool`, `--deny-tool`,
+and `--allow-url` rules, or explicitly opt into `--allow-all-tools` as above.
+Tool approval does not grant all paths or URLs. Add `--trust-folder` only after
+reviewing the checkout configuration if it is not already trusted. OpenCode
+YAML permission settings are not imported as Copilot permissions. An optional
+`--agent` selects an installed Copilot custom agent; it is not assumed to exist.
+Use `--help` for all options.
+
 ## Security
 
 Never commit API keys, provider credentials, signing material, keystores, APKs
