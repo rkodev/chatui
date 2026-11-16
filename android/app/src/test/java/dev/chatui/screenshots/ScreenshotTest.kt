@@ -96,7 +96,11 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Roborazzi goldens for the key M3 screens.
+ * Standalone Roborazzi goldens for the key M3 screens.
+ *
+ * ChatScreen is composed directly and ScreenshotSidebar is not ShellSidebar.
+ * These fixtures are not production-shell/navigation coverage; see
+ * ShellBaselineScreenshotTest for the pre-redesign actual-shell captures.
  *
  * Every screen is captured in light and dark. Each test method pins the
  * phone or tablet qualifiers so the same screen produces four goldens:
