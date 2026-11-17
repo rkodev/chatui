@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.datastore.settings.SettingsDataStore
+import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.Density
 import dev.chatui.core.model.ReasoningEffort
@@ -13,12 +14,15 @@ import dev.chatui.core.model.Theme
 import dev.chatui.feature.providers.ModelDefaults
 import dev.chatui.feature.providers.ProviderManagementService
 import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.coVerify
 import io.mockk.mockk
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -181,5 +185,123 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertThat(viewModel.state.value.error).isEqualTo("nope")
+    }
+
+    @Test
+    fun `initial and unrelated emissions are quiet while every rapid edit is persisted`() = runTest(dispatcher) {
+        val viewModel = SettingsViewModel(store, service)
+        advanceUntilIdle()
+        store.setLastActiveConversation("another-chat")
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.savedRevision).isEqualTo(0)
+
+        viewModel.onThemeChanged(Theme.DARK)
+        viewModel.onDensityChanged(Density.COMPACT)
+        viewModel.onDefaultSystemPromptChanged("one")
+        viewModel.onDefaultSystemPromptChanged("two")
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.savedRevision).isEqualTo(4)
+        assertThat(viewModel.state.value.pendingSaves).isEqualTo(0)
+        assertThat(store.current().defaultSystemPrompt).isEqualTo("two")
+        assertThat(store.current().theme).isEqualTo(Theme.DARK)
+        assertThat(SettingsViewModel(store, service).state.value.savedRevision).isEqualTo(0)
+    }
+
+    @Test
+    fun `rapid parameter patches preserve each other and external extras`() = runTest(dispatcher) {
+        val viewModel = SettingsViewModel(store, service)
+        advanceUntilIdle()
+        viewModel.onTemperatureChanged("0.25")
+        viewModel.onTopPChanged("0.8")
+        viewModel.onMaxOutputTokensChanged("512")
+        viewModel.onStopChanged("END\nDONE")
+        viewModel.onReasoningEffortChanged(ReasoningEffort.HIGH)
+        viewModel.onStreamingChanged(false)
+        advanceUntilIdle()
+
+        val params = store.current().defaultParams
+        assertThat(params.temperature).isEqualTo(0.25)
+        assertThat(params.topP).isEqualTo(0.8)
+        assertThat(params.maxOutputTokens).isEqualTo(512)
+        assertThat(params.stop).containsExactly("END", "DONE").inOrder()
+        assertThat(params.reasoningEffort).isEqualTo(ReasoningEffort.HIGH)
+        assertThat(params.streaming).isFalse()
+    }
+
+    @Test
+    fun `invalid numeric input never clears clamps or writes zero and blank resets to default`() = runTest(dispatcher) {
+        store.setDefaultParams(AndroidSettings.DEFAULT_CHAT_PARAMS.copy(temperature = 0.4, maxOutputTokens = 512))
+        val viewModel = SettingsViewModel(store, service)
+        advanceUntilIdle()
+        listOf("garbage", "-1", "3", "NaN", "Infinity").forEach { viewModel.onTemperatureChanged(it) }
+        listOf("0", "-1", "1.5", "2147483648").forEach { viewModel.onMaxOutputTokensChanged(it) }
+        viewModel.onTopPChanged("2")
+        advanceUntilIdle()
+        assertThat(store.current().defaultParams.temperature).isEqualTo(0.4)
+        assertThat(store.current().defaultParams.maxOutputTokens).isEqualTo(512)
+        assertThat(store.current().defaultParams.topP).isNull()
+        assertThat(viewModel.state.value.savedRevision).isEqualTo(0)
+        assertThat(viewModel.state.value.fieldErrors).hasSize(3)
+
+        viewModel.onTemperatureChanged("")
+        viewModel.onTopPChanged("0")
+        viewModel.onMaxOutputTokensChanged(" ")
+        advanceUntilIdle()
+        assertThat(store.current().defaultParams.temperature).isNull()
+        assertThat(store.current().defaultParams.topP).isEqualTo(0.0)
+        assertThat(store.current().defaultParams.maxOutputTokens).isNull()
+        assertThat(viewModel.state.value.fieldErrors).isEmpty()
+    }
+
+    @Test
+    fun `failed save remains actionable after an unrelated success until retry succeeds`() = runTest(dispatcher) {
+        val failingStore = mockk<SettingsDataStore>()
+        every { failingStore.settings } returns MutableStateFlow(AndroidSettings())
+        var failed = false
+        coEvery { failingStore.setTheme(Theme.DARK) } coAnswers {
+            if (!failed) {
+                failed = true
+                throw IllegalStateException("Storage is full")
+            }
+        }
+        coEvery { failingStore.setDensity(Density.COMPACT) } returns Unit
+        val viewModel = SettingsViewModel(failingStore, service)
+        advanceUntilIdle()
+
+        viewModel.onThemeChanged(Theme.DARK)
+        viewModel.onDensityChanged(Density.COMPACT)
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.error).isEqualTo("Storage is full")
+        viewModel.onPickerReturned()
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.error).isEqualTo("Storage is full")
+        viewModel.onRetry()
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.error).isNull()
+        coVerify(exactly = 2) { failingStore.setTheme(Theme.DARK) }
+        coVerify(exactly = 1) { failingStore.setDensity(Density.COMPACT) }
+    }
+
+    @Test
+    fun `picker return refreshes persisted defaults and warnings without announcing a local save`() = runTest(dispatcher) {
+        coEvery { service.getDefaults() } coAnswers {
+            val settings = store.current()
+            ModelDefaults(settings.defaultProviderId, settings.defaultModelId)
+        }
+        coEvery { service.listModels(any()) } returns emptyList()
+        coEvery { service.getDefaultModelWarning() } returns "Selected model is hidden."
+        val viewModel = SettingsViewModel(store, service)
+        advanceUntilIdle()
+
+        store.setDefaultProvider("provider-2", "model-2")
+        viewModel.onPickerReturned()
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.settings.defaultProviderId).isEqualTo("provider-2")
+        assertThat(viewModel.state.value.settings.defaultModelId).isEqualTo("model-2")
+        assertThat(viewModel.state.value.warning).isEqualTo("Selected model is hidden.")
+        assertThat(viewModel.state.value.savedRevision).isEqualTo(0)
     }
 }

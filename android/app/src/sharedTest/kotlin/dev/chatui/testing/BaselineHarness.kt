@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -14,6 +16,8 @@ import androidx.compose.ui.unit.Density
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
 import dagger.hilt.internal.GeneratedComponent
 import dagger.hilt.internal.GeneratedComponentManager
 import dev.chatui.core.database.ChatUiDatabase
@@ -43,11 +47,23 @@ import dev.chatui.feature.conversations.export.ChatExport
 import dev.chatui.feature.conversations.importer.DataStoreImportSettingsStore
 import dev.chatui.feature.conversations.importer.ImportService
 import dev.chatui.feature.conversations.importer.toAndroidSettings
+import dev.chatui.feature.providers.ProviderManagementEntryPoint
+import dev.chatui.feature.providers.ProviderManagementService
+import dev.chatui.feature.settings.SettingsEntryPoint
+import dev.chatui.feature.settings.DataControlsService
+import dev.chatui.feature.backup.BackupEntryPoint
+import dev.chatui.feature.backup.BackupSettingsService
+import dev.chatui.feature.onboarding.OnboardingEntryPoint
+import dev.chatui.feature.onboarding.OnboardingService
+import dev.chatui.feature.conversations.export.ExportEntryPoint
+import dev.chatui.feature.conversations.export.ExportService
+import dev.chatui.feature.conversations.importer.ImportEntryPoint
 import dev.chatui.shell.ChatUiApp
 import java.io.File
 import java.nio.file.Files
 import java.time.Clock
 import java.time.ZoneOffset
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -61,6 +77,7 @@ class BaselineHarness private constructor(
     val dependencies: ChatDependencies,
     val adapter: FakeProviderAdapter,
     val root: File,
+    val services: BaselineServices,
     private val database: ChatUiDatabase,
 ) : AutoCloseable {
     override fun close() {
@@ -76,6 +93,7 @@ class BaselineHarness private constructor(
             startConversationId: String? = null,
             missingConfiguration: Boolean = false,
             onDisk: Boolean = false,
+            onboardingCompleted: Boolean = true,
         ): BaselineHarness {
             val root = Files.createTempDirectory(context.cacheDir.toPath(), "ux-baseline-").toFile()
             val database = if (onDisk) {
@@ -86,7 +104,10 @@ class BaselineHarness private constructor(
             try {
                 val archive = BaselineFixtures.archive(longHistory, emptyHistory)
                 val settings = archive.settings.toAndroidSettings()
-                    .copy(lastActiveConversationId = startConversationId)
+                    .copy(
+                        lastActiveConversationId = startConversationId,
+                        onboardingCompleted = onboardingCompleted,
+                    )
                 val settingsStore = SettingsDataStore(BaselinePreferences())
                 settingsStore.save(settings)
                 val storage = AttachmentStorage(root)
@@ -153,6 +174,7 @@ class BaselineHarness private constructor(
                     ),
                     adapter = adapter,
                     root = root,
+                    services = BaselineServices(database, storage, settingsStore, clock),
                     database = database,
                 )
             } catch (error: Throwable) {
@@ -171,14 +193,14 @@ class BaselineHarness private constructor(
 @Composable
 fun BaselineShell(
     harness: BaselineHarness,
-    theme: Theme = Theme.LIGHT,
+    theme: Theme? = Theme.LIGHT,
     fontScale: Float = 1f,
-    densityMode: UiDensity = harness.settings.density,
+    densityMode: UiDensity? = harness.settings.density,
     windowInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
     val context = LocalContext.current
     val application = remember(context, harness) {
-        BaselineApplication(context.applicationContext, harness.dependencies)
+        BaselineApplication(context.applicationContext, harness)
     }
     val injectedContext = remember(context, application) {
         object : ContextWrapper(context) {
@@ -186,12 +208,13 @@ fun BaselineShell(
         }
     }
     val density = LocalDensity.current
+    val settings by harness.services.settings.settings.collectAsState(initial = harness.settings)
     CompositionLocalProvider(
         LocalContext provides injectedContext,
         LocalDensity provides Density(density.density, fontScale),
     ) {
         ChatUiApp(
-            settings = harness.settings.copy(theme = theme, density = densityMode),
+            settings = settings.copy(theme = theme ?: settings.theme, density = densityMode ?: settings.density),
             conversationService = harness.conversations,
             chatDrafts = harness.dependencies.drafts,
             windowInsets = windowInsets,
@@ -201,14 +224,22 @@ fun BaselineShell(
 
 private class BaselineApplication(
     context: Context,
-    dependencies: ChatDependencies,
-) : Application(), GeneratedComponentManager<GeneratedComponent> {
+    harness: BaselineHarness,
+) : Application(), GeneratedComponentManager<GeneratedComponent>, SingletonImageLoader.Factory {
     init {
         attachBaseContext(context)
     }
 
-    private val component = object : GeneratedComponent, ChatEntryPoint {
-        override fun chatDependencies(): ChatDependencies = dependencies
+    private val component = object : GeneratedComponent, ChatEntryPoint, SettingsEntryPoint,
+        ProviderManagementEntryPoint, BackupEntryPoint, OnboardingEntryPoint, ExportEntryPoint, ImportEntryPoint {
+        override fun chatDependencies(): ChatDependencies = harness.dependencies
+        override fun settingsDataStore(): SettingsDataStore = harness.services.settings
+        override fun dataControlsService(): DataControlsService = harness.services.data
+        override fun providerManagementService(): ProviderManagementService = harness.services.management
+        override fun backupSettingsService(): BackupSettingsService = harness.services.backup
+        override fun onboardingService(): OnboardingService = harness.services.onboarding
+        override fun exportService(): ExportService = harness.services.exporter
+        override fun importService(): ImportService = harness.services.importer
     }
 
     override fun getApplicationContext(): Context = this
@@ -218,6 +249,12 @@ private class BaselineApplication(
         if (name == Context.CONNECTIVITY_SERVICE) null else super.getSystemService(name)
 
     override fun generatedComponent(): GeneratedComponent = component
+
+    override fun newImageLoader(context: Context): ImageLoader =
+        ImageLoader.Builder(baseContext.applicationContext)
+            // Serialize fixture result publication with Compose; fetching/decoding still use IO.
+            .interceptorCoroutineContext(Dispatchers.Main.immediate)
+            .build()
 }
 
 private class BaselinePreferences : DataStore<Preferences> {

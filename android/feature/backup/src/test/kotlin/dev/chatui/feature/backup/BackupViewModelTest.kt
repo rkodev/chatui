@@ -180,7 +180,7 @@ class BackupViewModelTest {
 
     @Test
     fun `back up now calls the sync engine`() = runTest(dispatcher) {
-        val service = FakeBackupService()
+        val service = configuredService()
         val viewModel = BackupViewModel(service)
         advanceUntilIdle()
         viewModel.onFormChanged(validForm())
@@ -194,7 +194,7 @@ class BackupViewModelTest {
 
     @Test
     fun `restore defaults to merge`() = runTest(dispatcher) {
-        val service = FakeBackupService()
+        val service = configuredService()
         val viewModel = BackupViewModel(service)
         advanceUntilIdle()
         viewModel.onFormChanged(validForm())
@@ -208,7 +208,7 @@ class BackupViewModelTest {
 
     @Test
     fun `replace restore requires the typed confirmation`() = runTest(dispatcher) {
-        val service = FakeBackupService()
+        val service = configuredService()
         val viewModel = BackupViewModel(service)
         advanceUntilIdle()
         viewModel.onFormChanged(validForm())
@@ -233,7 +233,7 @@ class BackupViewModelTest {
 
     @Test
     fun `delete remote requires the typed confirmation`() = runTest(dispatcher) {
-        val service = FakeBackupService()
+        val service = configuredService()
         val viewModel = BackupViewModel(service)
         advanceUntilIdle()
         viewModel.onFormChanged(validForm())
@@ -254,7 +254,7 @@ class BackupViewModelTest {
 
     @Test
     fun `actions require a passphrase`() = runTest(dispatcher) {
-        val service = FakeBackupService()
+        val service = configuredService()
         val viewModel = BackupViewModel(service)
         advanceUntilIdle()
         viewModel.onFormChanged(validForm().copy(passphrase = ""))
@@ -264,6 +264,79 @@ class BackupViewModelTest {
 
         assertThat(viewModel.state.value.error).isEqualTo("Passphrase is required.")
         assertThat(service.backupCalls).isEqualTo(0)
+    }
+
+    @Test
+    fun `failed first backup still reports the configuration that was committed and enabled`() = runTest(dispatcher) {
+        val service = FakeBackupService().apply { backupError = IllegalStateException("Offline") }
+        val viewModel = BackupViewModel(service)
+        advanceUntilIdle()
+        viewModel.onFormChanged(validForm())
+        viewModel.onEnableChanged(true)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.configured).isTrue()
+        assertThat(viewModel.state.value.enabled).isTrue()
+        assertThat(viewModel.state.value.configurationEdited).isFalse()
+        assertThat(viewModel.state.value.error).isEqualTo("Offline")
+        assertThat(viewModel.state.value.message).isNull()
+    }
+
+    @Test
+    fun `testing edited configuration never commits or overwrites running configuration`() = runTest(dispatcher) {
+        val service = configuredService().apply { testError = IllegalStateException("Connection refused") }
+        val viewModel = BackupViewModel(service)
+        advanceUntilIdle()
+        val edited = viewModel.state.value.form.copy(endpoint = "https://edited.invalid", passphrase = "invented")
+        viewModel.onFormChanged(edited)
+        viewModel.onTestConnection()
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.form).isEqualTo(edited)
+        assertThat(viewModel.state.value.configurationEdited).isTrue()
+        assertThat(service.enabledCalls).isEmpty()
+        viewModel.onBackupNow()
+        advanceUntilIdle()
+        assertThat(service.backupCalls).isEqualTo(0)
+        assertThat(viewModel.state.value.error).contains("Apply")
+    }
+
+    @Test
+    fun `manual action after reload unlocks committed configuration without saving edits`() = runTest(dispatcher) {
+        val service = configuredService()
+        val viewModel = BackupViewModel(service)
+        advanceUntilIdle()
+        viewModel.onFormChanged(viewModel.state.value.form.copy(passphrase = "invented passphrase"))
+        viewModel.onBackupNow()
+        advanceUntilIdle()
+        assertThat(service.passphrases).containsExactly("invented passphrase")
+        assertThat(service.enabledCalls).isEmpty()
+        assertThat(viewModel.state.value.configurationEdited).isFalse()
+        assertThat(service.backupCalls).isEqualTo(1)
+    }
+
+    @Test
+    fun `cancelling destructive recovery clears phrases and never invokes the service`() = runTest(dispatcher) {
+        val service = configuredService()
+        val viewModel = BackupViewModel(service)
+        advanceUntilIdle()
+        viewModel.onRequestRestoreReplace()
+        viewModel.onReplaceConfirmationChanged(RESTORE_REPLACE_CONFIRMATION)
+        viewModel.onDismissDialogs()
+        viewModel.onRequestDeleteRemote()
+        viewModel.onDeleteConfirmationChanged(DELETE_REMOTE_CONFIRMATION)
+        viewModel.onDismissDialogs()
+        advanceUntilIdle()
+        assertThat(service.restoreRequests).isEmpty()
+        assertThat(service.deleteConfirmations).isEmpty()
+        assertThat(viewModel.state.value.replaceConfirmation).isEmpty()
+        assertThat(viewModel.state.value.deleteConfirmation).isEmpty()
+    }
+
+    private fun configuredService() = FakeBackupService().apply {
+        snapshot = BackupSettingsSnapshot(
+            config = config(enabled = true),
+            credentials = BackupCredentials(accessKeyId = "AKIA", secretAccessKey = "secret"),
+        )
     }
 
     private fun validForm() = BackupFormValues(
@@ -306,6 +379,8 @@ private class FakeBackupService : BackupSettingsServiceLike {
     val enabledCalls = mutableListOf<Boolean>()
     val restoreRequests = mutableListOf<RestoreRequest>()
     val deleteConfirmations = mutableListOf<String>()
+    val passphrases = mutableListOf<String>()
+    override fun usePassphrase(passphrase: String) { passphrases += passphrase }
 
     override suspend fun load(): BackupSettingsSnapshot = snapshot
 

@@ -14,21 +14,35 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -91,12 +105,19 @@ object BackupSettingsTestTags {
     const val PassphraseWarning = "backup-passphrase-warning"
     const val SetupCancel = "backup-setup-cancel"
     const val SetupComplete = "backup-setup-complete"
+    const val Configuration = "backup-configuration"
+    const val ConfigurationBack = "backup-configuration-back"
+    const val Configure = "backup-configure"
+    const val ApplyConfiguration = "backup-apply-configuration"
+    const val Details = "backup-details"
+    const val AdvancedRecovery = "backup-advanced-recovery"
 }
 
 /** Client-side statement shown on the backup screen. */
 const val BACKUP_CLIENT_SIDE_STATEMENT: String =
-    "Credentials and your passphrase stay on this device. Backup objects are " +
-        "encrypted before upload, so the storage provider only sees opaque ciphertext."
+    "Your passphrase stays in memory on this device. Storage credentials are stored " +
+        "encrypted and used to authenticate with your storage. Backup contents are " +
+        "encrypted before upload."
 
 /** Passphrase-loss warning shown on the backup screen. */
 const val BACKUP_PASSPHRASE_WARNING: String =
@@ -111,15 +132,13 @@ fun BackupSetupRoute(
     onComplete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SecureScreen {
-        BackupSettingsRoute(
-            service = service,
-            setupMode = true,
-            onSetupCancel = onCancel,
-            onSetupComplete = onComplete,
-            modifier = modifier.imePadding(),
-        )
-    }
+    BackupSettingsRoute(
+        service = service,
+        setupMode = true,
+        onSetupCancel = onCancel,
+        onSetupComplete = onComplete,
+        modifier = modifier.imePadding(),
+    )
 }
 
 /** Stateful backup settings entry point. */
@@ -139,26 +158,28 @@ fun BackupSettingsRoute(
         if (state.busy == null) onSetupCancel?.invoke()
     }
 
-    BackupSettingsScreen(
-        state = state,
-        onFormChanged = viewModel::onFormChanged,
-        onTestConnection = viewModel::onTestConnection,
-        onEnableChanged = viewModel::onEnableChanged,
-        onBackupNow = viewModel::onBackupNow,
-        onRestoreMerge = viewModel::onRestoreMerge,
-        onRequestRestoreReplace = viewModel::onRequestRestoreReplace,
-        onReplaceConfirmationChanged = viewModel::onReplaceConfirmationChanged,
-        onConfirmRestoreReplace = viewModel::onConfirmRestoreReplace,
-        onRequestDeleteRemote = viewModel::onRequestDeleteRemote,
-        onDeleteConfirmationChanged = viewModel::onDeleteConfirmationChanged,
-        onConfirmDeleteRemote = viewModel::onConfirmDeleteRemote,
-        onDismissDialogs = viewModel::onDismissDialogs,
-        onDismissError = viewModel::onDismissError,
-        setupMode = setupMode,
-        onSetupCancel = onSetupCancel,
-        onSetupComplete = onSetupComplete,
-        modifier = modifier,
-    )
+    SecureScreen {
+        BackupSettingsScreen(
+            state = state,
+            onFormChanged = viewModel::onFormChanged,
+            onTestConnection = viewModel::onTestConnection,
+            onEnableChanged = viewModel::onEnableChanged,
+            onBackupNow = viewModel::onBackupNow,
+            onRestoreMerge = viewModel::onRestoreMerge,
+            onRequestRestoreReplace = viewModel::onRequestRestoreReplace,
+            onReplaceConfirmationChanged = viewModel::onReplaceConfirmationChanged,
+            onConfirmRestoreReplace = viewModel::onConfirmRestoreReplace,
+            onRequestDeleteRemote = viewModel::onRequestDeleteRemote,
+            onDeleteConfirmationChanged = viewModel::onDeleteConfirmationChanged,
+            onConfirmDeleteRemote = viewModel::onConfirmDeleteRemote,
+            onDismissDialogs = viewModel::onDismissDialogs,
+            onDismissError = viewModel::onDismissError,
+            setupMode = setupMode,
+            onSetupCancel = onSetupCancel,
+            onSetupComplete = onSetupComplete,
+            modifier = modifier,
+        )
+    }
 }
 
 /**
@@ -191,13 +212,31 @@ fun BackupSettingsScreen(
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
     val form = state.form
-    val busy = state.busy != null
+    val busy = state.busy != null || state.loading
+    var configuration by rememberSaveable { mutableStateOf(setupMode) }
+    val overviewScroll = rememberScrollState()
+    val configurationScroll = rememberScrollState()
+    val configurationFocus = remember { FocusRequester() }
+    var restoreConfigurationFocus by remember { mutableStateOf(false) }
+    BackHandler(enabled = !setupMode && configuration) {
+        if (!busy) {
+            configuration = false
+            restoreConfigurationFocus = true
+        }
+    }
+    LaunchedEffect(configuration, restoreConfigurationFocus) {
+        if (!configuration && restoreConfigurationFocus) {
+            withFrameNanos { }
+            configurationFocus.requestFocus()
+            restoreConfigurationFocus = false
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(if (configuration) configurationScroll else overviewScroll)
                 .padding(vertical = dimens.sectionGap)
                 .testTag(BackupSettingsTestTags.Root),
         ) {
@@ -215,7 +254,18 @@ fun BackupSettingsScreen(
                         ) { Text("Cancel setup") }
                     }
                 }
+            } else if (configuration) {
+                TextButton(
+                    onClick = {
+                        configuration = false
+                        restoreConfigurationFocus = true
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.padding(horizontal = dimens.screenPadding)
+                        .testTag(BackupSettingsTestTags.ConfigurationBack),
+                ) { Text("Back to backup overview") }
             }
+            if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { error ->
                 InlineBanner(
                     severity = BannerSeverity.Error,
@@ -232,7 +282,7 @@ fun BackupSettingsScreen(
                 Spacer(Modifier.height(dimens.space3))
             }
 
-            state.testResult?.let { result ->
+            state.testResult?.takeIf { it.success }?.let { result ->
                 InlineBanner(
                     severity = if (result.success) {
                         BannerSeverity.Success
@@ -256,210 +306,27 @@ fun BackupSettingsScreen(
                     color = colors.fgMuted,
                     modifier = Modifier
                         .padding(horizontal = dimens.screenPadding)
-                        .testTag(BackupSettingsTestTags.Message),
+                        .testTag(BackupSettingsTestTags.Message)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
                 )
                 Spacer(Modifier.height(dimens.space3))
             }
 
             GroupedList {
-                GroupedSection(
-                    title = "Backend",
-                    footer = "Choose the storage provider. Credentials stay on this device " +
-                        "and backup objects are encrypted before upload.",
-                ) {
-                    BackendSelector(
-                        backend = form.backend,
-                        onBackendChanged = { onFormChanged(form.copy(backend = it)) },
-                    )
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(
-                    title = "Storage",
-                    footer = storageFooter(form.backend),
-                ) {
-                    StorageFields(
-                        form = form,
+                if (configuration) {
+                    BackupConfiguration(state, busy, onFormChanged, onTestConnection, onEnableChanged)
+                } else {
+                    BackupOverview(
+                        state = state,
                         busy = busy,
+                        onConfigure = { configuration = true },
+                        configurationFocus = configurationFocus,
                         onFormChanged = onFormChanged,
+                        onBackupNow = onBackupNow,
+                        onRestoreMerge = onRestoreMerge,
+                        onRequestRestoreReplace = onRequestRestoreReplace,
+                        onRequestDeleteRemote = onRequestDeleteRemote,
                     )
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(
-                    title = "Encryption",
-                    footer = BACKUP_PASSPHRASE_WARNING,
-                ) {
-                    Column(
-                        modifier = Modifier.padding(dimens.cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(dimens.space3),
-                    ) {
-                        BackupTextField(
-                            value = form.passphrase,
-                            onValueChange = { onFormChanged(form.copy(passphrase = it)) },
-                            label = "Passphrase",
-                            tag = BackupSettingsTestTags.Passphrase,
-                            enabled = !busy,
-                            password = true,
-                        )
-                        Text(
-                            text = BACKUP_PASSPHRASE_WARNING,
-                            style = Typography.footnote,
-                            color = colors.danger,
-                            modifier = Modifier.testTag(
-                                BackupSettingsTestTags.PassphraseWarning,
-                            ),
-                        )
-                    }
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(title = "Connection") {
-                    Column(
-                        modifier = Modifier.padding(dimens.cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(dimens.space3),
-                    ) {
-                        SecondaryButton(
-                            text = if (state.busy == BackupAction.TEST) {
-                                "Testing..."
-                            } else {
-                                "Test connection"
-                            },
-                            onClick = onTestConnection,
-                            enabled = !busy,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag(BackupSettingsTestTags.TestConnection),
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = dimens.rowMinHeight),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Enable backup",
-                                    style = Typography.body,
-                                    color = colors.fgPrimary,
-                                )
-                                Text(
-                                    text = "Save this configuration and run the first backup.",
-                                    style = Typography.footnote,
-                                    color = colors.fgMuted,
-                                )
-                            }
-                            Switch(
-                                checked = state.enabled,
-                                onCheckedChange = onEnableChanged,
-                                enabled = !busy,
-                                modifier = Modifier.testTag(BackupSettingsTestTags.Enable),
-                            )
-                        }
-                    }
-                }
-                if (!setupMode) {
-                    Spacer(Modifier.height(dimens.sectionGap))
-                    GroupedSection(
-                        title = "Status",
-                        modifier = Modifier.testTag(BackupSettingsTestTags.Status),
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(dimens.cardPadding),
-                            verticalArrangement = Arrangement.spacedBy(dimens.space2),
-                        ) {
-                            StatusRow(
-                                label = "Last backup",
-                                value = formatBackupTimestamp(state.status?.lastBackupAt),
-                                tag = BackupSettingsTestTags.LastBackup,
-                            )
-                            StatusRow(
-                                label = "Pending changes",
-                                value = (state.status?.pendingChanges ?: 0).toString(),
-                                tag = BackupSettingsTestTags.PendingChanges,
-                            )
-                            StatusRow(
-                                label = "Storage usage",
-                                value = formatBackupBytes(state.status?.storageUsageBytes ?: 0),
-                                tag = BackupSettingsTestTags.StorageUsage,
-                            )
-                            StatusRow(
-                                label = "Last error",
-                                value = state.error ?: state.status?.lastError ?: "None",
-                                tag = BackupSettingsTestTags.LastError,
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(dimens.sectionGap))
-                    GroupedSection(
-                        title = "Actions",
-                        footer = "Restore merges remote data into this device by default. " +
-                            "Replace and delete require a typed confirmation.",
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(dimens.cardPadding),
-                            verticalArrangement = Arrangement.spacedBy(dimens.space3),
-                        ) {
-                            PrimaryButton(
-                                text = if (state.busy == BackupAction.BACKUP) {
-                                    "Backing up..."
-                                } else {
-                                    "Back up now"
-                                },
-                                onClick = onBackupNow,
-                                enabled = !busy,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag(BackupSettingsTestTags.BackupNow),
-                            )
-                            SecondaryButton(
-                                text = if (state.busy == BackupAction.RESTORE) {
-                                    "Restoring..."
-                                } else {
-                                    "Restore from backup (merge)"
-                                },
-                                onClick = onRestoreMerge,
-                                enabled = !busy,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag(BackupSettingsTestTags.RestoreMerge),
-                            )
-                            SecondaryButton(
-                                text = "Restore and replace local data",
-                                onClick = onRequestRestoreReplace,
-                                enabled = !busy,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag(BackupSettingsTestTags.RestoreReplace),
-                            )
-                            TextButton(
-                                onClick = onRequestDeleteRemote,
-                                enabled = !busy,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = dimens.touchTargetMin)
-                                    .testTag(BackupSettingsTestTags.DeleteRemote),
-                            ) {
-                                Text(
-                                    text = "Delete remote backup",
-                                    color = colors.danger,
-                                )
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(title = "Privacy") {
-                    Column(
-                        modifier = Modifier.padding(dimens.cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(dimens.space2),
-                    ) {
-                        Text(
-                            text = BACKUP_CLIENT_SIDE_STATEMENT,
-                            style = Typography.subhead,
-                            color = colors.fgSecondary,
-                            modifier = Modifier.testTag(
-                                BackupSettingsTestTags.ClientSideStatement,
-                            ),
-                        )
-                    }
                 }
             }
             if (setupMode) onSetupComplete?.let { complete ->
@@ -474,7 +341,8 @@ fun BackupSettingsScreen(
                     PrimaryButton(
                         text = "Done",
                         onClick = complete,
-                        enabled = state.enabled && !busy && !state.loading && state.error == null,
+                        enabled = state.enabled && state.firstBackupCompleted && !busy &&
+                            !state.configurationEdited && state.error == null,
                         modifier = Modifier.fillMaxWidth().testTag(BackupSettingsTestTags.SetupComplete),
                     )
                 }
@@ -514,6 +382,253 @@ fun BackupSettingsScreen(
             confirmTag = BackupSettingsTestTags.ReplaceConfirmButton,
             enabled = state.canReplace,
         )
+    }
+}
+
+@Composable
+private fun BackupConfiguration(
+    state: BackupUiState,
+    busy: Boolean,
+    onFormChanged: (BackupFormValues) -> Unit,
+    onTestConnection: () -> Unit,
+    onEnableChanged: (Boolean) -> Unit,
+) {
+    val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
+    val form = state.form
+    GroupedSection(
+        title = "Configuration",
+        modifier = Modifier.testTag(BackupSettingsTestTags.Configuration),
+        footer = "Editing or testing does not save these values. " +
+            "Enable backup, or apply changes, to commit and run a backup.",
+    ) {
+        BackendSelector(
+            backend = form.backend,
+            onBackendChanged = { onFormChanged(form.copy(backend = it)) },
+            enabled = !busy,
+        )
+    }
+    Spacer(Modifier.height(dimens.sectionGap))
+    GroupedSection(title = "Storage", footer = storageFooter(form.backend)) {
+        StorageFields(form = form, busy = busy, onFormChanged = onFormChanged)
+    }
+    Spacer(Modifier.height(dimens.sectionGap))
+    EncryptionSection(form, busy, onFormChanged)
+    Spacer(Modifier.height(dimens.sectionGap))
+    GroupedSection(title = "Connection") {
+        Column(
+            modifier = Modifier.padding(dimens.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(dimens.space3),
+        ) {
+            SecondaryButton(
+                text = if (state.busy == BackupAction.TEST) "Testing..." else "Test connection",
+                onClick = onTestConnection,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().testTag(BackupSettingsTestTags.TestConnection),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = dimens.rowMinHeight),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Enable backup", style = Typography.body, color = colors.fgPrimary)
+                    Text(
+                        "Save this configuration and run the first backup.",
+                        style = Typography.footnote,
+                        color = colors.fgMuted,
+                    )
+                }
+                Switch(
+                    checked = state.enabled,
+                    onCheckedChange = onEnableChanged,
+                    enabled = !busy,
+                    modifier = Modifier.testTag(BackupSettingsTestTags.Enable)
+                        .semantics { contentDescription = "Enable backup" },
+                )
+            }
+            if (state.enabled && (state.configurationEdited || !state.firstBackupCompleted)) {
+                PrimaryButton(
+                    text = if (state.configurationEdited) {
+                        "Apply configuration and back up"
+                    } else {
+                        "Retry first backup"
+                    },
+                    onClick = { onEnableChanged(true) },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().testTag(BackupSettingsTestTags.ApplyConfiguration),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EncryptionSection(
+    form: BackupFormValues,
+    busy: Boolean,
+    onFormChanged: (BackupFormValues) -> Unit,
+) {
+    val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
+    GroupedSection(title = "Encryption") {
+        Column(
+            Modifier.padding(dimens.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(dimens.space3),
+        ) {
+            BackupTextField(
+                value = form.passphrase,
+                onValueChange = { onFormChanged(form.copy(passphrase = it)) },
+                label = "Passphrase (required for backup and recovery)",
+                tag = BackupSettingsTestTags.Passphrase,
+                enabled = !busy,
+                password = true,
+            )
+            Text(
+                BACKUP_PASSPHRASE_WARNING,
+                style = Typography.footnote,
+                color = colors.danger,
+                modifier = Modifier.testTag(BackupSettingsTestTags.PassphraseWarning),
+            )
+            Text(
+                BACKUP_CLIENT_SIDE_STATEMENT,
+                style = Typography.subhead,
+                color = colors.fgSecondary,
+                modifier = Modifier.testTag(BackupSettingsTestTags.ClientSideStatement),
+            )
+        }
+    }
+}
+
+@Composable
+private fun BackupOverview(
+    state: BackupUiState,
+    busy: Boolean,
+    onConfigure: () -> Unit,
+    configurationFocus: FocusRequester,
+    onFormChanged: (BackupFormValues) -> Unit,
+    onBackupNow: () -> Unit,
+    onRestoreMerge: () -> Unit,
+    onRequestRestoreReplace: () -> Unit,
+    onRequestDeleteRemote: () -> Unit,
+) {
+    val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
+    var details by rememberSaveable { mutableStateOf(false) }
+    var advanced by rememberSaveable { mutableStateOf(false) }
+    val canRun = !busy && !state.configurationEdited
+    if (!state.configured) {
+        GroupedSection(
+            footer = "Optional backup encrypts conversations on this device before uploading " +
+                "to your own storage. Keep your passphrase safe.",
+        ) {
+            PrimaryButton(
+                text = "Set up encrypted backup",
+                onClick = onConfigure,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().padding(dimens.cardPadding)
+                    .focusRequester(configurationFocus).testTag(BackupSettingsTestTags.Configure),
+            )
+        }
+        return
+    }
+    GroupedSection(modifier = Modifier.testTag(BackupSettingsTestTags.Status)) {
+        Column(
+            Modifier.padding(dimens.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(dimens.space3),
+        ) {
+            Text(
+                if (state.enabled) "Backup enabled" else "Backup paused",
+                style = Typography.headline,
+                color = colors.fgPrimary,
+            )
+            state.committedBackend?.let {
+                Text(backendLabel(it), style = Typography.subhead, color = colors.fgSecondary)
+            }
+            StatusRow(
+                "Last backup",
+                if (state.status == null) "Not available" else formatBackupTimestamp(state.status.lastBackupAt),
+                BackupSettingsTestTags.LastBackup,
+            )
+            StatusRow(
+                "Pending changes", state.status?.pendingChanges?.toString() ?: "Not available",
+                BackupSettingsTestTags.PendingChanges,
+            )
+            PrimaryButton(
+                text = if (state.busy == BackupAction.BACKUP) "Backing up..." else "Back up now",
+                onClick = onBackupNow,
+                enabled = canRun,
+                modifier = Modifier.fillMaxWidth().testTag(BackupSettingsTestTags.BackupNow),
+            )
+            if (state.configurationEdited) Text(
+                "Configuration edits are not saved. Apply them in Configuration before backup or recovery.",
+                style = Typography.footnote,
+            )
+            TextButton(
+                onClick = onRestoreMerge,
+                enabled = canRun,
+                modifier = Modifier.heightIn(min = dimens.touchTargetMin)
+                    .testTag(BackupSettingsTestTags.RestoreMerge),
+            ) { Text(if (state.busy == BackupAction.RESTORE) "Restoring..." else "Restore from backup (merge)") }
+        }
+        SettingsRow(
+            label = "Configuration",
+            value = if (state.configurationEdited) "Unsaved edits" else "Storage, test connection, and enable/disable",
+            showChevron = true,
+            onClick = if (busy) null else onConfigure,
+            modifier = Modifier.focusRequester(configurationFocus).testTag(BackupSettingsTestTags.Configure),
+            showDivider = false,
+        )
+    }
+    Spacer(Modifier.height(dimens.sectionGap))
+    EncryptionSection(state.form, busy, onFormChanged)
+    Spacer(Modifier.height(dimens.sectionGap))
+    GroupedSection {
+        SettingsRow(
+            label = "Storage and error details",
+            value = state.status?.lastError?.takeUnless { it == state.error }
+                ?.let { "Last backup needs attention" },
+            onClick = { details = !details },
+            showChevron = true,
+            modifier = Modifier.testTag(BackupSettingsTestTags.Details)
+                .semantics { stateDescription = if (details) "Expanded" else "Collapsed" },
+        )
+        if (details) Column(Modifier.padding(dimens.cardPadding)) {
+            StatusRow(
+                "Estimated local backup size",
+                state.status?.storageUsageBytes?.let(::formatBackupBytes) ?: "Not available",
+                BackupSettingsTestTags.StorageUsage,
+            )
+            Text("This is an estimate of local data, not remote storage usage or quota.", style = Typography.footnote)
+            if (state.status?.lastError != state.error || state.error == null) StatusRow(
+                "Last error", state.status?.lastError ?: if (state.status == null) "Not available" else "None",
+                BackupSettingsTestTags.LastError,
+            )
+        }
+    }
+    Spacer(Modifier.height(dimens.sectionGap))
+    GroupedSection(footer = "Restore merges by default. These destructive alternatives require the exact typed phrase.") {
+        SettingsRow(
+            label = "Advanced recovery",
+            value = "Replace local data or delete remote backup",
+            onClick = { advanced = !advanced },
+            showChevron = true,
+            modifier = Modifier.testTag(BackupSettingsTestTags.AdvancedRecovery)
+                .semantics { stateDescription = if (advanced) "Expanded" else "Collapsed" },
+        )
+        if (advanced) Column(Modifier.padding(dimens.cardPadding)) {
+            TextButton(
+                onClick = onRequestRestoreReplace,
+                enabled = canRun,
+                modifier = Modifier.heightIn(min = dimens.touchTargetMin)
+                    .testTag(BackupSettingsTestTags.RestoreReplace),
+            ) { Text("Restore and replace local data", color = colors.danger) }
+            TextButton(
+                onClick = onRequestDeleteRemote,
+                enabled = canRun,
+                modifier = Modifier.heightIn(min = dimens.touchTargetMin)
+                    .testTag(BackupSettingsTestTags.DeleteRemote),
+            ) { Text("Delete remote backup", color = colors.danger) }
+        }
     }
 }
 
@@ -724,6 +839,7 @@ private fun storageFooter(backend: BackupBackend): String = when (backend) {
 private fun BackendSelector(
     backend: BackupBackend,
     onBackendChanged: (BackupBackend) -> Unit,
+    enabled: Boolean,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val label = backendLabel(backend)
@@ -733,7 +849,7 @@ private fun BackendSelector(
             label = "Backend",
             value = label,
             showChevron = true,
-            onClick = { expanded = true },
+            onClick = if (enabled) ({ expanded = true }) else null,
             modifier = Modifier.testTag(BackupSettingsTestTags.Backend),
             showDivider = false,
         )
@@ -780,6 +896,10 @@ private fun BackupTextField(
         onValueChange = onValueChange,
         label = { Text(label) },
         singleLine = true,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (password) KeyboardType.Password else KeyboardType.Text,
+            autoCorrectEnabled = false,
+        ),
         enabled = enabled,
         visualTransformation = if (password) {
             PasswordVisualTransformation()
@@ -795,12 +915,10 @@ private fun BackupTextField(
 @Composable
 private fun StatusRow(label: String, value: String, tag: String) {
     val colors = LocalChatUiColors.current
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(tag),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
@@ -830,11 +948,19 @@ private fun ConfirmationDialog(
     enabled: Boolean,
 ) {
     val dimens = LocalDimens.current
+    val cancelFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        cancelFocus.requestFocus()
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(dimens.space3)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(dimens.space3),
+            ) {
                 Text(text = body, style = Typography.subhead)
                 OutlinedTextField(
                     value = phrase,
@@ -851,13 +977,17 @@ private fun ConfirmationDialog(
             TextButton(
                 onClick = onConfirm,
                 enabled = enabled,
-                modifier = Modifier.testTag(confirmTag),
+                modifier = Modifier.heightIn(min = dimens.touchTargetMin).testTag(confirmTag),
             ) {
                 Text(confirmLabel)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.heightIn(min = dimens.touchTargetMin)
+                    .focusRequester(cancelFocus).focusProperties { canFocus = true },
+            ) { Text("Cancel") }
         },
     )
 }

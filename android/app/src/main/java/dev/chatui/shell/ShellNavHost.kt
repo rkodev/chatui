@@ -262,6 +262,9 @@ fun NavGraphBuilder.shellDestinations(
                     launchSingleTop = true
                 }
             },
+            onOpenBackup = {
+                navController.navigate(SettingsDestination.BACKUP) { launchSingleTop = true }
+            },
         )
     }
     listOf(
@@ -282,6 +285,7 @@ fun NavGraphBuilder.shellDestinations(
             } else if (section == SettingsSection.BACKUP) {
                 BackupSettingsRoute(service = rememberBackupSettingsService())
             } else {
+                val pickerHost = LocalAppModelPicker.current
                 SettingsRoute(
                     section = section,
                     settingsStore = rememberSettingsDataStore(),
@@ -296,6 +300,13 @@ fun NavGraphBuilder.shellDestinations(
                         navController.navigate(ShellDestination.Providers.route) {
                             launchSingleTop = true
                         }
+                    },
+                    onOpenBackup = {
+                        navController.navigate(SettingsDestination.BACKUP) { launchSingleTop = true }
+                    },
+                    onOpenDefaultModelPicker = { onClosed ->
+                        checkNotNull(pickerHost) { "Settings requires the app model-picker host." }
+                            .openDefaults(onClosed)
                     },
                 )
             }

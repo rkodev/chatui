@@ -1,7 +1,11 @@
 package dev.chatui.feature.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,11 +40,14 @@ fun SettingsRoute(
     dataControlsService: DataControls,
     onOpenSection: (SettingsSection) -> Unit,
     onOpenProviders: () -> Unit,
+    onOpenBackup: () -> Unit,
     onExportAll: () -> Unit = {},
     onImportMerge: () -> Unit = {},
     onImportReplace: () -> Unit = {},
-    onOpenBackup: () -> Unit = { onOpenSection(SettingsSection.BACKUP) },
+    onOpenDefaultModelPicker: (onClosed: () -> Unit) -> Unit = {},
     modifier: Modifier = Modifier,
+    fileOperation: DataFileOperation = DataFileOperation(),
+    onDismissFileError: () -> Unit = {},
 ) {
     if (section == SettingsSection.ROOT) {
         SettingsRootScreen(
@@ -48,7 +55,7 @@ fun SettingsRoute(
             onOpenChatDefaults = { onOpenSection(SettingsSection.CHAT_DEFAULTS) },
             onOpenProviders = onOpenProviders,
             onOpenData = { onOpenSection(SettingsSection.DATA) },
-            onOpenBackup = { onOpenSection(SettingsSection.BACKUP) },
+            onOpenBackup = onOpenBackup,
             onOpenAbout = { onOpenSection(SettingsSection.ABOUT) },
             modifier = modifier,
         )
@@ -59,6 +66,7 @@ fun SettingsRoute(
         factory = SettingsViewModel.factory(settingsStore, service),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var pickerReturnVersion by remember { mutableIntStateOf(0) }
 
     when (section) {
         SettingsSection.APPEARANCE -> AppearanceSettingsScreen(
@@ -68,6 +76,9 @@ fun SettingsRoute(
             onChatFontSizeChanged = viewModel::onChatFontSizeChanged,
             onHapticFeedbackChanged = viewModel::onHapticFeedbackChanged,
             onDynamicColorChanged = viewModel::onDynamicColorChanged,
+            feedback = state,
+            onRetry = viewModel::onRetry,
+            onDismissError = viewModel::onDismissError,
             modifier = modifier,
         )
 
@@ -86,6 +97,14 @@ fun SettingsRoute(
             onShowTokenUsageChanged = viewModel::onShowTokenUsageChanged,
             onLoadRemoteImagesChanged = viewModel::onLoadRemoteImagesChanged,
             onDismissError = viewModel::onDismissError,
+            onRetry = viewModel::onRetry,
+            onOpenModelPicker = {
+                onOpenDefaultModelPicker {
+                    viewModel.onPickerReturned()
+                    pickerReturnVersion++
+                }
+            },
+            pickerReturnVersion = pickerReturnVersion,
             modifier = modifier,
         )
 
@@ -96,10 +115,12 @@ fun SettingsRoute(
             onExportAll = onExportAll,
             onImportMerge = onImportMerge,
             onImportReplace = onImportReplace,
+            fileOperation = fileOperation,
+            onDismissFileError = onDismissFileError,
             modifier = modifier,
         )
 
-        SettingsSection.BACKUP -> BackupSettingsScreen(modifier = modifier)
+        SettingsSection.BACKUP -> LaunchedEffect(Unit) { onOpenBackup() }
 
         SettingsSection.ABOUT -> AboutSettingsScreen(modifier = modifier)
 

@@ -2,13 +2,15 @@
 
 - Source plan: [Android minimalist design plan](../../android-minimalist-design-plan.md)
 - Behavior authority: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: In progress
+- Status: Blocked
 - Scope: Android presentation, navigation integration, accessibility, and resource efficiency. Preserve functionality.
 - Breakdown: 41 tasks across the source plan's UX-00 through UX-06 phases.
-- Implementation: UX-01.1 complete; UX-01.2 through UX-04.9 implemented.
-  Eleven earlier requested tasks have implementation acceptance; UX-02.3,
-  UX-02.4, UX-03.3, UX-03.6 and all nine UX-04 tasks retain the explicit
-  device/prerequisite blockers below. UX-00.3 remains owner-deferred, not passed.
+- Implementation: UX-01 through UX-05 presentation/integration is present;
+  UX-06 adds production-shell goldens, route/file/focus regressions and an
+  asserted profile journey. Fourteen tasks are Complete; the other 27 retain
+  explicit prerequisite/device/full-gate blockers. No generated-profile,
+  physical performance or usability acceptance is claimed. UX-00.3 remains
+  owner-deferred, not passed.
 
 ## Folder and numbering contract
 
@@ -182,25 +184,29 @@ is read-only unless a tightly coupled integration fix is explicitly required.
 | 26 | [UX-04.7 Extras JSON and curated routing](UX-04.7-advanced-routing.md) | Blocked | UX-04.6 |
 | 27 | [UX-04.8 Focused onboarding connection](UX-04.8-onboarding-connection.md) | Blocked | UX-02.4 |
 | 28 | [UX-04.9 Optional backup onboarding](UX-04.9-onboarding-backup.md) | Blocked | UX-04.8 |
-| 29 | [UX-05.1 Settings root and appearance](UX-05.1-settings-and-appearance.md) | Not started | UX-02.4 |
-| 30 | [UX-05.2 Global-default model-picker entry](UX-05.2-default-model-picker.md) | Not started | UX-05.1, UX-04.1 |
-| 31 | [UX-05.3 Grouped chat-default controls](UX-05.3-chat-defaults.md) | Not started | UX-05.2 |
-| 32 | [UX-05.4 Data actions and operation states](UX-05.4-data-and-storage.md) | Not started | UX-05.1 |
-| 33 | [UX-05.5 Quiet autosave and truthful privacy copy](UX-05.5-settings-feedback-and-copy.md) | Not started | UX-05.3, UX-05.4 |
-| 34 | [UX-05.6 Focused backup configuration](UX-05.6-backup-configuration.md) | Not started | UX-04.9, UX-05.1 |
-| 35 | [UX-05.7 Backup overview and recovery safeguards](UX-05.7-backup-overview.md) | Not started | UX-05.6 |
-| 36 | [UX-06.1 Integrated production-shell screenshots](UX-06.1-integrated-screenshots.md) | Not started | UX-02.4, UX-03.2, UX-03.4, UX-03.5, UX-03.6, UX-03.7, UX-04.5, UX-04.7, UX-04.9, UX-05.5, UX-05.7 |
-| 37 | [UX-06.2 Accessibility, focus, and inset acceptance](UX-06.2-accessibility-and-insets.md) | Not started | UX-06.1 |
-| 38 | [UX-06.3 Deterministic baseline-profile journey](UX-06.3-baseline-profile.md) | Not started | UX-06.1 |
-| 39 | [UX-06.4 Entry-level performance acceptance](UX-06.4-performance-acceptance.md) | Not started | UX-06.3 |
-| 40 | [UX-06.5 Device flows and usability walkthrough](UX-06.5-device-and-usability.md) | Not started | UX-06.2 |
-| 41 | [UX-06.6 Parity and implementation closeout](UX-06.6-parity-and-closeout.md) | Not started | UX-06.1, UX-06.2, UX-06.3, UX-06.4, UX-06.5 |
+| 29 | [UX-05.1 Settings root and appearance](UX-05.1-settings-and-appearance.md) | Blocked | UX-02.4 |
+| 30 | [UX-05.2 Global-default model-picker entry](UX-05.2-default-model-picker.md) | Blocked | UX-05.1, UX-04.1 |
+| 31 | [UX-05.3 Grouped chat-default controls](UX-05.3-chat-defaults.md) | Blocked | UX-05.2 |
+| 32 | [UX-05.4 Data actions and operation states](UX-05.4-data-and-storage.md) | Blocked | UX-05.1 |
+| 33 | [UX-05.5 Quiet autosave and truthful privacy copy](UX-05.5-settings-feedback-and-copy.md) | Blocked | UX-05.3, UX-05.4 |
+| 34 | [UX-05.6 Focused backup configuration](UX-05.6-backup-configuration.md) | Blocked | UX-04.9, UX-05.1 |
+| 35 | [UX-05.7 Backup overview and recovery safeguards](UX-05.7-backup-overview.md) | Blocked | UX-05.6 |
+| 36 | [UX-06.1 Integrated production-shell screenshots](UX-06.1-integrated-screenshots.md) | Blocked | UX-02.4, UX-03.2, UX-03.4, UX-03.5, UX-03.6, UX-03.7, UX-04.5, UX-04.7, UX-04.9, UX-05.5, UX-05.7 |
+| 37 | [UX-06.2 Accessibility, focus, and inset acceptance](UX-06.2-accessibility-and-insets.md) | Blocked | UX-06.1 |
+| 38 | [UX-06.3 Deterministic baseline-profile journey](UX-06.3-baseline-profile.md) | Blocked | UX-06.1 |
+| 39 | [UX-06.4 Entry-level performance acceptance](UX-06.4-performance-acceptance.md) | Blocked | UX-06.3 |
+| 40 | [UX-06.5 Device flows and usability walkthrough](UX-06.5-device-and-usability.md) | Blocked | UX-06.2 |
+| 41 | [UX-06.6 Parity and implementation closeout](UX-06.6-parity-and-closeout.md) | Blocked | UX-06.1, UX-06.2, UX-06.3, UX-06.4, UX-06.5 |
+
+Earlier verification records below are historical selected runs. Later changes
+extend their test counts and replace local Gradle XML reports; the
+[UX-05/06 record](#ux-0506-verification-record) is the current candidate gate.
 
 ## UX-01.2 through UX-03.7 verification record
 
 The requested implementation is present, including the owner-approved bounded
-header refinement recorded in UX-01.3 and the source plan. The final JUnit
-reports contain **505 passing tests, no failures/errors/skips**:
+header refinement recorded in UX-01.3 and the source plan. That selected run
+recorded **505 passing tests, no failures/errors/skips**:
 
 | Scope actually checked | Tests | Lint |
 | --- | --- | --- |
@@ -296,9 +302,9 @@ implemented; these statuses deliberately remain `Blocked`, not manual passes:
 | UX-03.6 | Android maintainer: close UX-03.3 and verify real photo/SAF/paste/drop grants, revocation and cancellation. |
 
 Record those results in the owning handoffs before marking the four tasks
-Complete. UX-04 was subsequently implemented under the explicit nine-task
-request below; that request is not evidence that UX-02.4 passed. UX-05 remains
-unstarted. UX-06.2/06.5 repeat the integrated accessibility/device matrix, and
+Complete. UX-04 and subsequently UX-05/06 were implemented under explicit
+batch requests; those requests are not evidence that UX-02.4 passed.
+UX-06.2/06.5 retain the integrated accessibility/device matrix, and
 UX-06.4 still requires physical performance comparisons. UX-00.3 remains
 owner-deferred/Blocked; its original dependency edges, frozen old build and
 budgets are unchanged.
@@ -307,7 +313,7 @@ budgets are unchanged.
 
 UX-04.1 through UX-04.9 are implemented, including real provider-scoped model
 management, app-owned conversation-picker return, coordinated settings/routing
-writes and opt-in real backup setup. The current selected JUnit reports contain
+writes and opt-in real backup setup. That selected run recorded
 **312 passing tests, no failures/errors/skips**:
 
 | Scope actually checked | Tests | Lint |
@@ -397,7 +403,8 @@ pending share/deep-link completion without draft replacement or auto-send.
 The existing first-run service remains OpenRouter-only despite its broader
 provider-option list; the UI explains that limitation. Other provider setup
 remains in Providers. All five backup backends and existing security/storage
-semantics are preserved. No UX-05 implementation was included.
+semantics are preserved. No UX-05 implementation was included in that earlier
+slice; the subsequent implementation is recorded below.
 
 ### UX-04 acceptance blockers and next gate
 
@@ -410,11 +417,207 @@ management/settings/key-editor return focus, onboarding/backup cancellation
 and pending-intent completion in the owning handoffs.
 
 Only after those results are recorded may the dependent statuses become
-Complete and later gates become eligible. The explicit UX-04 implementation
-request does not waive missing device acceptance. UX-05.6 must reuse
-`BackupSetupRoute(service, onCancel, onComplete, modifier)` after its own
-prerequisites. UX-00.3 remains owner-deferred, and no physical performance,
+Complete and later gates become eligible. Explicit implementation requests do
+not waive missing device acceptance. UX-05.6 now reuses the same
+`BackupSetupRoute(service, onCancel, onComplete, modifier)` without declaring
+its prerequisites accepted. UX-00.3 remains owner-deferred, and no physical performance,
 TalkBack, real-IME or UX-06 release acceptance is claimed here.
+
+## UX-05/06 verification record
+
+Implementation/evidence updated **2026-11-17**. All thirteen requested task
+files are **Blocked**, not unstarted or accepted. Their bounded implementation
+is present; earlier prerequisites, the red integrated gate and required
+device/profile/performance/usability evidence remain explicit. **Owner:
+Android maintainer**, with performance/usability reviewers for physical work.
+See [UX-06.6](UX-06.6-parity-and-closeout.md) for all 54 preservation IDs and
+thirteen source definition-of-done mappings.
+
+### Implemented scope and focused results
+
+Settings now has six concise entries, wrapping Appearance choices and a single
+preview. Chat defaults uses the app-owned Defaults picker, separate provider
+default reset and grouped Generation/Composer/Privacy with summaries,
+validation and atomic immediate updates. Persisted defaults affect future
+chats, never existing conversations/historical snapshots. Save feedback is
+quiet, mutation-driven and cannot hide an unrelated failed write.
+
+Data & storage prioritizes ordinary actions and uses one truthful operation/
+error owner from consent and preparation through picker, actual IO/service
+completion, cancellation and failure. Duplicate/concurrent actions are
+guarded; export preparation and import read/validation use IO. Existing
+plaintext warning, secret exclusion, separate import replace, key confirmation
+and exact clear phrase remain.
+
+Backup reuses one ViewModel/form for five-backend Configuration, optional
+onboarding and status-first Overview. Editing/testing does not save/enable;
+Done requires completed initial backup. Advanced replace/delete retain exact
+phrases and safe Cancel focus. Re-entering the passphrase unlocks committed
+configuration only in memory, without persisting form edits or rescheduling.
+Toolbar Up respects feature Back to return Configuration to Overview.
+Provider/storage authentication copy no longer confuses credentials with the
+memory-only encryption passphrase.
+
+The scoped app verification passed **65 tests**, including all 45
+`ShellBaselineScreenshotTest` methods, seven `SettingsRouteTest` cases,
+two cold-start cases and eleven affected standalone methods (22 PNGs).
+The final full run also passes these relevant cases. Full settings (40),
+backup (51), onboarding (45), conversations (108) and core-backup (123) suites
+pass; their counts are included in, not added to, the integrated table below.
+
+Focused source coverage includes actual Defaults selection/cancel/reopen/
+focus and future-chat creation, live appearance application, nested backup Up
+without committing edits, actual file/service callbacks using a fake document
+registry, missing picker retry, actual completion versus launch, and persistent
+write/validation failures. Backup tests cover all form variants, commit versus
+test/edit, initial failure/retry/Done, re-entered memory-only passphrase and
+destructive safeguards. No test requires real credentials or paid requests.
+
+### Visual evidence
+
+There are **160 new tracked actual-shell PNGs**: 40 scenarios in comfortable/
+compact and light/dark, under
+`android\app\src\test\screenshots\integrated_*_<density>_<theme>.png`.
+They exercise the production shell/graph and real facades against fixture
+Room/settings/files with fake external provider/storage/crypto boundaries.
+No alternate screenshot shell or shipping seed entry was added.
+
+The matrix includes prior chat/history states plus real Settings, Data,
+backup configuration/overview/error/recovery, Defaults details/manual ID,
+provider detail/management/credentials, actual Extras editor, onboarding and
+optional secure setup. Narrow 320 dp/200%, 411 dp/150%, 640 dp landscape,
+839/840/1280 dp and simulated keyboard-space cases extend the matrix.
+Foundation/standalone picker cases remain separately labeled.
+
+All variants were reviewed, including final changed-image contact sheets and
+full-size sensitive/advanced cases. Twenty-two affected existing widget PNGs
+were selectively updated (root/Appearance/defaults/About/data phone/tablet
+and onboarding backup setup phone). No legacy UX-00 artifact or unrelated
+chat/history golden was overwritten. Golden tolerances were not loosened.
+Catalog labels and decoded image pixels settle before capture; local images
+use a fixed scroll anchor and controlled stream captures omit cursor blink.
+The new route test waits for enabled Configuration after asynchronous load,
+not merely an already-visible disabled button. These are fixture timing
+corrections, not production animations/controls being disabled.
+
+### Final integrated gate
+
+The required integrated command was executed with `--continue`, followed by
+bounded fixture corrections and a final complete invocation. **1,250 tests:
+1,228 pass, 22 fail, zero skips.** The command exits 1; it is not a clean
+repository/Roborazzi acceptance pass.
+
+| Module | Tests | Failures | Lint errors / warnings |
+| --- | --- | --- | --- |
+| app | 288 | 19 | 0 / 16 |
+| core backup | 123 | 0 | 0 / 0 |
+| core database | 137 | 3 | 0 / 4 |
+| core datastore | 28 | 0 | 0 / 0 |
+| core design system | 51 | 0 | 0 / 5 |
+| core providers | 42 | 0 | 0 / 0 |
+| feature backup | 51 | 0 | 0 / 0 |
+| feature chat | 170 | 0 | 0 / 3 |
+| feature conversations | 108 | 0 | 0 / 3 |
+| feature onboarding | 45 | 0 | 0 / 1 |
+| feature providers | 167 | 0 | 0 / 2 |
+| feature settings | 40 | 0 | 0 / 2 |
+
+Failure investigation/disposition:
+
+- **18 older standalone `ScreenshotTest` methods:** chat Empty/Populated/
+  Streaming/Error phone+tablet; conversation List/Archived/Search/Empty
+  phone+tablet; expanded shell phone+tablet. These stop at their light
+  comparison, so their dark comparisons are not claimed checked. The
+  expectations/source scenes are outside this batch and were not broadly
+  re-recorded to hide prior visual differences.
+- **`ShellTransitionsTest`:** still clicks removed `shell-nav-backup`.
+  Unchanged production `AdaptiveShell` has Providers/Settings footer;
+  real Settings/Data > backup routes are separately exercised. The stale test
+  and that footer source were not changed in this batch.
+- **Three `core.database.MigrationTest` cases:** on Windows, the test driver
+  is configured for a relative database name while Robolectric requests an
+  absolute temporary path. Database source/tests are untouched.
+
+Android maintainer owns these remaining integrated-gate issues. Earlier
+iterations also exposed image-readiness/cursor/scroll composition races and a
+click on disabled Configuration; bounded fixture fixes above pass the final
+run without relaxed assertions. One earlier full run had a cold-start
+missing-chat timeout; both cold-start cases pass the focused and final runs.
+That observation is retained, not presented as a verified device fix.
+
+Full `lintDebug` has **zero errors / 36 warnings** with existing checks enabled.
+Debug, nonMinifiedRelease and debug instrumentation APK assembly pass.
+`:baselineprofile:compileNonMinifiedReleaseKotlin` passes; generation was
+explicitly skipped for these local build checks. The configured
+`:app:generateBaselineProfile` workflow uses connected **nonMinifiedRelease**,
+not BenchmarkRelease. Its resolved generated-source destination is
+`android\app\src\release\generated\baselineProfiles`; no profile was generated.
+See [UX-06.3](UX-06.3-baseline-profile.md) for required acknowledgements,
+guarded seed/update/verify recipe and the unverified device-installation gate.
+
+### Reproduction and local build identity
+
+From the repository root; the selected recording scopes were executed
+separately before verification, never with the whole legacy screenshot suite:
+
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+$env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
+Set-Location .\android
+$flags = @(
+  '--console=plain', '--quiet', '--no-daemon',
+  '-Pkotlin.compiler.execution.strategy=in-process',
+  '-Pandroid.baselineProfile.skipGeneration=true'
+)
+# Relevant app verification: 65 actual tests, not a zero-test task.
+.\gradlew.bat @flags '-Proborazzi.test.verify=true' :app:testDebugUnitTest `
+  --tests '*ShellBaselineScreenshotTest' --tests '*SettingsRouteTest' `
+  --tests '*ColdStartDeepLinkTest' `
+  --tests 'dev.chatui.screenshots.ScreenshotTest.settingsRoot*' `
+  --tests 'dev.chatui.screenshots.ScreenshotTest.settingsAppearance*' `
+  --tests 'dev.chatui.screenshots.ScreenshotTest.settingsChatDefaults*' `
+  --tests 'dev.chatui.screenshots.ScreenshotTest.settingsAbout*' `
+  --tests 'dev.chatui.screenshots.ScreenshotTest.dataSettings*' `
+  --tests 'dev.chatui.screenshots.ScreenshotTest.onboardingBackupSetupPhone' `
+  :app:lintDebug :app:assembleDebugAndroidTest
+# Final full gate: fails only the explicitly recorded older cases above.
+.\gradlew.bat @flags --continue testDebugUnitTest lintDebug `
+  :app:assembleDebug :app:verifyRoborazziDebug `
+  :app:assembleNonMinifiedRelease :app:assembleDebugAndroidTest `
+  :baselineprofile:compileNonMinifiedReleaseKotlin
+```
+
+Only the selected affected image scopes above and the actual-shell class were
+recorded using Roborazzi's record mode; verify mode was a separate run.
+Reports remain module-local under `build\test-results\testDebugUnitTest` and
+`build\reports\lint-results-debug.*`; app comparisons are under
+`android\app\build`. Selected reruns replace that module's XML rather than
+forming an additive total.
+
+Current local candidate artifacts are under
+`android\app\build\outputs\apk` (ignored, not published or device-verified):
+
+| Relative APK | SHA-256 |
+| --- | --- |
+| `debug\app-debug.apk` | `189E457139734DFE8893FE7A43948D31CA6FFC4CD8EEE7FAC4EBF52D1AEAFFC9` |
+| `nonMinifiedRelease\app-nonMinifiedRelease.apk` | `31C604A88F1689D0F5E592A3F1AA13BCBE659AE4CBBBECAF4382A13C1DE0D8B1` |
+| `androidTest\debug\app-debug-androidTest.apk` | `6974A67C1047AC378C33262BA52984CDE2B998637662A09BB0F4D10B8E4BA838` |
+
+These are local debug-signed identities, not release signing/provisioning or
+preserved physical evidence. App minSdk 26 and producer minSdk 28 are unchanged;
+no dependency version/SDK upgrade, database migration or new UI module was made.
+
+### Acceptance blockers
+
+Final `adb devices -l` has no connected device. There is no actual TalkBack,
+hardware keyboard, IME/SAF/navigation-mode/lifecycle/contrast matrix; no
+generated/reviewed profile or verified seed-preserving target installation;
+no physical entry-level/mid-tier old/new startup/frame/PSS evidence; and no
+anonymous walkthrough. JVM screenshots/semantics and compiled test APKs are
+not substitutes. UX-06.2 through UX-06.5 record exact missing configurations,
+budgets, procedures and owners; UX-06.6 leaves rollout/closeout blocked.
+Earlier UX-02/03/04 gates and owner-deferred UX-00.3 remain unchanged.
 
 ## Execution lanes and shared-file coordination
 

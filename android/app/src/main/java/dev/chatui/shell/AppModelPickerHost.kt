@@ -40,7 +40,7 @@ class AppModelPickerState : ViewModel() {
     }
 
     fun openDefaults(onClosed: () -> Unit = {}) {
-        open(ModelPickerTarget.Defaults, onClosed)
+        open(ModelPickerTarget.Defaults, onClosed, restoreHeaderFocus = false)
     }
 
     fun openConversationSettings(conversationId: String, onClosed: () -> Unit = {}) {

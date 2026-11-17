@@ -1,15 +1,16 @@
 package dev.chatui.shell
 
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import dagger.hilt.android.EntryPointAccessors
 import dev.chatui.core.database.import.ImportMode
@@ -24,8 +25,39 @@ import dev.chatui.feature.conversations.importer.ImportReplaceConfirmationDialog
 import dev.chatui.feature.conversations.importer.rememberImportDocumentLauncher
 import dev.chatui.feature.providers.ProviderManagementService
 import dev.chatui.feature.settings.DataControlsService
+import dev.chatui.feature.settings.DataFileAction
+import dev.chatui.feature.settings.DataFileOperation
+import dev.chatui.feature.settings.DataFilePhase
 import dev.chatui.feature.settings.SettingsRoute
 import dev.chatui.feature.settings.SettingsSection
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+internal class DataDocumentState : ViewModel() {
+    var operation by mutableStateOf(DataFileOperation())
+        private set
+
+    fun start(action: DataFileAction): Boolean {
+        if (operation.active) return false
+        operation = DataFileOperation(action, DataFilePhase.PICKING)
+        return true
+    }
+
+    fun advance(phase: DataFilePhase) {
+        operation = operation.copy(phase = phase, error = null)
+    }
+
+    fun fail(error: Throwable) {
+        operation = operation.copy(
+            phase = DataFilePhase.FAILED,
+            error = error.message ?: "Could not complete the data operation. Try again.",
+        )
+    }
+
+    fun clearResult() {
+        if (!operation.active) operation = DataFileOperation()
+    }
+}
 
 /**
  * Data settings destination with export/import SAF wiring.
@@ -59,21 +91,37 @@ fun DataSettingsDestination(
         ImportDocumentReader(context.contentResolver)
     }
 
-    var showExportWarning by remember { mutableStateOf(false) }
-    var showReplaceConfirmation by remember { mutableStateOf(false) }
-    var pendingImportMode by remember { mutableStateOf(ImportMode.MERGE) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var showExportWarning by rememberSaveable { mutableStateOf(false) }
+    var showReplaceConfirmation by rememberSaveable { mutableStateOf(false) }
+    val documents: DataDocumentState = viewModel()
 
     val exportLauncher = rememberExportDocumentLauncher(
-        artifact = { exportService.exportAll() },
-        onError = { error = it.message ?: "Export failed." },
+        artifact = { withContext(Dispatchers.IO) { exportService.exportAll() } },
+        onError = documents::fail,
+        onPreparing = { documents.advance(DataFilePhase.PREPARING) },
+        onPickerOpened = { documents.advance(DataFilePhase.PICKING) },
+        onWriting = { documents.advance(DataFilePhase.WORKING) },
+        onSuccess = { documents.advance(DataFilePhase.SUCCEEDED) },
+        onCancelled = { documents.advance(DataFilePhase.CANCELLED) },
+        operationScope = documents.viewModelScope,
     )
     val importLauncher = rememberImportDocumentLauncher(
         onDocument = { uri ->
-            val bytes = importReader.readBytes(uri)
-            importService.importBytes(bytes, ImportOptions(mode = pendingImportMode))
+            val mode = if (documents.operation.action == DataFileAction.IMPORT_REPLACE) {
+                ImportMode.REPLACE
+            } else {
+                ImportMode.MERGE
+            }
+            withContext(Dispatchers.IO) {
+                val bytes = importReader.readBytes(uri)
+                importService.importBytes(bytes, ImportOptions(mode = mode))
+            }
         },
-        onError = { error = it.message ?: "Import failed." },
+        onError = documents::fail,
+        onReading = { documents.advance(DataFilePhase.WORKING) },
+        onSuccess = { documents.advance(DataFilePhase.SUCCEEDED) },
+        onCancelled = { documents.advance(DataFilePhase.CANCELLED) },
+        operationScope = documents.viewModelScope,
     )
 
     SettingsRoute(
@@ -91,15 +139,17 @@ fun DataSettingsDestination(
                 launchSingleTop = true
             }
         },
-        onExportAll = { showExportWarning = true },
+        onExportAll = {
+            if (documents.start(DataFileAction.EXPORT)) showExportWarning = true
+        },
         onImportMerge = {
-            pendingImportMode = ImportMode.MERGE
-            importLauncher.launch()
+            if (documents.start(DataFileAction.IMPORT_MERGE)) importLauncher.launch()
         },
         onImportReplace = {
-            pendingImportMode = ImportMode.REPLACE
-            showReplaceConfirmation = true
+            if (documents.start(DataFileAction.IMPORT_REPLACE)) showReplaceConfirmation = true
         },
+        fileOperation = documents.operation,
+        onDismissFileError = documents::clearResult,
         onOpenBackup = {
             navController.navigate(SettingsDestination.BACKUP) {
                 launchSingleTop = true
@@ -111,30 +161,29 @@ fun DataSettingsDestination(
     if (showExportWarning) {
         ExportPlaintextWarningDialog(
             onConfirm = {
-                showExportWarning = false
-                exportLauncher.launch()
+                if (showExportWarning) {
+                    showExportWarning = false
+                    exportLauncher.launch()
+                }
             },
-            onDismiss = { showExportWarning = false },
+            onDismiss = {
+                showExportWarning = false
+                documents.advance(DataFilePhase.CANCELLED)
+            },
         )
     }
 
     if (showReplaceConfirmation) {
         ImportReplaceConfirmationDialog(
             onConfirm = {
-                showReplaceConfirmation = false
-                importLauncher.launch()
+                if (showReplaceConfirmation) {
+                    showReplaceConfirmation = false
+                    importLauncher.launch()
+                }
             },
-            onDismiss = { showReplaceConfirmation = false },
-        )
-    }
-
-    error?.let { message ->
-        AlertDialog(
-            onDismissRequest = { error = null },
-            title = { Text("Data operation failed") },
-            text = { Text(message) },
-            confirmButton = {
-                TextButton(onClick = { error = null }) { Text("OK") }
+            onDismiss = {
+                showReplaceConfirmation = false
+                documents.advance(DataFilePhase.CANCELLED)
             },
         )
     }

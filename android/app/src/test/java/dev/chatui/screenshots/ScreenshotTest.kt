@@ -1451,6 +1451,7 @@ class ScreenshotTest {
     }
 
     private val unopenedBackupService = object : BackupSettingsServiceLike {
+        override fun usePassphrase(passphrase: String): Nothing = error("Backup setup was not chosen.")
         override suspend fun load(): Nothing = error("Backup setup was not chosen.")
         override suspend fun saveConfig(values: BackupFormValues, enabled: Boolean): Nothing =
             error("Backup setup was not chosen.")

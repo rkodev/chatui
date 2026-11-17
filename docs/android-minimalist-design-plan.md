@@ -1,10 +1,28 @@
 # Android minimalist design and UX implementation plan
 
-**Status:** Proposed; implementation has not started.
+**Status:** Implementation present; integrated acceptance blocked, not complete.
 **Review date:** 2026-11-16.
 **Scope:** The native application in `android`.
 **Objective:** Make ChatUI calmer, more beautiful, easier to understand, and
 comfortable on entry-level Android phones without removing functionality.
+
+### Implementation progress (2026-11-17)
+
+The [41-task implementation pack](operations/android-minimalist-design-plan/README.md)
+records current status, ownership and evidence. UX-01 through UX-05 presentation/
+integration code is implemented; UX-06 adds actual-shell screenshots, focused
+regressions and a compiled asserted profile journey. The
+[UX-05/06 verification record](operations/android-minimalist-design-plan/README.md#ux-0506-verification-record)
+separates local results and known full-gate failures from missing acceptance.
+
+The program is **not complete**. Earlier navigation/input/provider/onboarding
+device gates remain blocked. UX-00.3 remains owner-deferred, and no generated
+profile, physical old/new resource distributions, actual TalkBack/IME/SAF review
+or anonymous usability walkthrough is claimed. The
+[closeout reconciliation](operations/android-minimalist-design-plan/UX-06.6-parity-and-closeout.md)
+maps all 54 preservation rows and thirteen definition-of-done items to evidence
+or a named blocker. Original review context, budgets and unchecked definition
+of done below are retained; they are not rewritten as measured results.
 
 ## 1. Recommended direction
 
@@ -48,6 +66,10 @@ reviewed rather than hidden inside a screenshot-only change.
 ## 2. Current application assessment
 
 ### Review basis and limits
+
+This assessment records the original review date above, before refinement.
+It is not a claim that the listed gaps remain in the current candidate; use
+the implementation pack for current progress and unresolved acceptance.
 
 The assessment covers the production shell, all feature-screen families,
 design-system components, relevant settings and navigation wiring, and

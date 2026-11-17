@@ -35,6 +35,10 @@ data class BackupUiState(
     val loading: Boolean = true,
     val form: BackupFormValues = BackupFormValues(),
     val enabled: Boolean = false,
+    val configured: Boolean = false,
+    val committedBackend: BackupBackend? = null,
+    val configurationEdited: Boolean = false,
+    val firstBackupCompleted: Boolean = false,
     val status: BackupStatus? = null,
     val busy: BackupAction? = null,
     val error: String? = null,
@@ -63,6 +67,7 @@ class BackupViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(BackupUiState())
     val state: StateFlow<BackupUiState> = _state.asStateFlow()
+    private var committedForm: BackupFormValues? = null
 
     init {
         load()
@@ -74,11 +79,16 @@ class BackupViewModel(
             try {
                 val snapshot = service.load()
                 val status = service.getStatus()
+                committedForm = snapshot.config?.let { snapshot.toForm(BackupFormValues()) }
                 _state.update { current ->
                     current.copy(
                         loading = false,
                         form = snapshot.toForm(current.form),
                         enabled = snapshot.config?.enabled ?: false,
+                        configured = snapshot.config != null,
+                        committedBackend = snapshot.config?.backend,
+                        configurationEdited = false,
+                        firstBackupCompleted = snapshot.config?.lastSyncAt != null,
                         status = status,
                     )
                 }
@@ -97,7 +107,13 @@ class BackupViewModel(
 
     fun onFormChanged(form: BackupFormValues) {
         _state.update {
-            it.copy(form = form, error = null, testResult = null)
+            it.copy(
+                form = form,
+                configurationEdited = committedForm != null && form.copy(passphrase = "") != committedForm,
+                error = null,
+                message = null,
+                testResult = null,
+            )
         }
     }
 
@@ -151,10 +167,18 @@ class BackupViewModel(
                 _state.update { it.copy(error = validation) }
                 return
             }
+            val form = _state.value.form
             runAction(BackupAction.ENABLE) {
-                service.setEnabled(enabled = true, values = _state.value.form)
+                service.setEnabled(enabled = true, values = form)
+                committedForm = form.copy(passphrase = "")
+                _state.update {
+                    it.copy(
+                        enabled = true, configured = true, committedBackend = form.backend,
+                        configurationEdited = false, firstBackupCompleted = false,
+                    )
+                }
                 service.backupNow()
-                _state.update { it.copy(enabled = true) }
+                _state.update { it.copy(firstBackupCompleted = true) }
                 "Backup enabled and the first backup completed."
             }
         } else {
@@ -167,12 +191,13 @@ class BackupViewModel(
     }
 
     fun onBackupNow() {
-        val validation = validateWithPassphrase()
+        val validation = validateForManualAction()
         if (validation != null) {
             _state.update { it.copy(error = validation) }
             return
         }
         runAction(BackupAction.BACKUP) {
+            service.usePassphrase(_state.value.form.passphrase)
             val result = service.backupNow()
             "Backed up ${result.uploadedConversations.size} conversation(s) and " +
                 "${result.uploadedAttachments.size} attachment(s)."
@@ -180,12 +205,13 @@ class BackupViewModel(
     }
 
     fun onRestoreMerge() {
-        val validation = validateWithPassphrase()
+        val validation = validateForManualAction()
         if (validation != null) {
             _state.update { it.copy(error = validation) }
             return
         }
         runAction(BackupAction.RESTORE) {
+            service.usePassphrase(_state.value.form.passphrase)
             val result = service.restore(RestoreRequest(replace = false))
             "Restored ${result.mergedConversations.size} conversation(s)."
         }
@@ -209,7 +235,7 @@ class BackupViewModel(
         val current = _state.value
         if (!current.canReplace) return
 
-        val validation = validateWithPassphrase()
+        val validation = validateForManualAction()
         if (validation != null) {
             _state.update {
                 it.copy(error = validation, showReplaceDialog = false)
@@ -218,6 +244,7 @@ class BackupViewModel(
         }
 
         runAction(BackupAction.RESTORE) {
+            service.usePassphrase(_state.value.form.passphrase)
             val result = service.restore(
                 RestoreRequest(
                     replace = true,
@@ -249,7 +276,7 @@ class BackupViewModel(
         val current = _state.value
         if (!current.canDeleteRemote) return
 
-        val validation = validateWithPassphrase()
+        val validation = validateForManualAction()
         if (validation != null) {
             _state.update {
                 it.copy(error = validation, showDeleteDialog = false)
@@ -258,6 +285,7 @@ class BackupViewModel(
         }
 
         runAction(BackupAction.DELETE) {
+            service.usePassphrase(_state.value.form.passphrase)
             service.deleteRemote(current.deleteConfirmation)
             _state.update {
                 it.copy(showDeleteDialog = false, deleteConfirmation = "")
@@ -300,12 +328,18 @@ class BackupViewModel(
         validateBackupForm(_state.value.form)
             ?: validatePassphrase(_state.value.form.passphrase)
 
+    private fun validateForManualAction(): String? = when {
+        !_state.value.configured -> "Set up encrypted backup before continuing."
+        _state.value.configurationEdited -> "Apply your configuration edits before backup or recovery."
+        else -> validateWithPassphrase()
+    }
+
     private fun runAction(action: BackupAction, block: suspend () -> String) {
         if (_state.value.busy != null) return
 
         viewModelScope.launch {
             _state.update {
-                it.copy(busy = action, error = null, message = null)
+                it.copy(busy = action, error = null, message = null, testResult = null)
             }
             try {
                 val message = block()

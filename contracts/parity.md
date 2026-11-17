@@ -60,6 +60,34 @@
   setup entry. All five backend/encryption/enable semantics remain unchanged.
   Skip/Done preserve pending shares, deep links, existing drafts and useful
   Chats navigation without auto-sending or creating a duplicate chat.
+- Android minimalist UX-05.1 through UX-05.7 implements the concise Settings
+  root, wrapping Appearance choices, app-owned Defaults picker and grouped
+  Generation/Composer/Privacy. Immediate atomic preference writes, unset versus
+  explicit generation values, both send-key modes, all fonts/densities and
+  existing-chat/historical-model isolation are retained. Save feedback follows
+  actual mutations, not initial/catalog emissions; errors remain explicit.
+- Data & storage orders ordinary export/import before destructive actions and
+  reports actual document/service completion, cancellation or failure. Existing
+  plaintext warning, merge/replace selection, archive/secret exclusion, key
+  removal and exact clear-data confirmation are unchanged. Preparation and
+  validation use IO; activity launch alone is not success.
+- Encrypted backup now separates Configuration from status-first Overview,
+  merge restore and disclosed advanced recovery. All five backends/fields,
+  secure credential handling, memory-only passphrase, exact replace/delete
+  phrases and optional onboarding remain. Re-entering a passphrase unlocks
+  committed configuration in service memory without saving edits/credentials
+  or rescheduling. Test/edit does not enable backup; failed first upload does
+  not falsely enable Done. Existing connected-network/battery-not-low,
+  six-hour unique periodic work and exponential 30-second backoff are unchanged.
+- UX-06 adds reviewed production-shell goldens, route/data/focus regressions and
+  an asserted disposable-fixture profile journey; it does not establish a
+  generated profile, physical speed, TalkBack/IME/SAF behavior or usability.
+  Every requested task remains acceptance-blocked, with all 54 preservation
+  rows and thirteen source definition-of-done items mapped in
+  [UX-06.6](../docs/operations/android-minimalist-design-plan/UX-06.6-parity-and-closeout.md).
+  Local commands, known unrelated full-gate failures and missing device/profile/
+  performance/usability evidence are in the
+  [UX-05/06 verification record](../docs/operations/android-minimalist-design-plan/README.md#ux-0506-verification-record).
 - These are Android presentation/integration changes, not reduced parity or a
   release/performance pass. Real-IME/focus and picker/grant acceptance remain
   blocked as recorded in the minimalist task pack; UX-00.3 is still explicitly

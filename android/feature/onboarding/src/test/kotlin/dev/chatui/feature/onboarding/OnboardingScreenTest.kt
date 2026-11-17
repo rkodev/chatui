@@ -931,7 +931,7 @@ class OnboardingScreenTest {
         composeRule.onNodeWithTag(BackupSettingsTestTags.SetupComplete).performScrollTo().assertIsNotEnabled()
         assertThat(finishes).isEqualTo(0)
         backup.backupError = null
-        composeRule.onNodeWithTag(BackupSettingsTestTags.Enable).performScrollTo().performClick()
+        composeRule.onNodeWithTag(BackupSettingsTestTags.ApplyConfiguration).performScrollTo().performClick()
         composeRule.onNodeWithTag(BackupSettingsTestTags.SetupComplete).performScrollTo().performClick()
         assertThat(finishes).isEqualTo(1)
         assertThat(backup.calls.count { it == "enable" }).isEqualTo(2)
@@ -987,6 +987,7 @@ private class OnboardingBackupFake : BackupSettingsServiceLike {
     val calls = mutableListOf<String>()
     var backupError: Throwable? = null
     var lastForm: BackupFormValues? = null
+    override fun usePassphrase(passphrase: String) { calls += "unlock" }
     override suspend fun load(): BackupSettingsSnapshot {
         calls += "load"
         return BackupSettingsSnapshot(config = null, credentials = null)

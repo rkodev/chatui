@@ -1,6 +1,7 @@
 package dev.chatui.shell
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -33,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -219,6 +222,7 @@ fun ShellScaffold(
     providerManagementService: ProviderManagementService? = null,
 ) {
     val activity = LocalActivity.current
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val expanded = activity != null &&
         calculateWindowSizeClass(activity).widthSizeClass == WindowWidthSizeClass.Expanded
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -331,10 +335,16 @@ fun ShellScaffold(
     ) {
         val rootModifier = Modifier
             .fillMaxSize()
+            .semantics { testTagsAsResourceId = true }
             .testTag(ShellTestTags.Root)
             .let { base -> if (isolated) base else base.shellShortcutHandler(actions) }
 
         Box(modifier = rootModifier) {
+            BackHandler(enabled = !isolated && !chat && !historyRoot) {
+                if (!navController.popBackStack()) {
+                    navController.navigateToShellRoute(ShellDestination.Conversations.route)
+                }
+            }
             BackHandler(
                 enabled = appHandlesBack(
                     BackState(drawerOpen = !expanded && drawerState.isOpen),
@@ -399,7 +409,9 @@ fun ShellScaffold(
                                         icon = Icons.AutoMirrored.Rounded.ArrowBack,
                                         contentDescription = "Back",
                                         onClick = {
-                                            if (!navController.popBackStack()) {
+                                            if (backDispatcher != null) {
+                                                backDispatcher.onBackPressed()
+                                            } else if (!navController.popBackStack()) {
                                                 navController.navigateToShellRoute(
                                                     ShellDestination.Conversations.route,
                                                 )
