@@ -1,7 +1,7 @@
 # ChatUI Feature Parity
 
 - Source: [IMPLEMENTATION.md section 5.4](../docs/IMPLEMENTATION.md#54-parity-checklist)
-- Updated: 2026-11-10
+- Updated: 2026-11-17
 - Purpose: authoritative cross-client requirement and commitment table.
 
 | Feature | Web | Android | Rust |
@@ -30,6 +30,10 @@
 
 ## Notes
 
+- Android [UX-01.1](../docs/operations/android-minimalist-design-plan/UX-01.1-colors-and-contrast.md)
+  refines semantic accent/selected/status contrast only. Feature commitments,
+  provider behavior, persisted preferences, and the opt-in dynamic-color policy
+  are unchanged; no capability is removed or reduced.
 - OpenRouter is the first release blocker. These rows are release-blocking on every published client: OpenRouter first-run onboarding, key introspection, catalog/pricing/modalities, streaming/reasoning/usage/cost, and provider routing preferences.
 - The Rust column may be `Optional` until the Rust desktop client is enabled for release. Once enabled and published, Rust must meet the same contracts, conformance, parity, and security bar as web and Android. The Rust client is desktop-only for Windows, macOS, and Linux; it is not an Android, iOS, or WASM client.
 - Current Rust status (2026-11-12): shipping and required for M5 onward (`M5-decisions.md` `DEC-M5-03`); the `Backup/sync` row is complete for Rust. The earlier M3.5 preview note is superseded.

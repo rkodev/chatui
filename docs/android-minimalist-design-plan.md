@@ -165,6 +165,11 @@ These calculations do not certify every rendered state. Check disabled,
 pressed, selected, warning, code, translucent, and dynamic-color combinations
 separately. Dynamic color must use the matching on-color roles.
 
+**Approved UX-01.1 alternative (2026-11-17):** the owner selected the deeper
+light accent `#1D4ED8`, retaining white on-accent text, because white pressed
+state layers reduce the originally proposed blue below 4.5:1. Keep the
+proposed dark pair `#8AB4F8` / `#0B1020` and the existing neutral palette.
+
 ### Responsive layout
 
 Width and device capability are separate concerns: a small viewport does not
@@ -608,8 +613,19 @@ Lite version or require users to diagnose their phone's RAM.
 
 ### Proposed measurable budgets
 
-Confirm these against named reference devices in UX-00; they are targets, not
-claims about the existing app.
+These are targets, not claims about the existing app. On 2026-11-17 the owner
+explicitly approved an AVD-only pre-redesign comparison baseline for UX-00.3,
+with physical-device acceptance retained in UX-06.4. This changes the baseline
+gate, not any budget or the release hardware matrix. Preserve the baseline
+APKs, source, fixtures, and measurement recipe so UX-06.4 can run both old and
+redesigned builds on named physical reference devices before accepting them;
+never compare an emulator baseline directly with a physical-device result.
+
+The owner subsequently deferred UX-00.3 on 2026-11-17 to proceed with UI
+refinement. No complete performance baseline is accepted; UX-01.1/UX-01.2
+may proceed under that explicit prerequisite waiver. The frozen old build
+and fixtures remain available for later old/new measurements. This deferral
+does not waive UX-06.4, change a budget, or establish performance compliance.
 
 | Measure | Acceptance target and method |
 | --- | --- |
@@ -621,8 +637,9 @@ claims about the existing app.
 | Network independence | History, settings, and draft editing remain usable under the existing offline rules. A slow provider must not freeze navigation or local UI. |
 
 Measure with deterministic fake streams/catalogs and local data, keeping network
-latency separate from rendering. Emulator screenshots are not evidence of
-physical-device memory, startup, or battery performance.
+latency separate from rendering. Label UX-00.3's AVD timing/frame/PSS evidence
+as emulator-only; neither it nor emulator screenshots demonstrate physical-device
+memory, startup, battery behavior, or achievement of these hardware targets.
 
 Update the existing baseline-profile journey rather than assuming it covers the
 new flows. `StartupBaselineProfile.kt` still searches for a literal menu glyph

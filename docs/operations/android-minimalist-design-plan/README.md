@@ -2,10 +2,10 @@
 
 - Source plan: [Android minimalist design plan](../../android-minimalist-design-plan.md)
 - Behavior authority: [IMPLEMENTATION.md](../../IMPLEMENTATION.md)
-- Status: Not started
+- Status: In progress
 - Scope: Android presentation, navigation integration, accessibility, and resource efficiency. Preserve functionality.
 - Breakdown: 41 tasks across the source plan's UX-00 through UX-06 phases.
-- Implementation: Not started by creating this task pack.
+- Implementation: UX-01.1 complete; UX-00.3 deferred by the owner.
 
 ## Folder and numbering contract
 
@@ -68,6 +68,22 @@ status source. Always qualify this pack when selecting a task.
 10. Mark `Complete` only when all acceptance criteria and required checks have
     evidence. Missing hardware/manual review is `Blocked`, not a pass. Update
     the task and index together, then stop at that task's boundary.
+
+**Approved UX-00.3 exception (2026-11-17):** the owner selected "Accept an
+explicitly labeled AVD baseline for UX-00.3; retain physical-device acceptance
+for UX-06.4." UX-00.3 may complete with reviewed, reproducible AVD measurements
+and frozen baseline artifacts; it must not claim entry-level/mid-tier physical
+hardware or hardware-budget acceptance. Its existing dependency edges are
+unchanged: UX-01.1 and UX-01.2 require this approved baseline gate, while
+UX-06.4 still requires physical old/new measurements and blocks release
+acceptance when hardware is missing. This is not a waiver for any other task.
+
+**Owner-directed deferral (2026-11-17):** "skip the perfomance baseline and
+lets get to the refinement". UX-00.3 remains `Blocked` with incomplete,
+excluded pilot evidence; it is not a performance pass. UX-01.1 and UX-01.2
+may proceed under this explicit prerequisite waiver. Keep the recorded
+dependency edges and physical UX-06.4 acceptance requirements; remeasure
+the preserved old build and candidate before making performance claims.
 
 ### Non-negotiable safeguards
 
@@ -138,7 +154,7 @@ is read-only unless a tightly coupled integration fix is explicitly required.
 | 1 | [UX-00.1 Functional inventory and decisions](UX-00.1-functional-inventory.md) | Complete | none |
 | 2 | [UX-00.2 Fixtures and visual baseline](UX-00.2-fixtures-and-visual-baseline.md) | Complete | UX-00.1 |
 | 3 | [UX-00.3 Reference-device performance baseline](UX-00.3-device-performance-baseline.md) | Blocked | UX-00.2 |
-| 4 | [UX-01.1 Semantic colors and contrast](UX-01.1-colors-and-contrast.md) | Not started | UX-00.3 |
+| 4 | [UX-01.1 Semantic colors and contrast](UX-01.1-colors-and-contrast.md) | Complete | UX-00.3 |
 | 5 | [UX-01.2 Density, spacing, and touch targets](UX-01.2-density-and-touch-targets.md) | Not started | UX-00.3 |
 | 6 | [UX-01.3 Compact scaffold title bar](UX-01.3-compact-scaffold.md) | Not started | UX-01.1, UX-01.2 |
 | 7 | [UX-01.4 Applied theme and feedback preferences](UX-01.4-theme-preferences.md) | Not started | UX-01.1 |
@@ -203,6 +219,8 @@ UX-06.1 waits for every screen-lane endpoint, including independent resource
 tasks. Accessibility and profile work can then proceed separately; device
 usability and performance converge at UX-06.6. A blocked measurement cannot be
 silently replaced by an emulator screenshot or an old milestone's pass.
+UX-00.3's explicitly approved AVD-baseline exception does not replace UX-06.4's
+physical-device evidence.
 
 ## Plan coverage and preservation ownership
 

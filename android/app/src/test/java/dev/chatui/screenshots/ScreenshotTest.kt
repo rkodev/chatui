@@ -1,10 +1,16 @@
 package dev.chatui.screenshots
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -16,13 +22,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.chatui.core.datastore.settings.AndroidSettings
+import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.ChatUiTheme
+import dev.chatui.core.designsystem.InlineBanner
+import dev.chatui.core.designsystem.LocalChatUiColors
+import dev.chatui.core.designsystem.PrimaryButton
+import dev.chatui.core.designsystem.SecondaryButton
 import dev.chatui.core.model.BrowserCors
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.ChatErrorCode
@@ -45,6 +60,8 @@ import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.model.ProviderKind
 import dev.chatui.core.model.Theme
 import dev.chatui.feature.chat.ChatAvailability
+import dev.chatui.feature.chat.ChatCodeBlock
+import dev.chatui.feature.chat.ChatCodeBlockTestTags
 import dev.chatui.feature.chat.ChatScreen
 import dev.chatui.feature.chat.ChatUiState
 import dev.chatui.feature.chat.StreamingState
@@ -84,6 +101,7 @@ import dev.chatui.feature.settings.StorageUsageEntry
 import dev.chatui.shell.AdaptiveShell
 import dev.chatui.shell.ConversationsPlaceholder
 import dev.chatui.shell.ShellSidebarDestination
+import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.serialization.json.buildJsonObject
@@ -105,6 +123,8 @@ import org.robolectric.annotation.GraphicsMode
  * Every screen is captured in light and dark. Each test method pins the
  * phone or tablet qualifiers so the same screen produces four goldens:
  * phone/light, phone/dark, tablet/light, and tablet/dark.
+ * The UX-01.1 component review instead writes opt-in external captures through
+ * CHATUI_REFINEMENT_DIR, leaving historical goldens untouched.
  *
  * All data is fake. No API key, prompt, conversation, or personal data is
  * rendered by these fixtures.
@@ -141,6 +161,92 @@ class ScreenshotTest {
         theme = Theme.DARK
         composeRule.waitForIdle()
         composeRule.onRoot().captureRoboImage("${name}_dark.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-notnight-mdpi")
+    fun semanticColorsLight() = captureSemanticColors(Theme.LIGHT)
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-night-mdpi")
+    fun semanticColorsDark() = captureSemanticColors(Theme.DARK)
+
+    private fun captureSemanticColors(theme: Theme) {
+        composeRule.setContent {
+            ChatUiTheme(themeMode = theme, reducedMotion = true) {
+                val colors = LocalChatUiColors.current
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(colors.bgCanvas)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("Actions and local content", color = colors.fgPrimary)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PrimaryButton("Continue", {})
+                        SecondaryButton("Cancel", {})
+                        PrimaryButton("Disabled", {}, enabled = false)
+                    }
+                    NavigationDrawerItem(
+                        label = { Text("Selected conversation") },
+                        selected = true,
+                        onClick = {},
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Native ripples are not drawn by Robolectric; label the modeled state.
+                        Button(
+                            onClick = {},
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.fgOnAccent.copy(alpha = 0.12f)
+                                    .compositeOver(colors.accent),
+                                contentColor = colors.fgOnAccent,
+                            ),
+                        ) { Text("Pressed (12%)") }
+                        Button(
+                            onClick = {},
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiary,
+                                contentColor = MaterialTheme.colorScheme.onTertiary,
+                            ),
+                        ) { Text("Warning") }
+                        Button(
+                            onClick = {},
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError,
+                            ),
+                        ) { Text("Error") }
+                    }
+                    InlineBanner(BannerSeverity.Info, "Local history", body = "Available offline")
+                    InlineBanner(BannerSeverity.Warning, "Review this setting")
+                    InlineBanner(BannerSeverity.Error, "Could not connect")
+                    ChatCodeBlock(
+                        "val answer = \"Invented local text\"",
+                        language = "kotlin",
+                        modifier = Modifier.heightIn(max = 128.dp),
+                    )
+                    Column(
+                        modifier = Modifier.background(colors.bgInput).padding(12.dp),
+                    ) {
+                        Text("Input surface", color = colors.fgPrimary)
+                        Text("Secondary information", color = colors.fgSecondary)
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithText("Selected conversation").assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatCodeBlockTestTags.Code).assertIsDisplayed()
+        composeRule.onNodeWithText("Input surface").assertIsDisplayed()
+        val output = System.getenv("CHATUI_REFINEMENT_DIR")
+        val directory = output?.let(::File)?.also {
+            require(it.isAbsolute) { "CHATUI_REFINEMENT_DIR must be an absolute artifact path." }
+            it.mkdirs()
+        }
+        val name = "semantic_colors_${theme.name.lowercase()}"
+        if (directory != null) {
+            composeRule.onRoot().captureRoboImage(file = File(directory, "$name.png"))
+        }
     }
 
     // Onboarding -----------------------------------------------------------------

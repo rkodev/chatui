@@ -3,6 +3,7 @@ package dev.chatui.core.designsystem
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,7 +29,7 @@ class DesignSystemTest {
         assertThat(LightColors.fgSecondary.toArgb()).isEqualTo(0xFF3C3C43.toInt())
         assertThat(LightColors.fgMuted.toArgb()).isEqualTo(0xFF6C6C70.toInt())
         assertThat(LightColors.fgOnAccent.toArgb()).isEqualTo(0xFFFFFFFF.toInt())
-        assertThat(LightColors.accent.toArgb()).isEqualTo(0xFF007AFF.toInt())
+        assertThat(LightColors.accent.toArgb()).isEqualTo(0xFF1D4ED8.toInt())
         assertThat(LightColors.accentHover.toArgb()).isEqualTo(0xFF0062CC.toInt())
         assertThat(LightColors.borderSubtle.toArgb()).isEqualTo(0xFFE5E5EA.toInt())
         assertThat(LightColors.borderStrong.toArgb()).isEqualTo(0xFF8E8E93.toInt())
@@ -56,7 +57,7 @@ class DesignSystemTest {
         assertThat(DarkColors.fgSecondary.toArgb()).isEqualTo(0xFFD1D1D6.toInt())
         assertThat(DarkColors.fgMuted.toArgb()).isEqualTo(0xFF8E8E93.toInt())
         assertThat(DarkColors.fgOnAccent.toArgb()).isEqualTo(0xFF0B1020.toInt())
-        assertThat(DarkColors.accent.toArgb()).isEqualTo(0xFF0A84FF.toInt())
+        assertThat(DarkColors.accent.toArgb()).isEqualTo(0xFF8AB4F8.toInt())
         assertThat(DarkColors.accentHover.toArgb()).isEqualTo(0xFF409CFF.toInt())
         assertThat(DarkColors.borderSubtle.toArgb()).isEqualTo(0xFF38383A.toInt())
         assertThat(DarkColors.borderStrong.toArgb()).isEqualTo(0xFF8E8E93.toInt())
@@ -85,6 +86,8 @@ class DesignSystemTest {
         assertThat(light.onPrimary).isEqualTo(LightColors.fgOnAccent)
         assertThat(light.primaryContainer).isEqualTo(LightColors.accentSoft)
         assertThat(light.onPrimaryContainer).isEqualTo(LightColors.onAccentSoft)
+        assertThat(light.secondaryContainer).isEqualTo(LightColors.accentSoft)
+        assertThat(light.onSecondaryContainer).isEqualTo(LightColors.onAccentSoft)
         assertThat(light.background).isEqualTo(LightColors.bgCanvas)
         assertThat(light.onBackground).isEqualTo(LightColors.fgPrimary)
         assertThat(light.surface).isEqualTo(LightColors.bgSurface)
@@ -130,6 +133,66 @@ class DesignSystemTest {
             .isAtLeast(4.5)
         assertThat(contrastRatio(DarkColors.fgPrimary, DarkColors.bgCanvas))
             .isAtLeast(4.5)
+    }
+
+    @Test
+    fun `filled accent labels retain contrast through pressed state layers`() {
+        listOf(LightColors, DarkColors).forEach { colors ->
+            listOf(0f, 0.08f, 0.10f, 0.12f, 0.16f).forEach { alpha ->
+                val background = colors.fgOnAccent.copy(alpha = alpha)
+                    .compositeOver(colors.accent)
+                assertThat(contrastRatio(colors.fgOnAccent, background)).isAtLeast(4.5)
+            }
+        }
+    }
+
+    @Test
+    fun `accent text and controls meet contrast on local surfaces`() {
+        listOf(LightColors, DarkColors).forEach { colors ->
+            listOf(
+                colors.bgCanvas,
+                colors.bgSurface,
+                colors.bgSurfaceRaised,
+                colors.bgInput,
+                colors.accentSoft,
+            ).forEach { background ->
+                assertThat(contrastRatio(colors.accent, background)).isAtLeast(4.5)
+            }
+        }
+    }
+
+    @Test
+    fun `dynamic primary on colors do not leak into fixed status roles`() {
+        val schemes = listOf(
+            false to LightColors.withDynamicAccent(
+                lightColorScheme(
+                    primary = Color(0xFFB8F397),
+                    onPrimary = Color(0xFF102008),
+                    primaryContainer = Color(0xFFD8F8CA),
+                    onPrimaryContainer = Color(0xFF102008),
+                ),
+            ),
+            true to DarkColors.withDynamicAccent(
+                darkColorScheme(
+                    primary = Color(0xFFD0BCFF),
+                    onPrimary = Color(0xFF381E72),
+                    primaryContainer = Color(0xFF4F378B),
+                    onPrimaryContainer = Color(0xFFEADDFF),
+                ),
+            ),
+        )
+
+        schemes.forEach { (isDark, colors) ->
+            val material = colors.toMaterialColorScheme(isDark)
+            assertThat(contrastRatio(material.onPrimary, material.primary)).isAtLeast(4.5)
+            assertThat(contrastRatio(material.onPrimaryContainer, material.primaryContainer))
+                .isAtLeast(4.5)
+            assertThat(contrastRatio(material.onSecondary, material.secondary)).isAtLeast(4.5)
+            assertThat(material.secondaryContainer).isEqualTo(colors.accentSoft)
+            assertThat(material.onSecondaryContainer).isEqualTo(colors.onAccentSoft)
+            assertThat(contrastRatio(material.onError, material.error)).isAtLeast(4.5)
+            assertThat(contrastRatio(material.onTertiary, material.tertiary)).isAtLeast(4.5)
+        }
     }
 
     @Test
