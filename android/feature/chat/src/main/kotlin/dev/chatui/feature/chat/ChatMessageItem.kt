@@ -259,6 +259,7 @@ fun ChatMessageItem(
                                 content = part,
                                 modifier = Modifier.testTag(ChatMessageTestTags.text(message.id)),
                                 chatFontSize = chatFontSize,
+                                parseImmediately = isActiveStream,
                                 loadRemoteImages = loadRemoteImages,
                                 imageOwnerKey = "${message.conversationId}:${message.id}",
                             )
