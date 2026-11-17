@@ -33,6 +33,7 @@ function createService(overrides: Partial<OnboardingServiceLike> = {}): Onboardi
 
 describe('OnboardingScreen', () => {
   it('shows the first-run welcome, preselects OpenRouter, and keeps chat disabled', async () => {
+    const user = userEvent.setup()
     const service = createService()
 
     render(<OnboardingScreen service={service} onConnected={vi.fn()} />)
@@ -41,13 +42,19 @@ describe('OnboardingScreen', () => {
     expect(screen.getByText(/bring-your-own-key/i)).toBeInTheDocument()
     expect(screen.getByText(/stay on this device/i)).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /OpenRouter/ })).toBeChecked()
-    expect(screen.getByRole('radio', { name: /^OpenAI/ })).toBeDisabled()
     expect(screen.getByText('Recommended')).toBeInTheDocument()
     expect(await screen.findByText('OpenAI: GPT-4o mini')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Start chatting' })).toBeDisabled()
+    expect(screen.getByText('Chat stays disabled until your key is validated.')).toBeInTheDocument()
+
     expect(
-      screen.getByText('Chat stays disabled until your key is validated.'),
-    ).toBeInTheDocument()
+      screen.getByText('Looking for another provider?').closest('details'),
+    ).not.toHaveAttribute('open')
+    await user.click(screen.getByText('Looking for another provider?'))
+    expect(screen.getByText('Looking for another provider?').closest('details')).toHaveAttribute(
+      'open',
+    )
+    expect(screen.getByRole('radio', { name: /^OpenAI/ })).toBeDisabled()
   })
 
   it('shows an actionable auth error and preserves the form', async () => {
@@ -67,9 +74,7 @@ describe('OnboardingScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Connect' }))
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent(
-      'Your API key was rejected. Check the key and try again.',
-    )
+    expect(alert).toHaveTextContent('Your API key was rejected. Check the key and try again.')
     expect(alert).not.toHaveTextContent('sk-test-key')
     expect(screen.getByLabelText('OpenRouter API key')).toHaveValue('sk-test-key')
     expect(screen.getByLabelText('Label (optional)')).toHaveValue('Work')
@@ -120,9 +125,7 @@ describe('OnboardingScreen', () => {
 
     resolveConnect({ conversationId: 'conversation-1', notice: null })
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Connected' })).toBeDisabled(),
-    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Connected' })).toBeDisabled())
   })
 
   it('shows a non-blocking catalog error and still allows connecting', async () => {

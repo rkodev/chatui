@@ -1,16 +1,28 @@
 import { RouterProvider } from '@tanstack/react-router'
 import { act, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useDraftStore } from '../../app/stores'
 import { createTestRouter } from '../providers/testRouter'
-import { createTestConversation, createTestModel, createTestProvider } from '../providers/testSupport'
+import {
+  createTestConversation,
+  createTestModel,
+  createTestProvider,
+} from '../providers/testSupport'
 import { ChatScreen } from './ChatScreen'
+import { Composer } from './Composer'
 import { createStreamingState, useStreamingStore } from './streamingStore'
 import { createTestChatSession, createTestMessage } from './testSupport'
 import type { ChatSession } from './useChatSession'
 
-function renderScreen(session: ChatSession) {
+function renderScreen(session: ChatSession, withComposer = false) {
   const router = createTestRouter(
-    () => <ChatScreen session={session} />,
+    () => (
+      <ChatScreen
+        session={session}
+        composer={withComposer ? <Composer session={session} /> : undefined}
+      />
+    ),
     'chat/$conversationId',
     '/chat/conversation-1',
     ['/', 'settings/providers/new', 'settings/models', 'chat/$conversationId/settings'],
@@ -21,6 +33,7 @@ function renderScreen(session: ChatSession) {
 
 afterEach(() => {
   useStreamingStore.getState().clearAll()
+  useDraftStore.setState({ drafts: {} })
 })
 
 describe('ChatScreen', () => {
@@ -33,7 +46,9 @@ describe('ChatScreen', () => {
   it('renders the not-found state', async () => {
     renderScreen(createTestChatSession({ status: 'not_found', conversation: null }))
 
-    expect(await screen.findByRole('heading', { name: 'Conversation not found' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Conversation not found' }),
+    ).toBeInTheDocument()
   })
 
   it('renders the load error state', async () => {
@@ -45,7 +60,9 @@ describe('ChatScreen', () => {
       }),
     )
 
-    expect(await screen.findByRole('heading', { name: 'Could not load the conversation' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Could not load the conversation' }),
+    ).toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent('IndexedDB unavailable')
   })
 
@@ -65,6 +82,7 @@ describe('ChatScreen', () => {
       'href',
       '/settings/providers/new',
     )
+    expect(screen.queryByRole('button', { name: /Explore an idea/ })).not.toBeInTheDocument()
   })
 
   it('renders the model-unavailable state', async () => {
@@ -88,16 +106,41 @@ describe('ChatScreen', () => {
   it('renders the empty conversation state', async () => {
     renderScreen(createTestChatSession())
 
-    expect(await screen.findByRole('heading', { name: 'Start the conversation' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Start the conversation' }),
+    ).toBeInTheDocument()
     expect(await screen.findByTestId('chat-composer-slot')).toBeInTheDocument()
   })
+
+  it.each(['', 'My unfinished thought'])(
+    'adds a starter to the current draft without sending or losing existing text (%j)',
+    async (draft) => {
+      const user = userEvent.setup()
+      const send = vi.fn(async () => true)
+      useDraftStore.setState({
+        drafts: { 'conversation-1': draft, 'another-conversation': 'Keep this draft' },
+      })
+      renderScreen(createTestChatSession({ send }), true)
+
+      await user.click(await screen.findByRole('button', { name: /Explore an idea/ }))
+
+      const prompt = 'Help me brainstorm an idea. Start by asking what I am working on.'
+      expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(
+        draft === '' ? prompt : `${draft}\n\n${prompt}`,
+      )
+      expect(screen.getByRole('textbox', { name: 'Message' })).toHaveFocus()
+      expect(useDraftStore.getState().drafts['another-conversation']).toBe('Keep this draft')
+      expect(send).not.toHaveBeenCalled()
+    },
+  )
 
   it('links to conversation settings from the chat header', async () => {
     renderScreen(createTestChatSession())
 
-    expect(
-      await screen.findByRole('link', { name: 'Conversation settings' }),
-    ).toHaveAttribute('href', '/chat/conversation-1/settings')
+    expect(await screen.findByRole('link', { name: 'Conversation settings' })).toHaveAttribute(
+      'href',
+      '/chat/conversation-1/settings',
+    )
   })
 
   it('renders complete history and the live-region announcement', async () => {

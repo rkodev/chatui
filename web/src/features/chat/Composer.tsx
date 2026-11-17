@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { useDraftStore } from '../../app/stores'
 import type { Attachment } from '../../domain'
+import { Icon } from '../../ui/Icon'
 import {
   Dialog,
   DialogClose,
@@ -374,7 +375,7 @@ export function Composer({ session }: ComposerProps) {
             onClick={handleStop}
             aria-label="Stop response"
           >
-            Stop
+            <Icon name="stop" size={17} />
           </Button>
         ) : (
           <Button
@@ -384,7 +385,7 @@ export function Composer({ session }: ComposerProps) {
             disabled={sendDisabled}
             aria-label="Send message"
           >
-            Send
+            <Icon name="arrow-up" size={19} />
           </Button>
         )}
       </div>
@@ -404,16 +405,18 @@ export function Composer({ session }: ComposerProps) {
           }}
         />
         <Button
-          variant="secondary"
+          variant="ghost"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
           disabled={composerDisabled || isStreaming || isAdding}
           aria-label="Attach files"
         >
+          <Icon name="paperclip" size={16} />
           {isAdding ? 'Adding…' : 'Attach files'}
         </Button>
-        <span className="composer__hint">
-          Images are downscaled to 2048 px before sending. Files stay on this device.
+        <span className="composer__hint">Files go directly to your provider when you send.</span>
+        <span className="composer__keys">
+          <kbd>{sendKey === 'enter' ? 'Enter' : 'Ctrl / ⌘ Enter'}</kbd> to send
         </span>
       </div>
 

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { Conversation } from '../../domain'
 import type { ConversationSearchGroup } from '../../storage'
+import { Icon } from '../../ui/Icon'
 import {
   Button,
   Dialog,
@@ -142,7 +143,7 @@ export function ConversationSidebar({
           aria-current={active ? 'page' : undefined}
         >
           <span className="conversation-sidebar__item-title">
-            {conversation.title}
+            <span className="conversation-sidebar__item-name">{conversation.title}</span>
             {conversation.pinned && (
               <span className="conversation-sidebar__pinned-badge">Pinned</span>
             )}
@@ -180,7 +181,17 @@ export function ConversationSidebar({
 
   return (
     <>
+      {isOpen && onClose && (
+        <button
+          type="button"
+          className="conversation-sidebar__backdrop"
+          onClick={onClose}
+          aria-label="Dismiss history"
+          tabIndex={-1}
+        />
+      )}
       <aside
+        id="conversation-history"
         className="conversation-sidebar"
         data-open={isOpen ? 'true' : 'false'}
         aria-label="Conversation history"
@@ -195,33 +206,26 @@ export function ConversationSidebar({
               onClick={onClose}
               aria-label="Close history"
             >
-              ×
+              <Icon name="close" />
             </Button>
           )}
         </div>
 
         <Button className="conversation-sidebar__new" onClick={onNewChat}>
+          <Icon name="plus" />
           New chat
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="conversation-sidebar__view-toggle"
-          onClick={() => onViewChange(archivedView ? 'active' : 'archived')}
-        >
-          {archivedView ? 'Back to chats' : 'Archived'}
         </Button>
 
         <div className="conversation-sidebar__search" role="search">
           <label className="conversation-sidebar__search-label" htmlFor="conversation-search">
             Search conversations
           </label>
+          <Icon name="search" size={16} className="conversation-sidebar__search-icon" />
           <input
             id="conversation-search"
             className="conversation-sidebar__search-input"
             type="search"
-            placeholder="Search conversations"
+            placeholder="Search your chats"
             value={search.query}
             onChange={(event) => search.onQueryChange(event.target.value)}
             onKeyDown={(event) => {
@@ -232,6 +236,16 @@ export function ConversationSidebar({
             }}
           />
         </div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="conversation-sidebar__view-toggle"
+          onClick={() => onViewChange(archivedView ? 'active' : 'archived')}
+        >
+          <Icon name={archivedView ? 'arrow-left' : 'archive'} size={15} />
+          {archivedView ? 'Back to chats' : 'Archived'}
+        </Button>
 
         {!online && (
           <p className="conversation-sidebar__offline" role="status">
@@ -245,140 +259,150 @@ export function ConversationSidebar({
           </p>
         )}
 
-        {searching ? (
-          <div className="conversation-sidebar__search-results" aria-label="Search results">
-            {search.status === 'loading' && (
-              <p className="conversation-sidebar__status" role="status" aria-live="polite">
-                Searching conversations…
-              </p>
-            )}
-
-            {search.status === 'error' && (
-              <p className="conversation-sidebar__error" role="alert">
-                Could not search conversations: {search.error ?? 'Unknown error'}
-              </p>
-            )}
-
-            {search.status === 'ready' && search.groups.length === 0 && (
-              <p className="conversation-sidebar__empty" role="status" aria-live="polite">
-                No conversations match “{search.query}”.
-              </p>
-            )}
-
-            {search.status === 'ready' && search.groups.length > 0 && (
-              <>
+        <div className="conversation-sidebar__history">
+          {searching ? (
+            <div className="conversation-sidebar__search-results" aria-label="Search results">
+              {search.status === 'loading' && (
                 <p className="conversation-sidebar__status" role="status" aria-live="polite">
-                  {search.groups.length} conversation{search.groups.length === 1 ? '' : 's'} match
-                  “{search.query}”.
+                  Searching conversations…
                 </p>
+              )}
 
-                {search.groups.map((group) => {
-                  const active = group.conversation.id === activeConversationId
+              {search.status === 'error' && (
+                <p className="conversation-sidebar__error" role="alert">
+                  Could not search conversations: {search.error ?? 'Unknown error'}
+                </p>
+              )}
 
-                  return (
-                    <section
-                      key={group.conversation.id}
-                      className="conversation-sidebar__search-group"
-                      aria-labelledby={`search-group-${group.conversation.id}`}
-                    >
-                      <h3
-                        id={`search-group-${group.conversation.id}`}
-                        className="conversation-sidebar__search-group-title"
-                      >
-                        <button
-                          type="button"
-                          className="conversation-sidebar__search-title"
-                          onClick={() => onSelect(group.conversation)}
-                          aria-current={active ? 'page' : undefined}
-                        >
-                          {group.conversation.title}
-                        </button>
-                        {group.titleMatch && (
-                          <span className="conversation-sidebar__search-badge">Title match</span>
-                        )}
-                      </h3>
+              {search.status === 'ready' && search.groups.length === 0 && (
+                <p className="conversation-sidebar__empty" role="status" aria-live="polite">
+                  No conversations match “{search.query}”.
+                </p>
+              )}
 
-                      {group.messageMatches.length > 0 && (
-                        <ul className="conversation-sidebar__list">
-                          {group.messageMatches.map((match) => (
-                            <li key={match.messageId} className="conversation-sidebar__search-match">
-                              <button
-                                type="button"
-                                className="conversation-sidebar__search-snippet"
-                                onClick={() => onSelect(group.conversation)}
-                              >
-                                <span className="conversation-sidebar__search-snippet-role">
-                                  {match.role}
-                                </span>
-                                <span>{match.snippet}</span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </section>
-                  )
-                })}
-
-                {search.truncated && (
-                  <p className="conversation-sidebar__status">
-                    Showing the most recent matches. Narrow your search to see more.
+              {search.status === 'ready' && search.groups.length > 0 && (
+                <>
+                  <p className="conversation-sidebar__status" role="status" aria-live="polite">
+                    {search.groups.length} conversation{search.groups.length === 1 ? '' : 's'} match
+                    “{search.query}”.
                   </p>
-                )}
-              </>
-            )}
-          </div>
-        ) : (
-          <>
-            {status === 'loading' && (
-              <p className="conversation-sidebar__status" role="status">
-                Loading conversations…
-              </p>
-            )}
 
-            {status === 'ready' && conversations.length === 0 && (
-              <p className="conversation-sidebar__empty">
-                {archivedView ? 'No archived conversations.' : 'No conversations yet.'}
-              </p>
-            )}
+                  {search.groups.map((group) => {
+                    const active = group.conversation.id === activeConversationId
 
-            {status === 'ready' && pinnedConversations.length > 0 && (
-              <section
-                className="conversation-sidebar__group"
-                aria-labelledby="history-group-pinned"
-              >
-                <h3
-                  id="history-group-pinned"
-                  className="conversation-sidebar__group-title"
-                >
-                  Pinned
-                </h3>
-                <ul className="conversation-sidebar__list">
-                  {pinnedConversations.map(renderConversationItem)}
-                </ul>
-              </section>
-            )}
+                    return (
+                      <section
+                        key={group.conversation.id}
+                        className="conversation-sidebar__search-group"
+                        aria-labelledby={`search-group-${group.conversation.id}`}
+                      >
+                        <h3
+                          id={`search-group-${group.conversation.id}`}
+                          className="conversation-sidebar__search-group-title"
+                        >
+                          <button
+                            type="button"
+                            className="conversation-sidebar__search-title"
+                            onClick={() => onSelect(group.conversation)}
+                            aria-current={active ? 'page' : undefined}
+                          >
+                            {group.conversation.title}
+                          </button>
+                          {group.titleMatch && (
+                            <span className="conversation-sidebar__search-badge">Title match</span>
+                          )}
+                        </h3>
 
-            {status === 'ready' &&
-              groups.map((group) => (
+                        {group.messageMatches.length > 0 && (
+                          <ul className="conversation-sidebar__list">
+                            {group.messageMatches.map((match) => (
+                              <li
+                                key={match.messageId}
+                                className="conversation-sidebar__search-match"
+                              >
+                                <button
+                                  type="button"
+                                  className="conversation-sidebar__search-snippet"
+                                  onClick={() => onSelect(group.conversation)}
+                                >
+                                  <span className="conversation-sidebar__search-snippet-role">
+                                    {match.role}
+                                  </span>
+                                  <span>{match.snippet}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </section>
+                    )
+                  })}
+
+                  {search.truncated && (
+                    <p className="conversation-sidebar__status">
+                      Showing the most recent matches. Narrow your search to see more.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              {status === 'loading' && (
+                <p className="conversation-sidebar__status" role="status">
+                  Loading conversations…
+                </p>
+              )}
+
+              {status === 'ready' && conversations.length === 0 && (
+                <p className="conversation-sidebar__empty">
+                  {archivedView ? 'No archived conversations.' : 'No conversations yet.'}
+                </p>
+              )}
+
+              {status === 'ready' && pinnedConversations.length > 0 && (
                 <section
-                  key={group.key}
                   className="conversation-sidebar__group"
-                  aria-labelledby={`history-group-${group.key}`}
+                  aria-labelledby="history-group-pinned"
                 >
-                  <h3
-                    id={`history-group-${group.key}`}
-                    className="conversation-sidebar__group-title"
-                  >
-                    {group.label}
+                  <h3 id="history-group-pinned" className="conversation-sidebar__group-title">
+                    Pinned
                   </h3>
                   <ul className="conversation-sidebar__list">
-                    {group.conversations.map(renderConversationItem)}
+                    {pinnedConversations.map(renderConversationItem)}
                   </ul>
                 </section>
-              ))}
-          </>
-        )}
+              )}
+
+              {status === 'ready' &&
+                groups.map((group) => (
+                  <section
+                    key={group.key}
+                    className="conversation-sidebar__group"
+                    aria-labelledby={`history-group-${group.key}`}
+                  >
+                    <h3
+                      id={`history-group-${group.key}`}
+                      className="conversation-sidebar__group-title"
+                    >
+                      {group.label}
+                    </h3>
+                    <ul className="conversation-sidebar__list">
+                      {group.conversations.map(renderConversationItem)}
+                    </ul>
+                  </section>
+                ))}
+            </>
+          )}
+        </div>
+
+        <div className="conversation-sidebar__footer">
+          <Icon name="shield" size={18} />
+          <div>
+            <strong>Yours, by design</strong>
+            <p>Chats are saved on this device.</p>
+          </div>
+        </div>
 
         <Dialog
           open={renameTarget !== null}

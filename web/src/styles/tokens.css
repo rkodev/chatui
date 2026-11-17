@@ -13,25 +13,26 @@
  */
 :root {
   /* Color: background */
-  --color-bg-canvas: #ffffff;
-  --color-bg-surface: #f7f7f8;
+  --color-bg-canvas: #fcfcfe;
+  --color-bg-surface: #f3f3f8;
   --color-bg-surface-raised: #ffffff;
-  --color-bg-user-bubble: #e8f0fe;
-  --color-bg-code: #f3f4f6;
+  --color-bg-user-bubble: #eeedf9;
+  --color-bg-code: #f1f1f6;
 
   /* Color: foreground */
-  --color-fg-primary: #1a1a1a;
-  --color-fg-secondary: #4a4a4a;
-  --color-fg-muted: #5f6368;
+  --color-fg-primary: #252533;
+  --color-fg-secondary: #545463;
+  --color-fg-muted: #686878;
   --color-fg-on-accent: #ffffff;
 
   /* Color: accent */
-  --color-accent: #1a56db;
-  --color-accent-hover: #1e40af;
+  --color-accent: #5c50c7;
+  --color-accent-hover: #4b3fb1;
+  --color-accent-subtle: color-mix(in srgb, var(--color-accent) 9%, transparent);
 
   /* Color: borders */
-  --color-border-subtle: #d1d5db;
-  --color-border-strong: #6b7280;
+  --color-border-subtle: #e2e2ec;
+  --color-border-strong: #898998;
 
   /* Color: status */
   --color-danger: #b91c1c;
@@ -52,6 +53,11 @@
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-full: 9999px;
+
+  /* Elevation */
+  --shadow-sm: 0 2px 6px rgb(25 23 50 / 4%);
+  --shadow-md: 0 8px 28px rgb(25 23 50 / 7%);
+  --shadow-lg: 0 24px 70px rgb(15 12 35 / 18%);
 
   /* Typography: body */
   --font-body-family:

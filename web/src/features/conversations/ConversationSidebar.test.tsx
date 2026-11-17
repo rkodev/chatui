@@ -88,6 +88,16 @@ describe('ConversationSidebar', () => {
     expect(props.onNewChat).toHaveBeenCalledTimes(1)
   })
 
+  it('dismisses the mobile history from its backdrop', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    renderSidebar({ isOpen: true, onClose })
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss history' }))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('selects a conversation and marks the active row', async () => {
     const user = userEvent.setup()
     const props = renderSidebar({ activeConversationId: 'today' })
