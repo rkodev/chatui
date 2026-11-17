@@ -43,12 +43,13 @@ use crate::chat::service::{ChatSendFailure, ChatSendResult, ChatService, describ
 use crate::chat::state::{MemoryStreamingStore, StreamingState, StreamingStore};
 
 slint::slint! {
+    import { AppText as Text, Design } from "../design.slint";
     import { Palette } from "std-widgets.slint";
 
     export component ChatWindow inherits Window {
         title: "ChatUI chat";
-        width: 900px;
-        height: 720px;
+        preferred-width: 900px;
+        preferred-height: 720px;
 
         in property <component-factory> messages-factory;
         in property <component-factory> composer-factory;
@@ -60,7 +61,7 @@ slint::slint! {
         in property <bool> announcement-assertive: false;
         in property <bool> dark: false;
 
-        background: root.dark ? #0f1115 : #ffffff;
+        background: Design.colors(root.dark).canvas;
         init => {
             Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
         }
@@ -73,13 +74,13 @@ slint::slint! {
 
             if (root.loading) : Text {
                 text: "Loading conversation…";
-                color: root.dark ? #9ca3af : #5f6368;
+                color: Design.colors(root.dark).muted;
                 accessible-live-region: polite;
             }
 
             if (!root.error.is-empty) : Text {
                 text: root.error;
-                color: root.dark ? #f87171 : #b91c1c;
+                color: Design.colors(root.dark).danger;
                 wrap: word-wrap;
                 accessible-live-region: assertive;
             }
@@ -113,6 +114,8 @@ pub struct ChatViewState {
     pub conversation_id: Option<String>,
     /// Conversation metadata used for streaming rows.
     pub conversation: Option<Conversation>,
+    /// Resolved model used by the current chat or the welcome screen.
+    pub model: Option<Model>,
     /// Whether the newest page is loading.
     pub loading: bool,
     /// Current list-level error.
@@ -135,6 +138,7 @@ impl ChatViewState {
         Self {
             conversation_id,
             conversation: None,
+            model: None,
             loading: false,
             error: None,
             sending: false,
@@ -200,6 +204,10 @@ struct ChatHandlers {
     attach: Option<Rc<dyn Fn()>>,
     paste_image: Option<Rc<dyn Fn()>>,
     remove_attachment: Option<Rc<dyn Fn(String)>>,
+    start_conversation: Option<Rc<dyn Fn(ComposerSend)>>,
+    cancel_start: Option<Rc<dyn Fn()>>,
+    open_providers: Option<Rc<dyn Fn()>>,
+    open_link: Option<Rc<dyn Fn(String)>>,
 }
 
 enum ChatEvent {
@@ -232,6 +240,17 @@ enum StreamPoll {
     Cleared,
 }
 
+struct ChatEventSender {
+    sender: Sender<(u64, ChatEvent)>,
+    epoch: u64,
+}
+
+impl ChatEventSender {
+    fn send(&self, event: ChatEvent) -> bool {
+        self.sender.send((self.epoch, event)).is_ok()
+    }
+}
+
 struct ChatShared {
     service: Arc<ChatService>,
     runner: Arc<ChatRunner>,
@@ -240,7 +259,8 @@ struct ChatShared {
     models: Arc<dyn ModelRepository>,
     loader: Arc<MessageListLoader>,
     runtime: Arc<dyn ChatRuntime>,
-    sender: Sender<ChatEvent>,
+    sender: Sender<(u64, ChatEvent)>,
+    epoch: Cell<u64>,
     state: RefCell<ChatViewState>,
     conversation_id: RefCell<Option<String>>,
     handlers: RefCell<ChatHandlers>,
@@ -250,6 +270,13 @@ struct ChatShared {
 }
 
 impl ChatShared {
+    fn event_sender(&self) -> ChatEventSender {
+        ChatEventSender {
+            sender: self.sender.clone(),
+            epoch: self.epoch.get(),
+        }
+    }
+
     fn reload_newest(&self, clear_streaming: bool) {
         let Some(conversation_id) = self.conversation_id.borrow().clone() else {
             return;
@@ -267,7 +294,7 @@ impl ChatShared {
         let conversations = Arc::clone(&self.conversations);
         let models = Arc::clone(&self.models);
         let runtime = Arc::clone(&self.runtime);
-        let sender = self.sender.clone();
+        let sender = self.event_sender();
 
         runtime.spawn(Box::pin(async move {
             let conversation = conversations.get(&conversation_id).await.ok().flatten();
@@ -303,20 +330,25 @@ impl ChatShared {
         }));
     }
 
-    fn start_send(&self, send: ComposerSend) {
+    fn start_send(&self, send: ComposerSend) -> Option<ComposerSend> {
         let Some(conversation_id) = self.conversation_id.borrow().clone() else {
-            return;
+            let handler = self.handlers.borrow().start_conversation.clone();
+            if let Some(handler) = handler {
+                handler(send);
+                return None;
+            }
+            return Some(send);
         };
 
         if conversation_id != send.conversation_id {
-            return;
+            return Some(send);
         }
 
         self.state.borrow_mut().sending = true;
 
         let service = Arc::clone(&self.service);
         let runtime = Arc::clone(&self.runtime);
-        let sender = self.sender.clone();
+        let sender = self.event_sender();
 
         runtime.spawn(Box::pin(async move {
             let parts = send.parts.clone();
@@ -326,16 +358,21 @@ impl ChatShared {
                 restore: Some(send),
             });
         }));
+        None
     }
 
     fn stop(&self) {
         let Some(conversation_id) = self.conversation_id.borrow().clone() else {
+            let handler = self.handlers.borrow().cancel_start.clone();
+            if let Some(handler) = handler {
+                handler();
+            }
             return;
         };
 
         let service = Arc::clone(&self.service);
         let runtime = Arc::clone(&self.runtime);
-        let sender = self.sender.clone();
+        let sender = self.event_sender();
 
         runtime.spawn(Box::pin(async move {
             let _ = service.cancel(&conversation_id).await;
@@ -352,7 +389,7 @@ impl ChatShared {
 
         let service = Arc::clone(&self.service);
         let runtime = Arc::clone(&self.runtime);
-        let sender = self.sender.clone();
+        let sender = self.event_sender();
 
         runtime.spawn(Box::pin(async move {
             let result = service.regenerate(&conversation_id, &target_id).await;
@@ -372,7 +409,7 @@ impl ChatShared {
 
         let service = Arc::clone(&self.service);
         let runtime = Arc::clone(&self.runtime);
-        let sender = self.sender.clone();
+        let sender = self.event_sender();
 
         runtime.spawn(Box::pin(async move {
             let result = service.retry(&conversation_id, &target_id).await;
@@ -390,7 +427,7 @@ impl ChatShared {
 
         let loader = Arc::clone(&self.loader);
         let runtime = Arc::clone(&self.runtime);
-        let sender = self.sender.clone();
+        let sender = self.event_sender();
 
         runtime.spawn(Box::pin(async move {
             match loader.load_older(&conversation_id, cursor).await {
@@ -457,6 +494,22 @@ fn composer_factory(window: &ComposerWindow) -> slint::ComponentFactory {
 }
 
 fn wire_message_list(shared: &Rc<ChatShared>, message_list: &Rc<RefCell<MessageListController>>) {
+    let shared_providers = Rc::clone(shared);
+    message_list.borrow().window().on_open_providers(move || {
+        let handler = shared_providers.handlers.borrow().open_providers.clone();
+        if let Some(handler) = handler {
+            handler();
+        }
+    });
+
+    let shared_links = Rc::clone(shared);
+    message_list.borrow().window().on_open_link(move |url| {
+        let handler = shared_links.handlers.borrow().open_link.clone();
+        if let Some(handler) = handler {
+            handler(url.to_string());
+        }
+    });
+
     let shared_copy = Rc::clone(shared);
     message_list.borrow_mut().set_on_copy(move |text| {
         if let Some(handler) = shared_copy.handlers.borrow().copy.clone() {
@@ -485,16 +538,51 @@ fn wire_message_list(shared: &Rc<ChatShared>, message_list: &Rc<RefCell<MessageL
     });
 }
 
-fn wire_composer(shared: &Rc<ChatShared>, composer: &Rc<RefCell<ComposerController>>) {
+fn wire_composer(
+    shared: &Rc<ChatShared>,
+    composer: &Rc<RefCell<ComposerController>>,
+    message_list: &Rc<RefCell<MessageListController>>,
+) {
     let shared_send = Rc::clone(shared);
     let composer_weak = Rc::downgrade(composer);
+    let messages = Rc::clone(message_list);
     composer.borrow_mut().set_on_send(move |send| {
         if let Some(composer) = composer_weak.upgrade() {
             composer.borrow().set_sending(true);
         }
 
         shared_send.state.borrow_mut().sending = true;
-        shared_send.start_send(send);
+        if let Some(send) = shared_send.start_send(send) {
+            shared_send.state.borrow_mut().sending = false;
+            if let Some(composer) = composer_weak.upgrade() {
+                composer.borrow().restore_after_failure(send);
+                composer.borrow().set_sending(false);
+            }
+            let error =
+                MessageListError::new("Start a new chat before sending. Your draft has been kept.");
+            shared_send.state.borrow_mut().error = Some(error.clone());
+            messages.borrow().set_error(error);
+        }
+    });
+
+    let starter_composer = Rc::downgrade(composer);
+    let starter_window = message_list.borrow().window().as_weak();
+    message_list.borrow().window().on_use_starter(move |text| {
+        let Some(composer) = starter_composer.upgrade() else {
+            return;
+        };
+        let can_apply = {
+            let composer = composer.borrow();
+            let state = composer.state();
+            state.text().trim().is_empty() && !state.is_sending() && !state.is_streaming()
+        };
+        if can_apply {
+            composer.borrow().set_text(text.to_string());
+            composer.borrow().window().invoke_focus_editor();
+            if let Some(window) = starter_window.upgrade() {
+                window.set_starters_enabled(false);
+            }
+        }
     });
 
     let shared_stop = Rc::clone(shared);
@@ -547,7 +635,7 @@ pub struct ChatController {
     shared: Rc<ChatShared>,
     message_list: Rc<RefCell<MessageListController>>,
     composer: Rc<RefCell<ComposerController>>,
-    receiver: RefCell<Receiver<ChatEvent>>,
+    receiver: RefCell<Receiver<(u64, ChatEvent)>>,
     dark: Cell<bool>,
 }
 
@@ -586,6 +674,7 @@ impl ChatController {
             loader: Arc::new(MessageListLoader::new(messages, config.page_size)),
             runtime,
             sender,
+            epoch: Cell::new(0),
             state: RefCell::new(ChatViewState::new(initial_conversation_id.clone())),
             conversation_id: RefCell::new(initial_conversation_id.clone()),
             handlers: RefCell::new(ChatHandlers::default()),
@@ -595,7 +684,7 @@ impl ChatController {
         });
 
         wire_message_list(&shared, &message_list);
-        wire_composer(&shared, &composer);
+        wire_composer(&shared, &composer, &message_list);
 
         let controller = Self {
             shared,
@@ -627,6 +716,39 @@ impl ChatController {
     /// Show or hide token usage in the message list metadata.
     pub fn set_show_token_usage(&self, show: bool) {
         self.message_list.borrow().set_show_token_usage(show);
+    }
+
+    /// Apply the live keyboard preference, not just its visible hint.
+    pub fn set_send_key(&self, send_key: SendKey) {
+        self.composer.borrow().set_send_key(send_key);
+    }
+
+    /// Apply the selected chat text size to messages and the editor.
+    pub fn set_chat_font_size(&self, size: f32) {
+        self.composer_window().set_chat_font_size(size);
+        self.messages_window().set_chat_font_size(size);
+    }
+
+    /// Resolve the welcome screen's model before a conversation exists.
+    pub fn set_default_model(&self, model: Option<Model>) {
+        if self.conversation_id().is_none() {
+            self.set_model(model.as_ref());
+        }
+    }
+
+    /// Clear the visible unsent content after explicitly clearing local data.
+    pub fn discard_draft(&self) {
+        let composer = self.composer.borrow();
+        let ids = composer
+            .state()
+            .attachments()
+            .iter()
+            .map(|attachment| attachment.id.clone())
+            .collect::<Vec<_>>();
+        for id in ids {
+            composer.remove_attachment(&id);
+        }
+        composer.set_text("");
     }
 
     /// Apply the dark or light palette to the message list and composer.
@@ -668,14 +790,28 @@ impl ChatController {
             .is_some_and(|conversation_id| self.shared.runner.is_streaming(conversation_id))
     }
 
+    /// Keep a draft intact while its conversation's model is being updated.
+    pub fn set_model_switching(&self, switching: bool) {
+        self.shared.state.borrow_mut().sending = switching;
+        let composer = self.composer.borrow();
+        composer.window().set_changing_model(switching);
+        composer.set_sending(switching);
+        drop(composer);
+        self.sync();
+    }
+
     /// Open a conversation, restore its draft, and load its newest page.
     pub fn open(&self, conversation_id: impl Into<String>) {
         let conversation_id = conversation_id.into();
+        self.shared
+            .epoch
+            .set(self.shared.epoch.get().wrapping_add(1));
 
         {
             let mut view = self.shared.state.borrow_mut();
             view.conversation_id = Some(conversation_id.clone());
             view.conversation = None;
+            view.model = None;
             view.loading = true;
             view.error = None;
             view.sending = false;
@@ -690,12 +826,58 @@ impl ChatController {
         self.shared.last_stream.borrow_mut().take();
         self.shared.terminal_reload_requested.set(false);
         self.composer.borrow().set_conversation(conversation_id);
+        self.composer.borrow().set_sending(false);
+        self.composer.borrow().window().set_changing_model(false);
+        self.composer.borrow().set_streaming(false);
         self.message_list.borrow().apply_newest_page(MessagePage {
             messages: Vec::new(),
             has_more: false,
         });
         self.message_list.borrow().set_loading_newest(true);
         self.shared.reload_newest(false);
+        self.sync();
+    }
+
+    /// Return to the welcome screen while keeping per-conversation drafts.
+    pub fn clear(&self) {
+        self.shared
+            .epoch
+            .set(self.shared.epoch.get().wrapping_add(1));
+        self.shared.conversation_id.borrow_mut().take();
+        *self.shared.state.borrow_mut() = ChatViewState::new(None);
+        self.shared.last_stream.borrow_mut().take();
+        self.shared.stream_message_id.borrow_mut().take();
+        self.shared.terminal_reload_requested.set(false);
+        let composer = self.composer.borrow();
+        composer.set_conversation("");
+        composer.set_sending(false);
+        composer.window().set_changing_model(false);
+        composer.set_streaming(false);
+        composer.set_model(None);
+        let list = self.message_list.borrow();
+        list.set_conversation(None);
+        list.set_streaming(None);
+        list.set_loading_newest(false);
+        list.clear_error();
+        list.apply_newest_page(MessagePage {
+            messages: Vec::new(),
+            has_more: false,
+        });
+        drop(list);
+        drop(composer);
+        self.sync();
+    }
+
+    /// Restore a first message when creating its conversation fails or stops.
+    pub fn restore_unsent_message(&self, send: ComposerSend, error: Option<String>) {
+        self.shared.state.borrow_mut().sending = false;
+        self.composer.borrow().restore_after_failure(send);
+        self.composer.borrow().set_sending(false);
+        if let Some(error) = error {
+            self.message_list
+                .borrow()
+                .set_error(MessageListError::new(error));
+        }
         self.sync();
     }
 
@@ -713,6 +895,11 @@ impl ChatController {
             .announcement
             .as_ref()
             .is_some_and(|announcement| announcement.politeness == LiveRegionPoliteness::Assertive);
+        let composer = self.composer.borrow();
+        let state = composer.state();
+        list.window().set_starters_enabled(
+            state.text().trim().is_empty() && !state.is_sending() && !state.is_streaming(),
+        );
     }
 
     /// Drain async results and update the live row.
@@ -720,15 +907,17 @@ impl ChatController {
     /// The desktop calls this from a short Slint timer (50-100 ms). Tests call
     /// it directly.
     pub fn poll(&self) {
+        self.message_list.borrow().poll_layout();
         let mut changed = false;
 
         loop {
             let event = self.receiver.borrow().try_recv();
 
             match event {
-                Ok(event) => {
+                Ok((epoch, event)) if epoch == self.shared.epoch.get() => {
                     changed |= self.apply_event(event);
                 }
+                Ok(_) => {}
                 Err(_) => break,
             }
         }
@@ -747,6 +936,12 @@ impl ChatController {
 
         if changed {
             self.sync();
+        } else {
+            let composer = self.composer.borrow();
+            let state = composer.state();
+            self.messages_window().set_starters_enabled(
+                state.text().trim().is_empty() && !state.is_sending() && !state.is_streaming(),
+            );
         }
     }
 
@@ -795,6 +990,26 @@ impl ChatController {
         self.shared.handlers.borrow_mut().remove_attachment = Some(Rc::new(handler));
     }
 
+    /// Create a conversation lazily when the first message is submitted.
+    pub fn set_on_start_conversation(&self, handler: impl Fn(ComposerSend) + 'static) {
+        self.shared.handlers.borrow_mut().start_conversation = Some(Rc::new(handler));
+    }
+
+    /// Cancel a pending first-message conversation creation.
+    pub fn set_on_cancel_start(&self, handler: impl Fn() + 'static) {
+        self.shared.handlers.borrow_mut().cancel_start = Some(Rc::new(handler));
+    }
+
+    /// Register the welcome screen's provider-management action.
+    pub fn set_on_open_providers(&self, handler: impl Fn() + 'static) {
+        self.shared.handlers.borrow_mut().open_providers = Some(Rc::new(handler));
+    }
+
+    /// Register the system-browser handler for allowlisted message links.
+    pub fn set_on_open_link(&self, handler: impl Fn(String) + 'static) {
+        self.shared.handlers.borrow_mut().open_link = Some(Rc::new(handler));
+    }
+
     /// Add a stored attachment to the composer.
     pub fn add_attachment(&self, attachment: PendingAttachment) {
         self.composer.borrow().add_attachment(attachment);
@@ -821,6 +1036,7 @@ impl ChatController {
     /// Set the selected model's capabilities on the composer.
     pub fn set_model(&self, model: Option<&Model>) {
         self.composer.borrow().set_model(model);
+        self.shared.state.borrow_mut().model = model.cloned();
     }
 
     fn apply_event(&self, event: ChatEvent) -> bool {
@@ -852,9 +1068,7 @@ impl ChatController {
                     .set_conversation(Some(conversation.clone()));
                 self.message_list.borrow().apply_newest_page(page);
 
-                if let Some(model) = model {
-                    self.composer.borrow().set_model(Some(&model));
-                }
+                self.set_model(model.as_ref());
 
                 true
             }
@@ -1939,6 +2153,112 @@ mod tests {
 
         adapter.gate2.notify_one();
         wait_for_rows(&harness.controller, 2);
+    }
+
+    #[test]
+    fn welcome_starters_keep_existing_drafts_and_never_send() {
+        let harness = harness(Arc::new(FakeAdapter::new(
+            Vec::new(),
+            summary("", "", None, None, None),
+        )));
+        harness
+            .controller
+            .messages_window()
+            .invoke_use_starter("A useful starting point".into());
+        assert_eq!(
+            harness.controller.composer_window().get_text(),
+            "A useful starting point"
+        );
+        harness
+            .controller
+            .messages_window()
+            .invoke_use_starter("Do not overwrite".into());
+        assert_eq!(
+            harness.controller.composer_window().get_text(),
+            "A useful starting point"
+        );
+        assert!(!harness.controller.state().sending);
+        assert!(harness.controller.conversation_id().is_none());
+    }
+
+    #[test]
+    fn first_send_can_be_restored_with_its_attachments() {
+        let harness = harness(Arc::new(FakeAdapter::new(
+            Vec::new(),
+            summary("", "", None, None, None),
+        )));
+        harness.controller.set_default_model(Some(model()));
+        harness.controller.add_attachment(PendingAttachment {
+            id: "attachment-first".to_owned(),
+            kind: AttachmentKind::File,
+            mime_type: "text/plain".to_owned(),
+            name: "notes.txt".to_owned(),
+            size: 12,
+            sha256: "hash".to_owned(),
+            storage_key: "key".to_owned(),
+            width: None,
+            height: None,
+        });
+        let pending = Rc::new(RefCell::new(None));
+        let recorded = Rc::clone(&pending);
+        harness.controller.set_on_start_conversation(move |send| {
+            *recorded.borrow_mut() = Some(send);
+        });
+        let window = harness.controller.composer_window();
+        window.invoke_text_changed("Keep this first message".into());
+        window.invoke_send();
+        assert!(harness.controller.state().sending);
+        assert!(!window.get_can_send());
+        let send = pending.borrow_mut().take().expect("first-send snapshot");
+        assert_eq!(send.attachments.len(), 1);
+        harness
+            .controller
+            .restore_unsent_message(send, Some("Choose a provider first.".to_owned()));
+        assert_eq!(window.get_text(), "Keep this first message");
+        assert_eq!(window.get_chips().row_count(), 1);
+        assert!(!harness.controller.state().sending);
+        assert!(harness.controller.state().error.is_some());
+    }
+
+    #[test]
+    fn stale_loads_cannot_repopulate_the_welcome_screen() {
+        let harness = harness(Arc::new(FakeAdapter::new(
+            Vec::new(),
+            summary("", "", None, None, None),
+        )));
+        let stale = harness.controller.shared.event_sender();
+        harness.controller.clear();
+        assert!(stale.send(ChatEvent::Loaded {
+            conversation: Box::new(conversation("old-conversation")),
+            page: MessagePage {
+                messages: Vec::new(),
+                has_more: false
+            },
+            model: Some(model()),
+            clear_streaming: false,
+        }));
+        harness.controller.poll();
+        assert!(harness.controller.conversation_id().is_none());
+        assert!(harness.controller.state().conversation.is_none());
+        assert!(harness.controller.state().model.is_none());
+    }
+
+    #[test]
+    fn changing_models_disables_send_without_losing_the_draft() {
+        let harness = harness(Arc::new(FakeAdapter::new(
+            Vec::new(),
+            summary("", "", None, None, None),
+        )));
+        let window = harness.controller.composer_window();
+        window.invoke_text_changed("Keep this draft".into());
+        harness.controller.set_model_switching(true);
+        assert!(!window.get_can_send());
+        assert!(window.get_changing_model());
+        window.invoke_send();
+        assert_eq!(window.get_text(), "Keep this draft");
+        harness.controller.set_model_switching(false);
+        assert!(window.get_can_send());
+        assert!(!window.get_changing_model());
     }
 
     #[test]

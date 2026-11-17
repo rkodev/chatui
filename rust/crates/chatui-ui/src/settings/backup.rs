@@ -421,6 +421,12 @@ pub struct BackupSettingsState {
     pub confirmation_input: String,
     /// Result of the last restore.
     pub last_restore: Option<RestoreOutcome>,
+    /// A storage operation is running off the UI thread.
+    pub busy: bool,
+    /// A restore is updating local conversations.
+    pub restoring: bool,
+    /// Connection fields differ from the saved configuration.
+    pub configuration_changed: bool,
 }
 
 impl BackupSettingsState {
@@ -434,6 +440,9 @@ impl BackupSettingsState {
             confirmation: None,
             confirmation_input: String::new(),
             last_restore: None,
+            busy: false,
+            restoring: false,
+            configuration_changed: false,
         }
     }
 
@@ -476,6 +485,7 @@ impl BackupSettingsState {
             Ok(status) => {
                 self.status = status;
                 self.notice = Some("Backup enabled.".to_owned());
+                self.configuration_changed = false;
                 Ok(())
             }
             Err(error) => self.fail(error),
@@ -498,6 +508,7 @@ impl BackupSettingsState {
     /// Run a backup now.
     pub fn backup_now(&mut self, service: &dyn BackupService) -> Result<(), BackupError> {
         self.clear_messages();
+        self.require_saved_configuration()?;
         if self.form.passphrase.is_empty() {
             return self.fail(BackupError::Validation(
                 "Enter your backup passphrase.".to_owned(),
@@ -523,6 +534,7 @@ impl BackupSettingsState {
         replace: bool,
     ) -> Result<(), BackupError> {
         self.clear_messages();
+        self.require_saved_configuration()?;
         if self.form.passphrase.is_empty() {
             return self.fail(BackupError::Validation(
                 "Enter your backup passphrase.".to_owned(),
@@ -559,6 +571,8 @@ impl BackupSettingsState {
 
     /// Confirm the staged destructive action.
     pub fn confirm(&mut self, service: &dyn BackupService) -> Result<(), BackupError> {
+        self.clear_messages();
+        self.require_saved_configuration()?;
         let Some(confirmation) = self.confirmation else {
             return self.fail(BackupError::ConfirmationRequired);
         };
@@ -636,6 +650,15 @@ impl BackupSettingsState {
     fn clear_messages(&mut self) {
         self.notice = None;
         self.error = None;
+    }
+
+    fn require_saved_configuration(&mut self) -> Result<(), BackupError> {
+        if self.configuration_changed {
+            return self.fail(BackupError::Validation(
+                "Save your connection changes before using the remote backup.".to_owned(),
+            ));
+        }
+        Ok(())
     }
 
     fn fail<T>(&mut self, error: BackupError) -> Result<T, BackupError> {

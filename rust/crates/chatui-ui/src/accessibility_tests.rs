@@ -51,6 +51,28 @@ fn assert_controls_have_names(root: &impl ElementRoot, surface: &str) {
 }
 
 #[test]
+fn disabled_shared_buttons_cannot_be_activated_through_accessibility() {
+    i_slint_backend_testing::init_no_event_loop();
+    let window = ComposerWindow::new().expect("composer");
+    let sent = std::rc::Rc::new(std::cell::Cell::new(false));
+    let recorded = std::rc::Rc::clone(&sent);
+    window.on_send(move || recorded.set(true));
+    let send = window
+        .root_element()
+        .query_descendants()
+        .find_all()
+        .into_iter()
+        .find(|element| element.accessible_label().as_deref() == Some("Send"))
+        .expect("Send button");
+    assert_eq!(send.accessible_enabled(), Some(false));
+    send.invoke_accessible_default_action();
+    assert!(!sent.get());
+    window.set_can_send(true);
+    send.invoke_accessible_default_action();
+    assert!(sent.get());
+}
+
+#[test]
 fn shell_controls_have_accessible_names_in_both_layouts() {
     i_slint_backend_testing::init_no_event_loop();
 
@@ -214,6 +236,7 @@ fn every_destination_hosts_a_real_feature_view() {
     shell.set_settings_factory(factory!(settings));
     shell.set_data_factory(factory!(data));
     shell.set_models_factory(factory!(models));
+    shell.show().expect("show shell");
 
     let destinations = [
         (0, "Chat", "Message"),
@@ -239,6 +262,7 @@ fn every_destination_hosts_a_real_feature_view() {
     }
 
     shell.set_show_models(true);
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::ZERO);
     let labels = accessible_labels(&shell);
     assert!(
         labels.iter().any(|label| label == "Search models"),
@@ -248,4 +272,7 @@ fn every_destination_hosts_a_real_feature_view() {
         labels.iter().any(|label| label == "Close models"),
         "models overlay did not render its close control: {labels:?}"
     );
+    shell.set_show_models(false);
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::ZERO);
+    shell.hide().expect("hide shell");
 }

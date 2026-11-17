@@ -508,7 +508,8 @@ fn build_parts(text: &str, attachments: &[PendingAttachment]) -> Vec<ContentPart
 }
 
 slint::slint! {
-    import { Button, Palette, ScrollView, TextEdit } from "std-widgets.slint";
+    import { AppButton as Button, AppText as Text, Design } from "../design.slint";
+    import { Palette, ScrollView } from "std-widgets.slint";
 
     export struct ComposerChip {
         id: string,
@@ -519,13 +520,14 @@ slint::slint! {
 
     export component ComposerWindow inherits Window {
         title: "ChatUI composer";
-        width: 900px;
-        height: 260px;
+        preferred-width: 900px;
+        preferred-height: 260px;
 
         in-out property <string> text: "";
         in property <bool> streaming: false;
         in property <bool> offline: false;
         in property <bool> sending: false;
+        in property <bool> changing-model: false;
         in property <bool> can-send: false;
         in property <int> visible-lines: 1;
         in property <int> content-lines: 1;
@@ -536,9 +538,13 @@ slint::slint! {
         in property <string> capability-warning: "";
         in property <string> attachment-error: "";
         in property <string> send-key-hint: "Enter to send";
+        in property <bool> send-on-enter: true;
+        in property <length> chat-font-size: 16px;
+        out property <length> preferred-content-height: max(156px, composer-layout.preferred-height);
         in property <bool> dark: false;
 
-        background: root.dark ? #0f1115 : #ffffff;
+        background: Design.colors(root.dark).canvas;
+        forward-focus: message-input;
         init => {
             Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
         }
@@ -552,86 +558,156 @@ slint::slint! {
         callback attach();
         callback paste-image();
         callback remove-attachment(string);
+        callback focus-editor();
+        focus-editor => { message-input.focus(); }
 
-        VerticalLayout {
-            padding: 12px;
+        composer-layout := VerticalLayout {
             spacing: 8px;
 
-            if (root.offline) : Text {
-                text: "You are offline. Sending is disabled.";
-                color: root.dark ? #f87171 : #b91c1c;
-                accessible-live-region: assertive;
+            Rectangle {
+                background: Design.colors(root.dark).raised;
+                border-radius: 16px;
+                border-width: 1px;
+                border-color: message-input.has-focus ? Design.colors(root.dark).accent : Design.colors(root.dark).border;
+                drop-shadow-blur: 16px;
+                drop-shadow-offset-y: 4px;
+                drop-shadow-color: root.dark ? #00000018 : #25253308;
+
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 10px;
+
+                    if (root.offline || !root.attachment-error.is-empty || !root.capability-warning.is-empty) : Text {
+                        text: root.offline ? "You are offline. Your draft is safe."
+                            : !root.attachment-error.is-empty ? root.attachment-error : root.capability-warning;
+                        color: root.offline || !root.attachment-error.is-empty ? Design.colors(root.dark).danger : Design.colors(root.dark).warning;
+                        accessible-live-region: assertive;
+                        wrap: word-wrap;
+                        font-size: 12px;
+                    }
+
+                    if (root.chips.length > 0) : ScrollView {
+                        height: min(96px, root.chips.length * 38px);
+                        content-width: self.width;
+                        VerticalLayout {
+                            spacing: 4px;
+                            for chip in root.chips : Rectangle {
+                                height: 34px;
+                                background: Design.colors(root.dark).surface;
+                                border-radius: 8px;
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    spacing: 8px;
+                                    Text {
+                                        text: chip.name;
+                                        vertical-alignment: center;
+                                        horizontal-stretch: 1;
+                                        min-width: 0px;
+                                        overflow: elide;
+                                        font-size: 12px;
+                                    }
+                                    Text {
+                                        text: chip.size-label;
+                                        color: Design.colors(root.dark).muted;
+                                        vertical-alignment: center;
+                                        font-size: 11px;
+                                    }
+                                    Button {
+                                        text: "Remove";
+                                        quiet: true;
+                                        dark: root.dark;
+                                        min-height: 28px;
+                                        preferred-height: 28px;
+                                        clicked => { root.remove-attachment(chip.id); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    ScrollView {
+                        height: min(160px, max(48px, message-input.preferred-height));
+                        content-width: self.width;
+                        content-height: editor-surface.height;
+
+                        editor-surface := Rectangle {
+                            width: parent.width;
+                            height: max(48px, root.editor-content-height, message-input.preferred-height);
+                            if (root.text.is-empty) : Text {
+                                width: parent.width;
+                                height: parent.height;
+                                horizontal-alignment: left;
+                                vertical-alignment: top;
+                                text: "Ask a question, share an idea...";
+                                color: Design.colors(root.dark).muted;
+                                font-size: root.chat-font-size;
+                                accessible-role: none;
+                            }
+                            message-input := TextInput {
+                                width: parent.width;
+                                height: parent.height;
+                                accessible-label: "Message";
+                                color: Design.colors(root.dark).text;
+                                selection-background-color: Design.colors(root.dark).accent;
+                                selection-foreground-color: Design.colors(root.dark).on-accent;
+                                font-size: root.chat-font-size;
+                                single-line: false;
+                                read-only: root.sending && !root.streaming;
+                                text <=> root.text;
+                                edited => { root.text-changed(self.text); }
+                                wrap: word-wrap;
+                                key-pressed(event) => {
+                                    if (event.text == Key.Return && !event.modifiers.shift
+                                        && (root.send-on-enter || event.modifiers.control || event.modifiers.meta)) {
+                                        if (root.can-send && !event.repeat) {
+                                            root.send();
+                                        }
+                                        return accept;
+                                    }
+                                    return reject;
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Button {
+                            text: "Attach";
+                            quiet: true;
+                            dark: root.dark;
+                            clicked => { root.attach(); }
+                        }
+                        Button {
+                            text: "Paste image";
+                            quiet: true;
+                            dark: root.dark;
+                            clicked => { root.paste-image(); }
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        if (root.streaming || (root.sending && !root.changing-model)) : Button {
+                            text: "Stop";
+                            danger: true;
+                            dark: root.dark;
+                            clicked => { root.stop(); }
+                        }
+                        if (!root.streaming && (!root.sending || root.changing-model)) : Button {
+                            text: root.changing-model ? "Changing model..." : "Send";
+                            primary: true;
+                            dark: root.dark;
+                            enabled: root.can-send;
+                            clicked => { root.send(); }
+                        }
+                    }
+                }
+            }
+
+            Text {
+                text: root.send-key-hint;
+                color: Design.colors(root.dark).muted;
+                horizontal-alignment: center;
                 wrap: word-wrap;
-            }
-
-            if (!root.capability-warning.is-empty) : Text {
-                text: root.capability-warning;
-                color: root.dark ? #fbbf24 : #b45309;
-                accessible-live-region: polite;
-                wrap: word-wrap;
-            }
-
-            if (!root.attachment-error.is-empty) : Text {
-                text: root.attachment-error;
-                color: root.dark ? #f87171 : #b91c1c;
-                accessible-live-region: assertive;
-                wrap: word-wrap;
-            }
-
-            for chip in root.chips : Rectangle {
-                height: 32px;
-                background: root.dark ? #171a21 : #f3f4f6;
-                border-radius: 8px;
-                HorizontalLayout {
-                    padding: 4px;
-                    spacing: 8px;
-                    Text { text: chip.name; vertical-alignment: center; }
-                    Text { text: chip.size-label; color: root.dark ? #9ca3af : #5f6368; vertical-alignment: center; }
-                    Rectangle { horizontal-stretch: 1; }
-                    Button { text: "Remove"; clicked => { root.remove-attachment(chip.id); } }
-                }
-            }
-
-            ScrollView {
-                height: root.editor-height;
-                content-width: self.width;
-                content-height: root.editor-content-height;
-
-                TextEdit {
-                    width: parent.width;
-                    height: root.editor-content-height;
-                    accessible-label: "Message";
-                    text <=> root.text;
-                    edited(text) => { root.text-changed(text); }
-                    wrap: word-wrap;
-                }
-            }
-
-            HorizontalLayout {
-                spacing: 8px;
-                Button {
-                    text: "Attach";
-                    clicked => { root.attach(); }
-                }
-                Button {
-                    text: "Paste image";
-                    clicked => { root.paste-image(); }
-                }
-                Rectangle { horizontal-stretch: 1; }
-                Text {
-                    text: root.send-key-hint;
-                    color: root.dark ? #9ca3af : #5f6368;
-                    vertical-alignment: center;
-                }
-                if (root.streaming || root.sending) : Button {
-                    text: "Stop";
-                    clicked => { root.stop(); }
-                }
-                if (!root.streaming && !root.sending) : Button {
-                    text: "Send";
-                    enabled: root.can-send;
-                    clicked => { root.send(); }
-                }
+                font-size: 11px;
             }
         }
     }
@@ -670,6 +746,7 @@ pub fn sync_window(window: &ComposerWindow, state: &ComposerState) {
     window.set_capability_warning(state.capability_warning().unwrap_or_default().into());
     window.set_attachment_error(state.attachment_error().unwrap_or_default().into());
     window.set_send_key_hint(state.send_key_hint().into());
+    window.set_send_on_enter(state.send_key() == SendKey::Enter);
 }
 
 #[derive(Default)]
@@ -717,6 +794,12 @@ impl ComposerController {
         sync_window(&self.window, &self.state.borrow());
     }
 
+    /// Replace the draft through the same persistence path as typing.
+    pub fn set_text(&self, text: impl Into<String>) {
+        self.state.borrow_mut().set_text(text);
+        self.sync();
+    }
+
     /// Set the streaming flag and refresh the window.
     pub fn set_streaming(&self, streaming: bool) {
         self.state.borrow_mut().set_streaming(streaming);
@@ -732,6 +815,12 @@ impl ComposerController {
     /// Set the sending flag and refresh the window.
     pub fn set_sending(&self, sending: bool) {
         self.state.borrow_mut().set_sending(sending);
+        self.sync();
+    }
+
+    /// Apply the send-key preference to the editor and its keyboard handler.
+    pub fn set_send_key(&self, send_key: SendKey) {
+        self.state.borrow_mut().set_send_key(send_key);
         self.sync();
     }
 

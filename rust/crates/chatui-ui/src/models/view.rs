@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use chatui_domain::{Model, Provider};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::models::error::{ModelManagementError, describe_model_error};
@@ -19,9 +20,11 @@ use crate::models::state::{
     ManualModelForm, ModelGroup, ModelManagementViewModel, ModelRow as StateModelRow,
     capability_chip_label,
 };
+use crate::tasks::UiTasks;
 
 slint::slint! {
-    import { Button, CheckBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
+    import { AppButton as Button, AppText as Text, Design } from "../design.slint";
+    import { ComboBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
 
     export struct ModelListRow {
         id: string,
@@ -41,17 +44,21 @@ slint::slint! {
 
     export component ModelManagementWindow inherits Window {
         title: "ChatUI models";
-        width: 1000px;
-        height: 760px;
+        preferred-width: 1000px;
+        preferred-height: 760px;
 
         in property <[ModelListRow]> models: [];
         in property <string> provider-label: "";
+        in property <[string]> provider-labels: [];
+        in property <int> provider-index: 0;
+        in-out property <length> body-scroll-y: 0px;
         in property <string> summary: "";
         in property <string> notice: "";
         in property <string> error-title: "";
         in property <string> error-message: "";
         in property <string> error-details: "";
         in property <bool> loading: false;
+        in property <bool> selection-pending: false;
         in property <bool> empty: false;
         in property <string> empty-message: "";
         in property <string> search-query: "";
@@ -72,7 +79,7 @@ slint::slint! {
         in property <string> manual-error: "";
         in property <bool> dark: false;
 
-        background: root.dark ? #0f1115 : #ffffff;
+        background: Design.colors(root.dark).canvas;
         init => {
             Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
         }
@@ -94,25 +101,35 @@ slint::slint! {
         callback manual-capabilities-changed(string);
         callback save-manual();
         callback toggle-picker-mode(bool);
+        callback provider-changed(int);
+        callback open-docs(string);
+        callback open-providers();
 
         VerticalLayout {
             padding: 16px;
-            spacing: 8px;
+            spacing: 14px;
 
             HorizontalLayout {
-                spacing: 8px;
-                Text { text: "Models"; font-size: 22px; font-weight: 600; }
-                Text { text: root.provider-label; color: root.dark ? #9ca3af : #5f6368; vertical-alignment: center; }
-                Rectangle { horizontal-stretch: 1; }
-                CheckBox {
-                    text: "Picker mode";
-                    checked: root.picker-mode;
-                    toggled => { root.toggle-picker-mode(self.checked); }
+                spacing: 12px;
+                VerticalLayout {
+                    spacing: 6px;
+                    Text { text: "Provider"; font-size: 12px; color: Design.colors(root.dark).muted; }
+                    ComboBox {
+                        model: root.provider-labels;
+                        current-index: root.provider-index;
+                        accessible-label: "Model provider";
+                        enabled: !root.loading && !root.selection-pending && root.provider-labels.length > 0;
+                        selected(value) => { root.provider-changed(self.current-index); }
+                    }
                 }
-                Button { text: "Refresh models"; clicked => { root.refresh(); } }
+                Button {
+                    text: root.loading ? "Refreshing..." : "Refresh";
+                    enabled: !root.loading && !root.selection-pending && root.provider-labels.length > 0;
+                    clicked => { root.refresh(); }
+                }
             }
 
-            Text { text: root.summary; color: root.dark ? #9ca3af : #5f6368; }
+            Text { text: root.summary; font-size: 12px; color: Design.colors(root.dark).muted; wrap: word-wrap; }
 
             LineEdit {
                 placeholder-text: "Search by name or model id";
@@ -128,7 +145,7 @@ slint::slint! {
             }
 
             if (!root.error-title.is-empty) : Rectangle {
-                background: root.dark ? #3b1d1d : #fde8e8;
+                background: Design.colors(root.dark).danger-soft;
                 border-radius: 8px;
                 VerticalLayout {
                     padding: 8px;
@@ -143,14 +160,14 @@ slint::slint! {
                         accessible-live-region: assertive;
                         wrap: word-wrap;
                     }
-                    if (!root.error-details.is-empty) : Text { text: root.error-details; wrap: word-wrap; color: root.dark ? #9ca3af : #5f6368; }
+                    if (!root.error-details.is-empty) : Text { text: root.error-details; wrap: word-wrap; color: Design.colors(root.dark).muted; }
                     Button { text: "Retry"; clicked => { root.retry(); } }
                 }
             }
 
             if (!root.availability-warning.is-empty) : Text {
                 text: root.availability-warning;
-                color: root.dark ? #fbbf24 : #b45309;
+                color: Design.colors(root.dark).warning;
                 wrap: word-wrap;
             }
 
@@ -159,61 +176,88 @@ slint::slint! {
             if (root.empty && !root.loading) : Text { text: root.empty-message; wrap: word-wrap; }
 
             ScrollView {
+                content-width: self.width;
+                content-y <=> root.body-scroll-y;
                 VerticalLayout {
+                    spacing: 12px;
+                    alignment: start;
+                  if (!root.manual-visible) : VerticalLayout {
+                    spacing: 12px;
+                    alignment: start;
                     for row in root.models : VerticalLayout {
+                        spacing: 8px;
                         if (row.group-start) : Text {
                             text: row.group-label;
                             font-weight: 600;
-                            font-size: 16px;
+                            font-size: 12px;
+                            color: Design.colors(root.dark).muted;
                         }
                         Rectangle {
-                            background: row.is-default ? (root.dark ? #16324f : #e8f0fe) : (root.dark ? #171a21 : #f7f7f8);
-                            border-radius: 8px;
+                            background: row.id == root.selected-model-id ? Design.colors(root.dark).accent-soft : Design.colors(root.dark).raised;
+                            border-radius: 12px;
+                            border-width: 1px;
+                            border-color: row.id == root.selected-model-id ? Design.colors(root.dark).accent : Design.colors(root.dark).border;
                             VerticalLayout {
-                                padding: 8px;
-                                spacing: 4px;
+                                padding: 14px;
+                                spacing: 8px;
                                 HorizontalLayout {
                                     spacing: 8px;
-                                    VerticalLayout {
-                                        Text { text: row.label; font-weight: 600; }
-                                        Text { text: row.meta; color: root.dark ? #9ca3af : #5f6368; wrap: word-wrap; }
-                                    }
-                                    Rectangle { horizontal-stretch: 1; }
+                                    Text { text: row.label; font-weight: 600; wrap: word-wrap; horizontal-stretch: 1; }
+                                }
+                                Text { text: row.remote-id; font-size: 12px; color: Design.colors(root.dark).muted; overflow: elide; }
+                                Text { text: row.meta; font-size: 12px; color: Design.colors(root.dark).secondary; wrap: word-wrap; }
+                                HorizontalLayout {
                                     if (!row.badges.is-empty) : Text {
                                         text: row.badges;
-                                        color: root.dark ? #4ade80 : #166534;
+                                        font-size: 11px;
+                                        color: Design.colors(root.dark).success;
                                         vertical-alignment: center;
+                                        wrap: word-wrap;
                                     }
-                                    Button {
-                                        text: row.pinned ? "Unpin" : "Pin";
-                                        clicked => { root.pin-model(row.id, !row.pinned); }
-                                    }
-                                    Button {
-                                        text: row.hidden ? "Unhide" : "Hide";
-                                        clicked => { root.hide-model(row.id, !row.hidden); }
-                                    }
-                                    Button {
-                                        text: "Set default";
-                                        clicked => { root.set-default(row.id); }
-                                    }
+                                    Rectangle { horizontal-stretch: 1; }
                                 }
                                 if (!row.chips.is-empty) : Text {
                                     text: row.chips;
-                                    color: root.dark ? #c7cbd1 : #4a4a4a;
+                                    font-size: 12px;
+                                    color: Design.colors(root.dark).secondary;
                                     wrap: word-wrap;
                                 }
-                                if (!row.docs-url.is-empty) : Text {
-                                    text: "Docs: " + row.docs-url;
-                                    wrap: word-wrap;
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    Button {
+                                        visible: !root.picker-mode;
+                                        text: row.pinned ? "Unpin" : "Pin";
+                                        quiet: true;
+                                        enabled: !root.loading && !root.selection-pending;
+                                        clicked => { root.pin-model(row.id, !row.pinned); }
+                                    }
+                                    Button {
+                                        visible: !root.picker-mode;
+                                        text: row.hidden ? "Unhide" : "Hide";
+                                        quiet: true;
+                                        enabled: !root.loading && !root.selection-pending;
+                                        clicked => { root.hide-model(row.id, !row.hidden); }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    Button {
+                                        text: root.picker-mode ? (row.id == root.selected-model-id ? "Selected" : "Use model") : (row.is-default ? "Default" : "Set default");
+                                        primary: true;
+                                        enabled: !root.loading && !root.selection-pending && !row.hidden && (root.picker-mode ? row.id != root.selected-model-id : !row.is-default);
+                                        clicked => { root.set-default(row.id); }
+                                    }
+                                }
+                                if (!row.docs-url.is-empty && !root.picker-mode) : Button {
+                                    text: "Provider documentation";
+                                    quiet: true;
+                                    align-left: true;
+                                    clicked => { root.open-docs(row.docs-url); }
                                 }
                             }
                         }
                     }
-                }
-            }
-
+                  }
             if (root.manual-visible) : VerticalLayout {
-                spacing: 4px;
+                spacing: 8px;
                 Text { text: "Add a model manually"; font-weight: 600; }
                 Text { text: "Model id"; }
                 LineEdit {
@@ -233,7 +277,7 @@ slint::slint! {
                     accessible-label: "Context window";
                     edited(text) => { root.manual-context-changed(text); }
                 }
-                Text { text: "Capabilities (text, vision, files, tools, reasoning, streaming)"; }
+                Text { text: "Capabilities (text, vision, files, tools, reasoning, streaming)"; wrap: word-wrap; }
                 LineEdit {
                     text: root.manual-capabilities;
                     accessible-label: "Capabilities";
@@ -241,19 +285,36 @@ slint::slint! {
                 }
                 if (!root.manual-error.is-empty) : Text {
                     text: root.manual-error;
-                    color: root.dark ? #f87171 : #b91c1c;
+                    color: Design.colors(root.dark).danger;
                     wrap: word-wrap;
                 }
                 HorizontalLayout {
                     spacing: 8px;
-                    Button { text: "Add model"; clicked => { root.save-manual(); } }
+                    Button { text: "Add model"; primary: true; clicked => { root.save-manual(); } }
                     Button { text: "Cancel"; clicked => { root.cancel-manual(); } }
                 }
             }
+                }
+            }
 
-            HorizontalLayout {
+            if (!root.manual-visible) : HorizontalLayout {
                 spacing: 8px;
-                Button { text: "Add model manually"; clicked => { root.open-manual(); } }
+                if (root.provider-labels.length == 0) : Button {
+                    text: "Connect a provider";
+                    primary: true;
+                    clicked => { root.open-providers(); }
+                }
+                if (root.provider-labels.length > 0 && !root.manual-visible) : Button {
+                    text: root.picker-mode ? "Manage models" : "Choose a model";
+                    quiet: true;
+                    clicked => { root.toggle-picker-mode(!root.picker-mode); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                if (!root.picker-mode && !root.manual-visible) : Button {
+                    text: "Add model manually";
+                    enabled: !root.loading && !root.selection-pending && root.provider-labels.length > 0;
+                    clicked => { root.open-manual(); }
+                }
             }
         }
     }
@@ -403,17 +464,20 @@ fn model_row(row: &StateModelRow, group: &ModelGroup, group_start: bool) -> Mode
 }
 
 fn reload(service: &ModelManagementService, state: &Rc<RefCell<ModelManagementViewModel>>) {
-    let (provider_id, query, picker_mode) = {
+    let (provider_id, query, picker_mode, loading, selected) = {
         let state = state.borrow();
         (
             state.provider_id.clone(),
             state.query.clone(),
             state.picker_mode,
+            state.list.loading,
+            state.picker.selected_model_id.clone(),
         )
     };
 
     match service.list_models(provider_id.as_deref()) {
-        Ok(list) => {
+        Ok(mut list) => {
+            list.loading = loading;
             state.borrow_mut().list = list;
         }
         Err(error) => {
@@ -422,7 +486,10 @@ fn reload(service: &ModelManagementService, state: &Rc<RefCell<ModelManagementVi
     }
 
     match service.picker(provider_id.as_deref(), &query, !picker_mode) {
-        Ok(picker) => {
+        Ok(mut picker) => {
+            if selected.is_some() {
+                picker.selected_model_id = selected;
+            }
             state.borrow_mut().picker = picker;
         }
         Err(error) => {
@@ -431,7 +498,15 @@ fn reload(service: &ModelManagementService, state: &Rc<RefCell<ModelManagementVi
     }
 }
 
-fn refresh(service: &ModelManagementService, state: &Rc<RefCell<ModelManagementViewModel>>) {
+fn refresh(
+    service: &Arc<ModelManagementService>,
+    tasks: &UiTasks,
+    state: &Rc<RefCell<ModelManagementViewModel>>,
+    weak: &slint::Weak<ModelManagementWindow>,
+) {
+    if state.borrow().list.loading {
+        return;
+    }
     let Some(provider_id) = state.borrow().provider_id.clone() else {
         state.borrow_mut().error = Some(describe_model_error(&ModelManagementError::InvalidInput(
             "Add a provider before refreshing models.".to_owned(),
@@ -440,34 +515,56 @@ fn refresh(service: &ModelManagementService, state: &Rc<RefCell<ModelManagementV
     };
 
     state.borrow_mut().list.loading = true;
-
-    match service.refresh(&provider_id) {
-        Ok(result) => {
-            let mut state = state.borrow_mut();
-            state.notice = result.notice;
-            state.error = None;
-            state.list.loading = false;
-        }
-        Err(error) => {
-            let mut state = state.borrow_mut();
-            state.error = Some(describe_model_error(&error));
-            state.list.loading = false;
-        }
+    if let Some(window) = weak.upgrade() {
+        sync_window(&window, &state.borrow());
     }
-
-    reload(service, state);
+    let work_service = Arc::clone(service);
+    let service = Arc::clone(service);
+    let state = Rc::clone(state);
+    let weak = weak.clone();
+    let target = provider_id.clone();
+    tasks.run(
+        move || work_service.refresh(&provider_id).map_err(Box::new),
+        move |outcome| {
+            {
+                let mut state = state.borrow_mut();
+                state.list.loading = false;
+                if state.provider_id.as_deref() == Some(&target) {
+                    match outcome {
+                        Ok(Ok(result)) => {
+                            state.notice = result.notice;
+                            state.error = None;
+                        }
+                        Ok(Err(error)) => state.error = Some(describe_model_error(&error)),
+                        Err(error) => {
+                            state.error = Some(describe_model_error(
+                                &ModelManagementError::InvalidInput(error.to_string()),
+                            ))
+                        }
+                    }
+                }
+            }
+            reload(&service, &state);
+            if let Some(window) = weak.upgrade() {
+                sync_window(&window, &state.borrow());
+            }
+        },
+    );
 }
 
 fn select_model(
     service: &ModelManagementService,
     state: &Rc<RefCell<ModelManagementViewModel>>,
     model_id: &str,
-) {
+) -> Option<Model> {
+    let mut selected = None;
     match service.set_default_model(model_id) {
         Ok(model) => {
             let mut state = state.borrow_mut();
             state.notice = Some(format!("Default model set to {}.", model.label));
             state.error = None;
+            state.picker.selected_model_id = Some(model.id.clone());
+            selected = Some(model);
         }
         Err(error) => {
             state.borrow_mut().error = Some(describe_model_error(&error));
@@ -475,6 +572,7 @@ fn select_model(
     }
 
     reload(service, state);
+    selected
 }
 
 fn pin_model(
@@ -564,20 +662,39 @@ fn save_manual(service: &ModelManagementService, state: &Rc<RefCell<ModelManagem
     reload(service, state);
 }
 
+type ModelSelectionHandler = Rc<RefCell<Option<Rc<dyn Fn(Model)>>>>;
+
 /// Owns the model management view model and the Slint window that renders it.
 pub struct ModelManagementController {
     service: Arc<ModelManagementService>,
     state: Rc<RefCell<ModelManagementViewModel>>,
     window: ModelManagementWindow,
+    providers: Rc<RefCell<Vec<Provider>>>,
+    tasks: Rc<UiTasks>,
+    on_selected: ModelSelectionHandler,
 }
 
 impl ModelManagementController {
     /// Create the model management window and load the first provider.
     pub fn new(service: Arc<ModelManagementService>) -> Result<Self, slint::PlatformError> {
+        Self::create(service, false)
+    }
+
+    /// Create a model library whose catalog refreshes never block the UI.
+    pub fn new_background(
+        service: Arc<ModelManagementService>,
+    ) -> Result<Self, slint::PlatformError> {
+        Self::create(service, true)
+    }
+
+    fn create(
+        service: Arc<ModelManagementService>,
+        background: bool,
+    ) -> Result<Self, slint::PlatformError> {
         let window = ModelManagementWindow::new()?;
         let mut state = ModelManagementViewModel::default();
-
-        if let Ok(providers) = service.providers() {
+        let providers = service.providers().unwrap_or_default();
+        {
             let default_provider_id = service.default_provider_id().ok().flatten();
             let provider = default_provider_id
                 .and_then(|id| providers.iter().find(|provider| provider.id == id).cloned())
@@ -593,6 +710,9 @@ impl ModelManagementController {
             service,
             state: Rc::new(RefCell::new(state)),
             window,
+            providers: Rc::new(RefCell::new(providers)),
+            tasks: Rc::new(UiTasks::new(background)),
+            on_selected: Rc::new(RefCell::new(None)),
         };
         reload(&controller.service, &controller.state);
         controller.wire();
@@ -613,14 +733,89 @@ impl ModelManagementController {
     /// Push the current view model into the window.
     pub fn sync(&self) {
         sync_window(&self.window, &self.state.borrow());
+        let providers = self.providers.borrow();
+        self.window.set_provider_labels(ModelRc::new(VecModel::from(
+            providers
+                .iter()
+                .map(|provider| SharedString::from(provider.label.clone()))
+                .collect::<Vec<_>>(),
+        )));
+        self.window.set_provider_index(
+            providers
+                .iter()
+                .position(|provider| Some(&provider.id) == self.state.borrow().provider_id.as_ref())
+                .unwrap_or(0) as i32,
+        );
+    }
+
+    /// Refresh cached providers and models after configuration changes.
+    pub fn reload(&self) {
+        match self.service.providers() {
+            Ok(providers) => {
+                let current = self.state.borrow().provider_id.clone();
+                let provider = current
+                    .as_ref()
+                    .and_then(|id| providers.iter().find(|provider| &provider.id == id))
+                    .or_else(|| providers.first());
+                {
+                    let mut state = self.state.borrow_mut();
+                    state.provider_id = provider.map(|provider| provider.id.clone());
+                    state.provider_label = provider
+                        .map(|provider| provider.label.clone())
+                        .unwrap_or_default();
+                    state.error = None;
+                }
+                *self.providers.borrow_mut() = providers;
+                reload(&self.service, &self.state);
+            }
+            Err(error) => self.state.borrow_mut().error = Some(describe_model_error(&error)),
+        }
+        self.sync();
+    }
+
+    /// Switch between choosing a chat model and managing the library.
+    pub fn set_picker_mode(&self, picker: bool) {
+        self.state.borrow_mut().picker_mode = picker;
+        reload(&self.service, &self.state);
+        self.sync();
+    }
+
+    /// Mark the current conversation model independently of the global default.
+    pub fn set_selected_model(&self, id: Option<String>) {
+        let default = self.state.borrow().picker.default_model_id.clone();
+        self.state.borrow_mut().picker.selected_model_id = id.or(default);
+        self.sync();
+    }
+
+    /// Open the library for a particular provider.
+    pub fn select_provider(&self, id: &str) {
+        if let Some(index) = self
+            .providers
+            .borrow()
+            .iter()
+            .position(|provider| provider.id == id)
+        {
+            self.window.invoke_provider_changed(index as i32);
+        }
+    }
+
+    /// Notify the host after a model was successfully selected.
+    pub fn set_on_selected(&self, handler: impl Fn(Model) + 'static) {
+        *self.on_selected.borrow_mut() = Some(Rc::new(handler));
+    }
+
+    /// Apply completed catalog requests in deterministic hosts.
+    pub fn poll(&self) {
+        self.tasks.poll();
     }
 
     fn wire(&self) {
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_refresh(move || {
-            refresh(&service, &state);
+            refresh(&service, &tasks, &state, &weak);
             if let Some(window) = weak.upgrade() {
                 sync_window(&window, &state.borrow());
             }
@@ -629,8 +824,9 @@ impl ModelManagementController {
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_retry(move || {
-            refresh(&service, &state);
+            refresh(&service, &tasks, &state, &weak);
             if let Some(window) = weak.upgrade() {
                 sync_window(&window, &state.borrow());
             }
@@ -650,10 +846,15 @@ impl ModelManagementController {
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let selected = Rc::clone(&self.on_selected);
         self.window.on_set_default(move |id| {
-            select_model(&service, &state, id.as_str());
+            let model = select_model(&service, &state, id.as_str());
             if let Some(window) = weak.upgrade() {
                 sync_window(&window, &state.borrow());
+            }
+            let handler = selected.borrow().clone();
+            if let (Some(model), Some(handler)) = (model, handler) {
+                handler(model);
             }
         });
 
@@ -683,6 +884,7 @@ impl ModelManagementController {
             open_manual(&state);
             if let Some(window) = weak.upgrade() {
                 sync_window(&window, &state.borrow());
+                window.set_body_scroll_y(0.0);
             }
         });
 
@@ -762,6 +964,34 @@ impl ModelManagementController {
             state.borrow_mut().picker_mode = value;
             reload(&service, &state);
             if let Some(window) = weak.upgrade() {
+                sync_window(&window, &state.borrow());
+            }
+        });
+
+        let weak = self.window.as_weak();
+        let state = Rc::clone(&self.state);
+        let providers = Rc::clone(&self.providers);
+        let service = Arc::clone(&self.service);
+        self.window.on_provider_changed(move |index| {
+            let Some(provider) = providers.borrow().get(index as usize).cloned() else {
+                return;
+            };
+            if state.borrow().provider_id.as_deref() == Some(&provider.id) {
+                return;
+            }
+            {
+                let mut state = state.borrow_mut();
+                state.provider_id = Some(provider.id);
+                state.provider_label = provider.label;
+                state.manual = None;
+                state.error = None;
+                state.notice = None;
+                state.picker.selected_model_id = None;
+            }
+            reload(&service, &state);
+            if let Some(window) = weak.upgrade() {
+                window.set_provider_index(index);
+                window.set_body_scroll_y(0.0);
                 sync_window(&window, &state.borrow());
             }
         });
@@ -1009,6 +1239,80 @@ mod tests {
             .filter_map(|index| models.row_data(index))
             .map(|row| row.label.to_string())
             .collect()
+    }
+
+    #[test]
+    fn reselecting_a_provider_keeps_the_manual_model_draft() {
+        i_slint_backend_testing::init_no_event_loop();
+        let controller = controller(Ok(Vec::new()), Vec::new(), default_settings());
+        let window = controller.window();
+        window.invoke_open_manual();
+        window.invoke_manual_remote_id_changed("my/local-model".into());
+        window.invoke_provider_changed(0);
+        assert!(window.get_manual_visible());
+        assert_eq!(window.get_manual_remote_id(), "my/local-model");
+    }
+
+    #[test]
+    fn searching_keeps_the_current_chat_model_selected() {
+        i_slint_backend_testing::init_no_event_loop();
+        let mut settings = default_settings();
+        settings.default_model_id = Some("m1".to_owned());
+        let controller = controller(
+            Ok(Vec::new()),
+            vec![
+                model("m1", "one", "First model", false, false, None),
+                model("m2", "two", "Second model", false, false, None),
+            ],
+            settings,
+        );
+        controller.set_picker_mode(true);
+        controller.set_selected_model(Some("m2".to_owned()));
+        controller.window().invoke_search_changed("Second".into());
+        assert_eq!(controller.window().get_selected_model_id(), "m2");
+    }
+
+    #[test]
+    fn opening_another_provider_during_discovery_releases_loading_without_stale_feedback() {
+        i_slint_backend_testing::init_no_event_loop();
+        let first = provider();
+        let mut second = first.clone();
+        second.id = "p2".to_owned();
+        second.label = "Second provider".to_owned();
+        let mut second_model = model("m2", "two", "Second model", false, false, None);
+        second_model.provider_id = second.id.clone();
+        let service = Arc::new(ModelManagementService::new(
+            Arc::new(FakeModels {
+                models: Mutex::new(vec![second_model]),
+            }),
+            Arc::new(FakeProviders {
+                providers: Mutex::new(vec![first, second]),
+            }),
+            Arc::new(FakeDiscovery {
+                result: Mutex::new(Ok(Vec::new())),
+            }),
+            Arc::new(FakeSettings {
+                settings: Mutex::new(default_settings()),
+            }),
+        ));
+        let controller = ModelManagementController::new_background(service).expect("models");
+        controller.window().invoke_refresh();
+        assert!(controller.window().get_loading());
+        controller.select_provider("p2");
+        controller.set_selected_model(Some("m2".to_owned()));
+        for _ in 0..1000 {
+            controller.poll();
+            if !controller.window().get_loading() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        assert!(!controller.window().get_loading());
+        assert_eq!(controller.window().get_provider_index(), 1);
+        assert_eq!(controller.window().get_selected_model_id(), "m2");
+        assert_eq!(row_labels(controller.window()), ["Second model"]);
+        assert!(controller.state().notice.is_none());
+        assert!(controller.state().error.is_none());
     }
 
     #[test]

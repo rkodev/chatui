@@ -358,7 +358,8 @@ impl ShellState {
 }
 
 slint::slint! {
-    import { Button } from "std-widgets.slint";
+    import { Palette } from "std-widgets.slint";
+    import { AppButton as Button, AppText as Text, AppIcon, AppCard, AppSectionButton, Design } from "design.slint";
 
     export struct ThemeTokens {
         bg-canvas: color,
@@ -425,70 +426,17 @@ slint::slint! {
         line-height: length,
     }
 
-    component NavItem inherits Rectangle {
+    component NavItem inherits AppSectionButton {
         in property <string> label;
-        in property <bool> active;
-        in property <color> fg;
-        in property <color> active-fg;
-        in property <color> accent;
-        in property <color> focus-color;
-        in property <length> focus-width;
-        in property <length> radius;
-        in property <length> pad;
+        in property <int> destination;
         in property <length> control-height: 40px;
-        in property <bool> reduced-motion: false;
-        callback clicked;
-        out property <bool> has-focus: fs.has-focus;
-        out property <bool> focus-visible: false;
-
-        height: root.control-height;
-        border-radius: root.radius;
-        background: root.active ? root.accent : transparent;
-        animate background { duration: root.reduced-motion ? 0ms : 120ms; }
-
-        accessible-role: button;
-        accessible-label: root.label;
-        accessible-action-default => { root.clicked(); }
-
-        forward-focus: fs;
-
-        fs := FocusScope {
-            x: 0;
-            width: 0;
-            focus-changed-event(reason) => {
-                root.focus-visible = reason == FocusReason.tab-navigation;
-            }
-            key-pressed(event) => {
-                if (event.text == Key.Space || event.text == Key.Return) {
-                    root.clicked();
-                    return accept;
-                }
-                return reject;
-            }
-        }
-
-        ta := TouchArea {
-            clicked => { root.clicked(); }
-        }
-
-        Text {
-            x: root.pad;
-            text: root.label;
-            color: root.active ? root.active-fg : root.fg;
-            font-size: 14px;
-            vertical-alignment: center;
-            accessible-role: none;
-        }
-
-        if (root.focus-visible) : Rectangle {
-            border-width: root.focus-width;
-            border-color: root.focus-color;
-            border-radius: root.radius;
-            background: transparent;
-        }
+        text: root.label;
+        icon-kind: root.destination;
+        preferred-height: root.control-height;
     }
 
     component Sidebar inherits Rectangle {
+        in property <bool> navigation-enabled: true;
         in property <[string]> destinations;
         in property <int> active-destination;
         in property <color> bg;
@@ -501,8 +449,11 @@ slint::slint! {
         in property <DensityTokens> density;
         in property <bool> show-close;
         in property <bool> reduced-motion: false;
+        in property <bool> dark: false;
         callback navigate(int);
         callback close-drawer;
+        callback new-chat;
+        callback shortcuts;
 
         width: 280px;
         background: root.bg;
@@ -511,38 +462,112 @@ slint::slint! {
         accessible-label: "Navigation";
 
         VerticalLayout {
-            padding: root.density.padding;
-            spacing: root.density.gap;
+            padding: root.density.padding + 4px;
+            spacing: root.density.space-3;
+
+            HorizontalLayout {
+                spacing: 12px;
+                height: 64px;
+                Rectangle {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 12px;
+                    background: Design.colors(root.dark).accent-soft;
+                    AppIcon {
+                        x: 9px;
+                        y: 9px;
+                        width: 22px;
+                        height: 22px;
+                        tint: root.accent;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 3px;
+                    Text {
+                        text: "ChatUI";
+                        color: root.fg;
+                        font-size: 21px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: "A thoughtful workspace";
+                        color: Design.colors(root.dark).muted;
+                        font-size: 12px;
+                    }
+                }
+            }
+
+            Button {
+                text: "New chat";
+                enabled: root.navigation-enabled;
+                icon-kind: 5;
+                primary: true;
+                dark: root.dark;
+                horizontal-stretch: 1;
+                preferred-height: 42px;
+                clicked => { root.new-chat(); }
+            }
 
             Text {
-                text: "ChatUI";
-                color: root.fg;
-                font-size: 20px;
+                text: "WORKSPACE";
+                color: Design.colors(root.dark).muted;
+                font-size: 11px;
                 font-weight: 600;
-                height: 32px;
+                height: 28px;
+                vertical-alignment: bottom;
             }
 
             for item[index] in root.destinations : NavItem {
+                enabled: root.navigation-enabled;
                 label: item;
                 active: index == root.active-destination;
-                fg: root.fg;
-                active-fg: root.active-fg;
-                accent: root.accent;
-                focus-color: root.focus-color;
-                focus-width: root.focus-width;
-                radius: root.radius;
-                pad: root.density.space-3;
+                destination: index;
+                dark: root.dark;
                 control-height: root.density.control-height;
-                reduced-motion: root.reduced-motion;
                 clicked => { root.navigate(index); }
             }
 
             Rectangle { vertical-stretch: 1; }
 
+            AppCard {
+                dark: root.dark;
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 7px;
+                    HorizontalLayout {
+                        spacing: 7px;
+                        AppIcon { kind: 7; tint: root.accent; width: 16px; height: 16px; }
+                        Text { text: "Local by default"; font-size: 12px; font-weight: 600; }
+                    }
+                    Text {
+                        text: "Your conversations live on this device. Your provider, your choice.";
+                        color: Design.colors(root.dark).muted;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            Button {
+                text: "Keyboard shortcuts";
+                quiet: true;
+                dark: root.dark;
+                horizontal-stretch: 1;
+                clicked => { root.shortcuts(); }
+            }
+
             if (root.show-close) : Button {
                 text: "Close navigation";
                 clicked => { root.close-drawer(); }
             }
+        }
+
+        Rectangle {
+            x: parent.width - 1px;
+            width: 1px;
+            height: parent.height;
+            background: Design.colors(root.dark).border;
         }
     }
 
@@ -563,26 +588,59 @@ slint::slint! {
         in property <component-factory> providers-factory;
         in property <component-factory> settings-factory;
         in property <component-factory> data-factory;
-        in property <component-factory> models-factory;
-        in property <bool> show-models: false;
+        in property <bool> dark: false;
+        in property <string> model-label: "Choose model";
+        in property <bool> model-selection-enabled: true;
+        in property <length> composer-height: 160px;
+        in property <bool> compact: false;
 
-        callback close-models;
+        callback open-models;
+        callback dismiss-notice;
 
         background: root.bg;
+        min-width: 0px;
+        horizontal-stretch: 1;
 
         accessible-role: main;
         accessible-label: root.title;
 
         VerticalLayout {
-            padding: root.density.padding;
-            spacing: root.density.gap;
+            padding: root.compact ? root.density.padding : root.density.padding + 8px;
+            spacing: root.density.space-4;
 
-            Text {
-                text: root.title;
-                color: root.fg;
-                font-size: 24px;
-                font-weight: 600;
-                height: 32px;
+            HorizontalLayout {
+                spacing: 12px;
+                VerticalLayout {
+                    spacing: 5px;
+                    Text {
+                        text: root.title;
+                        color: root.fg;
+                        font-size: 24px;
+                        font-weight: 700;
+                        overflow: elide;
+                        min-width: 0px;
+                    }
+                    if (!root.compact) : Text {
+                        text: root.active-destination == 0 ? "A space for your next good idea."
+                            : root.active-destination == 1 ? "Pick up right where you left off."
+                            : root.active-destination == 2 ? "Connect your tools. Keep your choice."
+                            : root.active-destination == 3 ? "Make this space feel like yours."
+                            : "Your conversations, always in your control.";
+                        color: root.muted;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+                }
+                if (root.active-destination == 0) : Button {
+                    text: root.model-label;
+                    icon-kind: 6;
+                    dark: root.dark;
+                    accessible-label: "Choose model";
+                    enabled: root.model-selection-enabled;
+                    max-width: 220px;
+                    min-width: 110px;
+                    clicked => { root.open-models(); }
+                }
             }
 
             Rectangle {
@@ -590,29 +648,47 @@ slint::slint! {
                 background: root.border;
             }
 
-            if (root.notice != "") : Text {
-                text: root.notice;
-                color: root.muted;
-                wrap: word-wrap;
-                font-size: root.chat.size;
-                height: root.chat.line-height;
+            if (root.notice != "") : AppCard {
+                dark: root.dark;
+                HorizontalLayout {
+                    padding: 12px;
+                    spacing: 8px;
+                    Text {
+                        text: root.notice;
+                        color: root.muted;
+                        wrap: word-wrap;
+                        horizontal-stretch: 1;
+                        min-width: 0px;
+                        accessible-live-region: polite;
+                    }
+                    Button {
+                        text: "Dismiss";
+                        dark: root.dark;
+                        quiet: true;
+                        clicked => { root.dismiss-notice(); }
+                    }
+                }
             }
 
             content := Rectangle {
                 vertical-stretch: 1;
 
                 // Chat: message list stretches, composer keeps a bounded height.
-                if (root.active-destination == 0) : VerticalLayout {
-                    spacing: root.density.gap;
-
-                    ComponentContainer {
-                        vertical-stretch: 1;
-                        component-factory: root.chat-messages-factory;
-                    }
-
-                    ComponentContainer {
-                        height: 160px;
-                        component-factory: root.chat-composer-factory;
+                if (root.active-destination == 0) : HorizontalLayout {
+                    alignment: center;
+                    VerticalLayout {
+                        spacing: root.density.gap;
+                        max-width: 820px;
+                        min-width: 0px;
+                        horizontal-stretch: 1;
+                        ComponentContainer {
+                            vertical-stretch: 1;
+                            component-factory: root.chat-messages-factory;
+                        }
+                        ComponentContainer {
+                            height: min(root.composer-height, content.height * 0.55);
+                            component-factory: root.chat-composer-factory;
+                        }
                     }
                 }
 
@@ -640,53 +716,6 @@ slint::slint! {
                     component-factory: root.data-factory;
                 }
 
-                // Models overlay. The factory returns the controller's own
-                // handle, so the embedded component stays usable across opens.
-                if (root.show-models) : Rectangle {
-                    width: parent.width;
-                    height: parent.height;
-                    background: #00000066;
-
-                    panel := Rectangle {
-                        width: min(parent.width - 48px, 720px);
-                        height: min(parent.height - 48px, 560px);
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2;
-                        background: root.bg;
-                        border-radius: 8px;
-                        border-width: 1px;
-                        border-color: root.border;
-
-                        VerticalLayout {
-                            padding: root.density.padding;
-                            spacing: root.density.gap;
-
-                            HorizontalLayout {
-                                spacing: root.density.gap;
-
-                                Text {
-                                    text: "Models";
-                                    color: root.fg;
-                                    font-size: 18px;
-                                    font-weight: 600;
-                                    vertical-alignment: center;
-                                }
-
-                                Rectangle { horizontal-stretch: 1; }
-
-                                Button {
-                                    text: "Close models";
-                                    clicked => { root.close-models(); }
-                                }
-                            }
-
-                            ComponentContainer {
-                                vertical-stretch: 1;
-                                component-factory: root.models-factory;
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -695,6 +724,10 @@ slint::slint! {
         title: "ChatUI";
         preferred-width: 1024px;
         preferred-height: 720px;
+        min-width: 420px;
+        min-height: 520px;
+        default-font-size: 14px;
+        background: root.tokens.bg-canvas;
 
         in property <ThemeTokens> tokens;
         in property <DensityTokens> density;
@@ -705,7 +738,12 @@ slint::slint! {
         in property <int> active-destination: 0;
         in property <[string]> destinations: ["Chat", "History", "Providers", "Settings", "Data"];
         in property <string> page-title: "Chat";
-        in property <string> notice: "";
+        in-out property <string> notice: "";
+        in property <bool> dark: false;
+        in property <string> chat-model-label: "Choose model";
+        in property <bool> navigation-enabled: true;
+        in property <bool> model-selection-enabled: true;
+        in property <length> composer-height: 160px;
         in property <component-factory> chat-messages-factory;
         in property <component-factory> chat-composer-factory;
         in property <component-factory> history-factory;
@@ -714,6 +752,14 @@ slint::slint! {
         in property <component-factory> data-factory;
         in property <component-factory> models-factory;
         in-out property <bool> show-models: false;
+        private property <bool> models-popup-open: models-popup.is-open;
+        changed show-models => {
+            if (self.show-models) { models-popup.show(); }
+            else { models-popup.close(); }
+        }
+        changed models-popup-open => {
+            if (!self.models-popup-open) { root.show-models = false; }
+        }
         in-out property <bool> shortcuts-help-open: false;
         in property <[string]> shortcut-lines: [];
         in property <bool> show-params-panel: false;
@@ -724,8 +770,11 @@ slint::slint! {
         callback width-changed(length);
         callback menu-command(string);
         callback files-dropped(data-transfer);
+        callback open-models();
 
         changed width => { root.width-changed(self.width); }
+        init => { Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light; }
+        changed dark => { Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light; }
 
         MenuBar {
             Menu {
@@ -834,6 +883,7 @@ slint::slint! {
 
         if root.sidebar-visible : HorizontalLayout {
             Sidebar {
+                navigation-enabled: root.navigation-enabled;
                 destinations: root.destinations;
                 active-destination: root.active-destination;
                 bg: root.tokens.bg-surface;
@@ -846,8 +896,11 @@ slint::slint! {
                 density: root.density;
                 show-close: false;
                 reduced-motion: root.reduced-motion;
+                dark: root.dark;
                 navigate(i) => { root.navigate(i); }
                 close-drawer => { root.close-drawer(); }
+                new-chat => { root.menu-command("new-chat"); }
+                shortcuts => { root.shortcuts-help-open = true; }
             }
 
             MainContent {
@@ -867,9 +920,13 @@ slint::slint! {
                 providers-factory: root.providers-factory;
                 settings-factory: root.settings-factory;
                 data-factory: root.data-factory;
-                models-factory: root.models-factory;
-                show-models: root.show-models;
-                close-models => { root.show-models = false; }
+                dark: root.dark;
+                model-label: root.chat-model-label;
+                model-selection-enabled: root.model-selection-enabled && root.navigation-enabled;
+                composer-height: root.composer-height;
+                compact: root.width < 840px;
+                open-models => { root.open-models(); }
+                dismiss-notice => { root.notice = ""; }
             }
         }
 
@@ -882,14 +939,25 @@ slint::slint! {
                     spacing: root.density.space-2;
                     Button {
                         text: "Menu";
+                        enabled: root.navigation-enabled;
                         accessible-label: "Toggle navigation";
                         clicked => { root.toggle-sidebar(); }
                     }
                     Text {
-                        text: root.page-title;
+                        text: "ChatUI";
                         color: root.tokens.fg-primary;
                         font-size: 18px;
+                        font-weight: 600;
                         vertical-alignment: center;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    Button {
+                        text: "New chat";
+                        enabled: root.navigation-enabled;
+                        icon-kind: 5;
+                        primary: true;
+                        dark: root.dark;
+                        clicked => { root.menu-command("new-chat"); }
                     }
                 }
             }
@@ -911,9 +979,13 @@ slint::slint! {
                 providers-factory: root.providers-factory;
                 settings-factory: root.settings-factory;
                 data-factory: root.data-factory;
-                models-factory: root.models-factory;
-                show-models: root.show-models;
-                close-models => { root.show-models = false; }
+                dark: root.dark;
+                model-label: root.chat-model-label;
+                model-selection-enabled: root.model-selection-enabled && root.navigation-enabled;
+                composer-height: root.composer-height;
+                compact: root.width < 840px;
+                open-models => { root.open-models(); }
+                dismiss-notice => { root.notice = ""; }
             }
         }
 
@@ -923,6 +995,7 @@ slint::slint! {
                 clicked => { root.close-drawer(); }
             }
             Sidebar {
+                navigation-enabled: root.navigation-enabled;
                 x: 0;
                 height: parent.height;
                 destinations: root.destinations;
@@ -937,9 +1010,62 @@ slint::slint! {
                 density: root.density;
                 show-close: true;
                 reduced-motion: root.reduced-motion;
+                dark: root.dark;
                 navigate(i) => { root.navigate(i); }
                 close-drawer => { root.close-drawer(); }
+                new-chat => { root.close-drawer(); root.menu-command("new-chat"); }
+                shortcuts => { root.close-drawer(); root.shortcuts-help-open = true; }
             }
+        }
+
+        models-popup := PopupWindow {
+            x: 0px;
+            y: 0px;
+            width: root.width;
+            height: root.height;
+            close-policy: close-on-click-outside;
+            forward-focus: close-models;
+          Rectangle {
+            background: #00000077;
+            width: 100%;
+            height: 100%;
+            TouchArea {
+                clicked => { root.show-models = false; }
+            }
+            AppCard {
+                dark: root.dark;
+                width: min(parent.width - 32px, 960px);
+                height: min(parent.height - 32px, 720px);
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                drop-shadow-blur: 24px;
+                drop-shadow-color: #00000030;
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text {
+                            text: "Model library";
+                            color: root.tokens.fg-primary;
+                            font-size: 20px;
+                            font-weight: 600;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        close-models := Button {
+                            text: "Close models";
+                            dark: root.dark;
+                            quiet: true;
+                            clicked => { root.show-models = false; }
+                        }
+                    }
+                    ComponentContainer {
+                        vertical-stretch: 1;
+                        component-factory: root.models-factory;
+                    }
+                }
+            }
+          }
         }
 
         if root.shortcuts-help-open : Rectangle {
@@ -1063,6 +1189,7 @@ pub fn chat_tokens(chat: &ChatTypography) -> ChatTokens {
 /// Push the current shell state into a Slint window.
 pub fn sync_window(window: &ShellWindow, state: &ShellState) {
     window.set_tokens(theme_tokens(&state.tokens()));
+    window.set_dark(state.resolved_theme().is_dark());
     window.set_density(density_tokens(&state.density_scale()));
     window.set_chat(chat_tokens(&state.chat_typography()));
     window.set_reduced_motion(state.reduced_motion());
@@ -1646,6 +1773,7 @@ mod tests {
         let models = TestFeatureWindow::new().expect("models feature");
         models.set_label("Models feature".into());
         window.set_models_factory(factory_for(&models));
+        window.show().expect("show shell");
 
         assert!(!window.get_show_models());
         assert!(
@@ -1655,6 +1783,7 @@ mod tests {
         );
 
         window.set_show_models(true);
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::ZERO);
         let labels = accessible_labels(&window);
         assert!(
             labels.iter().any(|label| label == "Models feature"),
@@ -1670,6 +1799,7 @@ mod tests {
         })
         .expect("close models button");
         close.invoke_accessible_default_action();
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::ZERO);
 
         assert!(
             !window.get_show_models(),
@@ -1680,5 +1810,15 @@ mod tests {
                 .iter()
                 .any(|label| label == "Models feature")
         );
+        window.set_show_models(true);
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::ZERO);
+        window
+            .window()
+            .dispatch_event(slint::platform::WindowEvent::KeyPressed {
+                text: slint::platform::Key::Escape.into(),
+            });
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::ZERO);
+        assert!(!window.get_show_models(), "Escape did not dismiss models");
+        window.hide().expect("hide shell");
     }
 }

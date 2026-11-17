@@ -9,6 +9,7 @@ pub mod announcement;
 pub mod attachments;
 pub mod composer;
 pub mod drafts;
+mod markdown_view;
 pub mod message_item;
 pub mod message_list;
 pub mod runner;

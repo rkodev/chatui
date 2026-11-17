@@ -63,6 +63,210 @@ fn chat_error(code: ChatErrorCode) -> ChatError {
 }
 
 #[test]
+fn native_measurements_follow_the_bottom_and_preserve_a_scrolled_anchor() {
+    let mut state = MessageListState::new(
+        "conversation-1",
+        MessageListConfig {
+            viewport_height: 200.0,
+            ..MessageListConfig::default()
+        },
+    );
+    state.apply_newest_page(page(
+        (0..10)
+            .map(|index| {
+                message(
+                    &format!("m{index}"),
+                    index,
+                    MessageRole::Assistant,
+                    "message",
+                )
+            })
+            .collect(),
+        false,
+    ));
+    state.measure_row("m9", 400.0);
+    assert_eq!(state.scroll_top(), state.max_scroll_top());
+    state.handle_scroll(500.0);
+    state.measure_row("m0", 200.0);
+    assert_eq!(state.scroll_top(), 580.0);
+    assert!(!state.near_bottom());
+}
+
+#[test]
+fn native_layout_and_code_copy_reach_the_controller() {
+    i_slint_backend_testing::init_no_event_loop();
+    let mut state = MessageListState::new("conversation-1", MessageListConfig::default());
+    state.apply_newest_page(page(
+        vec![message(
+            "m1",
+            1,
+            MessageRole::Assistant,
+            "```rust\nlet value = 1;\n```",
+        )],
+        false,
+    ));
+    let mut controller = MessageListController::new(state).expect("message list");
+    let copied = Rc::new(RefCell::new(String::new()));
+    let recorded = Rc::clone(&copied);
+    controller.set_on_copy(move |text| *recorded.borrow_mut() = text);
+    controller.window().invoke_row_measured("m1".into(), 300.0);
+    controller.window().invoke_viewport_measured(200.0);
+    controller.window().invoke_content_measured(316.0);
+    controller.poll_layout();
+    assert_eq!(controller.state().viewport_height(), 200.0);
+    assert_eq!(controller.state().content_height(), 316.0);
+    assert_eq!(controller.state().scroll_top(), 116.0);
+    let row = controller.window().get_rows().row_data(0).expect("row");
+    let code = row.blocks.row_data(0).expect("code block");
+    controller.window().invoke_copy_text(code.source);
+    assert_eq!(*copied.borrow(), "let value = 1;\n");
+}
+
+#[test]
+fn rendered_markdown_scrolls_follows_streaming_and_survives_resize() {
+    use i_slint_backend_testing::ElementRoot;
+    use slint::ComponentHandle;
+
+    slint::platform::set_platform(Box::new(i_slint_backend_testing::TestingBackend::new(
+        i_slint_backend_testing::TestingBackendOptions {
+            mock_time: true,
+            threading: false,
+            renderer_name: Some("software".into()),
+        },
+    )))
+    .expect("software renderer");
+    let text = "## A thoughtful response\n\n".to_owned()
+        + &"A paragraph with **important ideas** and enough detail to wrap naturally across several lines in a compact conversation.\n\n".repeat(12)
+        + "```rust\nlet next_step = \"keep learning\";\n```\n";
+    let mut state = MessageListState::new("conversation-1", MessageListConfig::default());
+    state.apply_newest_page(page(
+        vec![message("m1", 1, MessageRole::Assistant, &text)],
+        false,
+    ));
+    let controller = MessageListController::new(state).expect("message list");
+    controller.window().show().expect("show messages");
+    controller
+        .window()
+        .window()
+        .set_size(slint::LogicalSize::new(640.0, 400.0));
+    controller
+        .window()
+        .window()
+        .dispatch_event(slint::platform::WindowEvent::Resized {
+            size: slint::LogicalSize::new(640.0, 400.0),
+        });
+    let settle = || {
+        for _ in 0..8 {
+            i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(16));
+            controller
+                .window()
+                .window()
+                .take_snapshot()
+                .expect("render messages");
+            controller.poll_layout();
+        }
+    };
+    settle();
+    assert!(controller.state().max_scroll_top() > 0.0);
+    assert!(
+        controller.state().near_bottom(),
+        "initial scroll is {} / {}, native offset {}",
+        controller.state().scroll_top(),
+        controller.state().max_scroll_top(),
+        controller.window().get_content_y()
+    );
+    if let Some(directory) = std::env::var_os("CHATUI_SCREENSHOT_DIR") {
+        std::fs::create_dir_all(&directory).expect("screenshot directory");
+        let snapshot = controller
+            .window()
+            .window()
+            .take_snapshot()
+            .expect("transcript");
+        let pixels: Vec<u8> = snapshot
+            .as_slice()
+            .iter()
+            .flat_map(|pixel| [pixel.r, pixel.g, pixel.b])
+            .collect();
+        image::save_buffer(
+            std::path::PathBuf::from(directory).join("transcript-scroll.png"),
+            &pixels,
+            snapshot.width(),
+            snapshot.height(),
+            image::ColorType::Rgb8,
+        )
+        .expect("save transcript");
+    }
+    let regenerate = controller
+        .window()
+        .root_element()
+        .query_descendants()
+        .find_all()
+        .into_iter()
+        .find(|element| element.accessible_label().as_deref() == Some("Regenerate"))
+        .expect("visible message actions");
+    assert!(
+        regenerate.absolute_position().y >= 0.0
+            && regenerate.absolute_position().y + regenerate.size().height <= 400.0,
+        "bottom following must reveal the real native message actions"
+    );
+    let stable_height = controller.state().content_height();
+    settle();
+    assert!((controller.state().content_height() - stable_height).abs() < 1.0);
+
+    let mut stream = StreamingState::new("conversation-1", "m2", fixed());
+    stream.text = "More **helpful detail** to follow.\n\n".repeat(4);
+    controller.set_streaming(Some(stream.clone()));
+    settle();
+    assert!(controller.state().near_bottom());
+    assert!(
+        (controller.window().get_content_y() - controller.state().max_scroll_top()).abs() < 1.0
+    );
+
+    controller
+        .window()
+        .window()
+        .dispatch_event(slint::platform::WindowEvent::PointerScrolled {
+            position: slint::LogicalPosition::new(200.0, 200.0),
+            delta_x: 0.0,
+            delta_y: 240.0,
+        });
+    settle();
+    assert!(!controller.state().near_bottom());
+    let scrolled_top = controller.state().scroll_top();
+    let anchor = controller.state().viewport_top_id().map(str::to_owned);
+    stream.text.push_str(&text);
+    controller.set_streaming(Some(stream));
+    settle();
+    assert!((controller.state().scroll_top() - scrolled_top).abs() < 1.0);
+    assert!(!controller.state().near_bottom());
+
+    controller
+        .window()
+        .window()
+        .set_size(slint::LogicalSize::new(420.0, 400.0));
+    controller
+        .window()
+        .window()
+        .dispatch_event(slint::platform::WindowEvent::Resized {
+            size: slint::LogicalSize::new(420.0, 400.0),
+        });
+    settle();
+    assert_eq!(
+        controller.state().viewport_top_id().map(str::to_owned),
+        anchor
+    );
+    assert!(!controller.state().near_bottom());
+    controller.scroll_to_bottom();
+    settle();
+    let native_max = (controller.window().get_scroll_content_height()
+        - controller.window().get_viewport_height())
+    .max(0.0);
+    assert!((controller.window().get_content_y() - native_max).abs() < 1.0);
+    assert!(controller.state().near_bottom());
+    controller.window().hide().expect("hide messages");
+}
+
+#[test]
 fn ten_thousand_messages_render_a_bounded_window_in_order() {
     let config = MessageListConfig {
         viewport_height: 800.0,
