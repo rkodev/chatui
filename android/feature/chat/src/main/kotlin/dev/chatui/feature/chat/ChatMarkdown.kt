@@ -1,11 +1,12 @@
 package dev.chatui.feature.chat
 
-import android.graphics.BitmapFactory
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,23 +15,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.size.Scale
 import com.mikepenz.markdown.compose.LocalMarkdownComponents
 import com.mikepenz.markdown.compose.MarkdownElement
+import com.mikepenz.markdown.compose.MarkdownSuccess
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownCodeBlock
@@ -45,9 +54,6 @@ import com.mikepenz.markdown.utils.resolveImageLink
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.model.ChatFontSize
-import java.net.URL
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.findChildOfType
@@ -60,6 +66,11 @@ object ChatMarkdownTestTags {
     const val LoadImage = "chat-markdown-load-image"
     const val OpenImage = "chat-markdown-open-image"
     const val MathBlock = "chat-markdown-math-block"
+    const val RemoteImage = "chat-markdown-remote-image"
+    const val LoadingImage = "chat-markdown-loading-image"
+    const val LoadedImage = "chat-markdown-loaded-image"
+    const val ImageError = "chat-markdown-image-error"
+    const val RetryImage = "chat-markdown-retry-image"
 }
 
 /**
@@ -70,6 +81,8 @@ object ChatMarkdownTestTags {
  * local keeps the safe image resolver aligned with the parsed document.
  */
 private val LocalMarkdownContent = compositionLocalOf { "" }
+private val LocalMarkdownImageOwner = compositionLocalOf<String?> { null }
+internal val LocalMarkdownImageLoader = compositionLocalOf<ImageLoader?> { null }
 
 /**
  * Safe Markdown renderer for chat message content.
@@ -92,6 +105,7 @@ fun ChatMarkdown(
     chatFontSize: ChatFontSize = ChatFontSize.MD,
     parseImmediately: Boolean = false,
     loadRemoteImages: Boolean = false,
+    imageOwnerKey: String? = null,
 ) {
     val rendered = remember(content) { closeIncompleteFence(content) }
     val blocks = remember(rendered) { splitBlockMath(rendered) }
@@ -103,6 +117,7 @@ fun ChatMarkdown(
             chatFontSize = chatFontSize,
             parseImmediately = parseImmediately,
             loadRemoteImages = loadRemoteImages,
+            imageOwnerKey = imageOwnerKey,
         )
     } else {
         Column(
@@ -116,6 +131,7 @@ fun ChatMarkdown(
                         chatFontSize = chatFontSize,
                         parseImmediately = parseImmediately,
                         loadRemoteImages = loadRemoteImages,
+                        imageOwnerKey = imageOwnerKey,
                     )
 
                     is MathBlock.Math -> ChatMath(source = block.source, display = true)
@@ -132,6 +148,7 @@ private fun MarkdownBody(
     chatFontSize: ChatFontSize,
     parseImmediately: Boolean,
     loadRemoteImages: Boolean,
+    imageOwnerKey: String?,
 ) {
     val bodyStyle = Typography.chatStyle(chatFontSize)
     val typography = markdownTypography(
@@ -165,12 +182,20 @@ private fun MarkdownBody(
         immediate = parseImmediately,
     )
 
-    CompositionLocalProvider(LocalMarkdownContent provides content) {
+    CompositionLocalProvider(
+        LocalMarkdownImageOwner provides imageOwnerKey,
+    ) {
         Markdown(
             markdownState = markdownState,
             modifier = modifier,
             typography = typography,
             annotator = annotator,
+            success = { parsed, components, contentModifier ->
+                // Retained AST offsets belong to their parsed source, not a newer input.
+                CompositionLocalProvider(LocalMarkdownContent provides parsed.content) {
+                    MarkdownSuccess(state = parsed, components = components, modifier = contentModifier)
+                }
+            },
             components = markdownComponents(
                 checkbox = { model -> MarkdownCheckBox(model.content, model.node, model.typography.text) },
                 codeFence = { model -> BlockFencedCode(model) },
@@ -445,7 +470,8 @@ private fun BlockedImageContent(
     val dimens = LocalDimens.current
     val safeUrl = remember(destination) { sanitizeImageUrl(destination) }
     val uriHandler = LocalUriHandler.current
-    var loadRequested by remember(safeUrl) { mutableStateOf(false) }
+    val owner = LocalMarkdownImageOwner.current
+    var loadRequested by remember(owner, safeUrl) { mutableStateOf(false) }
 
     if (safeUrl != null && (loadRemoteImages || loadRequested)) {
         RemoteImage(url = safeUrl, alt = alt)
@@ -472,13 +498,13 @@ private fun BlockedImageContent(
         if (safeUrl != null) {
             TextButton(
                 onClick = { loadRequested = true },
-                modifier = Modifier.testTag(ChatMarkdownTestTags.LoadImage),
+                modifier = Modifier.heightIn(min = dimens.touchTargetMin).testTag(ChatMarkdownTestTags.LoadImage),
             ) {
                 Text("Load image")
             }
             TextButton(
                 onClick = { uriHandler.openUri(safeUrl) },
-                modifier = Modifier.testTag(ChatMarkdownTestTags.OpenImage),
+                modifier = Modifier.heightIn(min = dimens.touchTargetMin).testTag(ChatMarkdownTestTags.OpenImage),
             ) {
                 Text("Open image")
             }
@@ -488,32 +514,83 @@ private fun BlockedImageContent(
 
 @Composable
 private fun RemoteImage(url: String, alt: String) {
-    val image by produceState<ImageBitmap?>(initialValue = null, url) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                URL(url).openStream().use { stream ->
-                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
+    val context = LocalContext.current.applicationContext
+    val density = LocalDensity.current
+    val dimens = LocalDimens.current
+    val owner = LocalMarkdownImageOwner.current
+    val imageLoader = LocalMarkdownImageLoader.current ?: SingletonImageLoader.get(context)
+    var retry by remember(owner, url) { mutableIntStateOf(0) }
+    BoxWithConstraints(Modifier.fillMaxWidth().testTag(ChatMarkdownTestTags.RemoteImage)) {
+        val displayWidth = maxWidth.coerceIn(1.dp, 760.dp)
+        val displayHeight = maxHeight.coerceIn(1.dp, 320.dp)
+        val widthPx = with(density) { displayWidth.roundToPx().coerceAtLeast(1) }
+        val heightPx = with(density) { displayHeight.roundToPx().coerceAtLeast(1) }
+        val request = remember(context, url, widthPx, heightPx) {
+            ImageRequest.Builder(context)
+                .data(url)
+                .size(widthPx, heightPx)
+                .scale(Scale.FIT)
+                .build()
+        }
+        var status by remember(owner, request, retry) { mutableStateOf(RemoteImageStatus.Pending) }
+        Box(Modifier.fillMaxWidth()) {
+            key(owner, request, retry) {
+                AsyncImage(
+                    model = request,
+                    imageLoader = imageLoader,
+                    contentDescription = if (status == RemoteImageStatus.Ready) alt.ifBlank { "Remote image" } else null,
+                    contentScale = ContentScale.Fit,
+                    onLoading = { status = RemoteImageStatus.Pending },
+                    onSuccess = { status = RemoteImageStatus.Ready },
+                    onError = { status = RemoteImageStatus.Failed },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp.coerceAtMost(displayHeight), max = displayHeight)
+                        .then(
+                            if (status == RemoteImageStatus.Ready) {
+                                Modifier.testTag(ChatMarkdownTestTags.LoadedImage)
+                            } else {
+                                Modifier
+                            },
+                        ),
+                )
+            }
+            if (status != RemoteImageStatus.Ready) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = dimens.space2)
+                        .testTag(
+                            if (status == RemoteImageStatus.Pending) {
+                                ChatMarkdownTestTags.LoadingImage
+                            } else {
+                                ChatMarkdownTestTags.ImageError
+                            },
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(dimens.space1),
+                ) {
+                    if (alt.isNotBlank()) Text(blockedImageLabel(alt), style = Typography.footnote)
+                    Text(
+                        text = if (status == RemoteImageStatus.Pending) "Loading image..." else "Image unavailable.",
+                        style = Typography.footnote,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (status == RemoteImageStatus.Failed) {
+                        TextButton(
+                            onClick = { retry++ },
+                            modifier = Modifier.heightIn(min = dimens.touchTargetMin)
+                                .testTag(ChatMarkdownTestTags.RetryImage),
+                        ) {
+                            Text("Retry image")
+                        }
+                    }
                 }
-            }.getOrNull()
+            }
         }
     }
-
-    val bitmap = image
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap,
-            contentDescription = alt.ifBlank { "Remote image" },
-            modifier = Modifier.fillMaxWidth(),
-            contentScale = ContentScale.Fit,
-        )
-    } else {
-        Text(
-            text = "Image unavailable.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
 }
+
+private enum class RemoteImageStatus { Pending, Ready, Failed }
 
 @Composable
 private fun RawHtmlText(model: MarkdownComponentModel) {

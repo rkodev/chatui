@@ -147,6 +147,14 @@ conversation sharing and all-data export must remain available.
 | Shape | Restrained 12-16 dp sections and approximately 20 dp composer/user-bubble corners. No decorative tails required. |
 | Depth | Flat screen content; tonal separation for sheets and, at most, one subtle composer boundary. No backdrop blur. |
 
+**Approved compact-header constraint:** use one title line at ordinary font
+scale and at most two at larger scales, with ellipsis and complete accessible
+text. In short keyboard-constrained layouts, prioritize one model-label line
+and retain the full conversation title in accessibility state. Redundant
+padding may shrink to retain 48 dp controls. The owner approved this after
+review of the fully wrapped 320 dp/200% candidate; it does not truncate stored
+titles, drafts, or message content.
+
 Keep the existing semantic token names. Retain the current neutral palettes
 initially; fix hierarchy before undertaking a broad color change.
 

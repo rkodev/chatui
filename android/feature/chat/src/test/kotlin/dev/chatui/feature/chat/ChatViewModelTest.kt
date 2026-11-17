@@ -3,6 +3,7 @@ package dev.chatui.feature.chat
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.database.attachment.AttachmentInput
+import dev.chatui.core.database.attachment.AddAttachmentsResult
 import dev.chatui.core.model.ChatError
 import dev.chatui.core.model.ChatErrorCode
 import dev.chatui.core.model.ContentPart
@@ -15,6 +16,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -348,13 +350,16 @@ class ChatViewModelTest {
             adapter = FakeProviderAdapter(),
             clock = clock,
             attachments = store,
+            attachmentDispatcher = dispatcher,
         )
         runCurrent()
 
         viewModel.onAddAttachments(
             listOf(AttachmentInput("notes.txt", "text/plain", 5, "hello".toByteArray())),
         )
+        assertThat(viewModel.state.value.processingAttachments).isTrue()
         runCurrent()
+        assertThat(viewModel.state.value.processingAttachments).isFalse()
 
         val added = viewModel.state.value.pendingAttachments.single()
         assertThat(added.name).isEqualTo("notes.txt")
@@ -384,6 +389,7 @@ class ChatViewModelTest {
             adapter = adapter,
             clock = clock,
             attachments = store,
+            attachmentDispatcher = dispatcher,
         )
         runCurrent()
 
@@ -429,6 +435,7 @@ class ChatViewModelTest {
             adapter = adapter,
             clock = clock,
             attachments = store,
+            attachmentDispatcher = dispatcher,
         )
         runCurrent()
 
@@ -453,5 +460,76 @@ class ChatViewModelTest {
         adapter.events.send(StreamEvent.Finish(FinishReason.STOP))
         adapter.events.close()
         runCurrent()
+    }
+
+    @Test
+    fun `picker refresh re-reads only the owned conversation without resetting its draft or history`() = runTest(dispatcher) {
+        val source = FakeChatConversationSource()
+        val original = testMessage(role = MessageRole.ASSISTANT)
+        val store = FakeChatMessageStore(listOf(original))
+        val viewModel = ChatViewModel(
+            conversationId = "conversation-1",
+            conversations = source,
+            messages = store,
+            contextResolver = FakeChatContextResolver(),
+            adapter = FakeProviderAdapter(),
+            clock = clock,
+        )
+        runCurrent()
+        viewModel.onDraftChange("Retain this draft")
+        val params = source.conversation!!.params
+        source.conversation = source.conversation!!.copy(modelId = "model-2", modelLabel = "Model Two")
+        viewModel.refreshConversation()
+        runCurrent()
+
+        assertThat(viewModel.state.value.conversation?.modelId).isEqualTo("model-2")
+        assertThat(viewModel.state.value.conversation?.params).isEqualTo(params)
+        assertThat(viewModel.state.value.draft).isEqualTo("Retain this draft")
+        assertThat(viewModel.state.value.messages).containsExactly(original)
+        assertThat(store.writes).isEmpty()
+    }
+
+    @Test
+    fun `cancelled ingestion cleans only its newly abandoned storage and retains the draft and earlier attachments`() = runTest(dispatcher) {
+        val backing = FakeChatAttachmentStore()
+        var hold = false
+        val finish = CompletableDeferred<Unit>()
+        val store = object : ChatAttachmentStore by backing {
+            override suspend fun addFiles(inputs: List<AttachmentInput>, messageId: String?): AddAttachmentsResult {
+                val result = backing.addFiles(inputs, messageId)
+                if (hold) finish.await()
+                return result
+            }
+        }
+        val viewModel = ChatViewModel(
+            conversationId = "conversation-1",
+            conversations = FakeChatConversationSource(),
+            messages = FakeChatMessageStore(),
+            contextResolver = FakeChatContextResolver(),
+            adapter = FakeProviderAdapter(),
+            attachments = store,
+            attachmentDispatcher = dispatcher,
+            clock = clock,
+        )
+        runCurrent()
+        viewModel.onDraftChange("Still editing")
+        viewModel.onAddAttachments(listOf(AttachmentInput("kept.txt", "text/plain", 1, byteArrayOf(1))))
+        runCurrent()
+        val kept = viewModel.state.value.pendingAttachments.single()
+        hold = true
+        viewModel.onAddAttachments(listOf(AttachmentInput("abandoned.txt", "text/plain", 1, byteArrayOf(2))))
+        runCurrent()
+        assertThat(viewModel.state.value.processingAttachments).isTrue()
+        viewModel.onSend()
+        assertThat(viewModel.state.value.sending).isFalse()
+        viewModel.cancelAttachmentProcessing()
+        finish.complete(Unit)
+        runCurrent()
+
+        assertThat(viewModel.state.value.processingAttachments).isFalse()
+        assertThat(viewModel.state.value.draft).isEqualTo("Still editing")
+        assertThat(viewModel.state.value.pendingAttachments).containsExactly(kept)
+        assertThat(backing.attachments.values).containsExactly(kept)
+        assertThat(viewModel.state.value.attachmentError).isNull()
     }
 }

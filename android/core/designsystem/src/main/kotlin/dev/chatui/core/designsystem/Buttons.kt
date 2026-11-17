@@ -1,9 +1,10 @@
 package dev.chatui.core.designsystem
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -16,11 +17,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 
 /** Filled accent button for the primary action on a screen. */
@@ -35,7 +36,10 @@ fun PrimaryButton(
     val dimens = LocalDimens.current
     Button(
         onClick = onClick,
-        modifier = modifier.heightIn(min = dimens.touchTargetMin),
+        modifier = modifier.sizeIn(
+            minWidth = dimens.touchTargetMin,
+            minHeight = dimens.touchTargetMin,
+        ),
         enabled = enabled,
         shape = RoundedCornerShape(dimens.radiusMd),
         colors = ButtonDefaults.buttonColors(
@@ -59,7 +63,10 @@ fun SecondaryButton(
     val dimens = LocalDimens.current
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.heightIn(min = dimens.touchTargetMin),
+        modifier = modifier.sizeIn(
+            minWidth = dimens.touchTargetMin,
+            minHeight = dimens.touchTargetMin,
+        ),
         enabled = enabled,
         shape = RoundedCornerShape(dimens.radiusMd),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.accent),
@@ -81,7 +88,10 @@ fun IconAction(
     IconButton(
         onClick = onClick,
         modifier = modifier
-            .size(LocalDimens.current.touchTargetMin)
+            .sizeIn(
+                minWidth = LocalDimens.current.touchTargetMin,
+                minHeight = LocalDimens.current.touchTargetMin,
+            )
             .semantics { this.contentDescription = contentDescription },
         enabled = enabled,
     ) {
@@ -107,7 +117,10 @@ fun CircleIconButton(
     IconButton(
         onClick = onClick,
         modifier = modifier
-            .size(LocalDimens.current.touchTargetMin)
+            .sizeIn(
+                minWidth = LocalDimens.current.touchTargetMin,
+                minHeight = LocalDimens.current.touchTargetMin,
+            )
             .background(containerColor, CircleShape),
         enabled = enabled,
     ) {
@@ -120,10 +133,7 @@ fun CircleIconButton(
 }
 
 /**
- * Button that swaps its label for a spinner while [loading] is true.
- *
- * The label stays in the layout with zero alpha so the button width does not
- * jump when loading starts or stops.
+ * A pending action keeps its label and rejects duplicate activation.
  */
 @Composable
 fun LoadingButton(
@@ -137,7 +147,9 @@ fun LoadingButton(
     val dimens = LocalDimens.current
     Button(
         onClick = onClick,
-        modifier = modifier.heightIn(min = dimens.touchTargetMin),
+        modifier = modifier
+            .sizeIn(minWidth = dimens.touchTargetMin, minHeight = dimens.touchTargetMin)
+            .semantics { if (loading) stateDescription = "In progress" },
         enabled = enabled && !loading,
         shape = RoundedCornerShape(dimens.radiusMd),
         colors = ButtonDefaults.buttonColors(
@@ -145,19 +157,25 @@ fun LoadingButton(
             contentColor = colors.fgOnAccent,
         ),
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = text,
-                style = Typography.headline,
-                modifier = Modifier.alpha(if (loading) 0f else 1f),
-            )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(dimens.space2),
+        ) {
             if (loading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = colors.fgOnAccent,
-                )
+                if (LocalReducedMotion.current) {
+                    CircularProgressIndicator(
+                        progress = { 0.75f },
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
             }
+            Text(text = text, style = Typography.headline)
         }
     }
 }

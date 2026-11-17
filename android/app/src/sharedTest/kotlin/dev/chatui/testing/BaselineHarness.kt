@@ -3,6 +3,8 @@ package dev.chatui.testing
 import android.app.Application
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -26,6 +28,7 @@ import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.datastore.settings.SettingsDataStore
 import dev.chatui.core.model.ChatErrorCode
 import dev.chatui.core.model.Theme
+import dev.chatui.core.model.Density as UiDensity
 import dev.chatui.feature.chat.ChatContextResult
 import dev.chatui.feature.chat.ChatDependencies
 import dev.chatui.feature.chat.ChatEntryPoint
@@ -170,6 +173,8 @@ fun BaselineShell(
     harness: BaselineHarness,
     theme: Theme = Theme.LIGHT,
     fontScale: Float = 1f,
+    densityMode: UiDensity = harness.settings.density,
+    windowInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
     val context = LocalContext.current
     val application = remember(context, harness) {
@@ -186,9 +191,10 @@ fun BaselineShell(
         LocalDensity provides Density(density.density, fontScale),
     ) {
         ChatUiApp(
-            settings = harness.settings.copy(theme = theme),
+            settings = harness.settings.copy(theme = theme, density = densityMode),
             conversationService = harness.conversations,
             chatDrafts = harness.dependencies.drafts,
+            windowInsets = windowInsets,
         )
     }
 }

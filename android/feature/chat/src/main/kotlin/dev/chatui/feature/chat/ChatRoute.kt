@@ -1,6 +1,7 @@
 package dev.chatui.feature.chat
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,6 +27,7 @@ fun ChatRoute(
     onOpenConversationSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
     persistIntervalMs: Long = DEFAULT_PERSIST_INTERVAL_MS,
+    onOpenModelPicker: (String, () -> Unit) -> Unit = { _, _ -> },
 ) {
     val viewModel: ChatViewModel = viewModel(
         key = conversationId,
@@ -43,6 +45,9 @@ fun ChatRoute(
         ),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.cancelAttachmentProcessing() }
+    }
     val settings by dependencies.settings.settings.collectAsStateWithLifecycle(
         initialValue = AndroidSettings(),
     )
@@ -73,6 +78,9 @@ fun ChatRoute(
         onBack = onBack,
         onOpenProviders = onOpenProviders,
         onOpenConversationSettings = onOpenConversationSettings,
+        onOpenModelPicker = {
+            onOpenModelPicker(conversationId, viewModel::refreshConversation)
+        },
         onShareConversation = { format ->
             val text = ConversationShareFormatter.format(
                 title = state.conversation?.title ?: "Conversation",
@@ -81,7 +89,8 @@ fun ChatRoute(
             )
             context.startActivity(ConversationShareIntent.createChooserIntent(text))
         },
-        onAddAttachments = viewModel::onAddAttachments,
+        onAddAttachments = { viewModel.onAddAttachments(it) },
+        onIngestAttachment = { viewModel.onAddAttachments(listOf(it))?.join() },
         onRemoveAttachment = viewModel::onRemoveAttachment,
         onConfirmSend = viewModel::onConfirmSend,
         onCancelSendConfirmation = viewModel::onCancelSendConfirmation,

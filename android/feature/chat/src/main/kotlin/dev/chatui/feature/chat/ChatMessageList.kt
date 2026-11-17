@@ -1,22 +1,25 @@
 package dev.chatui.feature.chat
 
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,14 +30,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.LocalReducedMotion
 import dev.chatui.core.model.Attachment
 import dev.chatui.core.model.ChatFontSize
 import dev.chatui.core.model.ContentPart
@@ -50,8 +60,7 @@ object ChatMessageListTestTags {
     const val List = "chat-message-list"
     const val Older = "chat-message-list-older"
     const val Streaming = "chat-message-list-streaming"
-    const val ScrollToBottom = "chat-message-list-scroll-to-bottom"
-    const val NewMessages = "chat-message-list-new-messages"
+    const val Latest = "chat-message-list-latest"
 }
 
 /**
@@ -63,9 +72,7 @@ object ChatMessageListTestTags {
  * Compose skips them.
  *
  * Consecutive messages from the same role form a group: only the first row
- * shows the avatar and only the last row shows the timestamp. The list also
- * exposes a scroll-to-bottom affordance and a new-message pill when content
- * arrives while the user is reading history.
+ * shows the role label and only the last row shows the timestamp.
  */
 @Composable
 fun ChatMessageList(
@@ -91,7 +98,10 @@ fun ChatMessageList(
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
+    val reducedMotion = LocalReducedMotion.current
+    val followThreshold = with(LocalDensity.current) { 96.dp.roundToPx() }
     val scope = rememberCoroutineScope()
+    val conversationKey = conversation?.id ?: messages.firstOrNull()?.conversationId ?: streaming?.conversationId
     val isStreaming = streaming?.done == false
     val visibleMessages = remember(messages, isStreaming, streaming?.messageId) {
         if (isStreaming) {
@@ -110,42 +120,72 @@ fun ChatMessageList(
         visibleMessages.lastOrNull { it.role == MessageRole.USER }?.id
     }
 
-    val isNearBottom by remember {
+    val isNearBottom by remember(listState, followThreshold) {
         derivedStateOf {
             val info = listState.layoutInfo
-            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
-            info.totalItemsCount == 0 || lastVisible >= info.totalItemsCount - 2
+            val last = info.visibleItemsInfo.lastOrNull()
+            info.totalItemsCount == 0 || (
+                last != null && last.index >= info.totalItemsCount - 2 &&
+                    last.offset + last.size <= info.viewportEndOffset + followThreshold
+                )
         }
     }
-    var initialScrollDone by remember { mutableStateOf(false) }
-    var newMessagesWhileAway by remember { mutableStateOf(false) }
+    var initialScrollDone by rememberSaveable(conversationKey) { mutableStateOf(false) }
+    var following by rememberSaveable(conversationKey) {
+        mutableStateOf(listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0)
+    }
+    var newMessagesWhileAway by rememberSaveable(conversationKey) { mutableStateOf(false) }
+    var jumpingToLatest by remember(listState) { mutableStateOf(false) }
+    val latestContent by rememberUpdatedState(visibleMessages.lastOrNull() to activeStream)
 
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.totalItemsCount }.collect { total ->
-            if (total > 0 && !initialScrollDone) {
-                // Request the first position during layout; later programmatic
-                // scrolls animate so the list never jumps under the user.
-                listState.requestScrollToItem(total - 1)
+    LaunchedEffect(listState, conversationKey) {
+        var previousContent = latestContent
+        var previousSnapshot: FollowSnapshot? = null
+        var tailRequested = false
+        snapshotFlow {
+            val info = listState.layoutInfo
+            FollowSnapshot(
+                content = latestContent,
+                total = info.totalItemsCount,
+                firstKey = info.visibleItemsInfo.firstOrNull()?.key,
+                firstOffset = listState.firstVisibleItemScrollOffset,
+                lastItemBottom = info.visibleItemsInfo.lastOrNull()?.let { it.offset + it.size },
+                nearBottom = isNearBottom,
+                canScrollForward = listState.canScrollForward,
+                scrolling = listState.isScrollInProgress,
+            )
+        }.collect { snapshot ->
+            val contentChanged = previousContent != snapshot.content
+            previousContent = snapshot.content
+            val previous = previousSnapshot
+            previousSnapshot = snapshot
+            if (snapshot.total == 0) return@collect
+            if (!initialScrollDone) {
                 initialScrollDone = true
+                if (following) {
+                    tailRequested = true
+                    listState.requestScrollToItem(snapshot.total - 1)
+                }
+            } else {
+                val movedWithoutNewContent = previous != null &&
+                    previous.total == snapshot.total && !contentChanged &&
+                    (previous.firstKey != snapshot.firstKey || previous.firstOffset != snapshot.firstOffset)
+                if (!jumpingToLatest && (snapshot.scrolling || (movedWithoutNewContent && !tailRequested))) {
+                    following = snapshot.nearBottom
+                }
+                if (!snapshot.canScrollForward) tailRequested = false
+                if (contentChanged && !following) newMessagesWhileAway = true
+                if (following) {
+                    newMessagesWhileAway = false
+                    // Snap to the measured tail; token growth never restarts an animation.
+                    if (!snapshot.scrolling && snapshot.canScrollForward) {
+                        tailRequested = true
+                        listState.requestScrollToItem(snapshot.total - 1)
+                    }
+                }
             }
         }
     }
-
-    LaunchedEffect(messages.size, streaming?.text, streaming?.reasoning, activeStream != null) {
-        val total = listState.layoutInfo.totalItemsCount
-        if (total == 0 || !initialScrollDone) return@LaunchedEffect
-        if (isNearBottom) {
-            listState.animateScrollToItem(total - 1)
-        } else {
-            newMessagesWhileAway = true
-        }
-    }
-
-    LaunchedEffect(isNearBottom) {
-        if (isNearBottom) newMessagesWhileAway = false
-    }
-
-    val showScrollToBottom = !isNearBottom && (isStreaming || newMessagesWhileAway)
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -155,6 +195,7 @@ fun ChatMessageList(
                 .testTag(ChatMessageListTestTags.List),
             contentPadding = PaddingValues(dimens.padding),
             verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (hasOlder || loadingOlder) {
                 item(key = "older", contentType = "older") {
@@ -185,7 +226,11 @@ fun ChatMessageList(
                 val isGroupEnd = next == null || next.role != message.role
                 ChatMessageItem(
                     message = message,
-                    modifier = Modifier.animateItem(),
+                    modifier = if (reducedMotion) Modifier else Modifier.animateItem(
+                        fadeInSpec = tween(150),
+                        placementSpec = tween(160),
+                        fadeOutSpec = tween(150),
+                    ),
                     chatFontSize = chatFontSize,
                     showTokenUsage = showTokenUsage,
                     loadRemoteImages = loadRemoteImages,
@@ -224,58 +269,77 @@ fun ChatMessageList(
                     )
                 }
             }
+            item(key = Long.MIN_VALUE, contentType = "end") {
+                Spacer(Modifier.height(1.dp))
+            }
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(dimens.padding),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(dimens.space2),
-        ) {
-            if (newMessagesWhileAway) {
-                Surface(
-                    onClick = {
-                        scope.launch {
+        if (!isNearBottom) {
+            Surface(
+                onClick = {
+                    scope.launch {
+                        jumpingToLatest = true
+                        following = true
+                        newMessagesWhileAway = false
+                        try {
                             val total = listState.layoutInfo.totalItemsCount
-                            if (total > 0) listState.animateScrollToItem(total - 1)
+                            if (total > 0) {
+                                if (reducedMotion) {
+                                    listState.scrollToItem(total - 1)
+                                } else {
+                                    listState.animateScrollToItem(total - 1)
+                                }
+                            }
+                        } finally {
+                            jumpingToLatest = false
+                            following = isNearBottom
                         }
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(dimens.padding)
+                    .heightIn(min = dimens.touchTargetMin)
+                    .testTag(ChatMessageListTestTags.Latest)
+                    .semantics {
+                        contentDescription = "Latest messages"
+                        stateDescription = if (newMessagesWhileAway) "New content available" else "Earlier messages"
                     },
-                    shape = CircleShape,
-                    color = colors.accent,
-                    contentColor = colors.fgOnAccent,
-                    modifier = Modifier.testTag(ChatMessageListTestTags.NewMessages),
-                ) {
-                    Text(
-                        text = "New messages",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = dimens.space3, vertical = dimens.space2),
-                    )
-                }
-            }
-            if (showScrollToBottom) {
-                SmallFloatingActionButton(
-                    onClick = {
-                        scope.launch {
-                            val total = listState.layoutInfo.totalItemsCount
-                            if (total > 0) listState.animateScrollToItem(total - 1)
-                        }
-                    },
-                    containerColor = colors.bgSurfaceRaised,
-                    contentColor = colors.fgPrimary,
-                    modifier = Modifier
-                        .size(dimens.touchTargetMin)
-                        .testTag(ChatMessageListTestTags.ScrollToBottom),
+                shape = RoundedCornerShape(24.dp),
+                color = colors.bgSurfaceRaised,
+                contentColor = colors.fgPrimary,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = dimens.space3, vertical = dimens.space2),
+                    horizontalArrangement = Arrangement.spacedBy(dimens.space2),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.ArrowDownward,
-                        contentDescription = "Scroll to latest messages",
+                        contentDescription = null,
                     )
+                    Column {
+                        Text("Latest messages", style = MaterialTheme.typography.labelLarge)
+                        if (newMessagesWhileAway) {
+                            Text("New content available", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+private data class FollowSnapshot(
+    val content: Pair<Message?, StreamingState?>,
+    val total: Int,
+    val firstKey: Any?,
+    val firstOffset: Int,
+    val lastItemBottom: Int?,
+    val nearBottom: Boolean,
+    val canScrollForward: Boolean,
+    val scrolling: Boolean,
+)
 
 /** Transient message used to render the active stream with the normal item. */
 internal fun StreamingState.toMessage(conversation: Conversation?): Message {

@@ -30,6 +30,23 @@
 
 ## Notes
 
+- Android minimalist UX-01.2 through UX-03.7 implements compact density/
+  targets, real Chats and adaptive history, contextual More/Back, and an
+  app-owned model picker with isolated conversation/default targets. Sharing,
+  shortcuts, history operations and underlying settings/data/backup routes
+  remain available. Approved bounded title/model presentation retains full
+  accessible text; it does not alter stored titles or content.
+- The same Android slice widens messages, consolidates visible actions/usage,
+  warnings and Latest messages, and makes URI ingestion lifecycle-owned IO.
+  Drafts, attachment types/limits/consent, historical attribution, stream/
+  recovery cadence, request parameters, schemas and protocols are preserved.
+  Remote Markdown images use bounded existing-stack requests behind the same
+  policy; the `loadRemoteImages = true` default is unchanged. Code follows the
+  applied app theme and retains exact content and raw-source math fallback.
+- These are Android presentation/integration changes, not reduced parity or a
+  release/performance pass. Real-IME/focus and picker/grant acceptance remain
+  blocked as recorded in the minimalist task pack; UX-00.3 is still explicitly
+  owner-deferred and UX-06 retains physical-device acceptance.
 - Android [UX-01.1](../docs/operations/android-minimalist-design-plan/UX-01.1-colors-and-contrast.md)
   refines semantic accent/selected/status contrast only. Feature commitments,
   provider behavior, persisted preferences, and the opt-in dynamic-color policy

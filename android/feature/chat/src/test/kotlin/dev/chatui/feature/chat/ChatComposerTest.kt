@@ -1,5 +1,9 @@
 package dev.chatui.feature.chat
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -9,10 +13,15 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -23,17 +32,23 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.Attachment
 import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.SendKey
+import dev.chatui.core.model.Density as UiDensity
 import java.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -354,8 +369,8 @@ class ChatComposerTest {
             }
         }
 
-        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentWarning).assertIsDisplayed()
-        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentError).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentWarning).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentError).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -436,6 +451,162 @@ class ChatComposerTest {
         }
 
         assertThat(sends).isEqualTo(0)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `ordinary input grows through eight lines then scrolls without truncating the draft`() {
+        var draft by mutableStateOf("Line 1")
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                Box(Modifier.width(411.dp).height(700.dp)) {
+                    ChatComposer(
+                        draft, { draft = it }, {}, {}, SendKey.MOD_ENTER,
+                        enabled = true, streaming = false, sending = false,
+                    )
+                }
+            }
+        }
+        draft = (1..8).joinToString("\n") { "Line $it" }
+        composeRule.onNodeWithTag(ChatComposerTestTags.Input).assertHeightIsAtLeast(192.dp)
+        val eight = composeRule.onNodeWithTag(ChatComposerTestTags.Input).getUnclippedBoundsInRoot()
+        draft += "\nLine 9"
+        val nine = composeRule.onNodeWithTag(ChatComposerTestTags.Input).getUnclippedBoundsInRoot()
+        assertThat((nine.bottom - nine.top).value).isEqualTo((eight.bottom - eight.top).value)
+        composeRule.onNodeWithTag(ChatComposerTestTags.Input).assertTextEquals(draft)
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `short large-font viewport keeps editable text and immediate stop while adding attachments`() {
+        var draft by mutableStateOf((1..30).joinToString("\n") { "Draft line $it" })
+        var stops = 0
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 2f)) {
+                ChatUiTheme(reducedMotion = true) {
+                    Box(Modifier.width(320.dp).height(180.dp)) {
+                        ChatComposer(
+                            draft, { draft = it }, {}, { stops++ }, SendKey.MOD_ENTER,
+                            enabled = true, streaming = true, sending = false,
+                            processingAttachments = true,
+                        )
+                    }
+                }
+            }
+        }
+        val input = composeRule.onNodeWithTag(ChatComposerTestTags.Input).getUnclippedBoundsInRoot()
+        assertThat((input.bottom - input.top).value).isAtMost(80f)
+        composeRule.onNodeWithTag(ChatComposerTestTags.Input).performTextInput("\nKeep the rest")
+        assertThat(draft).contains("Draft line 30")
+        assertThat(draft).contains("Keep the rest")
+        composeRule.onNodeWithTag(ChatComposerTestTags.Processing).assertIsDisplayed()
+        composeRule.onNodeWithTag(ChatComposerTestTags.Stop)
+            .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp).performClick()
+        assertThat(stops).isEqualTo(1)
+        composeRule.onNodeWithTag(ChatComposerTestTags.Attach).assertIsEnabled()
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `attachment filename wraps without sharing its removal target`() {
+        val file = attachment().copy(name = "meeting-notes-for-our-project.txt", size = 2048)
+        var removed: String? = null
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 2f)) {
+                ChatUiTheme(reducedMotion = true) {
+                    ChatComposer(
+                        "", {}, {}, {}, SendKey.ENTER,
+                        enabled = true, streaming = false, sending = false,
+                        attachments = listOf(file), onRemoveAttachment = { removed = it },
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithText(file.name).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("2.0 KB").assertExists()
+        composeRule.onNodeWithTag(ChatComposerTestTags.removeAttachment(file.id))
+            .performScrollTo().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp).performClick()
+        assertThat(removed).isEqualTo(file.id)
+    }
+
+    @Test
+    fun `send changes directly to a stable stop target without waiting for motion`() {
+        var streaming by mutableStateOf(false)
+        var stops = 0
+        composeRule.setContent {
+            ChatUiTheme {
+                ChatComposer(
+                    "Draft", {}, {}, { stops++ }, SendKey.ENTER,
+                    enabled = true, streaming = streaming, sending = false,
+                )
+            }
+        }
+        val send = composeRule.onNodeWithTag(ChatComposerTestTags.Send).getUnclippedBoundsInRoot()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnIdle { streaming = true }
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeBy(32)
+        composeRule.waitForIdle()
+        val stop = composeRule.onNodeWithTag(ChatComposerTestTags.Stop).getUnclippedBoundsInRoot()
+        assertThat(stop).isEqualTo(send)
+        composeRule.onNodeWithTag(ChatComposerTestTags.Send).assertDoesNotExist()
+        composeRule.onNodeWithTag(ChatComposerTestTags.Stop).performClick()
+        assertThat(stops).isEqualTo(1)
+    }
+
+    @Test
+    @Config(qualifiers = "w640dp-h360dp")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `short input discloses readable attachments and removal instead of clipping the controls`() {
+        var density by mutableStateOf(UiDensity.COMFORTABLE)
+        var files by mutableStateOf(listOf(attachment(), attachment().copy(id = "attachment-2")))
+        var stops = 0
+        val removed = mutableListOf<String>()
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 2f)) {
+                ChatUiTheme(density = density, reducedMotion = true) {
+                    Box(Modifier.width(640.dp).height(56.dp)) {
+                        ChatComposer(
+                            "Retained draft", {}, {}, { stops++ }, SendKey.ENTER,
+                            enabled = true, streaming = true, sending = false,
+                            processingAttachments = true,
+                            attachments = files,
+                            attachmentWarning = "This model cannot receive images.",
+                            onRemoveAttachment = { id ->
+                                removed += id
+                                files = files.filterNot { it.id == id }
+                            },
+                            onAddPhoto = {},
+                        )
+                    }
+                }
+            }
+        }
+        UiDensity.entries.forEach { selected ->
+            density = selected
+            val first = files.first()
+            composeRule.onNodeWithTag(ChatComposerTestTags.Input)
+                .assertTextEquals("Retained draft").assertHeightIsAtLeast(48.dp)
+            composeRule.onNodeWithTag(ChatComposerTestTags.Attach)
+                .assertContentDescriptionEquals("Attachments").performClick()
+            composeRule.onNodeWithTag(ChatComposerTestTags.attachmentChip(first.id))
+                .performScrollTo().assertIsDisplayed()
+            composeRule.onNodeWithTag(ChatComposerTestTags.removeAttachment(first.id))
+                .performScrollTo().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp).performClick()
+            composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentWarning).performScrollTo().assertIsDisplayed()
+            composeRule.onNodeWithTag(ChatComposerTestTags.AttachPhoto).performScrollTo().performClick()
+            composeRule.onNodeWithTag(ChatComposerTestTags.Stop)
+                .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp).performClick()
+            val stop = composeRule.onNodeWithTag(ChatComposerTestTags.Stop).getUnclippedBoundsInRoot()
+            val composer = composeRule.onNodeWithTag(ChatComposerTestTags.Composer).getUnclippedBoundsInRoot()
+            assertThat(stop.top.value).isAtLeast(composer.top.value)
+            assertThat(stop.bottom.value).isAtMost(composer.bottom.value)
+        }
+        assertThat(stops).isEqualTo(2)
+        assertThat(removed).containsExactly("attachment-1", "attachment-2").inOrder()
+        assertThat(files).isEmpty()
     }
 
     private fun attachment(): Attachment = Attachment(

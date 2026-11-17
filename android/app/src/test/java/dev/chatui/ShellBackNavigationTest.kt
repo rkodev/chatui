@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -49,10 +48,11 @@ class ShellBackNavigationTest {
             composeRule.activity.onBackPressedDispatcher.onBackPressed()
         }
 
-        composeRule.onNodeWithTag(ShellTestTags.Sidebar).assertIsNotDisplayed()
+        composeRule.onNodeWithTag(dev.chatui.feature.conversations.ConversationListTestTags.Screen)
+            .assertDoesNotExist()
         composeRule.runOnIdle {
             assertThat(navController.currentDestination?.route)
-                .isEqualTo(ShellDestination.Conversations.route)
+                .isEqualTo(ShellDestination.Chat.route)
         }
     }
 
@@ -61,12 +61,10 @@ class ShellBackNavigationTest {
     fun `back navigates after the drawer is closed`() {
         setShell()
 
-        composeRule.onNodeWithTag(
-            ShellTestTags.navigationItem(ShellDestination.Backup.route),
-        ).performClick()
+        composeRule.runOnIdle { navController.navigate(ShellDestination.Conversations.route) }
         composeRule.runOnIdle {
             assertThat(navController.currentDestination?.route)
-                .isEqualTo(ShellDestination.Backup.route)
+                .isEqualTo(ShellDestination.Conversations.route)
         }
 
         composeRule.runOnIdle {
@@ -75,7 +73,7 @@ class ShellBackNavigationTest {
 
         composeRule.runOnIdle {
             assertThat(navController.currentDestination?.route)
-                .isEqualTo(ShellDestination.Conversations.route)
+                .isEqualTo(ShellDestination.Chat.route)
         }
     }
 
@@ -121,7 +119,8 @@ class ShellBackNavigationTest {
             composeRule.activity.onBackPressedDispatcher.onBackPressed()
         }
 
-        composeRule.onNodeWithTag(ShellTestTags.Sidebar).assertIsNotDisplayed()
+        composeRule.onNodeWithTag(dev.chatui.feature.conversations.ConversationListTestTags.Screen)
+            .assertDoesNotExist()
     }
 
     @Test
@@ -172,7 +171,7 @@ class ShellBackNavigationTest {
                 navController = rememberNavController()
                 ShellScaffold(
                     navController = navController,
-                    startDestination = ShellDestination.Conversations.route,
+                    startDestination = ShellDestination.Chat.route,
                     conversationService = FakeConversationService(),
                 )
                 overlay()

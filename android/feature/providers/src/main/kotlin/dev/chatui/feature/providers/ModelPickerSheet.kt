@@ -2,20 +2,17 @@ package dev.chatui.feature.providers
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -115,6 +112,7 @@ fun ModelPickerSheet(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     title: String = "Choose a model",
+    onRetry: () -> Unit = onRefresh,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -138,6 +136,7 @@ fun ModelPickerSheet(
             onManualLabelChanged = onManualLabelChanged,
             onAddManual = onAddManual,
             onRefresh = onRefresh,
+            onRetry = onRetry,
         )
     }
 }
@@ -165,6 +164,7 @@ fun ModelPickerContent(
     modifier: Modifier = Modifier,
     title: String = "Choose a model",
     header: (@Composable () -> Unit)? = null,
+    onRetry: () -> Unit = onRefresh,
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
@@ -229,7 +229,7 @@ fun ModelPickerContent(
                 ErrorState(
                     title = "Could not load models",
                     body = error,
-                    onRetry = onRefresh,
+                    onRetry = onRetry,
                     modifier = Modifier.testTag(ModelPickerTestTags.Error),
                 )
             }

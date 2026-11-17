@@ -5,7 +5,10 @@
 - Status: In progress
 - Scope: Android presentation, navigation integration, accessibility, and resource efficiency. Preserve functionality.
 - Breakdown: 41 tasks across the source plan's UX-00 through UX-06 phases.
-- Implementation: UX-01.1 complete; UX-00.3 deferred by the owner.
+- Implementation: UX-01.1 complete; UX-01.2 through UX-03.7 implemented.
+  Eleven requested tasks have implementation acceptance; UX-02.3, UX-02.4,
+  UX-03.3 and UX-03.6 retain the explicit device/prerequisite blockers below.
+  UX-00.3 remains owner-deferred, not passed.
 
 ## Folder and numbering contract
 
@@ -155,21 +158,21 @@ is read-only unless a tightly coupled integration fix is explicitly required.
 | 2 | [UX-00.2 Fixtures and visual baseline](UX-00.2-fixtures-and-visual-baseline.md) | Complete | UX-00.1 |
 | 3 | [UX-00.3 Reference-device performance baseline](UX-00.3-device-performance-baseline.md) | Blocked | UX-00.2 |
 | 4 | [UX-01.1 Semantic colors and contrast](UX-01.1-colors-and-contrast.md) | Complete | UX-00.3 |
-| 5 | [UX-01.2 Density, spacing, and touch targets](UX-01.2-density-and-touch-targets.md) | Not started | UX-00.3 |
-| 6 | [UX-01.3 Compact scaffold title bar](UX-01.3-compact-scaffold.md) | Not started | UX-01.1, UX-01.2 |
-| 7 | [UX-01.4 Applied theme and feedback preferences](UX-01.4-theme-preferences.md) | Not started | UX-01.1 |
-| 8 | [UX-01.5 Quiet state and motion primitives](UX-01.5-state-and-motion-primitives.md) | Not started | UX-01.3, UX-01.4 |
-| 9 | [UX-02.1 Reusable history presentation](UX-02.1-history-presentation.md) | Not started | UX-01.5 |
-| 10 | [UX-02.2 Real Chats root and adaptive history](UX-02.2-chats-root-and-drawer.md) | Not started | UX-02.1 |
-| 11 | [UX-02.3 Toolbar overflow and hierarchical navigation](UX-02.3-toolbar-and-back.md) | Not started | UX-02.2 |
-| 12 | [UX-02.4 App-owned model-picker host](UX-02.4-model-picker-host.md) | Not started | UX-02.3 |
-| 13 | [UX-03.1 Content-first message geometry](UX-03.1-message-layout.md) | Not started | UX-01.5 |
-| 14 | [UX-03.2 Message actions and metadata footer](UX-03.2-message-actions.md) | Not started | UX-03.1 |
-| 15 | [UX-03.3 Responsive composer and single warning](UX-03.3-composer-and-warnings.md) | Not started | UX-01.5 |
-| 16 | [UX-03.4 Latest-message control and streaming motion](UX-03.4-scrolling-and-streaming.md) | Not started | UX-03.1 |
-| 17 | [UX-03.5 Bounded remote Markdown images](UX-03.5-remote-images.md) | Not started | UX-03.1 |
-| 18 | [UX-03.6 Background attachment ingestion](UX-03.6-attachment-ingestion.md) | Not started | UX-03.3 |
-| 19 | [UX-03.7 App-themed code and rendering reuse](UX-03.7-code-and-markdown-rendering.md) | Not started | UX-03.1 |
+| 5 | [UX-01.2 Density, spacing, and touch targets](UX-01.2-density-and-touch-targets.md) | Complete | UX-00.3 |
+| 6 | [UX-01.3 Compact scaffold title bar](UX-01.3-compact-scaffold.md) | Complete | UX-01.1, UX-01.2 |
+| 7 | [UX-01.4 Applied theme and feedback preferences](UX-01.4-theme-preferences.md) | Complete | UX-01.1 |
+| 8 | [UX-01.5 Quiet state and motion primitives](UX-01.5-state-and-motion-primitives.md) | Complete | UX-01.3, UX-01.4 |
+| 9 | [UX-02.1 Reusable history presentation](UX-02.1-history-presentation.md) | Complete | UX-01.5 |
+| 10 | [UX-02.2 Real Chats root and adaptive history](UX-02.2-chats-root-and-drawer.md) | Complete | UX-02.1 |
+| 11 | [UX-02.3 Toolbar overflow and hierarchical navigation](UX-02.3-toolbar-and-back.md) | Blocked | UX-02.2 |
+| 12 | [UX-02.4 App-owned model-picker host](UX-02.4-model-picker-host.md) | Blocked | UX-02.3 |
+| 13 | [UX-03.1 Content-first message geometry](UX-03.1-message-layout.md) | Complete | UX-01.5 |
+| 14 | [UX-03.2 Message actions and metadata footer](UX-03.2-message-actions.md) | Complete | UX-03.1 |
+| 15 | [UX-03.3 Responsive composer and single warning](UX-03.3-composer-and-warnings.md) | Blocked | UX-01.5 |
+| 16 | [UX-03.4 Latest-message control and streaming motion](UX-03.4-scrolling-and-streaming.md) | Complete | UX-03.1 |
+| 17 | [UX-03.5 Bounded remote Markdown images](UX-03.5-remote-images.md) | Complete | UX-03.1 |
+| 18 | [UX-03.6 Background attachment ingestion](UX-03.6-attachment-ingestion.md) | Blocked | UX-03.3 |
+| 19 | [UX-03.7 App-themed code and rendering reuse](UX-03.7-code-and-markdown-rendering.md) | Complete | UX-03.1 |
 | 20 | [UX-04.1 Compact searchable model picker](UX-04.1-model-picker-presentation.md) | Not started | UX-02.4 |
 | 21 | [UX-04.2 Reachable model management](UX-04.2-manage-models-entry.md) | Not started | UX-04.1 |
 | 22 | [UX-04.3 Quiet provider list and truthful status](UX-04.3-provider-list.md) | Not started | UX-02.4 |
@@ -192,6 +195,112 @@ is read-only unless a tightly coupled integration fix is explicitly required.
 | 39 | [UX-06.4 Entry-level performance acceptance](UX-06.4-performance-acceptance.md) | Not started | UX-06.3 |
 | 40 | [UX-06.5 Device flows and usability walkthrough](UX-06.5-device-and-usability.md) | Not started | UX-06.2 |
 | 41 | [UX-06.6 Parity and implementation closeout](UX-06.6-parity-and-closeout.md) | Not started | UX-06.1, UX-06.2, UX-06.3, UX-06.4, UX-06.5 |
+
+## UX-01.2 through UX-03.7 verification record
+
+The requested implementation is present, including the owner-approved bounded
+header refinement recorded in UX-01.3 and the source plan. The final JUnit
+reports contain **505 passing tests, no failures/errors/skips**:
+
+| Scope actually checked | Tests | Lint |
+| --- | --- | --- |
+| Full design-system unit suite | 51 | No errors; 5 warnings |
+| Full chat unit suite | 170 | No errors; 3 warnings |
+| Full conversations unit suite | 108 | No errors; 3 warnings |
+| Selected provider picker/snapshot suites | 29 | No errors; 2 warnings |
+| Selected app shell/theme/navigation/picker/intent/candidate suites | 147 | No errors; 16 warnings |
+
+Production `:app:compileDebugKotlin` passed. Existing lint was used without
+suppressing checks, upgrading dependencies, or claiming the warnings resolved.
+Tasks were executed in combined invocations; these commands reproduce the
+verified scopes from the repository root:
+
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+$env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
+$env:CHATUI_REFINEMENT_DIR = Join-Path (Get-Location) 'android\app\build\reports\android-minimalist-refinement'
+Set-Location .\android
+$flags = @(
+  '--console=plain', '--quiet', '--no-daemon',
+  '-Pkotlin.compiler.execution.strategy=in-process',
+  '-Pandroid.baselineProfile.skipGeneration=true'
+)
+.\gradlew.bat @flags `
+  :core:designsystem:testDebugUnitTest :core:designsystem:lintDebug `
+  :feature:chat:testDebugUnitTest :feature:chat:lintDebug `
+  :feature:conversations:testDebugUnitTest :feature:conversations:lintDebug `
+  :feature:providers:testDebugUnitTest --tests '*ModelPicker*' --tests '*MessageModelSnapshotTest' `
+  :feature:providers:lintDebug
+.\gradlew.bat @flags `
+  :app:testDebugUnitTest `
+  --tests '*MotionHapticsThemeTest' --tests '*ShellThemeTest' `
+  --tests '*AdaptiveShellTest' --tests '*ShellNavigationTest' `
+  --tests '*ShellSidebarTest' --tests '*ShellInsetsTest' `
+  --tests '*ShellTopBarTest' --tests '*ShellBackNavigationTest' `
+  --tests '*BackPolicyTest' --tests '*KeyboardShortcutsTest' `
+  --tests '*AccessibilityFocusTest' --tests '*AppModelPickerHostTest' `
+  --tests '*DeepLink*' --tests '*ExternalIntent*' `
+  --tests '*ShellBaselineScreenshotTest' `
+  :app:lintDebug :app:compileDebugKotlin `
+  '-Proborazzi.test.record=true'
+```
+
+JUnit reports are under each checked module's
+`build\test-results\testDebugUnitTest`; lint XML/HTML/SARIF is under
+`build\reports\lint-results-debug.*`. The recorded task scope is selected, not
+the entire app/provider repository suite. No physical timing, frame, OOM, ANR,
+vibration, or real permission-grant acceptance is inferred from these reports.
+
+### Candidate visual evidence
+
+There are **104 separate current-candidate PNGs**: 26 cases, each in comfortable/
+compact and light/dark. The ignored artifact root is
+`android\app\build\reports\android-minimalist-refinement`, with groups
+`candidate-actual-shell`, `candidate-foundation`, and
+`candidate-standalone-picker`. Both the environment variable and Roborazzi's
+record property above are required; setting only the directory does not record.
+Do not broaden recording to unrelated screenshot/golden suites.
+
+Representative captures were reviewed for real Chats/empty/populated/search/
+archive, 839/840 dp hosting, expanded theme colors, code/table/reasoning, local
+images, errors/setup, controlled streaming, long history, and phone/landscape/
+1280 dp reading width. Foundation cases cover 320 dp at 100/150/200% fonts.
+They set Android's animator scale to 1/1/0 respectively and assert the
+theme's observed reduced-motion value, without overriding that theme flag.
+The test restores the prior scale afterward.
+
+`chat_portrait_ime224_font200_*` and
+`chat_landscape_ime224_font200_*` reserve a **simulated** 224 dp keyboard inset
+at 320 x 568 and 640 x 360. Every theme/density variant asserts complete
+48 dp input/Add/Send/Stop bounds above the inset. These captures intentionally
+do not render a keyboard and are not evidence of real platform IME behavior.
+Short attachment-disclosure/removal tests additionally exercise a 56 dp
+composer viewport at 200% in both densities.
+
+These are local review artifacts, not promoted/frozen goldens or completion
+of UX-06.1's later full-screen-lane review. The old UX-00 captures/build and
+fixtures remain unchanged. Preserve/promote accepted candidate evidence to
+approved storage during the integrated UX-06 review.
+
+### Remaining acceptance blockers and next gate
+
+`adb devices -l` reported no connected Android device. All requested code is
+implemented; these statuses deliberately remain `Blocked`, not manual passes:
+
+| Task | Blocker and owner |
+| --- | --- |
+| UX-02.3 | Android maintainer: real-IME portrait/landscape, 200% text, layered Back and return-focus review. |
+| UX-02.4 | Android maintainer: close UX-02.3 and confirm actual picker dismissal/selection returns focus correctly. |
+| UX-03.3 | Android maintainer: actual IME, both densities, Add/remove/Send/Stop and send-anyway consent. |
+| UX-03.6 | Android maintainer: close UX-03.3 and verify real photo/SAF/paste/drop grants, revocation and cancellation. |
+
+Record those results in the owning handoffs before marking the four tasks
+Complete. UX-04.1 and UX-05.1 become eligible after UX-02.4's gate; no
+unrequested later-phase implementation is included here. UX-06.2/06.5 repeat
+the integrated accessibility/device matrix, and UX-06.4 still requires
+physical performance comparisons. UX-00.3 remains owner-deferred/Blocked;
+its original dependency edges, frozen old build and budgets are unchanged.
 
 ## Execution lanes and shared-file coordination
 

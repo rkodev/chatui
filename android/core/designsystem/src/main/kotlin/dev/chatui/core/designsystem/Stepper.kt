@@ -2,6 +2,7 @@ package dev.chatui.core.designsystem
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -41,7 +42,9 @@ fun Stepper(
             },
             enabled = value > min,
             interactionSource = decreaseInteraction,
-            modifier = Modifier.pressScale(decreaseInteraction),
+            modifier = Modifier
+                .sizeIn(minWidth = LocalDimens.current.touchTargetMin, minHeight = LocalDimens.current.touchTargetMin)
+                .pressScale(decreaseInteraction),
         ) {
             Icon(
                 imageVector = Icons.Rounded.Remove,
@@ -63,7 +66,9 @@ fun Stepper(
             },
             enabled = value < max,
             interactionSource = increaseInteraction,
-            modifier = Modifier.pressScale(increaseInteraction),
+            modifier = Modifier
+                .sizeIn(minWidth = LocalDimens.current.touchTargetMin, minHeight = LocalDimens.current.touchTargetMin)
+                .pressScale(increaseInteraction),
         ) {
             Icon(
                 imageVector = Icons.Rounded.Add,

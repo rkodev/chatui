@@ -4,7 +4,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -174,13 +173,15 @@ class KeyboardShortcutsTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(ShellTestTags.Sidebar).assertIsNotDisplayed()
+        composeRule.onNodeWithTag(dev.chatui.feature.conversations.ConversationListTestTags.Screen)
+            .assertDoesNotExist()
     }
 
     @Test
     fun `help button opens the shortcut map`() {
         setShell()
 
+        composeRule.onNodeWithTag(ShellTestTags.MoreButton).performClick()
         composeRule.onNodeWithTag(ShellTestTags.ShortcutHelpButton).performClick()
 
         composeRule.onNodeWithTag(ShortcutHelpTestTags.Dialog).assertIsDisplayed()
@@ -229,7 +230,7 @@ class KeyboardShortcutsTest {
                 navController = rememberNavController()
                 ShellScaffold(
                     navController = navController,
-                    startDestination = ShellDestination.Conversations.route,
+                    startDestination = ShellDestination.Chat.route,
                     conversationService = FakeConversationService(conversations),
                     chatShortcutState = chatShortcutState,
                     shortcutActions = actions,

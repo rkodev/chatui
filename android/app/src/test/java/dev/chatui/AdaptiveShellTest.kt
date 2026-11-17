@@ -2,10 +2,14 @@ package dev.chatui
 
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onNodeWithText
+import com.google.common.truth.Truth.assertThat
+import dev.chatui.feature.conversations.ConversationListTestTags
 import androidx.navigation.compose.rememberNavController
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.shell.AdaptiveShell
@@ -27,11 +31,11 @@ class AdaptiveShellTest {
     @Test
     @Config(qualifiers = "w411dp-h891dp")
     fun `compact width uses a modal drawer`() {
-        setShell()
+        setShell(start = ShellDestination.Chat.route)
 
         composeRule.onNodeWithTag(ShellTestTags.MenuButton).assertIsDisplayed()
         composeRule.onNodeWithTag(ShellTestTags.Drawer).assertExists()
-        composeRule.onNodeWithTag(ShellTestTags.Sidebar).assertIsNotDisplayed()
+        composeRule.onNodeWithTag(ConversationListTestTags.Screen).assertDoesNotExist()
 
         composeRule.onNodeWithTag(ShellTestTags.MenuButton).performClick()
 
@@ -43,8 +47,9 @@ class AdaptiveShellTest {
     fun `839 dp stays on the compact path`() {
         setShell()
 
-        composeRule.onNodeWithTag(ShellTestTags.MenuButton).assertIsDisplayed()
-        composeRule.onNodeWithTag(ShellTestTags.Drawer).assertExists()
+        composeRule.onNodeWithTag(ConversationListTestTags.Screen).assertIsDisplayed()
+        composeRule.onNodeWithTag(ShellTestTags.ConversationsPlaceholder).assertDoesNotExist()
+        composeRule.onNodeWithTag(ShellTestTags.Drawer).assertDoesNotExist()
         composeRule.onNodeWithTag(ShellTestTags.ExpandedLayout).assertDoesNotExist()
     }
 
@@ -96,13 +101,33 @@ class AdaptiveShellTest {
         composeRule.onNodeWithTag(ShellTestTags.MainContent).assertIsDisplayed()
     }
 
-    private fun setShell() {
+    @Test
+    @Config(qualifiers = "w320dp-h568dp")
+    fun `compact chats is real and has one history collector and one new chat`() {
+        val service = FakeConversationService(
+            conversations = listOf(fakeConversation(title = "Invented history")),
+        )
+        setShell(service = service)
+
+        composeRule.onNodeWithText("Invented history").assertIsDisplayed()
+        composeRule.onAllNodesWithTag(ConversationListTestTags.NewChat).assertCountEquals(1)
+        composeRule.onNodeWithTag(ShellTestTags.ConversationsPlaceholder).assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertThat(service.activeHistoryCollectors).isEqualTo(1)
+            assertThat(service.maximumHistoryCollectors).isEqualTo(1)
+        }
+    }
+
+    private fun setShell(
+        start: String = ShellDestination.Conversations.route,
+        service: FakeConversationService = FakeConversationService(),
+    ) {
         composeRule.setContent {
             ChatUiTheme {
                 ShellScaffold(
                     navController = rememberNavController(),
-                    startDestination = ShellDestination.Conversations.route,
-                    conversationService = FakeConversationService(),
+                    startDestination = start,
+                    conversationService = service,
                 )
             }
         }

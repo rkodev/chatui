@@ -29,7 +29,7 @@ class ShellInsetsTest {
         setShell(WindowInsets(16.dp, 24.dp, 16.dp, 48.dp))
 
         val main = composeRule
-            .onNodeWithTag(ShellTestTags.MainContent)
+            .onNodeWithTag(ShellTestTags.ScreenContent)
             .getUnclippedBoundsInRoot()
 
         assertThat(main.left.value).isWithin(0.5f).of(16f)
@@ -43,7 +43,7 @@ class ShellInsetsTest {
         setShell(WindowInsets(16.dp, 24.dp, 16.dp, 48.dp))
 
         val main = composeRule
-            .onNodeWithTag(ShellTestTags.MainContent)
+            .onNodeWithTag(ShellTestTags.ScreenContent)
             .getUnclippedBoundsInRoot()
         val sidebar = composeRule
             .onNodeWithTag(ShellTestTags.Sidebar)
@@ -61,16 +61,14 @@ class ShellInsetsTest {
         composeRule.onNodeWithTag(ShellTestTags.MenuButton).performClick()
 
         val main = composeRule
-            .onNodeWithTag(ShellTestTags.MainContent)
+            .onNodeWithTag(ShellTestTags.ScreenContent)
             .getUnclippedBoundsInRoot()
         val sidebar = composeRule
             .onNodeWithTag(ShellTestTags.Sidebar)
             .getUnclippedBoundsInRoot()
 
-        // The drawer lives inside the already-inset content area, so its top
-        // must match the content top rather than adding the status-bar inset
-        // again.
-        assertThat(sidebar.top.value).isWithin(0.5f).of(main.top.value)
+        assertThat(sidebar.top.value).isWithin(0.5f).of(24f)
+        assertThat(sidebar.top.value).isLessThan(main.top.value)
     }
 
     private fun setShell(windowInsets: WindowInsets) {
@@ -78,7 +76,7 @@ class ShellInsetsTest {
             ChatUiTheme {
                 ShellScaffold(
                     navController = rememberNavController(),
-                    startDestination = ShellDestination.Conversations.route,
+                    startDestination = ShellDestination.Chat.route,
                     conversationService = FakeConversationService(),
                     windowInsets = windowInsets,
                 )

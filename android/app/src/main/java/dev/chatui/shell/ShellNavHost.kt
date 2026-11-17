@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -37,6 +38,7 @@ import dev.chatui.feature.chat.ChatPlaceholder
 import dev.chatui.feature.chat.ChatRoute
 import dev.chatui.feature.conversations.ConversationEntryPoint
 import dev.chatui.feature.conversations.ConversationService
+import dev.chatui.feature.conversations.ConversationRoute
 import dev.chatui.feature.onboarding.OnboardingEntryPoint
 import dev.chatui.feature.onboarding.OnboardingRoute
 import dev.chatui.feature.providers.ConversationSettingsRoute
@@ -60,6 +62,8 @@ import kotlinx.coroutines.CancellationException
 fun NavGraphBuilder.shellDestinations(
     navController: NavHostController,
     conversationService: ConversationService? = null,
+    historyContent: (@Composable () -> Unit)? = null,
+    onOpenModelPicker: (String, () -> Unit) -> Unit = { _, _ -> },
 ) {
     composable(ShellDestination.Onboarding.route) {
         val context = LocalContext.current
@@ -136,6 +140,7 @@ fun NavGraphBuilder.shellDestinations(
                     }
                 },
                 onOpenConversationSettings = { showSettings = true },
+                onOpenModelPicker = onOpenModelPicker,
                 modifier = Modifier.testTag(
                     ChatDestinationTestTags.conversation(conversationId),
                 ),
@@ -155,9 +160,17 @@ fun NavGraphBuilder.shellDestinations(
         }
     }
     composable(ShellDestination.Conversations.route) {
-        // The conversation history lives in the adaptive sidebar/drawer so the
-        // main content can keep the current chat or destination.
-        ConversationsPlaceholder()
+        if (historyContent != null) {
+            historyContent()
+        } else {
+            val service = conversationService ?: rememberShellConversationService()
+            ConversationRoute(
+                service = service,
+                onOpenConversation = {
+                    navController.navigate(ChatDestination.createRoute(it)) { launchSingleTop = true }
+                },
+            )
+        }
     }
     composable(ShellDestination.Providers.route) {
         val service = rememberProviderManagementService()
@@ -252,6 +265,17 @@ fun NavGraphBuilder.shellDestinations(
     }
     composable(ShellDestination.Backup.route) {
         BackupSettingsRoute(service = rememberBackupSettingsService())
+    }
+}
+
+@Composable
+private fun rememberShellConversationService(): ConversationService {
+    val context = LocalContext.current
+    return remember(context.applicationContext) {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            ConversationEntryPoint::class.java,
+        ).conversationService()
     }
 }
 
@@ -375,8 +399,12 @@ fun ShellNavHost(
     modifier: Modifier = Modifier,
     startDestination: String = ShellDestination.Conversations.route,
     conversationService: ConversationService? = null,
+    historyContent: (@Composable () -> Unit)? = null,
+    onOpenModelPicker: (String, () -> Unit) -> Unit = { _, _ -> },
 ) {
     val reducedMotion = LocalReducedMotion.current
+    val currentHistoryContent by rememberUpdatedState(historyContent)
+    val currentOpenModelPicker by rememberUpdatedState(onOpenModelPicker)
 
     NavHost(
         navController = navController,
@@ -441,6 +469,11 @@ fun ShellNavHost(
             }
         },
     ) {
-        shellDestinations(navController, conversationService)
+        shellDestinations(
+            navController,
+            conversationService,
+            historyContent = historyContent?.let { { currentHistoryContent?.invoke() } },
+            onOpenModelPicker = { id, onApplied -> currentOpenModelPicker(id, onApplied) },
+        )
     }
 }

@@ -41,6 +41,7 @@ data class ModelPickerUiState(
     val notice: String? = null,
     val manualRemoteId: String = "",
     val manualLabel: String = "",
+    val selectionVersion: Int = 0,
 ) {
     val groups: List<ModelPickerGroup>
         get() = buildModelPickerGroups(models, providers, query, includeHidden)
@@ -123,6 +124,7 @@ class ModelPickerViewModel(
                                 selectedModelId = updated.modelId,
                                 busy = false,
                                 notice = "Model switched to ${updated.modelLabel}.",
+                                selectionVersion = it.selectionVersion + 1,
                             )
                         }
                     }
@@ -137,6 +139,7 @@ class ModelPickerViewModel(
                                 warning = warning,
                                 busy = false,
                                 notice = "Default model set to ${model.label}.",
+                                selectionVersion = it.selectionVersion + 1,
                             )
                         }
                     }

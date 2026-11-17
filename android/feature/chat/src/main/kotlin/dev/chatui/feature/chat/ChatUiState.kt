@@ -37,6 +37,7 @@ data class ChatUiState(
     val error: ChatError? = null,
     val notice: String? = null,
     val pendingAttachments: List<Attachment> = emptyList(),
+    val processingAttachments: Boolean = false,
     val attachmentsByMessage: Map<String, Attachment> = emptyMap(),
     val attachmentError: String? = null,
     val attachmentWarning: String? = null,
@@ -55,6 +56,7 @@ data class ChatUiState(
     val canSend: Boolean
         get() = !sending &&
             !isStreaming &&
+            !processingAttachments &&
             (draft.isNotBlank() || pendingAttachments.isNotEmpty()) &&
             availability?.available != false
 
