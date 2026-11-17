@@ -43,10 +43,30 @@
   Remote Markdown images use bounded existing-stack requests behind the same
   policy; the `loadRemoteImages = true` default is unchanged. Code follows the
   applied app theme and retains exact content and raw-source math fallback.
+- Android minimalist UX-04.1 through UX-04.9 makes the shared searchable picker
+  compact, wires provider-scoped Manage models with hidden-model recovery, and
+  focuses provider setup/detail/key editing. Conversation/default/management
+  targets, full catalog/pricing/capabilities, labeled actions, validation,
+  credential storage and key-removal record semantics are preserved.
+- Conversation settings now use the app-owned picker and expose existing
+  curated OpenRouter routing alongside full validated extras JSON. Exact
+  generation/default distinctions still persist immediately; coordinated
+  field patches preserve newer settings and unknown routing/extra fields.
+  Routing/privacy defaults, protected request fields, drafts and historical
+  model attribution remain unchanged.
+- Onboarding keeps the existing OpenRouter `/key` first-run service and public
+  catalog, with its broader existing provider-option limitation explained.
+  Backup is explicitly optional; only Set up backup mounts the real secure
+  setup entry. All five backend/encryption/enable semantics remain unchanged.
+  Skip/Done preserve pending shares, deep links, existing drafts and useful
+  Chats navigation without auto-sending or creating a duplicate chat.
 - These are Android presentation/integration changes, not reduced parity or a
   release/performance pass. Real-IME/focus and picker/grant acceptance remain
   blocked as recorded in the minimalist task pack; UX-00.3 is still explicitly
-  owner-deferred and UX-06 retains physical-device acceptance.
+  owner-deferred and UX-06 retains physical-device acceptance. UX-04's selected
+  312 passing tests and 66 affected widget goldens do not replace those gates;
+  evidence and per-task blockers are in the
+  [UX-04 verification record](../docs/operations/android-minimalist-design-plan/README.md#ux-04-verification-record).
 - Android [UX-01.1](../docs/operations/android-minimalist-design-plan/UX-01.1-colors-and-contrast.md)
   refines semantic accent/selected/status contrast only. Feature commitments,
   provider behavior, persisted preferences, and the opt-in dynamic-color policy

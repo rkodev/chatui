@@ -38,7 +38,7 @@ class SheetBackTest {
                     onReasoningEffortChanged = {},
                     onStreamingChanged = {},
                     onExtrasChanged = {},
-                    onModelSelected = {},
+                    onOpenModelPicker = {},
                     onDelete = {},
                     onDismissError = {},
                 )
@@ -72,7 +72,7 @@ class SheetBackTest {
                     onReasoningEffortChanged = {},
                     onStreamingChanged = {},
                     onExtrasChanged = {},
-                    onModelSelected = {},
+                    onOpenModelPicker = {},
                     onDelete = { deleted = true },
                     onDismissError = {},
                 )

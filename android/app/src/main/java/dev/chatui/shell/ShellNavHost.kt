@@ -42,6 +42,7 @@ import dev.chatui.feature.conversations.ConversationRoute
 import dev.chatui.feature.onboarding.OnboardingEntryPoint
 import dev.chatui.feature.onboarding.OnboardingRoute
 import dev.chatui.feature.providers.ConversationSettingsRoute
+import dev.chatui.feature.providers.ManageModelsRoute
 import dev.chatui.feature.providers.ProviderDetailRoute
 import dev.chatui.feature.providers.ProviderListRoute
 import dev.chatui.feature.providers.ProviderManagementEntryPoint
@@ -77,12 +78,7 @@ fun NavGraphBuilder.shellDestinations(
         OnboardingRoute(
             service = service,
             backupService = rememberBackupSettingsService(),
-            onConnected = {
-                navController.navigate(ShellDestination.Conversations.route) {
-                    popUpTo(ShellDestination.Onboarding.route) { inclusive = true }
-                    launchSingleTop = true
-                }
-            },
+            onConnected = navController::finishOnboarding,
         )
     }
     composable(ShellDestination.Chat.route) { ChatPlaceholder() }
@@ -117,6 +113,8 @@ fun NavGraphBuilder.shellDestinations(
                 ).conversationService()
             }
             var showSettings by remember(conversationId) { mutableStateOf(false) }
+            var conversationRefreshVersion by remember(conversationId) { mutableStateOf(0) }
+            val pickerHost = LocalAppModelPicker.current
 
             LaunchedEffect(conversationId) {
                 try {
@@ -141,6 +139,7 @@ fun NavGraphBuilder.shellDestinations(
                 },
                 onOpenConversationSettings = { showSettings = true },
                 onOpenModelPicker = onOpenModelPicker,
+                conversationRefreshVersion = conversationRefreshVersion,
                 modifier = Modifier.testTag(
                     ChatDestinationTestTags.conversation(conversationId),
                 ),
@@ -150,10 +149,24 @@ fun NavGraphBuilder.shellDestinations(
                 ConversationSettingsRoute(
                     service = rememberProviderManagementService(),
                     conversationId = conversationId,
-                    onDismiss = { showSettings = false },
+                    onDismiss = {
+                        showSettings = false
+                        conversationRefreshVersion++
+                    },
                     onDeleted = {
                         showSettings = false
                         navController.popBackStack()
+                    },
+                    onOpenModelPicker = { id, onReturned ->
+                        val closed: () -> Unit = {
+                            onReturned()
+                            conversationRefreshVersion++
+                        }
+                        if (pickerHost != null) {
+                            pickerHost.openConversationSettings(id, closed)
+                        } else {
+                            onOpenModelPicker(id, closed)
+                        }
                     },
                 )
             }
@@ -177,6 +190,7 @@ fun NavGraphBuilder.shellDestinations(
 
         ProviderListRoute(
             service = service,
+            showTitle = false,
             onOpenProvider = { providerId ->
                 navController.navigate(ProviderDestination.createRoute(providerId)) {
                     launchSingleTop = true
@@ -198,6 +212,7 @@ fun NavGraphBuilder.shellDestinations(
         if (providerId == null) {
             ProviderListRoute(
                 service = service,
+                showTitle = false,
                 onOpenProvider = { id ->
                     navController.navigate(ProviderDestination.createRoute(id)) {
                         launchSingleTop = true
@@ -205,8 +220,31 @@ fun NavGraphBuilder.shellDestinations(
                 },
             )
         } else {
-            ProviderDetailRoute(service = service, providerId = providerId)
+            ProviderDetailRoute(
+                service = service,
+                providerId = providerId,
+                onOpenModels = { id ->
+                    navController.navigate(ProviderModelsDestination.createRoute(id)) {
+                        launchSingleTop = true
+                    }
+                },
+            )
         }
+    }
+    composable(
+        route = ProviderModelsDestination.ROUTE,
+        arguments = listOf(
+            navArgument(ProviderModelsDestination.ARG_PROVIDER_ID) {
+                type = NavType.StringType
+            },
+        ),
+    ) { entry ->
+        ManageModelsRoute(
+            service = rememberProviderManagementService(),
+            providerId = entry.arguments
+                ?.getString(ProviderModelsDestination.ARG_PROVIDER_ID).orEmpty(),
+            showTitle = false,
+        )
     }
     composable(ShellDestination.Settings.route) {
         SettingsRoute(
@@ -320,6 +358,14 @@ private fun rememberBackupSettingsService(): BackupSettingsService {
             context.applicationContext,
             BackupEntryPoint::class.java,
         ).backupSettingsService()
+    }
+}
+
+internal fun NavHostController.finishOnboarding() {
+    if (currentDestination?.route != ShellDestination.Onboarding.route) return
+    navigate(ShellDestination.Conversations.route) {
+        popUpTo(ShellDestination.Onboarding.route) { inclusive = true }
+        launchSingleTop = true
     }
 }
 

@@ -3,6 +3,10 @@ package dev.chatui.feature.providers
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -20,12 +24,45 @@ fun ConversationSettingsRoute(
     onDismiss: () -> Unit,
     onDeleted: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenModelPicker: ((String, () -> Unit) -> Unit)? = null,
 ) {
     val viewModel: ConversationSettingsViewModel = viewModel(
-        key = conversationId,
+        key = "conversation-settings-$conversationId",
         factory = ConversationSettingsViewModel.factory(service, conversationId),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var pickerOpen by remember(conversationId) { mutableStateOf(false) }
+    var pickerReturnVersion by rememberSaveable(conversationId) { mutableStateOf(0) }
+    val conversation = state.conversation
+    val routing: (@Composable () -> Unit)? = if (
+        state.provider?.presetId == "openrouter" && conversation != null
+    ) {
+        val routingConversation = conversation.copy(params = state.params)
+        val routingViewModel: ConversationRoutingViewModel = viewModel(
+            key = "conversation-routing-$conversationId-${state.provider?.id}",
+            factory = ConversationRoutingViewModel.factory(
+                service,
+                conversationId,
+                initialConversation = routingConversation,
+                persistPreferences = viewModel::persistRouting,
+            ),
+        )
+        val routingState by routingViewModel.state.collectAsStateWithLifecycle()
+        LaunchedEffect(routingConversation, routingState.busy) {
+            routingViewModel.onConversationChanged(routingConversation)
+        }
+        val content: @Composable () -> Unit = {
+            ConversationRoutingControls(
+                state = routingState,
+                onEnabledChanged = routingViewModel::onEnabledChanged,
+                onAllowFallbacksChanged = routingViewModel::onAllowFallbacksChanged,
+                onSortChanged = routingViewModel::onSortChanged,
+                onDenyDataCollectionChanged = routingViewModel::onDenyDataCollectionChanged,
+                onRetry = routingViewModel::onRetry,
+            )
+        }
+        content
+    } else null
 
     LaunchedEffect(state.deleted) {
         if (state.deleted) {
@@ -44,9 +81,23 @@ fun ConversationSettingsRoute(
         onReasoningEffortChanged = viewModel::onReasoningEffortChanged,
         onStreamingChanged = viewModel::onStreamingChanged,
         onExtrasChanged = viewModel::onExtrasChanged,
-        onModelSelected = viewModel::onModelSelected,
+        onOpenModelPicker = {
+            viewModel.prepareForModelPicker {
+                pickerOpen = true
+                onOpenModelPicker?.invoke(conversationId) {
+                    pickerOpen = false
+                    viewModel.refresh()
+                    pickerReturnVersion++
+                }
+            }
+        },
         onDelete = viewModel::onDelete,
         onDismissError = viewModel::onDismissError,
+        onRetry = viewModel::onRetry,
+        routingControls = routing,
+        pickerOpen = pickerOpen,
+        pickerReturnVersion = pickerReturnVersion,
+        modelPickerAvailable = onOpenModelPicker != null,
         modifier = modifier,
     )
 }

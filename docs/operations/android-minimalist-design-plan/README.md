@@ -5,10 +5,10 @@
 - Status: In progress
 - Scope: Android presentation, navigation integration, accessibility, and resource efficiency. Preserve functionality.
 - Breakdown: 41 tasks across the source plan's UX-00 through UX-06 phases.
-- Implementation: UX-01.1 complete; UX-01.2 through UX-03.7 implemented.
-  Eleven requested tasks have implementation acceptance; UX-02.3, UX-02.4,
-  UX-03.3 and UX-03.6 retain the explicit device/prerequisite blockers below.
-  UX-00.3 remains owner-deferred, not passed.
+- Implementation: UX-01.1 complete; UX-01.2 through UX-04.9 implemented.
+  Eleven earlier requested tasks have implementation acceptance; UX-02.3,
+  UX-02.4, UX-03.3, UX-03.6 and all nine UX-04 tasks retain the explicit
+  device/prerequisite blockers below. UX-00.3 remains owner-deferred, not passed.
 
 ## Folder and numbering contract
 
@@ -173,15 +173,15 @@ is read-only unless a tightly coupled integration fix is explicitly required.
 | 17 | [UX-03.5 Bounded remote Markdown images](UX-03.5-remote-images.md) | Complete | UX-03.1 |
 | 18 | [UX-03.6 Background attachment ingestion](UX-03.6-attachment-ingestion.md) | Blocked | UX-03.3 |
 | 19 | [UX-03.7 App-themed code and rendering reuse](UX-03.7-code-and-markdown-rendering.md) | Complete | UX-03.1 |
-| 20 | [UX-04.1 Compact searchable model picker](UX-04.1-model-picker-presentation.md) | Not started | UX-02.4 |
-| 21 | [UX-04.2 Reachable model management](UX-04.2-manage-models-entry.md) | Not started | UX-04.1 |
-| 22 | [UX-04.3 Quiet provider list and truthful status](UX-04.3-provider-list.md) | Not started | UX-02.4 |
-| 23 | [UX-04.4 Focused add-provider forms](UX-04.4-add-provider.md) | Not started | UX-04.3 |
-| 24 | [UX-04.5 Provider detail and secure key editor](UX-04.5-provider-detail.md) | Not started | UX-04.2, UX-04.4 |
-| 25 | [UX-04.6 Conversation essentials and generation](UX-04.6-conversation-settings.md) | Not started | UX-04.1 |
-| 26 | [UX-04.7 Extras JSON and curated routing](UX-04.7-advanced-routing.md) | Not started | UX-04.6 |
-| 27 | [UX-04.8 Focused onboarding connection](UX-04.8-onboarding-connection.md) | Not started | UX-02.4 |
-| 28 | [UX-04.9 Optional backup onboarding](UX-04.9-onboarding-backup.md) | Not started | UX-04.8 |
+| 20 | [UX-04.1 Compact searchable model picker](UX-04.1-model-picker-presentation.md) | Blocked | UX-02.4 |
+| 21 | [UX-04.2 Reachable model management](UX-04.2-manage-models-entry.md) | Blocked | UX-04.1 |
+| 22 | [UX-04.3 Quiet provider list and truthful status](UX-04.3-provider-list.md) | Blocked | UX-02.4 |
+| 23 | [UX-04.4 Focused add-provider forms](UX-04.4-add-provider.md) | Blocked | UX-04.3 |
+| 24 | [UX-04.5 Provider detail and secure key editor](UX-04.5-provider-detail.md) | Blocked | UX-04.2, UX-04.4 |
+| 25 | [UX-04.6 Conversation essentials and generation](UX-04.6-conversation-settings.md) | Blocked | UX-04.1 |
+| 26 | [UX-04.7 Extras JSON and curated routing](UX-04.7-advanced-routing.md) | Blocked | UX-04.6 |
+| 27 | [UX-04.8 Focused onboarding connection](UX-04.8-onboarding-connection.md) | Blocked | UX-02.4 |
+| 28 | [UX-04.9 Optional backup onboarding](UX-04.9-onboarding-backup.md) | Blocked | UX-04.8 |
 | 29 | [UX-05.1 Settings root and appearance](UX-05.1-settings-and-appearance.md) | Not started | UX-02.4 |
 | 30 | [UX-05.2 Global-default model-picker entry](UX-05.2-default-model-picker.md) | Not started | UX-05.1, UX-04.1 |
 | 31 | [UX-05.3 Grouped chat-default controls](UX-05.3-chat-defaults.md) | Not started | UX-05.2 |
@@ -283,7 +283,7 @@ of UX-06.1's later full-screen-lane review. The old UX-00 captures/build and
 fixtures remain unchanged. Preserve/promote accepted candidate evidence to
 approved storage during the integrated UX-06 review.
 
-### Remaining acceptance blockers and next gate
+### Earlier-slice acceptance blockers
 
 `adb devices -l` reported no connected Android device. All requested code is
 implemented; these statuses deliberately remain `Blocked`, not manual passes:
@@ -296,11 +296,125 @@ implemented; these statuses deliberately remain `Blocked`, not manual passes:
 | UX-03.6 | Android maintainer: close UX-03.3 and verify real photo/SAF/paste/drop grants, revocation and cancellation. |
 
 Record those results in the owning handoffs before marking the four tasks
-Complete. UX-04.1 and UX-05.1 become eligible after UX-02.4's gate; no
-unrequested later-phase implementation is included here. UX-06.2/06.5 repeat
-the integrated accessibility/device matrix, and UX-06.4 still requires
-physical performance comparisons. UX-00.3 remains owner-deferred/Blocked;
-its original dependency edges, frozen old build and budgets are unchanged.
+Complete. UX-04 was subsequently implemented under the explicit nine-task
+request below; that request is not evidence that UX-02.4 passed. UX-05 remains
+unstarted. UX-06.2/06.5 repeat the integrated accessibility/device matrix, and
+UX-06.4 still requires physical performance comparisons. UX-00.3 remains
+owner-deferred/Blocked; its original dependency edges, frozen old build and
+budgets are unchanged.
+
+## UX-04 verification record
+
+UX-04.1 through UX-04.9 are implemented, including real provider-scoped model
+management, app-owned conversation-picker return, coordinated settings/routing
+writes and opt-in real backup setup. The current selected JUnit reports contain
+**312 passing tests, no failures/errors/skips**:
+
+| Scope actually checked | Tests | Lint |
+| --- | --- | --- |
+| Selected provider/model/settings/routing suites | 144 | No errors; 2 warnings |
+| Full onboarding unit suite | 45 | No errors; 1 warning |
+| Backup settings screen suite | 6 | No errors; no warnings |
+| SecureScreen suite | 2 | Not rerun; no design-system source change |
+| Chat route/ViewModel suites | 15 | No errors; 3 warnings |
+| Selected app shell/picker/intent/visual suites | 100 | No errors; 16 warnings |
+
+These are selected results, not a full repository rerun or an addition to the
+earlier slice's historical 505-case report. Current JUnit/lint report locations
+are the same as above. Production `:app:assembleDebug` also passed; the local
+APK is `android\app\build\outputs\apk\debug\app-debug.apk`.
+Existing lint checks remain enabled; warnings were not claimed resolved.
+
+The following commands reproduce the verified scopes from the repository root.
+They were executed in bounded invocations; no paid generation or live backup
+backend was used.
+
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+$env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
+Set-Location .\android
+$flags = @(
+  '--console=plain', '--quiet', '--no-daemon',
+  '-Pkotlin.compiler.execution.strategy=in-process',
+  '-Pandroid.baselineProfile.skipGeneration=true'
+)
+.\gradlew.bat @flags :feature:providers:testDebugUnitTest `
+  --tests '*ModelPicker*' --tests '*MessageModelSnapshotTest' `
+  --tests '*ProviderList*' --tests '*ProviderDetail*' `
+  --tests '*ProviderRoutesTest' --tests '*ConversationSettings*' `
+  --tests '*Routing*' --tests '*ParameterSupport*' --tests '*SheetBackTest' `
+  :feature:providers:lintDebug
+.\gradlew.bat @flags :feature:onboarding:testDebugUnitTest :feature:onboarding:lintDebug
+.\gradlew.bat @flags `
+  :feature:backup:testDebugUnitTest --tests '*BackupSettingsScreenTest' `
+  :feature:backup:lintDebug `
+  :core:designsystem:testDebugUnitTest --tests '*SecureScreenTest'
+.\gradlew.bat @flags :feature:chat:testDebugUnitTest `
+  --tests '*ChatRouteFlowTest' --tests '*ChatViewModelTest' :feature:chat:lintDebug
+.\gradlew.bat @flags '-Proborazzi.test.verify=true' :app:testDebugUnitTest `
+  --tests '*ShellNavigationTest' --tests '*ShellTopBarTest' `
+  --tests '*ShellBackNavigationTest' --tests '*AppModelPickerHostTest' `
+  --tests '*ExternalIntent*' --tests '*ColdStartDeepLinkTest' `
+  --tests 'dev.chatui.screenshots.ShellBaselineScreenshotTest.standalone*' `
+  --tests 'dev.chatui.screenshots.ScreenshotTest.onboarding*' `
+  --tests 'dev.chatui.screenshots.ScreenshotTest.modelPicker*' `
+  --tests 'dev.chatui.screenshots.ScreenshotTest.provider*' `
+  --tests 'dev.chatui.screenshots.ScreenshotTest.conversationSettings*' `
+  :app:lintDebug :app:assembleDebug
+```
+
+### UX-04 visual and preservation evidence
+
+`Screenshots\ScreenshotTest.kt` verifies **33 affected cases / 66 light-dark
+goldens** under `android\app\src\test\screenshots`: 40 narrowly updated existing
+images and 26 new images. Reviewed scenes include phone/tablet picker filters/
+empty/management, truthful provider list/detail, add/custom/key editor,
+conversation essentials/generation/Advanced, onboarding welcome/invalid key/
+connecting/catalog, and optional/real backup setup. Narrow 320 dp/200% scenes
+and a short connecting-landscape scene extend the existing suite.
+
+Modal captures select their actual modal root. Large-font cases set and restore
+Robolectric's real font-scale configuration, not just an outer density local
+that a modal may replace. Static interaction fixtures settle the test clock
+and omit transient ripple/state layers; production feedback and normal
+functional tests are unchanged. This corrects observed initiating-control
+pixel timing differences without loosening image comparison tolerances.
+Only affected scenes were recorded and reviewed; no historical UX-00 artifact
+or unrelated golden suite was re-recorded.
+
+These are standalone widget goldens plus focused production route/host tests,
+not UX-06.1's full integrated-shell visual acceptance. Two existing standalone
+picker candidate cases also pass in both densities/themes without recording
+external candidate artifacts. Keyboard tests reserve a simulated inset;
+neither they nor static screenshots render or validate an actual IME.
+
+Regressions cover management nonselection/hidden recovery, exact immediate
+settings/default resets, raw known/unknown routing-field interleaving, failed
+write retry and invalid-draft retention, secure key rotation/removal, optional
+backup's no-service-call choice, actual setup enable/failure/cancel, and
+pending share/deep-link completion without draft replacement or auto-send.
+The existing first-run service remains OpenRouter-only despite its broader
+provider-option list; the UI explains that limitation. Other provider setup
+remains in Providers. All five backup backends and existing security/storage
+semantics are preserved. No UX-05 implementation was included.
+
+### UX-04 acceptance blockers and next gate
+
+The final `adb devices -l` check reports no connected device. All nine task
+files and index rows are therefore **Blocked**, with implementation/automated
+criteria recorded separately from required acceptance. **Owner: Android
+maintainer.** Close inherited UX-02.4/UX-02.3, then record actual IME,
+320 dp/200% and short-landscape reachability, both densities, layered Back,
+management/settings/key-editor return focus, onboarding/backup cancellation
+and pending-intent completion in the owning handoffs.
+
+Only after those results are recorded may the dependent statuses become
+Complete and later gates become eligible. The explicit UX-04 implementation
+request does not waive missing device acceptance. UX-05.6 must reuse
+`BackupSetupRoute(service, onCancel, onComplete, modifier)` after its own
+prerequisites. UX-00.3 remains owner-deferred, and no physical performance,
+TalkBack, real-IME or UX-06 release acceptance is claimed here.
 
 ## Execution lanes and shared-file coordination
 

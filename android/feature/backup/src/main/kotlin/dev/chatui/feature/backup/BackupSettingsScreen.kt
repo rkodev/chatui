@@ -1,5 +1,6 @@
 package dev.chatui.feature.backup
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -39,6 +41,7 @@ import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.PrimaryButton
 import dev.chatui.core.designsystem.SecondaryButton
+import dev.chatui.core.designsystem.SecureScreen
 import dev.chatui.core.designsystem.SettingsRow
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.model.BackupBackend
@@ -86,6 +89,8 @@ object BackupSettingsTestTags {
     const val ReplaceConfirmButton = "backup-replace-confirm"
     const val ClientSideStatement = "backup-client-side-statement"
     const val PassphraseWarning = "backup-passphrase-warning"
+    const val SetupCancel = "backup-setup-cancel"
+    const val SetupComplete = "backup-setup-complete"
 }
 
 /** Client-side statement shown on the backup screen. */
@@ -98,17 +103,41 @@ const val BACKUP_PASSPHRASE_WARNING: String =
     "If you lose your passphrase, your backup cannot be recovered. ChatUI cannot " +
         "reset it or read your encrypted backup without it."
 
+/** A separate setup surface; callers must mount it only after an explicit choice. */
+@Composable
+fun BackupSetupRoute(
+    service: BackupSettingsServiceLike,
+    onCancel: () -> Unit,
+    onComplete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SecureScreen {
+        BackupSettingsRoute(
+            service = service,
+            setupMode = true,
+            onSetupCancel = onCancel,
+            onSetupComplete = onComplete,
+            modifier = modifier.imePadding(),
+        )
+    }
+}
+
 /** Stateful backup settings entry point. */
 @Composable
 fun BackupSettingsRoute(
     service: BackupSettingsServiceLike,
     modifier: Modifier = Modifier,
     setupMode: Boolean = false,
+    onSetupCancel: (() -> Unit)? = null,
+    onSetupComplete: (() -> Unit)? = null,
 ) {
     val viewModel: BackupViewModel = viewModel(
         factory = BackupViewModel.factory(service),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    BackHandler(enabled = setupMode && onSetupCancel != null) {
+        if (state.busy == null) onSetupCancel?.invoke()
+    }
 
     BackupSettingsScreen(
         state = state,
@@ -126,6 +155,8 @@ fun BackupSettingsRoute(
         onDismissDialogs = viewModel::onDismissDialogs,
         onDismissError = viewModel::onDismissError,
         setupMode = setupMode,
+        onSetupCancel = onSetupCancel,
+        onSetupComplete = onSetupComplete,
         modifier = modifier,
     )
 }
@@ -154,6 +185,8 @@ fun BackupSettingsScreen(
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier,
     setupMode: Boolean = false,
+    onSetupCancel: (() -> Unit)? = null,
+    onSetupComplete: (() -> Unit)? = null,
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
@@ -168,6 +201,21 @@ fun BackupSettingsScreen(
                 .padding(vertical = dimens.sectionGap)
                 .testTag(BackupSettingsTestTags.Root),
         ) {
+            if (setupMode) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = dimens.screenPadding),
+                    verticalArrangement = Arrangement.spacedBy(dimens.space2),
+                ) {
+                    Text("Set up encrypted backup", style = Typography.title2, color = colors.fgPrimary)
+                    onSetupCancel?.let { cancel ->
+                        TextButton(
+                            onClick = cancel,
+                            enabled = !busy,
+                            modifier = Modifier.testTag(BackupSettingsTestTags.SetupCancel),
+                        ) { Text("Cancel setup") }
+                    }
+                }
+            }
             state.error?.let { error ->
                 InlineBanner(
                     severity = BannerSeverity.Error,
@@ -412,6 +460,23 @@ fun BackupSettingsScreen(
                             ),
                         )
                     }
+                }
+            }
+            if (setupMode) onSetupComplete?.let { complete ->
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(dimens.screenPadding),
+                    verticalArrangement = Arrangement.spacedBy(dimens.space2),
+                ) {
+                    Text(
+                        "Enable backup to finish setup, or cancel to continue without it.",
+                        style = Typography.footnote,
+                    )
+                    PrimaryButton(
+                        text = "Done",
+                        onClick = complete,
+                        enabled = state.enabled && !busy && !state.loading && state.error == null,
+                        modifier = Modifier.fillMaxWidth().testTag(BackupSettingsTestTags.SetupComplete),
+                    )
                 }
             }
         }

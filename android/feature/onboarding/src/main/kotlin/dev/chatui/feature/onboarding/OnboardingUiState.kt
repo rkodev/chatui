@@ -58,6 +58,7 @@ data class OnboardingUiState(
     val testing: Boolean = false,
     val connected: Boolean = false,
     val catalog: CatalogUiState = CatalogUiState.Loading,
+    val cachedCatalog: List<CatalogModel> = emptyList(),
     val error: OnboardingErrorCopy? = null,
     val notice: String? = null,
 ) {

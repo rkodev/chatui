@@ -2,13 +2,16 @@ package dev.chatui.feature.providers
 
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.model.ChatParams
+import dev.chatui.core.model.Conversation
 import dev.chatui.core.model.ReasoningEffort
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -241,5 +244,229 @@ class ConversationSettingsViewModelTest {
                 extra = JsonObject(emptyMap()),
             ),
         )
+    }
+
+    @Test
+    fun `explicit zero values and every generation reset remain distinct from defaults`() = runTest(dispatcher) {
+        val service = service()
+        val viewModel = ConversationSettingsViewModel(service, "conversation-1")
+        advanceUntilIdle()
+
+        viewModel.onTemperatureChanged("0")
+        viewModel.onTopPChanged("0")
+        viewModel.onMaxOutputTokensChanged("1")
+        viewModel.onStopChanged("END\nSTOP")
+        viewModel.onReasoningEffortChanged(ReasoningEffort.LOW)
+        viewModel.onStreamingChanged(false)
+        advanceUntilIdle()
+
+        val explicit = service.conversations.getValue("conversation-1").params
+        assertThat(explicit.temperature).isEqualTo(0.0)
+        assertThat(explicit.topP).isEqualTo(0.0)
+        assertThat(explicit.maxOutputTokens).isEqualTo(1)
+        assertThat(viewModel.state.value.generationSummary).contains("Temperature 0.0")
+        assertThat(viewModel.state.value.generationSummary).contains("Streaming off")
+
+        viewModel.onTemperatureChanged("")
+        viewModel.onTopPChanged("")
+        viewModel.onMaxOutputTokensChanged("")
+        viewModel.onStopChanged("")
+        viewModel.onReasoningEffortChanged(null)
+        viewModel.onStreamingChanged(true)
+        advanceUntilIdle()
+
+        val reset = service.conversations.getValue("conversation-1").params
+        assertThat(reset).isEqualTo(testChatParams(extra = explicit.extra))
+        assertThat(viewModel.state.value.generationSummary).isEqualTo("Model defaults · Streaming on")
+    }
+
+    @Test
+    fun `invalid numeric input is retained without silently clamping or clearing persistence`() = runTest(dispatcher) {
+        val service = service()
+        service.conversations["conversation-1"] = testConversation(
+            params = testChatParams().copy(temperature = 0.7, maxOutputTokens = 256),
+        )
+        val viewModel = ConversationSettingsViewModel(service, "conversation-1")
+        advanceUntilIdle()
+
+        viewModel.onTemperatureChanged("4.2")
+        viewModel.onMaxOutputTokensChanged("0")
+        advanceUntilIdle()
+        assertThat(service.conversations.getValue("conversation-1").params.temperature).isEqualTo(0.7)
+        assertThat(service.conversations.getValue("conversation-1").params.maxOutputTokens).isEqualTo(256)
+        assertThat(viewModel.state.value.temperatureText).isEqualTo("4.2")
+        assertThat(viewModel.state.value.parameterErrors.keys)
+            .containsAtLeast(CoreParameterKey.TEMPERATURE, CoreParameterKey.MAX_OUTPUT_TOKENS)
+
+        viewModel.onTemperatureChanged("0.")
+        viewModel.onMaxOutputTokensChanged("1025")
+        viewModel.onTopPChanged("0.123456789")
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.temperatureText).isEqualTo("0.")
+        assertThat(service.conversations.getValue("conversation-1").params.temperature).isEqualTo(0.0)
+        assertThat(service.conversations.getValue("conversation-1").params.topP).isEqualTo(0.123456789)
+        assertThat(service.conversations.getValue("conversation-1").params.maxOutputTokens).isEqualTo(1025)
+        assertThat(viewModel.state.value.parameterErrors).isEmpty()
+    }
+
+    @Test
+    fun `interleaved suspended generation raw extras and routing writes preserve newer fields`() = runTest(dispatcher) {
+        val backing = service()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var firstWrite = true
+        val service = object : ProviderManagementService by backing {
+            override suspend fun setConversationSettings(
+                conversationId: String,
+                systemPrompt: String?,
+                params: ChatParams?,
+            ): Conversation {
+                if (firstWrite) {
+                    firstWrite = false
+                    entered.complete(Unit)
+                    release.await()
+                }
+                return backing.setConversationSettings(conversationId, systemPrompt, params)
+            }
+        }
+        val settings = ConversationSettingsViewModel(service, "conversation-1")
+        advanceUntilIdle()
+        val routing = ConversationRoutingViewModel(
+            service, "conversation-1",
+            initialConversation = settings.state.value.conversation,
+            persistPreferences = settings::persistRouting,
+        )
+
+        settings.onTemperatureChanged("0.625")
+        runCurrent()
+        assertThat(entered.isCompleted).isTrue()
+        settings.onExtrasChanged(
+            """{"unknown":{"keep":true},"provider":{"order":["upstream"],"allow_fallbacks":false,"sort":"latency","data_collection":"deny"}}""",
+        )
+        routing.onEnabledChanged(true)
+        settings.onStreamingChanged(false)
+        settings.onSystemPromptChanged("Keep these instructions")
+        release.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(readRoutingPreferences(backing.conversations.getValue("conversation-1").params)).isEqualTo(
+            RoutingPreferences(
+                enabled = true,
+                allowFallbacks = false,
+                sort = RoutingSort.LATENCY,
+                denyDataCollection = true,
+            ),
+        )
+        routing.onSortChanged(RoutingSort.PRICE)
+        settings.onMaxOutputTokensChanged("513")
+        advanceUntilIdle()
+
+        val stored = backing.conversations.getValue("conversation-1")
+        val extras = stored.params.extra.getValue("openrouter").jsonObject
+        assertThat(extras.getValue("unknown").jsonObject.getValue("keep")).isEqualTo(JsonPrimitive(true))
+        assertThat(extras.getValue("provider").jsonObject.getValue("order").toString())
+            .isEqualTo("""["upstream"]""")
+        assertThat(readRoutingPreferences(stored.params).sort).isEqualTo(RoutingSort.PRICE)
+        assertThat(readRoutingPreferences(stored.params).allowFallbacks).isFalse()
+        assertThat(readRoutingPreferences(stored.params).denyDataCollection).isTrue()
+        assertThat(stored.params.temperature).isEqualTo(0.625)
+        assertThat(stored.params.maxOutputTokens).isEqualTo(513)
+        assertThat(stored.params.streaming).isFalse()
+        assertThat(stored.systemPrompt).isEqualTo("Keep these instructions")
+        assertThat(settings.state.value.params).isEqualTo(stored.params)
+
+        val reopened = ConversationSettingsViewModel(service, "conversation-1")
+        advanceUntilIdle()
+        assertThat(reopened.state.value.extrasText).contains("unknown")
+        assertThat(reopened.state.value.routingSummary).contains("cheapest provider")
+    }
+
+    @Test
+    fun `invalid raw JSON survives routing and generation updates until corrected`() = runTest(dispatcher) {
+        val service = service()
+        val settings = ConversationSettingsViewModel(service, "conversation-1")
+        advanceUntilIdle()
+        val routing = ConversationRoutingViewModel(
+            service, "conversation-1",
+            initialConversation = settings.state.value.conversation,
+            persistPreferences = settings::persistRouting,
+        )
+
+        settings.onExtrasChanged("""{"unfinished":""")
+        routing.onEnabledChanged(true)
+        advanceUntilIdle()
+        settings.onTopPChanged("0.8")
+        advanceUntilIdle()
+        assertThat(settings.state.value.extrasText).isEqualTo("""{"unfinished":""")
+        assertThat(settings.state.value.extrasError).isEqualTo("Provider extras must be valid JSON.")
+        assertThat(readRoutingPreferences(service.conversations.getValue("conversation-1").params).enabled).isTrue()
+        assertThat(settings.state.value.advancedSummary).contains("JSON needs correction")
+
+        val corrected = readProviderExtras(settings.state.value.params, "openrouter")
+        settings.onExtrasChanged(JsonObject(corrected + ("unknown" to JsonPrimitive("retained"))).toString())
+        advanceUntilIdle()
+        assertThat(settings.state.value.extrasError).isNull()
+        assertThat(settings.state.value.params.topP).isEqualTo(0.8)
+        assertThat(readRoutingPreferences(settings.state.value.params).enabled).isTrue()
+        assertThat(settings.state.value.extrasText).contains("retained")
+    }
+
+    @Test
+    fun `failed extras write retains pending edits and explicit retry persists them`() = runTest(dispatcher) {
+        val service = service()
+        val settings = ConversationSettingsViewModel(service, "conversation-1")
+        advanceUntilIdle()
+        service.error = IllegalStateException("Try again")
+        settings.onExtrasChanged("""{"unknown":"retain"}""")
+        settings.onTemperatureChanged("0.4")
+        advanceUntilIdle()
+        assertThat(settings.state.value.hasPendingChanges).isTrue()
+        assertThat(settings.state.value.extrasText).contains("retain")
+        assertThat(settings.state.value.error).isEqualTo("Try again")
+
+        service.error = null
+        settings.onRetry()
+        advanceUntilIdle()
+        assertThat(settings.state.value.hasPendingChanges).isFalse()
+        assertThat(settings.state.value.error).isNull()
+        assertThat(service.conversations.getValue("conversation-1").params.temperature).isEqualTo(0.4)
+        assertThat(service.conversations.getValue("conversation-1").params.extra["openrouter"].toString())
+            .contains("retain")
+    }
+
+    @Test
+    fun `provider change refreshes extras context and prevents stale OpenRouter writes`() = runTest(dispatcher) {
+        val service = service()
+        service.providersFlow.value += testProvider(id = "google", presetId = "google")
+        service.models += testModel(id = "google-model", providerId = "google")
+        service.conversations["conversation-1"] = testConversation(
+            params = withRoutingPreferences(
+                testChatParams(
+                    extra = JsonObject(mapOf("google" to JsonObject(mapOf("future" to JsonPrimitive(true))))),
+                ).copy(temperature = 0.3),
+                RoutingPreferences(enabled = true),
+            ),
+        ).copy(systemPrompt = "Retain prompt")
+        val settings = ConversationSettingsViewModel(service, "conversation-1")
+        advanceUntilIdle()
+        settings.onExtrasChanged("{")
+
+        settings.onModelSelected("google-model")
+        advanceUntilIdle()
+        assertThat(settings.state.value.presetId).isEqualTo("google")
+        assertThat(settings.state.value.extrasText).contains("future")
+        assertThat(settings.state.value.extrasError).isNull()
+        assertThat(settings.state.value.routingSummary).isNull()
+        assertThat(settings.state.value.params.temperature).isEqualTo(0.3)
+        assertThat(settings.state.value.systemPrompt).isEqualTo("Retain prompt")
+        assertThat(
+            runCatching { settings.persistRouting { it.copy(enabled = true) } }.exceptionOrNull()?.message,
+        ).contains("current provider")
+        assertThat(service.conversations.getValue("conversation-1").params.extra["openrouter"]).isNull()
+
+        settings.onModelSelected("model-1")
+        advanceUntilIdle()
+        assertThat(settings.state.value.extrasText).isEqualTo("{")
+        assertThat(settings.state.value.extrasError).isNotNull()
     }
 }

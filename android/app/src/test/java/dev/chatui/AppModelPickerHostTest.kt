@@ -2,7 +2,12 @@ package dev.chatui
 
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -14,9 +19,12 @@ import dev.chatui.core.model.Conversation
 import dev.chatui.feature.chat.ChatScreenTestTags
 import dev.chatui.feature.chat.ChatTopBarState
 import dev.chatui.feature.providers.ModelDefaults
+import dev.chatui.feature.providers.ConversationSettingsRoute
+import dev.chatui.feature.providers.ConversationSettingsTestTags
 import dev.chatui.feature.providers.ModelPickerTestTags
 import dev.chatui.feature.providers.ProviderManagementService
 import dev.chatui.shell.AppModelPickerState
+import dev.chatui.shell.AppModelPickerHost
 import dev.chatui.shell.ShellDestination
 import dev.chatui.shell.ShellScaffold
 import dev.chatui.testing.BaselineFixtures
@@ -155,6 +163,54 @@ class AppModelPickerHostTest {
         assertThat(host.close(second)).isTrue()
         assertThat(secondClosed).isEqualTo(1)
         assertThat(host.request).isNull()
+    }
+
+    @Test
+    fun `settings picker returns persisted model and focus without dismissing its parent or restoring header focus`() {
+        var showingSettings by mutableStateOf(true)
+        records["first"] = records.getValue("first").copy(systemPrompt = "Retain prompt")
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                Box {
+                    if (showingSettings) {
+                        ConversationSettingsRoute(
+                            service, "first",
+                            onDismiss = { showingSettings = false },
+                            onDeleted = {},
+                            onOpenModelPicker = host::openConversationSettings,
+                        )
+                    }
+                    AppModelPickerHost(host, service = service, onClosed = { refreshed++ })
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(ConversationSettingsTestTags.Model).performClick()
+        composeRule.onNodeWithTag(ModelPickerTestTags.Sheet).assertIsDisplayed()
+        assertThat(host.request!!.restoreHeaderFocus).isFalse()
+        composeRule.runOnIdle {
+            (ShadowDialog.getShownDialogs().last { it.isShowing } as ComponentDialog)
+                .onBackPressedDispatcher.onBackPressed()
+        }
+        composeRule.onNodeWithTag(ModelPickerTestTags.Sheet).assertDoesNotExist()
+        composeRule.onNodeWithTag(ConversationSettingsTestTags.Sheet).assertIsDisplayed()
+        composeRule.onNodeWithTag(ConversationSettingsTestTags.Model).assertIsFocused()
+        assertThat(showingSettings).isTrue()
+
+        composeRule.onNodeWithTag(ConversationSettingsTestTags.Model).performClick()
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("model-2")).performClick()
+        composeRule.onNodeWithTag(ModelPickerTestTags.Sheet).assertDoesNotExist()
+        composeRule.onNodeWithText("Model Two").assertIsDisplayed()
+        composeRule.onNodeWithText("Retain prompt").assertExists()
+        composeRule.onNodeWithTag(ConversationSettingsTestTags.Model).assertIsFocused()
+        assertThat(records.getValue("first").modelId).isEqualTo("model-2")
+        assertThat(defaults.modelId).isEqualTo("model-1")
+        assertThat(refreshed).isEqualTo(0)
+        composeRule.runOnIdle {
+            (ShadowDialog.getShownDialogs().last { it.isShowing } as ComponentDialog)
+                .onBackPressedDispatcher.onBackPressed()
+        }
+        composeRule.onNodeWithTag(ConversationSettingsTestTags.Sheet).assertDoesNotExist()
     }
 
     private fun showShell() {

@@ -6,6 +6,7 @@ import dev.chatui.core.model.Theme
 import dev.chatui.core.network.ModelInfo
 import dev.chatui.core.network.OpenRouterRequestException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -176,6 +177,72 @@ class OnboardingViewModelTest {
         assertThat((catalog as CatalogUiState.Error).message)
             .contains("You can still connect")
     }
+
+    @Test
+    fun `catalog retries retain cache and ordinary input edits never refetch`() = runTest(dispatcher) {
+        val service = FakeOnboardingService()
+        val viewModel = OnboardingViewModel(service)
+        advanceUntilIdle()
+        viewModel.onContinue()
+        viewModel.onApiKeyChanged("fake-key")
+        viewModel.onLabelChanged("Work")
+        viewModel.onThemeSelected(Theme.DARK)
+        advanceUntilIdle()
+        assertThat(service.loadCatalogCalls).isEqualTo(1)
+
+        service.catalogError = IllegalStateException("Offline")
+        viewModel.onRetryCatalog()
+        viewModel.onRetryCatalog()
+        advanceUntilIdle()
+        assertThat(service.loadCatalogCalls).isEqualTo(2)
+        assertThat(viewModel.state.value.catalog).isInstanceOf(CatalogUiState.Error::class.java)
+        assertThat(viewModel.state.value.cachedCatalog.single().remoteId).isEqualTo("openrouter/auto")
+        assertThat(viewModel.state.value.apiKey).isEqualTo("fake-key")
+        assertThat(viewModel.state.value.label).isEqualTo("Work")
+
+        service.catalogError = null
+        viewModel.onRetryCatalog()
+        advanceUntilIdle()
+        assertThat(service.loadCatalogCalls).isEqualTo(3)
+        assertThat(viewModel.state.value.catalog).isInstanceOf(CatalogUiState.Ready::class.java)
+    }
+
+    @Test
+    fun `connection pending state prevents duplicate validation and retains its input`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val service = FakeOnboardingService().apply { connectGate = gate }
+        val viewModel = OnboardingViewModel(service)
+        advanceUntilIdle()
+        viewModel.onContinue()
+        viewModel.onApiKeyChanged("fake-key")
+        viewModel.onLabelChanged("Work")
+        viewModel.onConnect()
+        viewModel.onConnect()
+        advanceUntilIdle()
+        assertThat(service.connectCalls).isEqualTo(1)
+        assertThat(viewModel.state.value.testing).isTrue()
+        viewModel.onBack()
+        viewModel.onApiKeyChanged("different key")
+        assertThat(viewModel.state.value.step).isEqualTo(OnboardingStep.KEY_ENTRY)
+        assertThat(viewModel.state.value.apiKey).isEqualTo("fake-key")
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.step).isEqualTo(OnboardingStep.BACKUP)
+        assertThat(viewModel.state.value.connected).isTrue()
+        assertThat(viewModel.state.value.label).isEqualTo("Work")
+    }
+
+    @Test
+    fun `enabled provider choices remain selectable with OpenRouter initially selected`() = runTest(dispatcher) {
+        val service = FakeOnboardingService().apply { openAiEnabled = true }
+        val viewModel = OnboardingViewModel(service)
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.selectedProviderId).isEqualTo("openrouter")
+        viewModel.onProviderSelected("openai")
+        viewModel.onContinue()
+        assertThat(viewModel.state.value.selectedProviderId).isEqualTo("openai")
+    }
 }
 
 private class FakeOnboardingService : OnboardingService {
@@ -192,6 +259,9 @@ private class FakeOnboardingService : OnboardingService {
     var lastTheme: Theme? = null
     var currentTheme: Theme = Theme.SYSTEM
     var loadCatalogCalls: Int = 0
+    var connectCalls: Int = 0
+    var connectGate: CompletableDeferred<Unit>? = null
+    var openAiEnabled = false
 
     override fun providerOptions(): List<ProviderOption> = listOf(
         ProviderOption(
@@ -204,7 +274,7 @@ private class FakeOnboardingService : OnboardingService {
         ProviderOption(
             id = "openai",
             label = "OpenAI",
-            enabled = false,
+            enabled = openAiEnabled,
             recommended = false,
             statusLabel = "Coming later",
         ),
@@ -223,6 +293,8 @@ private class FakeOnboardingService : OnboardingService {
     }
 
     override suspend fun connect(apiKey: String, label: String?): OnboardingResult {
+        connectCalls++
+        connectGate?.await()
         lastApiKey = apiKey
         lastLabel = label
         connectError?.let { throw it }

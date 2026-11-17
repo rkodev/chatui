@@ -45,6 +45,7 @@ class OnboardingViewModel(
 
     private val _events = MutableSharedFlow<OnboardingEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<OnboardingEvent> = _events.asSharedFlow()
+    private var catalogLoading = false
 
     init {
         loadCatalog()
@@ -185,13 +186,16 @@ class OnboardingViewModel(
     }
 
     private fun loadCatalog() {
+        if (catalogLoading) return
+        catalogLoading = true
         _state.update { it.copy(catalog = CatalogUiState.Loading) }
 
         viewModelScope.launch {
             try {
                 val models = service.loadCatalog()
                 _state.update {
-                    it.copy(catalog = CatalogUiState.Ready(models.map { model -> model.toCatalogModel() }))
+                    val catalog = models.map { model -> model.toCatalogModel() }
+                    it.copy(catalog = CatalogUiState.Ready(catalog), cachedCatalog = catalog)
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -199,6 +203,8 @@ class OnboardingViewModel(
                 _state.update {
                     it.copy(catalog = CatalogUiState.Error(describeCatalogError(error)))
                 }
+            } finally {
+                catalogLoading = false
             }
         }
     }

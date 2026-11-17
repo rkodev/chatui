@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -25,11 +27,13 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,7 +44,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.EmptyState
@@ -70,6 +76,9 @@ object ModelPickerTestTags {
     const val Refresh = "model-picker-refresh"
     const val PullRefresh = "model-picker-pull-refresh"
     const val Loading = "model-picker-loading"
+    const val Target = "model-picker-target"
+    const val ManualToggle = "model-picker-manual-toggle"
+    const val ManualProvider = "model-picker-manual-provider"
 
     fun group(key: String): String = "model-picker-group-$key"
 
@@ -149,7 +158,11 @@ fun ModelPickerSheet(
  * the same content works for global defaults, per-conversation overrides, and
  * model management.
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(
+    ExperimentalFoundationApi::class,
+    ExperimentalMaterial3Api::class,
+    ExperimentalLayoutApi::class,
+)
 @Composable
 fun ModelPickerContent(
     state: ModelPickerUiState,
@@ -165,14 +178,26 @@ fun ModelPickerContent(
     title: String = "Choose a model",
     header: (@Composable () -> Unit)? = null,
     onRetry: () -> Unit = onRefresh,
+    showTitle: Boolean = true,
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
     var filter by rememberSaveable { mutableStateOf(ModelFilter.All) }
+    var manualExpanded by rememberSaveable(state.target) { mutableStateOf(false) }
     val groups = remember(state.groups, filter) { filterGroups(state.groups, filter) }
+    val providerLabel = state.providers.firstOrNull { it.id == state.providerId }?.label
+    val selectionWarning = when {
+        state.target is ModelPickerTarget.Manage || state.loading -> null
+        state.warning != null -> state.warning
+        !state.availability.available -> state.availability.message
+        state.selectedModel?.hidden == true ->
+            "The current model is hidden from the picker. It remains selected; " +
+                "use Manage models to unhide it."
+        else -> null
+    }
 
     PullToRefreshBox(
-        isRefreshing = state.loading && state.groups.isNotEmpty(),
+        isRefreshing = state.refreshing,
         onRefresh = onRefresh,
         modifier = modifier
             .fillMaxWidth()
@@ -187,11 +212,26 @@ fun ModelPickerContent(
             contentPadding = PaddingValues(dimens.padding),
             verticalArrangement = Arrangement.spacedBy(dimens.gap),
         ) {
-        item {
+        if (showTitle) item {
             Text(
                 text = title,
                 style = Typography.title1,
                 color = colors.fgPrimary,
+            )
+        }
+
+        item {
+            Text(
+                text = when (state.target) {
+                    is ModelPickerTarget.Conversation -> "Changes apply to this conversation."
+                    ModelPickerTarget.Defaults -> "Changes apply to defaults for new chats."
+                    is ModelPickerTarget.Manage ->
+                        "Manage ${providerLabel ?: "this provider"} models. " +
+                            "This does not change chat models or defaults."
+                },
+                style = Typography.footnote,
+                color = colors.fgSecondary,
+                modifier = Modifier.testTag(ModelPickerTestTags.Target),
             )
         }
 
@@ -245,20 +285,54 @@ fun ModelPickerContent(
             }
         }
 
-        if (!state.availability.available) {
-            state.availability.message?.let { message ->
+        selectionWarning?.let { message ->
                 item {
                     InlineBanner(
                         severity = BannerSeverity.Warning,
-                        title = "Model unavailable",
+                        title = "Current selection",
                         body = message,
                         modifier = Modifier.testTag(ModelPickerTestTags.Warning),
                     )
                 }
+        }
+
+        item(key = "catalog-actions") {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(dimens.space2),
+            ) {
+                TextButton(
+                    onClick = { manualExpanded = !manualExpanded },
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ModelPickerTestTags.ManualToggle)
+                        .semantics {
+                            stateDescription = if (manualExpanded) "Expanded" else "Collapsed"
+                        },
+                ) {
+                    Text(if (manualExpanded) "Close manual entry" else "Add model by ID")
+                }
+                TextButton(
+                    onClick = onRefresh,
+                    enabled = !state.busy && !state.loading && state.providerId != null,
+                    modifier = Modifier
+                        .heightIn(min = dimens.touchTargetMin)
+                        .testTag(ModelPickerTestTags.Refresh),
+                ) {
+                    Text(if (state.refreshing) "Refreshing models..." else "Refresh models")
+                }
             }
         }
 
-        if (state.loading) {
+        if (manualExpanded) item(key = "manual-entry") {
+            ManualAddSection(
+                state = state,
+                onManualRemoteIdChanged = onManualRemoteIdChanged,
+                onManualLabelChanged = onManualLabelChanged,
+                onAddManual = onAddManual,
+            )
+        }
+
+        if (state.loading && state.models.isEmpty()) {
             item {
                 SkeletonList(
                     modifier = Modifier.testTag(ModelPickerTestTags.Loading),
@@ -267,7 +341,11 @@ fun ModelPickerContent(
             }
         }
 
-        if (!state.loading && groups.isEmpty()) {
+        if (state.loading && state.models.isNotEmpty()) item {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
+        if (!state.loading && state.error == null && groups.isEmpty()) {
             item {
                 EmptyState(
                     title = "No models found",
@@ -303,27 +381,6 @@ fun ModelPickerContent(
             }
         }
 
-        item {
-            ManualAddSection(
-                state = state,
-                onManualRemoteIdChanged = onManualRemoteIdChanged,
-                onManualLabelChanged = onManualLabelChanged,
-                onAddManual = onAddManual,
-            )
-        }
-
-        item {
-            Button(
-                onClick = onRefresh,
-                enabled = !state.busy,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = dimens.touchTargetMin)
-                    .testTag(ModelPickerTestTags.Refresh),
-            ) {
-                Text("Refresh models")
-            }
-        }
         }
     }
 }
@@ -343,6 +400,7 @@ private fun filterGroups(
     ModelFilter.Pinned -> groups.filter { it.pinned }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ModelFilterRow(
     selected: ModelFilter,
@@ -350,7 +408,7 @@ private fun ModelFilterRow(
 ) {
     val dimens = LocalDimens.current
 
-    Row(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(ModelPickerTestTags.Filters),
@@ -394,13 +452,22 @@ private fun ModelRow(
             .clickable(enabled = !busy) {
                 haptics.tick()
                 onSelect()
+            }
+            .semantics {
+                this.selected = selected
+                stateDescription = listOfNotNull(
+                    "Selected".takeIf { selected },
+                    "Pinned".takeIf { model.pinned },
+                    "Hidden".takeIf { model.hidden },
+                    "Free".takeIf { free },
+                ).joinToString(", ")
             },
         shape = RoundedCornerShape(dimens.radiusMd),
         color = if (selected) colors.accentSoft else colors.bgSurfaceRaised,
     ) {
         Column(
-            modifier = Modifier.padding(dimens.cardPadding),
-            verticalArrangement = Arrangement.spacedBy(dimens.space2),
+            modifier = Modifier.padding(dimens.space3),
+            verticalArrangement = Arrangement.spacedBy(dimens.space1),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -408,25 +475,11 @@ private fun ModelRow(
                         text = model.label,
                         style = Typography.headline,
                         color = colors.fgPrimary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = providerLabel,
                         style = Typography.footnote,
                         color = colors.fgSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (free) {
-                    Text(
-                        text = "Free",
-                        style = Typography.caption,
-                        color = colors.accent,
-                        modifier = Modifier
-                            .padding(horizontal = dimens.space1)
-                            .testTag(ModelPickerTestTags.freeBadge(model.id)),
                     )
                 }
                 if (selected) {
@@ -452,6 +505,7 @@ private fun ModelRow(
                     ) {
                         DropdownMenuItem(
                             text = { Text(if (model.pinned) "Unpin" else "Pin") },
+                            enabled = !busy,
                             onClick = {
                                 menuExpanded = false
                                 haptics.tick()
@@ -461,6 +515,7 @@ private fun ModelRow(
                         )
                         DropdownMenuItem(
                             text = { Text(if (model.hidden) "Unhide" else "Hide") },
+                            enabled = !busy,
                             onClick = {
                                 menuExpanded = false
                                 haptics.tick()
@@ -479,42 +534,43 @@ private fun ModelRow(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(dimens.space1)) {
-                ModelChip(formatContextWindow(model.contextWindow))
-                ModelChip(formatModelPrice(model))
+            val status = listOfNotNull(
+                "Selected".takeIf { selected },
+                "Pinned".takeIf { model.pinned },
+                "Hidden".takeIf { model.hidden },
+            )
+            if (status.isNotEmpty()) {
+                Text(
+                    text = status.joinToString(" · "),
+                    style = Typography.caption,
+                    color = colors.fgSecondary,
+                )
             }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(dimens.space1)) {
-                modelCapabilityChips(model).forEach { chip ->
-                    ModelChip(chip)
-                }
-            }
+            Text(
+                text = formatContextWindow(model.contextWindow) + " · " +
+                    modelCapabilityChips(model).filterNot {
+                        it == "Text" || it == "Streaming"
+                    }.joinToString(" · ").ifEmpty { "Text" },
+                style = Typography.footnote,
+                color = colors.fgSecondary,
+            )
+            Text(
+                text = formatModalities(model),
+                style = Typography.footnote,
+                color = colors.fgSecondary,
+            )
+            Text(
+                text = formatModelPrice(model),
+                style = Typography.footnote,
+                color = colors.fgPrimary,
+                modifier = if (free) Modifier.testTag(ModelPickerTestTags.freeBadge(model.id))
+                    else Modifier,
+            )
 
             if (detailsExpanded) {
                 ModelDetails(model)
             }
         }
-    }
-}
-
-@Composable
-private fun ModelChip(text: String) {
-    val colors = LocalChatUiColors.current
-    val dimens = LocalDimens.current
-
-    Surface(
-        shape = RoundedCornerShape(dimens.radiusFull),
-        color = colors.bgGrouped,
-    ) {
-        Text(
-            text = text,
-            style = Typography.caption,
-            color = colors.fgSecondary,
-            modifier = Modifier.padding(
-                horizontal = dimens.space2,
-                vertical = dimens.space1,
-            ),
-        )
     }
 }
 
@@ -535,7 +591,17 @@ private fun ModelDetails(model: Model) {
             color = colors.fgMuted,
         )
         Text(
+            text = "Remote ID: ${model.remoteId}",
+            style = Typography.footnote,
+            color = colors.fgSecondary,
+        )
+        Text(
             text = "Canonical slug: ${model.canonicalSlug ?: "Not reported"}",
+            style = Typography.footnote,
+            color = colors.fgSecondary,
+        )
+        Text(
+            text = "Capabilities: ${modelCapabilityChips(model).joinToString(", ")}",
             style = Typography.footnote,
             color = colors.fgSecondary,
         )
@@ -575,9 +641,18 @@ private fun ManualAddSection(
 
     Column(verticalArrangement = Arrangement.spacedBy(dimens.space2)) {
         Text(
-            text = "Add a model manually",
+            text = "Add model by ID",
             style = Typography.title3,
             color = LocalChatUiColors.current.fgPrimary,
+        )
+        Text(
+            text = state.providers.firstOrNull { it.id == state.providerId }?.let {
+                "Add to ${it.label}."
+            } ?: "Provider context is unavailable. Open a configured provider's Models " +
+                "screen to add a model; no provider will be chosen automatically.",
+            style = Typography.footnote,
+            color = LocalChatUiColors.current.fgSecondary,
+            modifier = Modifier.testTag(ModelPickerTestTags.ManualProvider),
         )
         OutlinedTextField(
             value = state.manualRemoteId,
@@ -600,7 +675,7 @@ private fun ManualAddSection(
         )
         Button(
             onClick = onAddManual,
-            enabled = !state.busy,
+            enabled = !state.busy && !state.loading && state.providerId != null,
             modifier = Modifier
                 .heightIn(min = dimens.touchTargetMin)
                 .testTag(ModelPickerTestTags.AddManual),

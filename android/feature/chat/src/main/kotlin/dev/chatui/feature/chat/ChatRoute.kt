@@ -2,6 +2,7 @@ package dev.chatui.feature.chat
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -28,6 +29,7 @@ fun ChatRoute(
     modifier: Modifier = Modifier,
     persistIntervalMs: Long = DEFAULT_PERSIST_INTERVAL_MS,
     onOpenModelPicker: (String, () -> Unit) -> Unit = { _, _ -> },
+    conversationRefreshVersion: Int = 0,
 ) {
     val viewModel: ChatViewModel = viewModel(
         key = conversationId,
@@ -45,6 +47,9 @@ fun ChatRoute(
         ),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(conversationRefreshVersion) {
+        if (conversationRefreshVersion > 0) viewModel.refreshConversation()
+    }
     DisposableEffect(viewModel) {
         onDispose { viewModel.cancelAttachmentProcessing() }
     }

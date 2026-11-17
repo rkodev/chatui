@@ -108,7 +108,11 @@ fun withRoutingPreferences(
     if (provider == null) {
         openrouter.remove("provider")
     } else {
-        openrouter["provider"] = provider
+        val merged = (openrouter["provider"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+        // Only the three curated keys belong to these controls.
+        listOf("allow_fallbacks", "sort", "data_collection").forEach(merged::remove)
+        merged.putAll(provider)
+        openrouter["provider"] = JsonObject(merged)
     }
 
     if (openrouter.isEmpty()) {

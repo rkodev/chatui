@@ -34,12 +34,33 @@ data class ConversationRoutingUiState(
 class ConversationRoutingViewModel(
     private val service: ProviderManagementService,
     private val conversationId: String,
+    initialConversation: Conversation? = null,
+    private val persistPreferences: suspend ((RoutingPreferences) -> RoutingPreferences) -> Conversation = { transform ->
+        service.setConversationRouting(conversationId, transform(service.getConversationRouting(conversationId)))
+    },
 ) : ViewModel() {
     private val _state = MutableStateFlow(ConversationRoutingUiState())
     val state: StateFlow<ConversationRoutingUiState> = _state.asStateFlow()
+    private var pendingChange: ((RoutingPreferences) -> RoutingPreferences)? = null
 
     init {
-        load()
+        if (initialConversation?.id == conversationId) onConversationChanged(initialConversation) else load()
+    }
+
+    fun onConversationChanged(conversation: Conversation) {
+        val current = _state.value
+        if (conversation.id != conversationId || current.busy || conversation == current.conversation) return
+        val preferences = readRoutingPreferences(conversation.params)
+        val routingChanged = preferences != current.conversation?.params?.let(::readRoutingPreferences)
+        if (routingChanged) pendingChange = null
+        _state.update {
+            it.copy(
+                conversation = conversation,
+                preferences = if (pendingChange != null) it.preferences else preferences,
+                loading = false,
+                error = if (routingChanged) null else it.error,
+            )
+        }
     }
 
     fun onEnabledChanged(enabled: Boolean) {
@@ -59,7 +80,9 @@ class ConversationRoutingViewModel(
     }
 
     fun onRetry() {
-        load()
+        if (_state.value.busy || _state.value.loading) return
+        val change = pendingChange
+        if (change == null) load() else persist(change, _state.value.preferences)
     }
 
     private fun load() {
@@ -93,18 +116,29 @@ class ConversationRoutingViewModel(
     }
 
     private fun update(transform: (RoutingPreferences) -> RoutingPreferences) {
-        if (_state.value.busy) {
-            return
-        }
+        val current = _state.value
+        if (current.busy || current.loading || current.conversation == null) return
 
-        val next = transform(_state.value.preferences)
+        val previous = pendingChange
+        val change: (RoutingPreferences) -> RoutingPreferences =
+            if (previous == null) transform else { preferences -> transform(previous(preferences)) }
+        persist(change, transform(current.preferences))
+    }
+
+    private fun persist(transform: (RoutingPreferences) -> RoutingPreferences, next: RoutingPreferences) {
+        pendingChange = transform
         _state.update { it.copy(preferences = next, busy = true, error = null) }
 
         viewModelScope.launch {
             try {
-                val updated = service.setConversationRouting(conversationId, next)
+                val updated = persistPreferences(transform)
+                pendingChange = null
                 _state.update {
-                    it.copy(conversation = updated, busy = false)
+                    it.copy(
+                        conversation = updated,
+                        preferences = readRoutingPreferences(updated.params),
+                        busy = false,
+                    )
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -120,8 +154,14 @@ class ConversationRoutingViewModel(
         fun factory(
             service: ProviderManagementService,
             conversationId: String,
+            initialConversation: Conversation? = null,
+            persistPreferences: suspend ((RoutingPreferences) -> RoutingPreferences) -> Conversation = { transform ->
+                service.setConversationRouting(conversationId, transform(service.getConversationRouting(conversationId)))
+            },
         ): ViewModelProvider.Factory = viewModelFactory {
-            initializer { ConversationRoutingViewModel(service, conversationId) }
+            initializer {
+                ConversationRoutingViewModel(service, conversationId, initialConversation, persistPreferences)
+            }
         }
     }
 }

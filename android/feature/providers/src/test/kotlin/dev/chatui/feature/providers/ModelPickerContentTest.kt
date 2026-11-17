@@ -1,5 +1,15 @@
 package dev.chatui.feature.providers
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
@@ -12,7 +22,10 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.ModelCapability
@@ -48,7 +61,8 @@ class ModelPickerContentTest {
         ),
         selectedModelId: String? = "model-1",
     ) = ModelPickerUiState(
-        target = ModelPickerTarget.Manage("provider-1"),
+        target = ModelPickerTarget.Conversation("conversation-1"),
+        conversation = testConversation(),
         models = models,
         providers = listOf(testProvider()),
         selectedModelId = selectedModelId,
@@ -78,8 +92,8 @@ class ModelPickerContentTest {
         composeRule.onNodeWithTag(ModelPickerTestTags.group("provider-1")).assertIsDisplayed()
         composeRule.onNodeWithTag(ModelPickerTestTags.model("model-1")).assertIsDisplayed()
         composeRule.onNodeWithText("\$0.15 / M input · \$0.6 / M output").assertIsDisplayed()
-        composeRule.onNodeWithText("128K context").assertIsDisplayed()
-        composeRule.onNodeWithText("Vision").assertIsDisplayed()
+        composeRule.onNodeWithText("128K context · Vision").assertIsDisplayed()
+        composeRule.onNodeWithText("text in · text out").assertExists()
         composeRule.onNodeWithTag(ModelPickerTestTags.check("model-1"), useUnmergedTree = true)
             .performScrollTo()
             .assertIsDisplayed()
@@ -221,6 +235,8 @@ class ModelPickerContentTest {
 
         composeRule.onNodeWithTag(ModelPickerTestTags.filter("pinned")).performClick()
 
+        composeRule.onNodeWithTag(ModelPickerTestTags.Content)
+            .performScrollToNode(hasTestTag(ModelPickerTestTags.model("pinned")))
         composeRule.onNodeWithTag(ModelPickerTestTags.model("pinned")).assertIsDisplayed()
         composeRule.onNodeWithTag(ModelPickerTestTags.model("regular")).assertDoesNotExist()
     }
@@ -301,6 +317,10 @@ class ModelPickerContentTest {
         }
 
         composeRule.onNodeWithTag(ModelPickerTestTags.Content)
+            .performScrollToNode(hasTestTag(ModelPickerTestTags.ManualToggle))
+        composeRule.onNodeWithTag(ModelPickerTestTags.ManualId).assertDoesNotExist()
+        composeRule.onNodeWithTag(ModelPickerTestTags.ManualToggle).performClick()
+        composeRule.onNodeWithTag(ModelPickerTestTags.Content)
             .performScrollToNode(hasTestTag(ModelPickerTestTags.AddManual))
         composeRule.onNodeWithTag(ModelPickerTestTags.AddManual).performClick()
 
@@ -379,5 +399,108 @@ class ModelPickerContentTest {
         }
 
         composeRule.onNodeWithTag(ModelPickerTestTags.Empty).assertIsDisplayed()
+    }
+
+    @Test
+    fun `search combines with free and pinned filters`() {
+        var current by mutableStateOf(
+            state(
+                models = listOf(
+                    testModel(id = "free", remoteId = "author/alpha:free", label = "Alpha free", pinned = true),
+                    testModel(id = "paid", remoteId = "author/alpha", label = "Alpha paid"),
+                    testModel(id = "other", label = "Other", pinned = true),
+                ),
+            ),
+        )
+        composeRule.setContent {
+            ChatUiTheme {
+                PickerFixture(current, onQueryChanged = { current = current.copy(query = it) })
+            }
+        }
+        composeRule.onNodeWithTag(ModelPickerTestTags.Search).performTextReplacement("alpha")
+        composeRule.onNodeWithTag(ModelPickerTestTags.filter("free")).performClick()
+        composeRule.onNodeWithTag(ModelPickerTestTags.Content)
+            .performScrollToNode(hasTestTag(ModelPickerTestTags.model("free")))
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("free")).assertIsDisplayed()
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("paid")).assertDoesNotExist()
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("other")).assertDoesNotExist()
+        composeRule.onNodeWithTag(ModelPickerTestTags.filter("pinned")).performClick()
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("free")).assertExists()
+        composeRule.onNodeWithTag(ModelPickerTestTags.model("paid")).assertDoesNotExist()
+    }
+
+    @Test
+    fun `target label and failure do not masquerade as loading or an empty catalog`() {
+        var current by mutableStateOf(
+            state(models = emptyList()).copy(target = ModelPickerTarget.Defaults, loading = true),
+        )
+        var refreshes = 0
+        composeRule.setContent {
+            ChatUiTheme { PickerFixture(current, onRefresh = { refreshes++ }) }
+        }
+        composeRule.onNodeWithText("Changes apply to defaults for new chats.").assertIsDisplayed()
+        composeRule.onNodeWithTag(ModelPickerTestTags.Loading).assertExists()
+        composeRule.onNodeWithTag(ModelPickerTestTags.Warning).assertDoesNotExist()
+        composeRule.onNodeWithTag(ModelPickerTestTags.Empty).assertDoesNotExist()
+
+        composeRule.runOnIdle { current = current.copy(loading = false, error = "Offline") }
+        composeRule.onNodeWithTag(ModelPickerTestTags.Error).assertIsDisplayed()
+        composeRule.onNodeWithTag(ModelPickerTestTags.Loading).assertDoesNotExist()
+        composeRule.onNodeWithTag(ModelPickerTestTags.Empty).assertDoesNotExist()
+        composeRule.runOnIdle { assertThat(refreshes).isEqualTo(0) }
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h568dp-mdpi")
+    fun `price and wrapping filters remain reachable at 200 percent with a keyboard inset`() {
+        val model = testModel(
+            label = "A long model label that must remain readable",
+            capabilities = listOf(ModelCapability.TEXT, ModelCapability.VISION, ModelCapability.REASONING),
+            pricing = ModelPricing(inputPerMTok = 123.45, outputPerMTok = 678.9, perRequest = 0.02),
+        )
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                ChatUiTheme {
+                    Box(Modifier.fillMaxSize().padding(bottom = 224.dp)) {
+                        PickerFixture(state(models = listOf(model)))
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithTag(ModelPickerTestTags.Search).assertIsDisplayed()
+        listOf("all", "free", "pinned").forEach {
+            val bounds = composeRule.onNodeWithTag(ModelPickerTestTags.filter(it)).getUnclippedBoundsInRoot()
+            assertThat(bounds.left.value).isAtLeast(0f)
+            assertThat(bounds.right.value).isAtMost(320f)
+            assertThat((bounds.bottom - bounds.top).value).isAtLeast(48f)
+        }
+        composeRule.onNodeWithTag(ModelPickerTestTags.Content)
+            .performScrollToNode(hasTestTag(ModelPickerTestTags.model(model.id)))
+        composeRule.onNodeWithText(formatModelPrice(model), useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        val bounds = composeRule.onNodeWithText(formatModelPrice(model), useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertThat(bounds.right.value).isAtMost(320f)
+    }
+
+    @Composable
+    private fun PickerFixture(
+        state: ModelPickerUiState,
+        onQueryChanged: (String) -> Unit = {},
+        onRefresh: () -> Unit = {},
+    ) {
+        ModelPickerContent(
+            state = state,
+            onQueryChanged = onQueryChanged,
+            onSelect = {},
+            onPin = { _, _ -> },
+            onHide = { _, _ -> },
+            onManualRemoteIdChanged = {},
+            onManualLabelChanged = {},
+            onAddManual = {},
+            onRefresh = onRefresh,
+        )
     }
 }

@@ -533,6 +533,7 @@ fun ShellScaffold(
 }
 
 private fun shellTitle(route: String): String = when (route) {
+    ProviderModelsDestination.ROUTE -> "Manage models"
     SettingsDestination.APPEARANCE -> "Appearance"
     SettingsDestination.CHAT_DEFAULTS -> "Chat defaults"
     SettingsDestination.DATA -> "Data & storage"

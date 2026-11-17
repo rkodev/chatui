@@ -35,6 +35,8 @@ fun ManageModelsScreen(
     onAddManual: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    onRetry: () -> Unit = onRefresh,
+    showTitle: Boolean = true,
 ) {
     val dimens = LocalDimens.current
 
@@ -50,6 +52,8 @@ fun ManageModelsScreen(
         onManualLabelChanged = onManualLabelChanged,
         onAddManual = onAddManual,
         onRefresh = onRefresh,
+        onRetry = onRetry,
+        showTitle = showTitle,
         header = {
             Column(
                 modifier = Modifier.fillMaxWidth(),

@@ -5,9 +5,15 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.view.Window
 import android.view.WindowManager
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -16,21 +22,35 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Rule
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowDialog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class ProviderDetailScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private val originalFontScale = RuntimeEnvironment.getApplication().resources.configuration.fontScale
+
+    @After
+    fun restoreFontScale() {
+        RuntimeEnvironment.setFontScale(originalFontScale)
+    }
 
     private fun providerWithMetadata() = testProvider(
         metadata = buildJsonObject {
@@ -48,10 +68,17 @@ class ProviderDetailScreenTest {
                             put("interval", "1m")
                         },
                     )
+
                 },
             )
         },
     )
+
+    private fun openConnectionDetails() {
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.ConnectionDetails))
+        composeRule.onNodeWithTag(ProviderDetailTestTags.ConnectionDetails).performClick()
+    }
 
     @Test
     fun `shows key metadata and CORS without the secret`() {
@@ -84,6 +111,10 @@ class ProviderDetailScreenTest {
             .assertTextContains("Limit: \$10")
         composeRule.onNodeWithTag(ProviderDetailTestTags.FreeTier)
             .assertTextContains("Free tier: No")
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Cors).assertDoesNotExist()
+        openConnectionDetails()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.RateLimit))
         composeRule.onNodeWithTag(ProviderDetailTestTags.RateLimit)
             .assertTextContains("Rate limit: 20 requests per 1m")
         composeRule.onNodeWithTag(ProviderDetailTestTags.Cors)
@@ -151,6 +182,9 @@ class ProviderDetailScreenTest {
             }
         }
 
+        openConnectionDetails()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.Preset))
         composeRule.onNodeWithTag(ProviderDetailTestTags.Preset)
             .assertTextContains("Preset: custom")
         composeRule.onNodeWithTag(ProviderDetailTestTags.BaseUrl)
@@ -220,8 +254,11 @@ class ProviderDetailScreenTest {
         }
 
         composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
-            .performScrollToNode(hasTestTag(ProviderDetailTestTags.RotateButton))
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.ChangeKey))
+        composeRule.onNodeWithTag(ProviderDetailTestTags.NewKeyField).assertDoesNotExist()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.ChangeKey).performClick()
         composeRule.onNodeWithTag(ProviderDetailTestTags.RotateButton).performClick()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.CancelKeyEditor).performClick()
         composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
             .performScrollToNode(hasTestTag(ProviderDetailTestTags.RemoveButton))
         composeRule.onNodeWithTag(ProviderDetailTestTags.RemoveButton).performClick()
@@ -288,6 +325,7 @@ class ProviderDetailScreenTest {
             }
         }
 
+        openConnectionDetails()
         composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
             .performScrollToNode(hasTestTag(ProviderDetailTestTags.DocsLink))
         composeRule.onNodeWithTag(ProviderDetailTestTags.DocsLink).performClick()
@@ -322,6 +360,7 @@ class ProviderDetailScreenTest {
             }
         }
 
+        openConnectionDetails()
         composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
             .performScrollToNode(hasTestTag(ProviderDetailTestTags.DocsLink))
         composeRule.onNodeWithTag(ProviderDetailTestTags.DocsLink).performClick()
@@ -359,6 +398,95 @@ class ProviderDetailScreenTest {
         composeRule.onNodeWithTag(ProviderDetailTestTags.Error).assertIsDisplayed()
         composeRule.onNodeWithText("Retry").performClick()
         assertThat(retries).isEqualTo(1)
+    }
+
+    @Test
+    fun `unknown usage stays unknown and secondary actions run only on request`() {
+        var state by mutableStateOf(ProviderDetailUiState(provider = testProvider(), loading = false))
+        var managed = 0
+        var refreshed = 0
+        var validated = 0
+        composeRule.setContent {
+            ChatUiTheme {
+                ProviderDetailScreen(
+                    state, onNewKeyChanged = {}, onRotateKey = {}, onRemoveKey = {}, onCancelRemove = {},
+                    onToggleEnabled = {}, onValidate = { validated++ }, onRefreshModels = { refreshed++ },
+                    onRetry = {}, onOpenModels = { managed++ },
+                )
+            }
+        }
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Usage).assertTextContains("Usage: Not reported")
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Limit).assertTextContains("Limit: Not reported")
+        composeRule.runOnIdle { state = state.copy(notice = "Presentation changed") }
+        composeRule.runOnIdle {
+            assertThat(managed + refreshed + validated).isEqualTo(0)
+        }
+        listOf(
+            ProviderDetailTestTags.ManageModels,
+            ProviderDetailTestTags.RefreshModels,
+            ProviderDetailTestTags.ValidateButton,
+        ).forEach { tag ->
+            composeRule.onNodeWithTag(ProviderDetailTestTags.Screen).performScrollToNode(hasTestTag(tag))
+            composeRule.onNodeWithTag(tag).performClick()
+        }
+        assertThat(managed).isEqualTo(1)
+        assertThat(refreshed).isEqualTo(1)
+        assertThat(validated).isEqualTo(1)
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h480dp")
+    fun `large font overview diagnostics and secure replacement editor remain reachable`() {
+        RuntimeEnvironment.setFontScale(2f)
+        var cleared = false
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 2f)) {
+                ChatUiTheme(reducedMotion = true) {
+                    ProviderDetailScreen(
+                        ProviderDetailUiState(
+                            provider = testProvider(label = "A provider with a long descriptive label"),
+                            loading = false, newKey = "fake-replacement",
+                        ),
+                        onNewKeyChanged = { cleared = it.isEmpty() },
+                        onRotateKey = {}, onRemoveKey = {}, onCancelRemove = {},
+                        onToggleEnabled = {}, onValidate = {}, onRefreshModels = {}, onRetry = {},
+                    )
+                }
+            }
+        }
+        listOf(ProviderDetailTestTags.EnabledToggle, ProviderDetailTestTags.ManageModels)
+            .forEach { tag ->
+                composeRule.onNodeWithTag(ProviderDetailTestTags.Screen).performScrollToNode(hasTestTag(tag))
+                composeRule.onNodeWithTag(tag).assertIsDisplayed()
+                val bounds = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+                assertThat(bounds.left).isAtLeast(0f)
+                assertThat(bounds.right).isAtMost(320f)
+            }
+        openConnectionDetails()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.Cors))
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Cors).assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.Screen)
+            .performScrollToNode(hasTestTag(ProviderDetailTestTags.ChangeKey))
+        composeRule.onNodeWithTag(ProviderDetailTestTags.ChangeKey).performClick()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.NewKeyField).performScrollTo().assertIsDisplayed()
+        val window = ShadowDialog.getShownDialogs().last { it.isShowing }.window!!
+        assertThat(window.isSecure()).isTrue()
+        fun renderedText(): String {
+            val layouts = mutableListOf<TextLayoutResult>()
+            composeRule.onNodeWithTag(ProviderDetailTestTags.NewKeyField)
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            return layouts.single().layoutInput.text.text
+        }
+        assertThat(renderedText()).doesNotContain("fake-replacement")
+        composeRule.onNodeWithTag(ProviderDetailTestTags.ShowKey).performClick()
+        assertThat(renderedText()).isEqualTo("fake-replacement")
+        assertThat(window.isSecure()).isTrue()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.RotateButton).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.CancelKeyEditor).performScrollTo().performClick()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.KeyEditor).assertDoesNotExist()
+        composeRule.onNodeWithTag(ProviderDetailTestTags.ChangeKey).assertIsFocused()
+        assertThat(cleared).isTrue()
     }
 }
 

@@ -12,23 +12,33 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.Density as DisplayDensity
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.chatui.core.datastore.settings.AndroidSettings
@@ -59,6 +69,11 @@ import dev.chatui.core.model.Provider
 import dev.chatui.core.model.ProviderAuthType
 import dev.chatui.core.model.ProviderKind
 import dev.chatui.core.model.Theme
+import dev.chatui.feature.backup.BackupFormValues
+import dev.chatui.feature.backup.BackupSettingsScreen
+import dev.chatui.feature.backup.BackupSettingsServiceLike
+import dev.chatui.feature.backup.BackupUiState
+import dev.chatui.feature.backup.RestoreRequest
 import dev.chatui.feature.chat.ChatAvailability
 import dev.chatui.feature.chat.ChatCodeBlock
 import dev.chatui.feature.chat.ChatCodeBlockTestTags
@@ -75,19 +90,34 @@ import dev.chatui.feature.conversations.ConversationSearchResult
 import dev.chatui.feature.onboarding.CatalogModel
 import dev.chatui.feature.onboarding.CatalogUiState
 import dev.chatui.feature.onboarding.OnboardingScreen
+import dev.chatui.feature.onboarding.OnboardingErrorCopy
 import dev.chatui.feature.onboarding.OnboardingStep
+import dev.chatui.feature.onboarding.OnboardingTestTags
 import dev.chatui.feature.onboarding.OnboardingUiState
 import dev.chatui.feature.onboarding.ProviderOption
 import dev.chatui.feature.providers.ModelPickerContent
+import dev.chatui.feature.providers.ModelDefaults
 import dev.chatui.feature.providers.ModelPickerTarget
 import dev.chatui.feature.providers.ModelPickerTestTags
 import dev.chatui.feature.providers.ModelPickerUiState
+import dev.chatui.feature.providers.ConversationRoutingControls
+import dev.chatui.feature.providers.ConversationRoutingTestTags
+import dev.chatui.feature.providers.ConversationRoutingUiState
+import dev.chatui.feature.providers.ConversationSettingsSheet
+import dev.chatui.feature.providers.ConversationSettingsTestTags
+import dev.chatui.feature.providers.ConversationSettingsUiState
+import dev.chatui.feature.providers.CustomProviderFormState
 import dev.chatui.feature.providers.ProviderAvailability
 import dev.chatui.feature.providers.ProviderDetailScreen
+import dev.chatui.feature.providers.ProviderDetailTestTags
 import dev.chatui.feature.providers.ProviderDetailUiState
 import dev.chatui.feature.providers.ProviderListScreen
 import dev.chatui.feature.providers.ProviderListTestTags
 import dev.chatui.feature.providers.ProviderListUiState
+import dev.chatui.feature.providers.RoutingPreferences
+import dev.chatui.feature.providers.RoutingSort
+import dev.chatui.feature.providers.routingSummary
+import dev.chatui.feature.providers.withRoutingPreferences
 import dev.chatui.feature.settings.AboutSettingsScreen
 import dev.chatui.feature.settings.AppearanceSettingsScreen
 import dev.chatui.feature.settings.ChatDefaultsSettingsScreen
@@ -107,9 +137,11 @@ import java.time.ZoneOffset
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Rule
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -136,31 +168,62 @@ class ScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private val originalFontScale = RuntimeEnvironment.getApplication().resources.configuration.fontScale
+
+    @After
+    fun restoreFontScale() {
+        RuntimeEnvironment.setFontScale(originalFontScale)
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
     private fun captureBoth(
         name: String,
         interaction: (() -> Unit)? = null,
+        fontScale: Float? = null,
+        rootTag: String? = null,
+        staticInteraction: Boolean = false,
         content: @Composable () -> Unit,
     ) {
+        fontScale?.let(RuntimeEnvironment::setFontScale)
         var theme by mutableStateOf(Theme.LIGHT)
         composeRule.setContent {
-            ChatUiTheme(themeMode = theme, reducedMotion = true) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
-                ) {
-                    content()
+            val display = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides DisplayDensity(display.density, fontScale ?: display.fontScale),
+            ) {
+                ChatUiTheme(themeMode = theme, reducedMotion = true) {
+                    // Static interaction goldens omit transient ripple/state layers.
+                    CompositionLocalProvider(
+                        LocalRippleConfiguration provides LocalRippleConfiguration.current
+                            .takeUnless { staticInteraction },
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background),
+                        ) {
+                            content()
+                        }
+                    }
                 }
             }
         }
+        fun capture(suffix: String) {
+            val root = if (rootTag == null) composeRule.onRoot() else {
+                composeRule.onNode(isRoot() and hasAnyDescendant(hasTestTag(rootTag)))
+            }
+            root.captureRoboImage("${name}_$suffix.png")
+        }
         composeRule.waitForIdle()
         interaction?.invoke()
+        if (staticInteraction) composeRule.mainClock.advanceTimeBy(1_000)
         composeRule.waitForIdle()
-        composeRule.onRoot().captureRoboImage("${name}_light.png")
+        capture("light")
 
         theme = Theme.DARK
+        if (staticInteraction) composeRule.mainClock.advanceTimeBy(1_000)
         composeRule.waitForIdle()
-        composeRule.onRoot().captureRoboImage("${name}_dark.png")
+        capture("dark")
     }
 
     @Test
@@ -319,7 +382,11 @@ class ScreenshotTest {
 
     @Test
     @Config(qualifiers = "w411dp-h891dp")
-    fun onboardingCatalogPhone() = captureBoth("onboarding_catalog_phone") {
+    fun onboardingCatalogPhone() = captureBoth(
+        "onboarding_catalog_phone",
+        staticInteraction = true,
+        interaction = ::openOnboardingCatalog,
+    ) {
         OnboardingScreen(
             state = onboardingState(
                 step = OnboardingStep.KEY_ENTRY,
@@ -343,7 +410,11 @@ class ScreenshotTest {
 
     @Test
     @Config(qualifiers = "w840dp-h1280dp")
-    fun onboardingCatalogTablet() = captureBoth("onboarding_catalog_tablet") {
+    fun onboardingCatalogTablet() = captureBoth(
+        "onboarding_catalog_tablet",
+        staticInteraction = true,
+        interaction = ::openOnboardingCatalog,
+    ) {
         OnboardingScreen(
             state = onboardingState(
                 step = OnboardingStep.KEY_ENTRY,
@@ -384,6 +455,7 @@ class ScreenshotTest {
             onBack = {},
             onConnect = {},
             onRetryCatalog = {},
+            backupService = unopenedBackupService,
         )
     }
 
@@ -406,7 +478,68 @@ class ScreenshotTest {
             onBack = {},
             onConnect = {},
             onRetryCatalog = {},
+            backupService = unopenedBackupService,
         )
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h568dp-mdpi")
+    fun onboardingNarrowLargeText() = captureBoth("onboarding_narrow_font200", fontScale = 2f) {
+        OnboardingFixture(onboardingState())
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-mdpi")
+    fun onboardingErrorPhone() = captureBoth("onboarding_error_phone") {
+        OnboardingFixture(
+            onboardingState(
+                step = OnboardingStep.KEY_ENTRY,
+                apiKey = "example-not-a-real-key",
+            ).copy(
+                error = OnboardingErrorCopy(
+                    "Key not accepted",
+                    "Check your key and try again. Your input has been kept.",
+                    "Invented unauthorized validation response.",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w640dp-h360dp-mdpi")
+    fun onboardingConnectingLandscape() = captureBoth(
+        "onboarding_connecting_landscape",
+        staticInteraction = true,
+        interaction = {
+            composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+                .performScrollToNode(hasTestTag(OnboardingTestTags.ConnectButton))
+            composeRule.onNodeWithTag(OnboardingTestTags.ConnectButton).performScrollTo()
+        },
+    ) {
+        OnboardingFixture(
+            onboardingState(step = OnboardingStep.KEY_ENTRY, apiKey = "example-not-a-real-key")
+                .copy(testing = true),
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h568dp-mdpi")
+    fun onboardingBackupNarrowLargeText() = captureBoth(
+        "onboarding_backup_narrow_font200",
+        staticInteraction = true,
+        fontScale = 2f,
+        interaction = {
+            composeRule.onNodeWithTag(OnboardingTestTags.BackupStep)
+                .performScrollToNode(hasTestTag(OnboardingTestTags.BackupSkip))
+        },
+    ) {
+        OnboardingFixture(onboardingState(step = OnboardingStep.BACKUP, connected = true))
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-mdpi")
+    fun onboardingBackupSetupPhone() = captureBoth("onboarding_backup_setup_phone") {
+        BackupSetupFixture()
     }
 
     // Chat -----------------------------------------------------------------------
@@ -624,6 +757,7 @@ class ScreenshotTest {
     @Config(qualifiers = "w411dp-h891dp")
     fun modelPickerFiltersPhone() = captureBoth(
         name = "model_picker_filters_phone",
+        staticInteraction = true,
         interaction = {
             composeRule.onNodeWithTag(ModelPickerTestTags.filter("pinned")).performClick()
         },
@@ -645,6 +779,7 @@ class ScreenshotTest {
     @Config(qualifiers = "w840dp-h1280dp")
     fun modelPickerFiltersTablet() = captureBoth(
         name = "model_picker_filters_tablet",
+        staticInteraction = true,
         interaction = {
             composeRule.onNodeWithTag(ModelPickerTestTags.filter("pinned")).performClick()
         },
@@ -694,6 +829,25 @@ class ScreenshotTest {
         )
     }
 
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-mdpi")
+    fun modelPickerManagePhone() = captureBoth("model_picker_manage_phone") {
+        ModelPickerFixture(
+            modelPickerState(
+                models = listOf(
+                    model("hidden", "Hidden model", pinned = true).copy(hidden = true),
+                    model("visible", "Available model"),
+                ),
+            ).copy(target = ModelPickerTarget.Manage("provider-1"), selectedModelId = null, includeHidden = true),
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h568dp-mdpi")
+    fun modelPickerNarrowLargeText() = captureBoth("model_picker_narrow_font200", fontScale = 2f) {
+        ModelPickerFixture(modelPickerState())
+    }
+
     // Providers ------------------------------------------------------------------
 
     @Test
@@ -720,6 +874,8 @@ class ScreenshotTest {
     @Config(qualifiers = "w411dp-h891dp")
     fun providerAddSheetPhone() = captureBoth(
         name = "provider_add_sheet_phone",
+        staticInteraction = true,
+        rootTag = ProviderListTestTags.AddSheet,
         interaction = {
             composeRule.onNodeWithTag(ProviderListTestTags.AddProvider).performClick()
         },
@@ -735,6 +891,8 @@ class ScreenshotTest {
     @Config(qualifiers = "w840dp-h1280dp")
     fun providerAddSheetTablet() = captureBoth(
         name = "provider_add_sheet_tablet",
+        staticInteraction = true,
+        rootTag = ProviderListTestTags.AddSheet,
         interaction = {
             composeRule.onNodeWithTag(ProviderListTestTags.AddProvider).performClick()
         },
@@ -784,6 +942,112 @@ class ScreenshotTest {
             onRefreshModels = {},
             onRetry = {},
         )
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h568dp-mdpi")
+    fun providerCustomNarrowLargeText() = captureBoth(
+        "provider_custom_narrow_font200",
+        staticInteraction = true,
+        fontScale = 2f,
+        rootTag = ProviderListTestTags.AddSheet,
+        interaction = {
+            composeRule.onNodeWithTag(ProviderListTestTags.AddProvider).performClick()
+            composeRule.onNodeWithTag(ProviderListTestTags.CustomOption).performScrollTo().performClick()
+            composeRule.onNodeWithTag(ProviderListTestTags.CustomBaseUrl).performScrollTo()
+        },
+    ) {
+        ProviderListScreen(
+            state = providerListState().copy(
+                customForm = CustomProviderFormState(
+                    baseUrl = "https://local.example.invalid/v1",
+                    authType = ProviderAuthType.NONE,
+                ),
+            ),
+            onOpenProvider = {},
+            onRetry = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-mdpi")
+    fun providerKeyEditorPhone() = captureBoth(
+        "provider_key_editor_phone",
+        staticInteraction = true,
+        rootTag = ProviderDetailTestTags.KeyEditor,
+        interaction = {
+            composeRule.onNodeWithTag(ProviderDetailTestTags.ChangeKey).performScrollTo().performClick()
+            composeRule.onNodeWithTag(ProviderDetailTestTags.NewKeyField).assertIsDisplayed()
+        },
+    ) {
+        ProviderDetailScreen(
+            state = ProviderDetailUiState(
+                provider = provider(),
+                modelCount = 3,
+                newKey = "example-replacement-not-a-real-key",
+                loading = false,
+            ),
+            onNewKeyChanged = {},
+            onRotateKey = {},
+            onRemoveKey = {},
+            onCancelRemove = {},
+            onToggleEnabled = {},
+            onValidate = {},
+            onRefreshModels = {},
+            onRetry = {},
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-mdpi")
+    fun conversationSettingsPhone() = captureBoth(
+        "conversation_settings_phone",
+        rootTag = ConversationSettingsTestTags.Sheet,
+    ) {
+        ConversationSettingsFixture()
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-mdpi")
+    fun conversationSettingsGenerationPhone() = captureBoth(
+        "conversation_settings_generation_phone",
+        staticInteraction = true,
+        rootTag = ConversationSettingsTestTags.Sheet,
+        interaction = {
+            composeRule.onNodeWithTag(ConversationSettingsTestTags.Generation).performScrollTo().performClick()
+            composeRule.onNodeWithTag(ConversationSettingsTestTags.Temperature).performScrollTo()
+        },
+    ) {
+        ConversationSettingsFixture()
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-mdpi")
+    fun conversationSettingsAdvancedPhone() = captureBoth(
+        "conversation_settings_advanced_phone",
+        staticInteraction = true,
+        rootTag = ConversationSettingsTestTags.Sheet,
+        interaction = {
+            composeRule.onNodeWithTag(ConversationSettingsTestTags.Advanced).performScrollTo().performClick()
+            composeRule.onNodeWithTag(ConversationRoutingTestTags.Controls).performScrollTo()
+        },
+    ) {
+        ConversationSettingsFixture()
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h568dp-mdpi")
+    fun conversationSettingsNarrowLargeText() = captureBoth(
+        "conversation_settings_narrow_font200",
+        staticInteraction = true,
+        fontScale = 2f,
+        rootTag = ConversationSettingsTestTags.Sheet,
+        interaction = {
+            composeRule.onNodeWithTag(ConversationSettingsTestTags.Generation).performScrollTo().performClick()
+            composeRule.onNodeWithTag(ConversationSettingsTestTags.Temperature).performScrollTo()
+        },
+    ) {
+        ConversationSettingsFixture()
     }
 
     // Settings -------------------------------------------------------------------
@@ -1163,6 +1427,137 @@ class ScreenshotTest {
 
     // Fixtures -------------------------------------------------------------------
 
+    private fun openOnboardingCatalog() {
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.CatalogDisclosure))
+        composeRule.onNodeWithTag(OnboardingTestTags.CatalogDisclosure).performClick()
+        composeRule.onNodeWithTag(OnboardingTestTags.Screen)
+            .performScrollToNode(hasTestTag(OnboardingTestTags.catalogModel("openrouter/auto")))
+    }
+
+    @Composable
+    private fun OnboardingFixture(state: OnboardingUiState) {
+        OnboardingScreen(
+            state = state,
+            onApiKeyChanged = {},
+            onLabelChanged = {},
+            onProviderSelected = {},
+            onContinue = {},
+            onBack = {},
+            onConnect = {},
+            onRetryCatalog = {},
+            backupService = unopenedBackupService,
+        )
+    }
+
+    private val unopenedBackupService = object : BackupSettingsServiceLike {
+        override suspend fun load(): Nothing = error("Backup setup was not chosen.")
+        override suspend fun saveConfig(values: BackupFormValues, enabled: Boolean): Nothing =
+            error("Backup setup was not chosen.")
+        override suspend fun setEnabled(enabled: Boolean, values: BackupFormValues): Nothing =
+            error("Backup setup was not chosen.")
+        override suspend fun testConnection(values: BackupFormValues): Nothing = error("Backup setup was not chosen.")
+        override suspend fun backupNow(): Nothing = error("Backup setup was not chosen.")
+        override suspend fun restore(request: RestoreRequest): Nothing = error("Backup setup was not chosen.")
+        override suspend fun deleteRemote(confirmation: String): Nothing = error("Backup setup was not chosen.")
+        override suspend fun getStatus(): Nothing = error("Backup setup was not chosen.")
+    }
+
+    @Composable
+    private fun BackupSetupFixture() {
+        BackupSettingsScreen(
+            state = BackupUiState(
+                loading = false,
+                form = BackupFormValues(
+                    endpoint = "https://storage.example.invalid",
+                    region = "example-region",
+                    bucket = "example-backups",
+                ),
+            ),
+            setupMode = true,
+            onSetupCancel = {},
+            onSetupComplete = {},
+            onFormChanged = {},
+            onTestConnection = {},
+            onEnableChanged = {},
+            onBackupNow = {},
+            onRestoreMerge = {},
+            onRequestRestoreReplace = {},
+            onReplaceConfirmationChanged = {},
+            onConfirmRestoreReplace = {},
+            onRequestDeleteRemote = {},
+            onDeleteConfirmationChanged = {},
+            onConfirmDeleteRemote = {},
+            onDismissDialogs = {},
+            onDismissError = {},
+        )
+    }
+
+    @Composable
+    private fun ModelPickerFixture(state: ModelPickerUiState) {
+        ModelPickerContent(
+            state = state,
+            onQueryChanged = {},
+            onSelect = {},
+            onPin = { _, _ -> },
+            onHide = { _, _ -> },
+            onManualRemoteIdChanged = {},
+            onManualLabelChanged = {},
+            onAddManual = {},
+            onRefresh = {},
+        )
+    }
+
+    @Composable
+    private fun ConversationSettingsFixture() {
+        val preferences = RoutingPreferences(
+            enabled = true,
+            sort = RoutingSort.PRICE,
+            denyDataCollection = true,
+        )
+        val params = withRoutingPreferences(
+            chatParams().copy(
+                temperature = 0.0,
+                maxOutputTokens = 1024,
+                extra = buildJsonObject { put("openrouter", buildJsonObject { put("future_option", true) }) },
+            ),
+            preferences,
+        )
+        ConversationSettingsSheet(
+            state = ConversationSettingsUiState(
+                conversation = conversation().copy(params = params),
+                provider = provider(),
+                model = model("model-1", "Model One"),
+                params = params,
+                systemPrompt = "Answer concisely.",
+                extrasText = params.extra.getValue("openrouter").toString(),
+                routingSummary = routingSummary(preferences),
+                loading = false,
+            ),
+            onDismiss = {},
+            onSystemPromptChanged = {},
+            onTemperatureChanged = {},
+            onTopPChanged = {},
+            onMaxOutputTokensChanged = {},
+            onStopChanged = {},
+            onReasoningEffortChanged = {},
+            onStreamingChanged = {},
+            onExtrasChanged = {},
+            onOpenModelPicker = {},
+            onDelete = {},
+            onDismissError = {},
+            routingControls = {
+                ConversationRoutingControls(
+                    state = ConversationRoutingUiState(preferences = preferences, loading = false),
+                    onEnabledChanged = {},
+                    onAllowFallbacksChanged = {},
+                    onSortChanged = {},
+                    onDenyDataCollectionChanged = {},
+                )
+            },
+        )
+    }
+
     private fun onboardingState(
         step: OnboardingStep = OnboardingStep.WELCOME,
         apiKey: String = "",
@@ -1291,6 +1686,7 @@ class ScreenshotTest {
         ),
     ): ModelPickerUiState = ModelPickerUiState(
         target = ModelPickerTarget.Defaults,
+        defaults = ModelDefaults("provider-1", models.firstOrNull()?.id),
         models = models,
         providers = listOf(provider()),
         loading = false,

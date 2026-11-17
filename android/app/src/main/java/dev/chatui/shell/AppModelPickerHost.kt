@@ -27,6 +27,7 @@ class AppModelPickerState : ViewModel() {
     internal class Request(
         val target: ModelPickerTarget,
         val refresh: () -> Unit,
+        val restoreHeaderFocus: Boolean,
     ) : ViewModelStoreOwner {
         override val viewModelStore = ViewModelStore()
     }
@@ -42,10 +43,18 @@ class AppModelPickerState : ViewModel() {
         open(ModelPickerTarget.Defaults, onClosed)
     }
 
-    private fun open(target: ModelPickerTarget, refresh: () -> Unit) {
+    fun openConversationSettings(conversationId: String, onClosed: () -> Unit = {}) {
+        open(ModelPickerTarget.Conversation(conversationId), onClosed, restoreHeaderFocus = false)
+    }
+
+    private fun open(
+        target: ModelPickerTarget,
+        refresh: () -> Unit,
+        restoreHeaderFocus: Boolean = true,
+    ) {
         if (request?.target == target) return
         val previous = request
-        request = Request(target, refresh)
+        request = Request(target, refresh, restoreHeaderFocus)
         previous?.viewModelStore?.clear()
     }
 
@@ -84,7 +93,7 @@ internal fun AppModelPickerHost(
     )
     val pickerState by picker.state.collectAsStateWithLifecycle()
     val close = {
-        if (state.close(request)) onClosed(request.target)
+        if (state.close(request) && request.restoreHeaderFocus) onClosed(request.target)
     }
 
     LaunchedEffect(request, pickerState.selectionVersion) {

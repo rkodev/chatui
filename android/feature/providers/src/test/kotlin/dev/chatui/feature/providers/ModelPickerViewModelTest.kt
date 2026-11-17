@@ -148,4 +148,62 @@ class ModelPickerViewModelTest {
         assertThat(viewModel.state.value.error)
             .isEqualTo("Enter the model id, for example author/model.")
     }
+
+    @Test
+    fun `management includes hidden models without selecting a persisted target`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        service.models += testModel(id = "hidden", hidden = true)
+        val defaults = service.defaults
+        val conversation = service.conversations["conversation-1"]
+        val viewModel = ModelPickerViewModel(service, ModelPickerTarget.Manage("provider-1"))
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.groups.flatMap { it.models }.map { it.id })
+            .contains("hidden")
+        viewModel.onSelect(service.models.last())
+        advanceUntilIdle()
+        viewModel.onHide(service.models.last(), false)
+        advanceUntilIdle()
+
+        assertThat(service.models.last().hidden).isFalse()
+        assertThat(service.defaults).isEqualTo(defaults)
+        assertThat(service.conversations["conversation-1"]).isEqualTo(conversation)
+        assertThat(viewModel.state.value.selectionVersion).isEqualTo(0)
+    }
+
+    @Test
+    fun `missing management provider cannot fall back for manual add or refresh`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ModelPickerViewModel(service, ModelPickerTarget.Manage("deleted"))
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.error).isEqualTo("Provider not found.")
+        assertThat(viewModel.state.value.providerId).isNull()
+        viewModel.onManualRemoteIdChanged("author/manual")
+        viewModel.onAddManual()
+        viewModel.onRefresh()
+        advanceUntilIdle()
+
+        assertThat(service.models).hasSize(1)
+        assertThat(service.refreshCalls).isEqualTo(0)
+        assertThat(service.defaults.providerId).isEqualTo("provider-1")
+    }
+
+    @Test
+    fun `failed refresh retains cached rows and entered manual values`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ModelPickerViewModel(service, ModelPickerTarget.Manage("provider-1"))
+        advanceUntilIdle()
+        viewModel.onManualRemoteIdChanged("author/manual")
+        service.error = IllegalStateException("Try again")
+
+        viewModel.onRefresh()
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.models).hasSize(1)
+        assertThat(viewModel.state.value.manualRemoteId).isEqualTo("author/manual")
+        assertThat(viewModel.state.value.error).isEqualTo("Try again")
+        assertThat(viewModel.state.value.loading).isFalse()
+        assertThat(viewModel.state.value.refreshing).isFalse()
+    }
 }
