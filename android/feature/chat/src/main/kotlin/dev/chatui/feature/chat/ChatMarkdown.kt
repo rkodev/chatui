@@ -41,12 +41,15 @@ import com.mikepenz.markdown.compose.LocalMarkdownComponents
 import com.mikepenz.markdown.compose.MarkdownElement
 import com.mikepenz.markdown.compose.MarkdownSuccess
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
+import com.mikepenz.markdown.compose.components.MarkdownComponents
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownCodeBlock
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.elements.MarkdownCheckBox
 import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.State
 import com.mikepenz.markdown.model.markdownAnnotator
+import com.mikepenz.markdown.model.parseMarkdown
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
 import com.mikepenz.markdown.utils.resolveImageAlt
@@ -176,56 +179,75 @@ private fun MarkdownBody(
         })
     }
 
-    val markdownState = rememberMarkdownState(
-        content = content,
-        retainState = true,
-        immediate = parseImmediately,
+    val components = markdownComponents(
+        checkbox = { model -> MarkdownCheckBox(model.content, model.node, model.typography.text) },
+        codeFence = { model -> BlockFencedCode(model) },
+        codeBlock = { model ->
+            MarkdownCodeBlock(
+                content = model.content,
+                node = model.node,
+                style = model.typography.code,
+            ) { code, language, style ->
+                ChatCodeBlock(
+                    code = code.removeSuffix("\n"),
+                    language = language,
+                    style = style,
+                )
+            }
+        },
+        image = { model -> BlockedImage(model, loadRemoteImages) },
+        inlineImage = { model -> BlockedInlineImage(model, loadRemoteImages) },
+        custom = { type, model ->
+            if (type == MarkdownElementTypes.HTML_BLOCK) {
+                RawHtmlText(model)
+            } else {
+                val components = LocalMarkdownComponents.current
+                model.node.children.forEach { child ->
+                    MarkdownElement(child, components, model.content)
+                }
+            }
+        },
     )
+    val success: @Composable (State.Success, MarkdownComponents, Modifier) -> Unit =
+        { parsed, successComponents, contentModifier ->
+            // Retained AST offsets belong to their parsed source, not a newer input.
+            CompositionLocalProvider(LocalMarkdownContent provides parsed.content) {
+                MarkdownSuccess(state = parsed, components = successComponents, modifier = contentModifier)
+            }
+        }
 
     CompositionLocalProvider(
         LocalMarkdownImageOwner provides imageOwnerKey,
     ) {
-        Markdown(
-            markdownState = markdownState,
-            modifier = modifier,
-            typography = typography,
-            annotator = annotator,
-            success = { parsed, components, contentModifier ->
-                // Retained AST offsets belong to their parsed source, not a newer input.
-                CompositionLocalProvider(LocalMarkdownContent provides parsed.content) {
-                    MarkdownSuccess(state = parsed, components = components, modifier = contentModifier)
-                }
-            },
-            components = markdownComponents(
-                checkbox = { model -> MarkdownCheckBox(model.content, model.node, model.typography.text) },
-                codeFence = { model -> BlockFencedCode(model) },
-                codeBlock = { model ->
-                    MarkdownCodeBlock(
-                        content = model.content,
-                        node = model.node,
-                        style = model.typography.code,
-                    ) { code, language, style ->
-                        ChatCodeBlock(
-                            code = code.removeSuffix("\n"),
-                            language = language,
-                            style = style,
-                        )
-                    }
-                },
-                image = { model -> BlockedImage(model, loadRemoteImages) },
-                inlineImage = { model -> BlockedInlineImage(model, loadRemoteImages) },
-                custom = { type, model ->
-                    if (type == MarkdownElementTypes.HTML_BLOCK) {
-                        RawHtmlText(model)
-                    } else {
-                        val components = LocalMarkdownComponents.current
-                        model.node.children.forEach { child ->
-                            MarkdownElement(child, components, model.content)
-                        }
-                    }
-                },
-            ),
-        )
+        if (parseImmediately) {
+            // rememberMarkdownState only parses the initial input synchronously; later
+            // updates go through a background dispatcher that the test clock cannot
+            // await. Active streams must reflect the latest token in the same frame,
+            // so parse each update synchronously instead.
+            val state = remember(content) { parseMarkdown(content) }
+            Markdown(
+                state = state,
+                modifier = modifier,
+                typography = typography,
+                annotator = annotator,
+                success = success,
+                components = components,
+            )
+        } else {
+            val markdownState = rememberMarkdownState(
+                content = content,
+                retainState = true,
+                immediate = false,
+            )
+            Markdown(
+                markdownState = markdownState,
+                modifier = modifier,
+                typography = typography,
+                annotator = annotator,
+                success = success,
+                components = components,
+            )
+        }
     }
 }
 
