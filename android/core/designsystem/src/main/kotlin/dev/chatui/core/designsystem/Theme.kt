@@ -30,6 +30,12 @@ val LocalReducedMotion = staticCompositionLocalOf { false }
 /** True when haptic feedback is enabled by the persisted setting. */
 val LocalHaptics = staticCompositionLocalOf { true }
 
+/** The applied application theme, which can differ from the system setting. */
+val LocalIsDarkTheme = staticCompositionLocalOf { false }
+
+/** Whether the current platform actually applied the requested dynamic accent. */
+val LocalDynamicColorApplied = staticCompositionLocalOf { false }
+
 /** Resolves the persisted theme mode against the current system setting. */
 fun resolveDarkTheme(themeMode: Theme, systemInDarkTheme: Boolean): Boolean =
     when (themeMode) {
@@ -65,7 +71,8 @@ fun ChatUiTheme(
     val darkTheme = resolveDarkTheme(themeMode, isSystemInDarkTheme())
     val baseColors = if (darkTheme) DarkColors else LightColors
     val context = LocalContext.current
-    val colors = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    val applyDynamicColor = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val colors = if (applyDynamicColor) {
         val scheme = if (darkTheme) {
             dynamicDarkColorScheme(context)
         } else {
@@ -86,6 +93,8 @@ fun ChatUiTheme(
         LocalChatUiMotion provides motion,
         LocalReducedMotion provides motion.reducedMotion,
         LocalHaptics provides hapticsEnabled,
+        LocalIsDarkTheme provides darkTheme,
+        LocalDynamicColorApplied provides applyDynamicColor,
     ) {
         MaterialTheme(
             colorScheme = colors.toMaterialColorScheme(darkTheme),

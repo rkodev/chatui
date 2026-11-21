@@ -37,10 +37,12 @@ data class ModelPickerUiState(
     val includeHidden: Boolean = false,
     val loading: Boolean = true,
     val busy: Boolean = false,
+    val refreshing: Boolean = false,
     val error: String? = null,
     val notice: String? = null,
     val manualRemoteId: String = "",
     val manualLabel: String = "",
+    val selectionVersion: Int = 0,
 ) {
     val groups: List<ModelPickerGroup>
         get() = buildModelPickerGroups(models, providers, query, includeHidden)
@@ -55,7 +57,9 @@ data class ModelPickerUiState(
         get() = when (target) {
             is ModelPickerTarget.Conversation -> conversation?.providerId
             ModelPickerTarget.Defaults -> defaults?.providerId
-            is ModelPickerTarget.Manage -> target.providerId
+            is ModelPickerTarget.Manage -> target.providerId.takeIf { id ->
+                providers.any { it.id == id }
+            }
         }
 }
 
@@ -75,7 +79,7 @@ class ModelPickerViewModel(
     private val _state = MutableStateFlow(
         ModelPickerUiState(
             target = target,
-            includeHidden = includeHidden,
+            includeHidden = includeHidden || target is ModelPickerTarget.Manage,
         ),
     )
     val state: StateFlow<ModelPickerUiState> = _state.asStateFlow()
@@ -123,6 +127,7 @@ class ModelPickerViewModel(
                                 selectedModelId = updated.modelId,
                                 busy = false,
                                 notice = "Model switched to ${updated.modelLabel}.",
+                                selectionVersion = it.selectionVersion + 1,
                             )
                         }
                     }
@@ -137,6 +142,7 @@ class ModelPickerViewModel(
                                 warning = warning,
                                 busy = false,
                                 notice = "Default model set to ${model.label}.",
+                                selectionVersion = it.selectionVersion + 1,
                             )
                         }
                     }
@@ -201,12 +207,14 @@ class ModelPickerViewModel(
     }
 
     fun onRefresh() {
+        if (_state.value.busy) return
         val providerId = _state.value.providerId
         if (providerId == null) {
             _state.update { it.copy(error = "Choose a provider before refreshing models.") }
             return
         }
 
+        _state.update { it.copy(refreshing = true) }
         runAction {
             service.refreshModels(providerId)
             reloadModels()
@@ -264,8 +272,19 @@ class ModelPickerViewModel(
                     }
 
                     is ModelPickerTarget.Manage -> {
-                        val models = service.listModels(currentTarget.providerId)
                         val providers = service.listProviders()
+                        if (providers.none { it.id == currentTarget.providerId }) {
+                            _state.update {
+                                it.copy(
+                                    providers = providers,
+                                    models = emptyList(),
+                                    loading = false,
+                                    error = "Provider not found.",
+                                )
+                            }
+                            return@launch
+                        }
+                        val models = service.listModels(currentTarget.providerId)
                         _state.update {
                             it.copy(
                                 models = models,
@@ -295,12 +314,12 @@ class ModelPickerViewModel(
         viewModelScope.launch {
             try {
                 block()
-                _state.update { it.copy(busy = false) }
+                _state.update { it.copy(busy = false, refreshing = false) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
                 _state.update {
-                    it.copy(busy = false, error = providerErrorMessage(error))
+                    it.copy(busy = false, refreshing = false, error = providerErrorMessage(error))
                 }
             }
         }

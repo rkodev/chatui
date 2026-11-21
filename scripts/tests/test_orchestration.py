@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
-"""Deterministic tests for scripts/next-task and scripts/run-tasks."""
+"""Deterministic tests for task selection, status, and CLI orchestration."""
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import re
+import runpy
 import subprocess
 import sys
 import tempfile
 import textwrap
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 NEXT_TASK = REPO_ROOT / "scripts" / "next-task"
 RUN_TASKS = REPO_ROOT / "scripts" / "run-tasks"
+RUN_COPILOT_TASKS = REPO_ROOT / "scripts" / "run-copilot-tasks.py"
 TASK_STATUS = REPO_ROOT / "scripts" / "task-status"
 
 FAKE_OPENCODE = """#!{python}
@@ -487,6 +492,240 @@ class RunTasksTests(unittest.TestCase):
             calls = [json.loads(line) for line in log.read_text().splitlines()]
             self.assertEqual(len(calls), 1)
             self.assertIn(str(in_progress), calls[0][-1])
+
+
+class CopilotRunTasksTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.task_dir = Path(temporary.name) / "tasks with spaces \u6d4b\u8bd5"
+        self.task_dir.mkdir()
+        self.task_dir = self.task_dir.resolve()
+        self.main = runpy.run_path(str(RUN_COPILOT_TASKS))["main"]
+        self.real_run = subprocess.run
+        self.executable = str(REPO_ROOT / "fake copilot.exe")
+        self.calls: list[tuple[list[str], dict]] = []
+        self.outcomes: list[str] = []
+        self.exit_code = 0
+        self.repeat_task: Path | None = None
+
+    def fake_run(self, command: list[str], **kwargs) -> subprocess.CompletedProcess:
+        if command[0] == sys.executable:
+            self.assertIn(Path(command[1]), (NEXT_TASK, TASK_STATUS))
+            if Path(command[1]) == NEXT_TASK and self.repeat_task:
+                return subprocess.CompletedProcess(command, 0, f"{self.repeat_task}\n", "")
+            return self.real_run(command, **kwargs)
+        if command == ["git", "rev-parse", "--show-toplevel"]:
+            return self.real_run(command, **kwargs)
+
+        self.assertEqual(command[0], self.executable)
+        self.calls.append((command, kwargs))
+        if not self.exit_code:
+            prompt = command[command.index("--prompt") + 1]
+            task = Path(
+                prompt.split("Implement exactly one task: ", 1)[1]
+                .split(". Read the task file", 1)[0]
+            )
+            status = self.outcomes.pop(0) if self.outcomes else "Complete"
+            mark_status(task, status)
+        return subprocess.CompletedProcess(command, self.exit_code)
+
+    def invoke(
+        self, *args: str, env: dict[str, str] | None = None, missing_cli: bool = False
+    ) -> tuple[int, str, str]:
+        environment = os.environ.copy()
+        for name in ("COPILOT_MODEL", "MAX_TASKS", "INCLUDE_IN_PROGRESS"):
+            environment.pop(name, None)
+        environment.update(env or {})
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            mock.patch.dict(os.environ, environment, clear=True),
+            mock.patch("shutil.which", return_value=None if missing_cli else self.executable),
+            mock.patch("subprocess.run", side_effect=self.fake_run),
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+        ):
+            try:
+                code = self.main([str(self.task_dir), *args])
+            except SystemExit as exc:
+                code = exc.code
+        return code, stdout.getvalue(), stderr.getvalue()
+
+    def write_index(self, *tasks: Path) -> Path:
+        readme = self.task_dir / "README.md"
+        rows = [
+            "# Tasks\n",
+            "| Order | Task | Status | Depends on |",
+            "| --- | --- | --- | --- |",
+        ]
+        rows.extend(
+            f"| {index} | [{task.stem}]({task.name}) | Not started | none |"
+            for index, task in enumerate(tasks, 1)
+        )
+        readme.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        return readme
+
+    def test_runs_fresh_sessions_in_dependency_order_and_syncs_index(self) -> None:
+        first = write_task(self.task_dir, "UX-00.1", 1)
+        second = write_task(self.task_dir, "UX-00.2", 2, dependencies="UX-00.1", bold=True)
+        index = self.write_index(first, second)
+
+        code, _, stderr = self.invoke()
+
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(len(self.calls), 2)
+        for (command, kwargs), task in zip(self.calls, (first, second)):
+            self.assertEqual(command[command.index("--model") + 1], "gpt-6.1-sol")
+            self.assertEqual(Path(kwargs["cwd"]), REPO_ROOT)
+            self.assertIn(str(task), command[command.index("--prompt") + 1])
+            for flag in ("--agent", "--allow-all-tools", "--trust-folder", "--continue"):
+                self.assertNotIn(flag, command)
+            self.assertIn(f"]({task.name}) | Complete |", index.read_text(encoding="utf-8"))
+
+    def test_model_override_precedence(self) -> None:
+        task = write_task(self.task_dir, "T-001", 1)
+        for args, environment, expected in (
+            ([], {"COPILOT_MODEL": "gpt-6.1-terra"}, "gpt-6.1-terra"),
+            (["--model", "gpt-6.1-sol"], {"COPILOT_MODEL": "gpt-6.1-terra"}, "gpt-6.1-sol"),
+        ):
+            with self.subTest(args=args):
+                mark_status(task, "Not started")
+                code, _, stderr = self.invoke(*args, env=environment)
+                self.assertEqual(code, 0, stderr)
+                command = self.calls[-1][0]
+                self.assertEqual(command[command.index("--model") + 1], expected)
+
+    def test_limits_attempts_and_explicitly_resumes_in_progress(self) -> None:
+        first = write_task(self.task_dir, "T-001", 1, status="In progress")
+        second = write_task(self.task_dir, "T-002", 2)
+        for args, environment, expected in (
+            (["--max-tasks", "1"], {}, second),
+            (["--max-tasks", "1", "--include-in-progress"], {}, first),
+            ([], {"MAX_TASKS": "1", "INCLUDE_IN_PROGRESS": "1"}, first),
+        ):
+            with self.subTest(args=args, environment=environment):
+                mark_status(first, "In progress")
+                mark_status(second, "Not started")
+                self.calls.clear()
+                code, _, stderr = self.invoke(*args, env=environment)
+                self.assertEqual(code, 0, stderr)
+                self.assertEqual(len(self.calls), 1)
+                self.assertIn(str(expected), self.calls[0][0][-1])
+
+    def test_syncs_blocked_tasks_and_continues_only_independent_work(self) -> None:
+        first = write_task(self.task_dir, "T-001", 1)
+        dependent = write_task(self.task_dir, "T-002", 2, dependencies="T-001")
+        independent = write_task(self.task_dir, "T-003", 3)
+        index = self.write_index(first, dependent, independent)
+        self.outcomes = ["Blocked", "Complete"]
+
+        code, _, stderr = self.invoke()
+
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(len(self.calls), 2)
+        self.assertIn(str(independent), self.calls[1][0][-1])
+        content = index.read_text(encoding="utf-8")
+        self.assertIn(f"]({first.name}) | Blocked |", content)
+        self.assertIn(f"]({dependent.name}) | Not started |", content)
+        self.assertIn(f"]({independent.name}) | Complete |", content)
+
+    def test_stops_on_copilot_failure_or_unfinished_task(self) -> None:
+        task = write_task(self.task_dir, "T-001", 1)
+        write_task(self.task_dir, "T-002", 2)
+        for exit_code, status, expected in (
+            (7, "Not started", 7),
+            (0, "Not started", 1),
+            (0, "In progress", 1),
+        ):
+            with self.subTest(exit_code=exit_code, status=status):
+                mark_status(task, "Not started")
+                self.calls.clear()
+                self.exit_code = exit_code
+                self.outcomes = [status]
+                code, _, _ = self.invoke()
+                self.assertEqual(code, expected)
+                self.assertEqual(len(self.calls), 1)
+
+    def test_dry_run_forwards_explicit_permissions_without_changing_tasks(self) -> None:
+        task = write_task(self.task_dir, "T-001", 1)
+        index = self.write_index(task)
+        before = (task.read_bytes(), index.read_bytes())
+
+        code, stdout, stderr = self.invoke(
+            "--dry-run",
+            "--agent", "custom-copilot-agent",
+            "--allow-all-tools",
+            "--trust-folder",
+            "--allow-tool", "shell(git status:*)",
+            "--allow-tool", "write",
+            "--deny-tool", "shell(git push:*)",
+            "--allow-url", "https://example.com",
+            missing_cli=True,
+        )
+
+        self.assertEqual(code, 0, stderr)
+        self.assertFalse(self.calls)
+        self.assertEqual((task.read_bytes(), index.read_bytes()), before)
+        command = json.loads(stdout)
+        self.assertEqual(command.count("--allow-tool"), 2)
+        self.assertIn("shell(git status:*)", command)
+        self.assertIn("shell(git push:*)", command)
+        self.assertIn("https://example.com", command)
+        self.assertIn("custom-copilot-agent", command)
+        self.assertIn("--allow-all-tools", command)
+        self.assertIn("--trust-folder", command)
+
+    def test_rejects_bad_configuration_and_selector_errors_before_copilot(self) -> None:
+        task = write_task(self.task_dir, "T-001", 1)
+        for args, environment in (
+            (["--max-tasks", "-1"], {}),
+            ([], {"MAX_TASKS": "invalid"}),
+            (["--model", ""], {}),
+            (["--unknown-option"], {}),
+        ):
+            with self.subTest(args=args, environment=environment):
+                code, _, _ = self.invoke(*args, env=environment)
+                self.assertEqual(code, 2)
+        task.write_text("# T-001\n\n- Status: Not started\n- Depends on: none\n", encoding="utf-8")
+        code, _, stderr = self.invoke()
+        self.assertEqual(code, 2, stderr)
+        self.assertIn("missing required field", stderr)
+        self.task_dir = self.task_dir / "missing"
+        code, _, stderr = self.invoke()
+        self.assertEqual(code, 2, stderr)
+        self.assertIn("does not exist", stderr)
+        self.assertFalse(self.calls)
+
+    def test_missing_copilot_is_only_an_error_when_a_task_needs_running(self) -> None:
+        task = write_task(self.task_dir, "T-001", 1)
+        code, _, stderr = self.invoke(missing_cli=True)
+        self.assertEqual(code, 2)
+        self.assertIn("not found on PATH", stderr)
+
+        mark_status(task, "Complete")
+        code, _, stderr = self.invoke(missing_cli=True)
+        self.assertEqual(code, 0, stderr)
+        self.assertFalse(self.calls)
+
+    def test_stops_if_index_sync_fails(self) -> None:
+        write_task(self.task_dir, "T-001", 1)
+        write_task(self.task_dir, "T-002", 2)
+        (self.task_dir / "README.md").write_text("# Missing task rows\n", encoding="utf-8")
+
+        code, _, stderr = self.invoke()
+
+        self.assertEqual(code, 2)
+        self.assertIn("no index row links to", stderr)
+        self.assertEqual(len(self.calls), 1)
+
+    def test_rejects_repeated_selection_without_starting_another_session(self) -> None:
+        self.repeat_task = write_task(self.task_dir, "T-001", 1)
+
+        code, _, stderr = self.invoke()
+
+        self.assertEqual(code, 1)
+        self.assertIn("without progress", stderr)
+        self.assertEqual(len(self.calls), 1)
 
 
 class TaskStatusTests(unittest.TestCase):

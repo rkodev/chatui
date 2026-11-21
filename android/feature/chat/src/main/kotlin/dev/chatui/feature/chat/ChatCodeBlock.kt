@@ -2,14 +2,13 @@ package dev.chatui.feature.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -22,7 +21,6 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.WrapText
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
+import dev.chatui.core.designsystem.LocalIsDarkTheme
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.designsystem.rememberHaptics
 import dev.snipme.highlights.Highlights
@@ -53,6 +52,7 @@ import dev.snipme.highlights.model.BoldHighlight
 import dev.snipme.highlights.model.CodeHighlight
 import dev.snipme.highlights.model.ColorHighlight
 import dev.snipme.highlights.model.SyntaxThemes
+import dev.snipme.highlights.model.SyntaxLanguage
 import kotlinx.coroutines.delay
 
 /** Test tags exposed by a fenced code block. */
@@ -81,14 +81,13 @@ fun ChatCodeBlock(
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
     val haptics = rememberHaptics()
-    val darkMode = isSystemInDarkTheme()
+    val darkMode = LocalIsDarkTheme.current
     val normalized = remember(language) { normalizeCodeLanguage(language) }
-    val highlighted = remember(code, normalized, darkMode) {
-        highlightMarkdownCode(code, normalized, darkMode)
-    }
+    val highlighted = rememberCodeHighlight(code, normalized, darkMode)
     val label = remember(language) { codeLanguageLabel(language) }
     var copied by remember(code) { mutableStateOf(false) }
-    var wrapped by remember(code) { mutableStateOf(false) }
+    var wrapped by remember { mutableStateOf(false) }
+    val horizontalScroll = rememberScrollState()
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
     val shape = RoundedCornerShape(12.dp)
@@ -114,6 +113,7 @@ fun ChatCodeBlock(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
+                modifier = Modifier.weight(1f, fill = false),
                 shape = RoundedCornerShape(percent = 50),
                 color = colors.bgSurfaceRaised,
             ) {
@@ -130,7 +130,7 @@ fun ChatCodeBlock(
                 IconButton(
                     onClick = { wrapped = !wrapped },
                     modifier = Modifier
-                        .heightIn(min = dimens.touchTargetMin)
+                        .sizeIn(minWidth = dimens.touchTargetMin, minHeight = dimens.touchTargetMin)
                         .testTag(ChatCodeBlockTestTags.Wrap)
                         .semantics {
                             contentDescription = if (wrapped) "Scroll" else "Wrap"
@@ -153,7 +153,7 @@ fun ChatCodeBlock(
                         copied = true
                     },
                     modifier = Modifier
-                        .heightIn(min = dimens.touchTargetMin)
+                        .sizeIn(minWidth = dimens.touchTargetMin, minHeight = dimens.touchTargetMin)
                         .testTag(ChatCodeBlockTestTags.Copy)
                         .semantics {
                             contentDescription = if (copied) "Copied" else "Copy code"
@@ -177,7 +177,7 @@ fun ChatCodeBlock(
                 } else {
                     Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
+                        .horizontalScroll(horizontalScroll)
                         .padding(dimens.space3)
                 }
                 Text(
@@ -187,24 +187,36 @@ fun ChatCodeBlock(
                     modifier = codeModifier.testTag(ChatCodeBlockTestTags.Code),
                 )
             }
-            if (!wrapped) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                        .width(24.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(Color.Transparent, colors.bgCode),
+            if (!wrapped && horizontalScroll.canScrollForward) {
+                Box(Modifier.matchParentSize()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                            .width(24.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(Color.Transparent, colors.bgCode),
+                                ),
                             ),
-                        ),
-                )
+                    )
+                }
             }
         }
     }
 }
 
 private const val COPIED_RESET_MS = 1_500L
+
+@Composable
+internal fun rememberCodeHighlight(
+    code: String,
+    language: SyntaxLanguage?,
+    darkMode: Boolean,
+    highlighter: (String, SyntaxLanguage?, Boolean) -> AnnotatedString? = ::highlightMarkdownCode,
+): AnnotatedString? = remember(code, language, darkMode) {
+    highlighter(code, language, darkMode)
+}
 
 /**
  * Highlight [code] with the bounded M1 language set.

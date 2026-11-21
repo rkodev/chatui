@@ -21,12 +21,19 @@ import dev.chatui.core.network.ResolvedAttachment
 import java.time.Clock
 import java.time.Instant
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Number of messages loaded per page. */
 const val CHAT_MESSAGE_PAGE_SIZE: Int = 50
@@ -50,6 +57,7 @@ class ChatViewModel(
     private val drafts: ChatDrafts = InMemoryChatDrafts(),
     private val attachments: ChatAttachmentStore? = null,
     persistIntervalMs: Long = DEFAULT_PERSIST_INTERVAL_MS,
+    private val attachmentDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     private val runner = ChatRunner(
         adapter = adapter,
@@ -69,6 +77,7 @@ class ChatViewModel(
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
 
     private var oldestLoadedSequence: Long? = null
+    private val attachmentJobs = mutableSetOf<Job>()
 
     init {
         observeConversation()
@@ -81,14 +90,38 @@ class ChatViewModel(
         setDraft(text)
     }
 
-    /** Add files from a picker, clipboard, or drag-and-drop. */
-    fun onAddAttachments(inputs: List<AttachmentInput>) {
-        val store = attachments ?: return
-        if (inputs.isEmpty()) return
-
+    /** A cross-feature picker must refresh this snapshot, not assume a shared observer. */
+    fun refreshConversation() {
         viewModelScope.launch {
             try {
-                val result = store.addFiles(inputs)
+                val conversation = conversations.getConversation(conversationId)
+                _state.update { it.copy(conversation = conversation, loading = false) }
+                if (conversation != null) refreshAvailability(conversation)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(error = storageError(error.message ?: "Could not reload the conversation."))
+                }
+            }
+        }
+    }
+
+    /** Add files from a picker, clipboard, or drag-and-drop. */
+    fun onAddAttachments(inputs: List<AttachmentInput>): Job? {
+        val store = attachments ?: return null
+        if (inputs.isEmpty()) return null
+
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            var added = emptyList<Attachment>()
+            var retained = false
+            try {
+                // Finish one storage transaction before cancelling, so only its
+                // newly abandoned rows/bytes can be removed deterministically.
+                val result = withContext(attachmentDispatcher + NonCancellable) {
+                    store.addFiles(inputs).also { added = it.attachments }
+                }
+                ensureActive()
                 _state.update { state ->
                     state.copy(
                         pendingAttachments = state.pendingAttachments + result.attachments,
@@ -96,6 +129,7 @@ class ChatViewModel(
                         confirmSendWithUnsupportedAttachments = false,
                     )
                 }
+                retained = true
                 updateAttachmentWarning()
             } catch (error: CancellationException) {
                 throw error
@@ -105,8 +139,32 @@ class ChatViewModel(
                         attachmentError = error.message ?: "Could not add the attachment.",
                     )
                 }
+            } finally {
+                if (!retained && added.isNotEmpty()) {
+                    withContext(attachmentDispatcher + NonCancellable) {
+                        added.forEach { attachment ->
+                            runCatching { store.remove(attachment.id) }.onFailure {
+                                _state.update { state ->
+                                    state.copy(attachmentError = "Could not remove the cancelled attachment.")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
+        attachmentJobs += job
+        _state.update { it.copy(processingAttachments = true, attachmentError = null) }
+        job.invokeOnCompletion {
+            attachmentJobs -= job
+            _state.update { it.copy(processingAttachments = attachmentJobs.isNotEmpty()) }
+        }
+        job.start()
+        return job
+    }
+
+    fun cancelAttachmentProcessing() {
+        attachmentJobs.toList().forEach { it.cancel() }
     }
 
     /** Remove a pending attachment and its local bytes. */
@@ -190,7 +248,7 @@ class ChatViewModel(
 
     fun onSend() {
         val current = _state.value
-        if (current.sending || current.isStreaming) return
+        if (current.sending || current.isStreaming || current.processingAttachments) return
         if (current.availability?.available == false) return
 
         val text = current.draft.trim()
@@ -206,7 +264,7 @@ class ChatViewModel(
 
     private fun sendNow() {
         val current = _state.value
-        if (current.sending || current.isStreaming) return
+        if (current.sending || current.isStreaming || current.processingAttachments) return
         if (current.availability?.available == false) return
 
         val text = current.draft.trim()

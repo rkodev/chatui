@@ -11,8 +11,7 @@ import androidx.compose.ui.graphics.Color
  *
  * The property names are the Compose form of the shared dotted token names:
  * `color.bg.canvas` -> [bgCanvas], `color.fg.on-accent` -> [fgOnAccent], and so
- * on. Values mirror `web/src/styles/themes.css` so both clients render the same
- * palette.
+ * on. Android's accent pairs follow the minimalist design contrast review.
  */
 @Immutable
 data class ChatUiColors(
@@ -40,6 +39,8 @@ data class ChatUiColors(
     val scrim: Color = Color(0x66000000),
     val skeletonBase: Color = borderSubtle,
     val skeletonHighlight: Color = bgSurface,
+    val fgOnDanger: Color = fgOnAccent,
+    val fgOnWarning: Color = fgOnAccent,
 )
 
 /** Light palette from the design review section 4.1. */
@@ -53,7 +54,7 @@ val LightColors: ChatUiColors = ChatUiColors(
     fgSecondary = Color(0xFF3C3C43),
     fgMuted = Color(0xFF6C6C70),
     fgOnAccent = Color(0xFFFFFFFF),
-    accent = Color(0xFF007AFF),
+    accent = Color(0xFF1D4ED8),
     accentHover = Color(0xFF0062CC),
     borderSubtle = Color(0xFFE5E5EA),
     borderStrong = Color(0xFF8E8E93),
@@ -81,7 +82,7 @@ val DarkColors: ChatUiColors = ChatUiColors(
     fgSecondary = Color(0xFFD1D1D6),
     fgMuted = Color(0xFF8E8E93),
     fgOnAccent = Color(0xFF0B1020),
-    accent = Color(0xFF0A84FF),
+    accent = Color(0xFF8AB4F8),
     accentHover = Color(0xFF409CFF),
     borderSubtle = Color(0xFF38383A),
     borderStrong = Color(0xFF8E8E93),
@@ -129,8 +130,10 @@ fun ChatUiColors.toMaterialColorScheme(isDark: Boolean): ColorScheme {
         onPrimaryContainer = onAccentSoft,
         secondary = accentHover,
         onSecondary = fgOnAccent,
+        secondaryContainer = accentSoft,
+        onSecondaryContainer = onAccentSoft,
         tertiary = warning,
-        onTertiary = fgOnAccent,
+        onTertiary = fgOnWarning,
         background = bgCanvas,
         onBackground = fgPrimary,
         surface = bgSurface,
@@ -143,6 +146,6 @@ fun ChatUiColors.toMaterialColorScheme(isDark: Boolean): ColorScheme {
         outline = borderStrong,
         outlineVariant = borderSubtle,
         error = danger,
-        onError = fgOnAccent,
+        onError = fgOnDanger,
     )
 }

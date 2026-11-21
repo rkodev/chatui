@@ -33,4 +33,4 @@ pub use state::{
     ImportSummaryView, KeyRowView, ProviderKeySummary, RemoveKeyRequest, StorageUsage,
     StorageUsageEntry, USAGE_NOTE, UsageRowView, format_bytes,
 };
-pub use view::{DataController, DataWindow, sync_window};
+pub use view::{DataChange, DataController, DataWindow, sync_window};

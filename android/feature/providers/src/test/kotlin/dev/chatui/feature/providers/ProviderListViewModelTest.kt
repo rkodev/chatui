@@ -1,6 +1,7 @@
 package dev.chatui.feature.providers
 
 import com.google.common.truth.Truth.assertThat
+import dev.chatui.core.model.ProviderAuthType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -176,5 +177,80 @@ class ProviderListViewModelTest {
         advanceUntilIdle()
 
         assertThat(viewModel.state.value.error).isEqualTo("boom")
+    }
+
+    @Test
+    fun `no-auth preset does not require or submit a key`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        service.options += ProviderAvailability("local", "Local", true, false, null, requiresKey = false)
+        val viewModel = ProviderListViewModel(service)
+        advanceUntilIdle()
+
+        viewModel.onPresetSelected("local")
+        viewModel.onCreatePresetProvider()
+        advanceUntilIdle()
+
+        assertThat(service.lastPresetInput?.presetId).isEqualTo("local")
+        assertThat(service.lastPresetInput?.apiKey).isNull()
+        assertThat(viewModel.state.value.creationVersion).isEqualTo(1)
+    }
+
+    @Test
+    fun `unsupported preset and duplicate cross-form submits cannot create profiles`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ProviderListViewModel(service)
+        advanceUntilIdle()
+        viewModel.onPresetSelected("google")
+        viewModel.onPresetApiKeyChanged("fake-key")
+        viewModel.onCreatePresetProvider()
+        assertThat(viewModel.state.value.presetForm.error)
+            .isEqualTo("This provider preset is not available yet.")
+        assertThat(service.presetCreateCalls).isEqualTo(0)
+
+        viewModel.onPresetSelected("openai")
+        viewModel.onCreatePresetProvider()
+        viewModel.onCreatePresetProvider()
+        viewModel.onCreateCustomProvider()
+        advanceUntilIdle()
+
+        assertThat(service.presetCreateCalls).isEqualTo(1)
+        assertThat(service.customCreateCalls).isEqualTo(0)
+    }
+
+    @Test
+    fun `custom auth modes headers and recoverable failure retain the form`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ProviderListViewModel(service)
+        advanceUntilIdle()
+        viewModel.onCustomBaseUrlChanged("https://example.com/v1")
+        viewModel.onCustomAuthTypeChanged(ProviderAuthType.X_API_KEY)
+        viewModel.onCustomApiKeyChanged("fake-key")
+        viewModel.onAddCustomHeader()
+        viewModel.onCustomHeaderNameChanged(0, "X-Team")
+        viewModel.onCustomHeaderValueChanged(0, "first")
+        viewModel.onCustomHeaderValueChanged(0, "second")
+        service.createError = IllegalStateException("Try again")
+
+        viewModel.onCreateCustomProvider()
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.customForm.apiKey).isEqualTo("fake-key")
+        assertThat(viewModel.state.value.customForm.headers.single().value).isEqualTo("second")
+        assertThat(viewModel.state.value.creationVersion).isEqualTo(0)
+
+        service.createError = null
+        viewModel.onCreateCustomProvider()
+        advanceUntilIdle()
+        assertThat(service.lastCustomInput?.authType).isEqualTo(ProviderAuthType.X_API_KEY)
+        assertThat(service.lastCustomInput?.headers).containsExactly("X-Team", "second")
+
+        viewModel.onCustomBaseUrlChanged("https://example.com/v1")
+        viewModel.onCustomAuthTypeChanged(ProviderAuthType.NONE)
+        viewModel.onAddCustomHeader()
+        viewModel.onRemoveCustomHeader(0)
+        viewModel.onCreateCustomProvider()
+        advanceUntilIdle()
+        assertThat(service.lastCustomInput?.authType).isEqualTo(ProviderAuthType.NONE)
+        assertThat(service.lastCustomInput?.apiKey).isNull()
+        assertThat(service.lastCustomInput?.headers).isEmpty()
     }
 }

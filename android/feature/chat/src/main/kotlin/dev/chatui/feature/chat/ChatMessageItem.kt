@@ -4,12 +4,6 @@ import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -23,18 +17,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Icon
@@ -50,8 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -59,6 +50,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -66,12 +59,10 @@ import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
 import dev.chatui.core.database.attachment.formatAttachmentSize
 import dev.chatui.core.designsystem.BannerSeverity
-import dev.chatui.core.designsystem.BrandMark
 import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.LocalReducedMotion
-import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.designsystem.bubbleAppear
 import dev.chatui.core.designsystem.rememberHaptics
@@ -97,6 +88,7 @@ object ChatMessageTestTags {
     const val Retry = "chat-message-retry"
     const val Meta = "chat-message-meta"
     const val Timestamp = "chat-message-timestamp"
+    const val Usage = "chat-message-usage"
     const val AttachmentImage = "chat-message-attachment-image"
     const val AttachmentFile = "chat-message-attachment-file"
 
@@ -109,6 +101,10 @@ object ChatMessageTestTags {
     fun attachment(id: String): String = "chat-message-attachment-$id"
 
     fun avatar(id: String): String = "chat-message-avatar-$id"
+
+    fun role(id: String): String = "chat-message-role-$id"
+
+    fun bubble(id: String): String = "chat-message-bubble-$id"
 }
 
 private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
@@ -132,9 +128,9 @@ private fun Message.reasoningParts(): List<String> = parts
 
 private fun formatUsage(usage: Usage): String {
     val parts = buildList {
-        usage.inputTokens?.let { add("$it in") }
-        usage.outputTokens?.let { add("$it out") }
-        usage.totalTokens?.let { add("$it total") }
+        usage.inputTokens?.let { add("$it input") }
+        usage.outputTokens?.let { add("$it output") }
+        usage.totalTokens?.let { add("$it total tokens") }
         usage.costUsd?.let { add("$" + "%.4f".format(it)) }
     }
     return parts.joinToString(" · ")
@@ -147,11 +143,10 @@ private fun formatUsage(usage: Usage): String {
  * expose copy/regenerate/edit actions. The item also renders cancelled,
  * interrupted, and inline error states.
  *
- * Grouping is driven by the caller: [isGroupStart] shows the avatar and adds
- * the larger inter-group gap, while [isGroupEnd] shows the timestamp and the
- * tail corner on the sender side.
+ * [isGroupStart] adds a restrained role label and inter-group gap.
+ * [isGroupEnd] groups footer metadata; user bubbles stay right-aligned.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChatMessageItem(
     message: Message,
@@ -190,72 +185,63 @@ fun ChatMessageItem(
     val errorCopy = message.error?.let(::describeChatError)
     val bodyStyle: TextStyle = Typography.chatStyle(chatFontSize)
     val alignment = if (isUser) Alignment.End else Alignment.Start
-    val bubbleColor = if (isUser) colors.bgUserBubble else colors.bgGrouped
+    val bubbleColor = if (isUser) colors.bgUserBubble else Color.Transparent
     var reasoningExpanded by remember(message.id) { mutableStateOf(false) }
     var detailsExpanded by remember(message.id) { mutableStateOf(false) }
     var timestampVisible by remember(message.id) { mutableStateOf(false) }
     var contextMenuOpen by remember(message.id) { mutableStateOf(false) }
 
-    val waitingForFirstToken = isActiveStream && !hasContent
-    val bubbleShape = RoundedCornerShape(
-        topStart = dimens.bubbleRadius,
-        topEnd = dimens.bubbleRadius,
-        bottomStart = if (!isUser && isGroupEnd) dimens.bubbleTailRadius else dimens.bubbleRadius,
-        bottomEnd = if (isUser && isGroupEnd) dimens.bubbleTailRadius else dimens.bubbleRadius,
-    )
-    val bubbleBrush = if (waitingForFirstToken) {
-        rememberShimmerBrush(bubbleColor)
-    } else {
-        SolidColor(bubbleColor)
-    }
+    val bubbleShape = RoundedCornerShape(dimens.bubbleRadius)
 
     Column(
         modifier = modifier
+            .widthIn(max = 760.dp)
             .fillMaxWidth()
-            .padding(top = if (isGroupStart) 10.dp else 0.dp)
+            .padding(top = if (isGroupStart) dimens.densitySpace3 else 0.dp)
             .testTag(ChatMessageTestTags.message(message.id))
             .semantics { contentDescription = "${roleLabel(message.role)} message" },
         horizontalAlignment = alignment,
         verticalArrangement = Arrangement.spacedBy(dimens.space1),
     ) {
+        if (isGroupStart) {
+            Text(
+                text = roleLabel(message.role),
+                style = Typography.footnote,
+                color = colors.fgMuted,
+                modifier = Modifier.testTag(ChatMessageTestTags.role(message.id)).clearAndSetSemantics {},
+            )
+        }
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val maxBubbleWidth = maxWidth * 0.78f
+            val maxBubbleWidth = if (isUser) maxWidth * 0.88f else maxWidth
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
                 verticalAlignment = Alignment.Bottom,
             ) {
-                if (!isUser && isGroupStart) {
-                    MessageAvatar(message = message)
-                    Box(modifier = Modifier.width(dimens.space2))
-                }
-
                 Box {
                     Column(
                         modifier = Modifier
                             .widthIn(max = maxBubbleWidth)
-                            .bubbleAppear(message.id)
+                            .then(
+                                if (isActiveStream || reducedMotion) Modifier else Modifier.bubbleAppear(message.id),
+                            )
                             .clip(bubbleShape)
-                            .background(brush = bubbleBrush, shape = bubbleShape)
+                            .background(color = bubbleColor, shape = bubbleShape)
+                            .testTag(ChatMessageTestTags.bubble(message.id))
                             .pointerInput(message.id) {
                                 detectTapGestures(
                                     onTap = { timestampVisible = !timestampVisible },
                                     onLongPress = {
-                                        haptics.longPress()
-                                        contextMenuOpen = true
+                                        if (showActions) {
+                                            haptics.longPress()
+                                            contextMenuOpen = true
+                                        }
                                     },
                                 )
                             }
                             .padding(
-                                horizontal = dimens.bubblePaddingH,
+                                horizontal = if (isUser) dimens.bubblePaddingH else 0.dp,
                                 vertical = dimens.bubblePaddingV,
-                            )
-                            .animateContentSize(
-                                animationSpec = if (reducedMotion) {
-                                    snap()
-                                } else {
-                                    MotionSpecs.springGentleSize
-                                },
                             ),
                         verticalArrangement = Arrangement.spacedBy(dimens.space2),
                     ) {
@@ -273,12 +259,10 @@ fun ChatMessageItem(
                                 content = part,
                                 modifier = Modifier.testTag(ChatMessageTestTags.text(message.id)),
                                 chatFontSize = chatFontSize,
+                                parseImmediately = isActiveStream,
                                 loadRemoteImages = loadRemoteImages,
+                                imageOwnerKey = "${message.conversationId}:${message.id}",
                             )
-                        }
-
-                        if (isActiveStream && hasText) {
-                            StreamingCaret()
                         }
 
                         attachmentParts.forEach { part ->
@@ -298,7 +282,7 @@ fun ChatMessageItem(
                             }
                         }
 
-                        if (waitingForFirstToken) {
+                        if (isActiveStream) {
                             TypingIndicator()
                         }
 
@@ -340,93 +324,57 @@ fun ChatMessageItem(
                             )
                         }
                     }
-
-                    if (contextMenuOpen) {
-                        ChatMessageActions(
-                            message = message,
-                            canRegenerate = canRegenerate,
-                            canEditLastUser = canEditLastUser,
-                            onRegenerate = onRegenerate,
-                            onEditLastUser = onEditLastUser,
-                            inline = false,
-                            menuInitiallyOpen = true,
-                            onMenuDismiss = { contextMenuOpen = false },
-                        )
-                    }
-                }
-
-                if (isUser && isGroupStart) {
-                    Box(modifier = Modifier.width(dimens.space2))
-                    MessageAvatar(message = message)
                 }
             }
         }
 
-        if (showActions && !contextMenuOpen) {
-            ChatMessageActions(
-                message = message,
-                canRegenerate = canRegenerate,
-                canEditLastUser = canEditLastUser,
-                onRegenerate = onRegenerate,
-                onEditLastUser = onEditLastUser,
-                inline = canRegenerate,
-            )
-        }
-
-        if (showTimestamp || timestampVisible) {
-            Text(
-                text = TIME_FORMATTER.format(message.createdAt.atZone(zoneId)),
-                style = Typography.caption,
-                color = colors.fgMuted,
-                modifier = Modifier.testTag(ChatMessageTestTags.Timestamp),
-            )
-        }
-
-        val usage = message.usage?.let(::formatUsage).orEmpty()
         val meta = buildList {
             if (message.role == MessageRole.ASSISTANT) {
                 (message.modelLabel ?: message.modelId)?.let { add(it) }
                 message.providerId?.let { add(it) }
             }
-            if (showTokenUsage && usage.isNotEmpty()) {
-                add(usage)
+        }
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(dimens.space2),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            if (showActions) {
+                ChatMessageActions(
+                    message = message,
+                    canRegenerate = canRegenerate,
+                    canEditLastUser = canEditLastUser,
+                    onRegenerate = onRegenerate,
+                    onEditLastUser = onEditLastUser,
+                    inline = canRegenerate,
+                    menuInitiallyOpen = contextMenuOpen,
+                    onMenuDismiss = { contextMenuOpen = false },
+                )
+            }
+            if (showTimestamp || timestampVisible) {
+                Text(
+                    text = TIME_FORMATTER.format(message.createdAt.atZone(zoneId)),
+                    style = Typography.footnote,
+                    color = colors.fgMuted,
+                    modifier = Modifier.align(Alignment.CenterVertically).testTag(ChatMessageTestTags.Timestamp),
+                )
+            }
+            if (meta.isNotEmpty()) {
+                Text(
+                    text = meta.joinToString(" · "),
+                    style = Typography.footnote,
+                    color = colors.fgMuted,
+                    modifier = Modifier.align(Alignment.CenterVertically).testTag(ChatMessageTestTags.Meta),
+                )
             }
         }
-
-        if (meta.isNotEmpty()) {
+        val usage = message.usage?.let(::formatUsage).orEmpty()
+        if (showTokenUsage && usage.isNotEmpty()) {
             Text(
-                text = meta.joinToString(" · "),
-                style = Typography.caption,
+                text = usage,
+                style = Typography.footnote,
                 color = colors.fgMuted,
-                modifier = Modifier.testTag(ChatMessageTestTags.Meta),
-            )
-        }
-    }
-}
-
-@Composable
-private fun MessageAvatar(message: Message) {
-    val colors = LocalChatUiColors.current
-    if (message.role == MessageRole.ASSISTANT) {
-        BrandMark(
-            modifier = Modifier
-                .size(28.dp)
-                .testTag(ChatMessageTestTags.avatar(message.id)),
-            size = 28.dp,
-        )
-    } else {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(colors.accentSoft)
-                .testTag(ChatMessageTestTags.avatar(message.id)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "Y",
-                style = Typography.caption,
-                color = colors.onAccentSoft,
+                modifier = Modifier.testTag(ChatMessageTestTags.Usage),
             )
         }
     }
@@ -442,15 +390,12 @@ private fun ReasoningDisclosure(
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
     val reduced = LocalReducedMotion.current
-    Column(
-        modifier = Modifier.animateContentSize(
-            animationSpec = if (reduced) snap() else MotionSpecs.springGentleSize,
-        ),
-    ) {
+    Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = dimens.touchTargetMin)
+                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
                 .testTag(ChatMessageTestTags.Reasoning)
                 .combinedClickable(onClick = onToggle, onLongClick = onToggle),
             verticalAlignment = Alignment.CenterVertically,
@@ -473,12 +418,12 @@ private fun ReasoningDisclosure(
             enter = if (reduced) {
                 EnterTransition.None
             } else {
-                fadeIn() + expandVertically()
+                fadeIn(tween(150)) + expandVertically(tween(150))
             },
             exit = if (reduced) {
                 ExitTransition.None
             } else {
-                fadeOut() + shrinkVertically()
+                fadeOut(tween(150)) + shrinkVertically(tween(150))
             },
         ) {
             Text(
@@ -546,87 +491,13 @@ private fun ErrorCard(
 @Composable
 private fun TypingIndicator(modifier: Modifier = Modifier) {
     val colors = LocalChatUiColors.current
-    val reduced = LocalReducedMotion.current
-    val transition = rememberInfiniteTransition(label = "typing")
-    Row(
+    Text(
+        text = "Generating response",
+        style = Typography.footnote,
+        color = colors.fgMuted,
         modifier = modifier
             .testTag(ChatMessageTestTags.Typing)
-            .semantics { contentDescription = "Assistant is typing" },
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(3) { index ->
-            val alpha = if (reduced) {
-                0.7f
-            } else {
-                val animated by transition.animateFloat(
-                    initialValue = 0.3f,
-                    targetValue = 1f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(durationMillis = 600, delayMillis = index * 120),
-                        repeatMode = RepeatMode.Reverse,
-                    ),
-                    label = "typingDot$index",
-                )
-                animated
-            }
-            Box(
-                modifier = Modifier
-                    .offset(y = (-3 * alpha).dp)
-                    .size(6.dp)
-                    .background(colors.fgMuted.copy(alpha = alpha), CircleShape),
-            )
-        }
-    }
-}
-
-@Composable
-private fun StreamingCaret(modifier: Modifier = Modifier) {
-    val colors = LocalChatUiColors.current
-    val reduced = LocalReducedMotion.current
-    val transition = rememberInfiniteTransition(label = "caret")
-    val alpha = if (reduced) {
-        1f
-    } else {
-        val animated by transition.animateFloat(
-            initialValue = 0.2f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = MotionSpecs.caretBlinkMillis / 2),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "caretAlpha",
-        )
-        animated
-    }
-    Box(
-        modifier = modifier
-            .size(width = 2.dp, height = 16.dp)
-            .background(colors.accent.copy(alpha = alpha))
-            .testTag(ChatMessageTestTags.Caret),
-    )
-}
-
-@Composable
-private fun rememberShimmerBrush(base: androidx.compose.ui.graphics.Color): Brush {
-    val colors = LocalChatUiColors.current
-    val reduced = LocalReducedMotion.current
-    if (reduced) return SolidColor(base)
-    val transition = rememberInfiniteTransition(label = "bubbleShimmer")
-    val progress by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1_200),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "bubbleShimmerProgress",
-    )
-    val x = progress * 1_000f
-    return Brush.linearGradient(
-        colors = listOf(base, colors.skeletonHighlight, base),
-        start = androidx.compose.ui.geometry.Offset(x, 0f),
-        end = androidx.compose.ui.geometry.Offset(x + 400f, 400f),
+            .semantics { contentDescription = "Assistant is generating a response" },
     )
 }
 

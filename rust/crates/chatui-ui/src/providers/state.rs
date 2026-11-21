@@ -463,6 +463,8 @@ pub struct ProviderManagementViewModel {
     pub notice: Option<String>,
     /// Current error copy.
     pub error: Option<ProviderManagementErrorCopy>,
+    /// A connection or credential validation is running in the background.
+    pub busy: bool,
 }
 
 impl ProviderManagementViewModel {

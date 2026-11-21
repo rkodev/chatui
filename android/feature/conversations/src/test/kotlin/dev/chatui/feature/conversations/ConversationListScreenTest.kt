@@ -9,6 +9,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.foundation.layout.Column
+import dev.chatui.core.designsystem.PrimaryButton
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -894,7 +898,7 @@ class ConversationListScreenTest {
     }
 
     @Test
-    fun `empty state start chat button invokes the intent`() {
+    fun `empty history retains one new chat action`() {
         var clicks = 0
 
         composeRule.setContent {
@@ -916,8 +920,48 @@ class ConversationListScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(ConversationListTestTags.EmptyStartChat).performClick()
+        composeRule.onAllNodesWithText("New chat").assertCountEquals(1)
+        composeRule.onNodeWithTag(ConversationListTestTags.NewChat).performClick()
 
         assertThat(clicks).isEqualTo(1)
+    }
+
+    @Test
+    fun `host can own the title and sole new chat while keeping archive and search`() {
+        var state by mutableStateOf(ConversationListUiState(loading = false))
+        var newChats = 0
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                Column {
+                    Text("Host Chats")
+                    PrimaryButton("New chat", { newChats++ })
+                    ConversationListScreen(
+                        state = state,
+                        title = null,
+                        showNewChat = false,
+                        onNewChat = { error("The host owns New chat") },
+                        onSelect = {},
+                        onRename = { _, _ -> },
+                        onDeleteRequested = {},
+                        onDeleteDismissed = {},
+                        onDeleteConfirmed = {},
+                        onRetry = {},
+                        onSearchQueryChanged = { state = state.copy(searchQuery = it) },
+                        onSearchRetry = {},
+                        onViewChanged = { state = state.copy(view = it) },
+                    )
+                }
+            }
+        }
+
+        composeRule.onAllNodesWithText("New chat").assertCountEquals(1)
+        composeRule.onNodeWithTag(ConversationListTestTags.NewChat).assertDoesNotExist()
+        composeRule.onNodeWithText("New chat").performClick()
+        composeRule.onNodeWithText("Archived").performClick()
+        composeRule.onNodeWithText("No archived conversations").assertIsDisplayed()
+        composeRule.onNodeWithText("Chats", useUnmergedTree = true).performClick()
+        composeRule.onNodeWithTag(ConversationListTestTags.SearchField).performTextInput("invented")
+        composeRule.onNodeWithTag(ConversationListTestTags.SearchEmpty).assertIsDisplayed()
+        composeRule.runOnIdle { assertThat(newChats).isEqualTo(1) }
     }
 }

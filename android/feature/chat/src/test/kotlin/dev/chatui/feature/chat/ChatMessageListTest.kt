@@ -4,13 +4,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performClick
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.core.model.ContentPart
@@ -220,7 +227,7 @@ class ChatMessageListTest {
     }
 
     @Test
-    fun `consecutive same-role messages share a group and show one avatar`() {
+    fun `consecutive same-role messages share one role label without avatars`() {
         val first = testMessage(
             id = "user-1",
             sequence = 1,
@@ -251,13 +258,14 @@ class ChatMessageListTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(ChatMessageTestTags.avatar("user-1")).assertExists()
-        composeRule.onNodeWithTag(ChatMessageTestTags.avatar("user-2")).assertDoesNotExist()
-        composeRule.onNodeWithTag(ChatMessageTestTags.avatar("assistant-1")).assertExists()
+        composeRule.onNodeWithTag(ChatMessageTestTags.role("user-1")).assertExists()
+        composeRule.onNodeWithTag(ChatMessageTestTags.role("user-2")).assertDoesNotExist()
+        composeRule.onNodeWithTag(ChatMessageTestTags.role("assistant-1")).assertExists()
+        composeRule.onNodeWithTag(ChatMessageTestTags.avatar("user-1")).assertDoesNotExist()
     }
 
     @Test
-    fun `scroll to bottom fab appears when scrolled up during streaming`() {
+    fun `one labeled latest control appears when reading older messages`() {
         val messages = (0 until 50).map { index ->
             testMessage(
                 id = "message-$index",
@@ -286,12 +294,13 @@ class ChatMessageListTest {
         composeRule.onNodeWithTag(ChatMessageListTestTags.List).performScrollToIndex(0)
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(ChatMessageListTestTags.ScrollToBottom)
+        composeRule.onAllNodesWithTag(ChatMessageListTestTags.Latest).assertCountEquals(1)
+        composeRule.onNodeWithTag(ChatMessageListTestTags.Latest)
             .assertIsDisplayed()
     }
 
     @Test
-    fun `new message pill appears when content arrives off screen`() {
+    fun `off-screen updates preserve the reader and mark the latest control unread`() {
         val messages = (0 until 50).map { index ->
             testMessage(
                 id = "message-$index",
@@ -307,13 +316,16 @@ class ChatMessageListTest {
                 startedAt = now,
             ).copy(text = "First"),
         )
+        lateinit var list: LazyListState
 
         composeRule.setContent {
             ChatUiTheme {
+                list = rememberLazyListState()
                 ChatMessageList(
                     messages = messages,
                     streaming = streaming,
                     zoneId = java.time.ZoneOffset.UTC,
+                    listState = list,
                 )
             }
         }
@@ -321,11 +333,121 @@ class ChatMessageListTest {
 
         composeRule.onNodeWithTag(ChatMessageListTestTags.List).performScrollToIndex(0)
         composeRule.waitForIdle()
+        val before = list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset
 
         streaming = streaming.copy(text = "First and second")
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(ChatMessageListTestTags.NewMessages)
+        composeRule.onNodeWithTag(ChatMessageListTestTags.Latest)
             .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "New content available"))
+        assertThat(list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset).isEqualTo(before)
+        composeRule.onNodeWithTag(ChatMessageListTestTags.Latest).performClick()
+        composeRule.waitForIdle()
+        assertThat(list.canScrollForward).isFalse()
+        composeRule.onNodeWithTag(ChatMessageListTestTags.Latest).assertDoesNotExist()
+    }
+
+    @Test
+    fun `prepended history keeps the keyed anchor and does not create unread content`() {
+        var messages by mutableStateOf((20..60).map { index ->
+            testMessage(id = "message-$index", sequence = index.toLong(), text = "Message $index")
+        })
+        lateinit var list: LazyListState
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                list = rememberLazyListState()
+                ChatMessageList(messages, null, hasOlder = true, listState = list)
+            }
+        }
+        composeRule.onNodeWithTag(ChatMessageListTestTags.List).performScrollToIndex(10)
+        composeRule.waitForIdle()
+        val anchor = list.layoutInfo.visibleItemsInfo.first().key
+        val offset = list.firstVisibleItemScrollOffset
+
+        messages = (0..19).map { index ->
+            testMessage(id = "message-$index", sequence = index.toLong(), text = "Message $index")
+        } + messages
+        composeRule.waitForIdle()
+
+        assertThat(list.layoutInfo.visibleItemsInfo.first().key).isEqualTo(anchor)
+        assertThat(list.firstVisibleItemScrollOffset).isEqualTo(offset)
+        composeRule.onNodeWithTag(ChatMessageListTestTags.Latest)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Earlier messages"))
+    }
+
+    @Test
+    fun `following remains at the tail through large deltas completion and cancellation without animation`() {
+        var streaming by mutableStateOf(
+            createStreamingState("conversation-1", "assistant-stream", now).copy(text = "First"),
+        )
+        lateinit var list: LazyListState
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                list = rememberLazyListState()
+                ChatMessageList(
+                    messages = listOf(testMessage()),
+                    streaming = streaming,
+                    listState = list,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        streaming = streaming.copy(text = "A growing line of the response.\n".repeat(80))
+        composeRule.waitForIdle()
+        assertThat(list.canScrollForward).isFalse()
+        assertThat(list.isScrollInProgress).isFalse()
+        composeRule.onNodeWithTag(ChatMessageListTestTags.Latest).assertDoesNotExist()
+
+        streaming = streaming.copy(status = MessageStatus.CANCELLED, done = true)
+        composeRule.waitForIdle()
+        assertThat(list.canScrollForward).isFalse()
+        composeRule.onNodeWithTag(ChatMessageTestTags.Cancelled).assertExists()
+        composeRule.onNodeWithTag(ChatMessageTestTags.Typing).assertDoesNotExist()
+    }
+
+    @Test
+    fun `changing the current model leaves historical attribution unchanged`() {
+        var conversation by mutableStateOf(testConversation())
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                ChatMessageList(listOf(testMessage(role = MessageRole.ASSISTANT)), null, conversation = conversation)
+            }
+        }
+        conversation = conversation.copy(modelLabel = "A newly selected model", modelId = "new-model")
+        composeRule.onNodeWithTag(ChatMessageTestTags.Meta)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Text, listOf(androidx.compose.ui.text.AnnotatedString("Model One \u00b7 provider-1"))))
+        composeRule.onNodeWithText("A newly selected model", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `restoration preserves reading position and unread state instead of following a live response`() {
+        val restoration = StateRestorationTester(composeRule)
+        val messages = (0 until 40).map { index ->
+            testMessage(id = "saved-$index", sequence = index.toLong(), text = "Message $index")
+        }
+        var streaming by mutableStateOf(
+            createStreamingState("conversation-1", "assistant-stream", now).copy(text = "First"),
+        )
+        lateinit var list: LazyListState
+        restoration.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                list = rememberLazyListState()
+                ChatMessageList(messages, streaming, listState = list)
+            }
+        }
+        composeRule.onNodeWithTag(ChatMessageListTestTags.List).performScrollToIndex(8)
+        streaming = streaming.copy(text = "First and second")
+        composeRule.waitForIdle()
+        val anchor = list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset
+
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.waitForIdle()
+        assertThat(list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset).isEqualTo(anchor)
+        composeRule.onNodeWithTag(ChatMessageListTestTags.Latest)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "New content available"))
+        streaming = streaming.copy(text = "Another long response.\n".repeat(80))
+        composeRule.waitForIdle()
+        assertThat(list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset).isEqualTo(anchor)
     }
 }

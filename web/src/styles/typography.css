@@ -31,6 +31,7 @@ h6 {
   font-family: var(--font-heading-family);
   font-weight: var(--font-heading-weight);
   line-height: var(--font-heading-line-height);
+  letter-spacing: -0.025em;
 }
 
 h1 {
@@ -73,6 +74,7 @@ pre {
 
 a {
   color: var(--color-accent);
+  text-underline-offset: 3px;
 }
 
 a:hover {

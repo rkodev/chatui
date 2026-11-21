@@ -2,7 +2,12 @@ import { useEffect, useState, type FormEvent } from 'react'
 import type { ModelInfo } from '../../providers/openrouter'
 import { getPresetAvailability, providerPresets } from '../../providers/registry'
 import { Button } from '../../ui/primitives'
-import { describeCatalogError, describeOnboardingError, type OnboardingErrorCopy } from './errorCopy'
+import { Icon } from '../../ui/Icon'
+import {
+  describeCatalogError,
+  describeOnboardingError,
+  type OnboardingErrorCopy,
+} from './errorCopy'
 import type { OnboardingServiceLike } from './types'
 import './onboarding.css'
 
@@ -103,124 +108,144 @@ export function OnboardingScreen({ service, onConnected }: OnboardingScreenProps
 
   const providers = getPresetAvailability(providerPresets, ['openrouter'])
   const connectDisabled = testing || connected || apiKey.trim() === ''
+  const renderProvider = ({ preset, enabled, status }: (typeof providers)[number]) => (
+    <label key={preset.id} className="onboarding__provider" data-disabled={!enabled}>
+      <input
+        type="radio"
+        name="onboarding-provider"
+        value={preset.id}
+        checked={preset.id === 'openrouter'}
+        disabled={!enabled}
+        onChange={() => undefined}
+      />
+      <span className="onboarding__provider-name">{preset.label}</span>
+      {preset.id === 'openrouter' && <span className="onboarding__badge">Recommended</span>}
+      {status === 'disabled' && <span className="onboarding__muted">Add from Settings</span>}
+      {status === 'coming-later' && <span className="onboarding__muted">Coming later</span>}
+    </label>
+  )
 
   return (
     <section className="onboarding" aria-labelledby="onboarding-title">
       <div className="onboarding__intro">
+        <span className="onboarding__eyebrow">Your AI, on your terms</span>
         <h2 id="onboarding-title">Welcome to ChatUI</h2>
         <p>
-          ChatUI is bring-your-own-key (BYOK). You connect your own OpenRouter API key, and
-          your conversations, settings, and key stay on this device. Nothing is sent to a
-          ChatUI server.
-        </p>
-        <p>
-          OpenRouter is required for this preview. Other enabled providers can be added
-          from Settings after you connect.
+          One calm place for your favorite models. ChatUI is bring-your-own-key (BYOK): your
+          conversations, settings, and key stay on this device. Nothing is sent to a ChatUI server.
         </p>
       </div>
 
-      <fieldset className="onboarding__providers">
-        <legend>Choose a provider</legend>
-        {providers.map(({ preset, enabled, status }) => (
-          <label
-            key={preset.id}
-            className="onboarding__provider"
-            data-disabled={!enabled}
-          >
-            <input
-              type="radio"
-              name="onboarding-provider"
-              value={preset.id}
-              checked={preset.id === 'openrouter'}
-              disabled={!enabled}
-              onChange={() => undefined}
-            />
-            <span className="onboarding__provider-name">{preset.label}</span>
-            {preset.id === 'openrouter' && (
-              <span className="onboarding__badge">Recommended</span>
-            )}
-            {status === 'disabled' && (
-              <span className="onboarding__muted">Add from Settings</span>
-            )}
-            {status === 'coming-later' && (
-              <span className="onboarding__muted">Coming later</span>
-            )}
-          </label>
-        ))}
-      </fieldset>
-
-      <form className="onboarding__form" onSubmit={handleSubmit}>
-        <div className="onboarding__field">
-          <label htmlFor="onboarding-api-key">OpenRouter API key</label>
-          <input
-            id="onboarding-api-key"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-            aria-describedby="onboarding-key-help"
-          />
-          <p id="onboarding-key-help" className="onboarding__help">
-            Your key is stored on this device and is never sent to a ChatUI server.
-          </p>
-        </div>
-
-        <div className="onboarding__field">
-          <label htmlFor="onboarding-key-label">Label (optional)</label>
-          <input
-            id="onboarding-key-label"
-            type="text"
-            autoComplete="off"
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-            placeholder="Personal, Work, …"
-          />
-        </div>
-
-        <label className="onboarding__checkbox">
-          <input
-            type="checkbox"
-            checked={rememberKeys}
-            onChange={(event) => setRememberKeys(event.target.checked)}
-          />
-          <span>Remember this key on this device</span>
-        </label>
-
-        <div className="onboarding__actions">
-          <Button type="submit" disabled={connectDisabled}>
-            {testing ? 'Testing…' : connected ? 'Connected' : 'Connect'}
-          </Button>
-          {testing && <p className="onboarding__status" role="status">Testing key…</p>}
-          {connected && (
-            <p className="onboarding__status" role="status">
-              Connected. Opening a new chat…
+      <div className="onboarding__setup">
+        <fieldset className="onboarding__providers">
+          <legend>Choose a provider</legend>
+          {providers.filter(({ enabled }) => enabled).map(renderProvider)}
+          <details className="onboarding__other-providers">
+            <summary>Looking for another provider?</summary>
+            <p className="onboarding__help">
+              OpenRouter is required for this preview. Other enabled providers can be added from
+              Settings after you connect.
             </p>
-          )}
-        </div>
+            <div className="onboarding__provider-options">
+              {providers.filter(({ enabled }) => !enabled).map(renderProvider)}
+            </div>
+          </details>
+        </fieldset>
 
-        {notice && (
-          <p className="onboarding__notice" role="status">
-            {notice}
-          </p>
-        )}
+        <form className="onboarding__form" onSubmit={handleSubmit}>
+          <div className="onboarding__form-intro">
+            <h3>Connect your first provider</h3>
+            <p>Your favorite models are just one key away.</p>
+          </div>
+          <div className="onboarding__field">
+            <label htmlFor="onboarding-api-key">OpenRouter API key</label>
+            <input
+              id="onboarding-api-key"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={apiKey}
+              placeholder="Paste your OpenRouter key"
+              onChange={(event) => setApiKey(event.target.value)}
+              aria-describedby="onboarding-key-help"
+            />
+            <p id="onboarding-key-help" className="onboarding__help">
+              Your key is stored on this device and is never sent to a ChatUI server.
+            </p>
+            <a
+              href="https://openrouter.ai/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="onboarding__key-link"
+            >
+              Get an OpenRouter key <Icon name="arrow-right" size={14} />
+            </a>
+          </div>
 
-        {error && (
-          <div className="onboarding__error" role="alert">
-            <strong className="onboarding__error-title">{error.title}</strong>
-            <p>{error.message}</p>
-            {error.details && (
-              <details className="onboarding__details">
-                <summary>Details</summary>
-                <pre>{error.details}</pre>
-              </details>
+          <div className="onboarding__field">
+            <label htmlFor="onboarding-key-label">Label (optional)</label>
+            <input
+              id="onboarding-key-label"
+              type="text"
+              autoComplete="off"
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              placeholder="Personal, Work, …"
+            />
+          </div>
+
+          <label className="onboarding__checkbox">
+            <input
+              type="checkbox"
+              checked={rememberKeys}
+              onChange={(event) => setRememberKeys(event.target.checked)}
+            />
+            <span>Remember this key on this device</span>
+          </label>
+
+          <div className="onboarding__actions">
+            <Button type="submit" disabled={connectDisabled}>
+              {testing ? 'Testing…' : connected ? 'Connected' : 'Connect'}
+              <Icon name="arrow-right" size={17} />
+            </Button>
+            {testing && (
+              <p className="onboarding__status" role="status">
+                Testing key…
+              </p>
+            )}
+            {connected && (
+              <p className="onboarding__status" role="status">
+                Connected. Opening a new chat…
+              </p>
             )}
           </div>
-        )}
-      </form>
+
+          {notice && (
+            <p className="onboarding__notice" role="status">
+              {notice}
+            </p>
+          )}
+
+          {error && (
+            <div className="onboarding__error" role="alert">
+              <strong className="onboarding__error-title">{error.title}</strong>
+              <p>{error.message}</p>
+              {error.details && (
+                <details className="onboarding__details">
+                  <summary>Details</summary>
+                  <pre>{error.details}</pre>
+                </details>
+              )}
+            </div>
+          )}
+        </form>
+      </div>
 
       <section className="onboarding__catalog" aria-labelledby="onboarding-models-title">
-        <h3 id="onboarding-models-title">Available models</h3>
+        <h3 id="onboarding-models-title">
+          <Icon name="layers" size={20} />
+          Available models
+        </h3>
         {catalog.status === 'loading' && (
           <p className="onboarding__status" role="status">
             Loading the public model catalog…
@@ -233,26 +258,37 @@ export function OnboardingScreen({ service, onConnected }: OnboardingScreenProps
         )}
         {catalog.status === 'ready' && catalog.models.length === 0 && (
           <p className="onboarding__status" role="status">
-            No models were returned. You can still connect; models will load after
-            validation.
+            No models were returned. You can still connect; models will load after validation.
           </p>
         )}
         {catalog.status === 'ready' && catalog.models.length > 0 && (
           <>
             <p className="onboarding__help">
-              {catalog.models.length} models are available. Chat stays disabled until your
-              key is validated.
+              {catalog.models.length} models are available. Chat stays disabled until your key is
+              validated.
             </p>
             <ul className="onboarding__models">
               {catalog.models.map((model) => (
                 <li key={model.remoteId}>
-                  <span>{model.label}</span>
-                  <span className="onboarding__muted">{model.remoteId}</span>
+                  <span className="onboarding__model-initial" aria-hidden="true">
+                    {model.label.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div>
+                    <span className="onboarding__model-label">{model.label}</span>
+                    <span className="onboarding__muted">{model.remoteId}</span>
+                  </div>
                 </li>
               ))}
             </ul>
           </>
         )}
+        <div className="onboarding__privacy">
+          <Icon name="shield" size={20} />
+          <div>
+            <strong>Yours, from the first message</strong>
+            <p>No ChatUI account. No middleman. Requests go directly to the provider you choose.</p>
+          </div>
+        </div>
         <Button
           type="button"
           variant="secondary"

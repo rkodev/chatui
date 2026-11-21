@@ -1,0 +1,84 @@
+import { AppButton, AppText, Design } from "../design.slint";
+
+export struct NativeMarkdownBlock {
+    text: styled-text,
+    source: string,
+    label: string,
+    marker: string,
+    indent: int,
+    heading: int,
+    code: bool,
+    quote: bool,
+    rule: bool,
+}
+
+export component MarkdownContent inherits VerticalLayout {
+    in property <[NativeMarkdownBlock]> blocks;
+    in property <bool> dark: false;
+    in property <length> chat-font-size: 16px;
+    callback open-link(string);
+    callback copy-text(string);
+    spacing: 10px;
+    alignment: start;
+    vertical-stretch: 0;
+
+    for block in root.blocks : HorizontalLayout {
+        padding-left: block.indent * 10px;
+        spacing: 8px;
+        if (!block.marker.is-empty) : AppText {
+            text: block.marker;
+            font-size: root.chat-font-size;
+            color: Design.colors(root.dark).secondary;
+            vertical-alignment: top;
+        }
+        if (block.rule) : Rectangle {
+            horizontal-stretch: 1;
+            height: 1px;
+            background: Design.colors(root.dark).border;
+        }
+        if (!block.rule) : Rectangle {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            background: block.code || block.quote ? Design.colors(root.dark).surface : transparent;
+            border-radius: block.code || block.quote ? 8px : 0px;
+            VerticalLayout {
+                padding: block.code || block.quote ? 12px : 0px;
+                spacing: 8px;
+                if (block.code) : HorizontalLayout {
+                    spacing: 8px;
+                    AppText {
+                        text: block.label;
+                        font-size: 11px;
+                        color: Design.colors(root.dark).muted;
+                        horizontal-stretch: 1;
+                        min-width: 0px;
+                        overflow: elide;
+                        vertical-alignment: center;
+                    }
+                    AppButton {
+                        text: "Copy";
+                        accessible-label: "Copy " + block.label;
+                        dark: root.dark;
+                        quiet: true;
+                        min-height: 28px;
+                        preferred-height: 28px;
+                        clicked => { root.copy-text(block.source); }
+                    }
+                }
+                StyledText {
+                    text: block.text;
+                    min-width: 0px;
+                    // Propagate wrapped height through the nested block layouts.
+                    height: self.preferred-height;
+                    default-color: block.quote ? Design.colors(root.dark).secondary : Design.colors(root.dark).text;
+                    default-font-size: block.heading > 0
+                        ? root.chat-font-size + max(2, 10 - block.heading * 2) * 1px
+                        : block.code ? max(12px, root.chat-font-size - 2px) : root.chat-font-size;
+                    default-font-family: block.code ? "monospace" : "";
+                    link-color: Design.colors(root.dark).accent;
+                    link-clicked(url) => { root.open-link(url); }
+                }
+            }
+        }
+    }
+}

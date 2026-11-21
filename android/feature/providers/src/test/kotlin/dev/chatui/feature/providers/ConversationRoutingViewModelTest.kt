@@ -68,4 +68,72 @@ class ConversationRoutingViewModelTest {
 
         assertThat(viewModel.state.value.error).isEqualTo("Conversation not found.")
     }
+
+    @Test
+    fun `retry persists a failed routing edit after an unrelated snapshot refresh`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ConversationRoutingViewModel(service, "conversation-1")
+        advanceUntilIdle()
+        service.error = IllegalStateException("Try again")
+
+        viewModel.onEnabledChanged(true)
+        advanceUntilIdle()
+        val original = service.conversations.getValue("conversation-1")
+        val updated = original.copy(params = original.params.copy(temperature = 0.4))
+        service.conversations["conversation-1"] = updated
+        viewModel.onConversationChanged(updated)
+        assertThat(viewModel.state.value.preferences.enabled).isTrue()
+        assertThat(viewModel.state.value.error).isEqualTo("Try again")
+        assertThat(service.lastRouting).isNull()
+
+        service.error = null
+        viewModel.onRetry()
+        advanceUntilIdle()
+
+        assertThat(service.lastRouting?.enabled).isTrue()
+        assertThat(viewModel.state.value.error).isNull()
+        assertThat(service.conversations.getValue("conversation-1").params.temperature).isEqualTo(0.4)
+    }
+
+    @Test
+    fun `a later routing choice also retries the earlier unsaved choice`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ConversationRoutingViewModel(service, "conversation-1")
+        advanceUntilIdle()
+        service.error = IllegalStateException("Try again")
+        viewModel.onEnabledChanged(true)
+        advanceUntilIdle()
+
+        service.error = null
+        viewModel.onSortChanged(RoutingSort.PRICE)
+        advanceUntilIdle()
+
+        assertThat(service.lastRouting?.enabled).isTrue()
+        assertThat(service.lastRouting?.sort).isEqualTo(RoutingSort.PRICE)
+        assertThat(viewModel.state.value.error).isNull()
+    }
+
+    @Test
+    fun `a field change preserves newer routing fields not yet shown by this editor`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ConversationRoutingViewModel(service, "conversation-1")
+        advanceUntilIdle()
+        service.routing["conversation-1"] = RoutingPreferences(
+            enabled = true,
+            allowFallbacks = false,
+            sort = RoutingSort.LATENCY,
+        )
+
+        viewModel.onDenyDataCollectionChanged(true)
+        advanceUntilIdle()
+
+        assertThat(service.lastRouting).isEqualTo(
+            RoutingPreferences(
+                enabled = true,
+                allowFallbacks = false,
+                sort = RoutingSort.LATENCY,
+                denyDataCollection = true,
+            ),
+        )
+    }
 }

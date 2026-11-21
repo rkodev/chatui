@@ -35,18 +35,18 @@ data class ChatUiMotion(
     val springSnappy: SpringSpec<Float> = SpringSpec(stiffness = 500f, dampingRatio = 0.85f),
     val springGentle: SpringSpec<Float> = SpringSpec(stiffness = 300f, dampingRatio = 0.9f),
     val fadeThroughMillis: Int = 180,
-    val sharedAxisMillis: Int = 220,
-    val emphasizedMillis: Int = 300,
+    val sharedAxisMillis: Int = 180,
+    val emphasizedMillis: Int = 180,
 ) {
     companion object {
         val Standard: ChatUiMotion = ChatUiMotion(
             fastMillis = 120,
-            normalMillis = 200,
+            normalMillis = 160,
             standardEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f),
             reducedMotion = false,
             fadeThroughMillis = 180,
-            sharedAxisMillis = 220,
-            emphasizedMillis = 300,
+            sharedAxisMillis = 180,
+            emphasizedMillis = 180,
         )
 
         val Reduced: ChatUiMotion = ChatUiMotion(

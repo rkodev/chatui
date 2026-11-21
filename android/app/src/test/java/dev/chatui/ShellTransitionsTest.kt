@@ -38,12 +38,12 @@ class ShellTransitionsTest {
         }
 
         composeRule.onNodeWithTag(
-            ShellTestTags.navigationItem(ShellDestination.Backup.route),
+            ShellTestTags.navigationItem(ShellDestination.Settings.route),
         ).performClick()
 
         composeRule.runOnIdle {
             assertThat(navController.currentDestination?.route)
-                .isEqualTo(ShellDestination.Backup.route)
+                .isEqualTo(ShellDestination.Settings.route)
         }
     }
 }

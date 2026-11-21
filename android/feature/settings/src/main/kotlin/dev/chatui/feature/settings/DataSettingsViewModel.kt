@@ -15,6 +15,41 @@ import kotlinx.coroutines.launch
 /** Confirmation phrase required before clear-all runs. */
 const val CLEAR_ALL_CONFIRMATION: String = "DELETE ALL DATA"
 
+enum class DataFileAction { EXPORT, IMPORT_MERGE, IMPORT_REPLACE }
+
+enum class DataFilePhase { IDLE, PREPARING, PICKING, WORKING, SUCCEEDED, CANCELLED, FAILED }
+
+data class DataFileOperation(
+    val action: DataFileAction = DataFileAction.EXPORT,
+    val phase: DataFilePhase = DataFilePhase.IDLE,
+    val error: String? = null,
+) {
+    val active: Boolean
+        get() = phase in setOf(DataFilePhase.PREPARING, DataFilePhase.PICKING, DataFilePhase.WORKING)
+
+    val description: String?
+        get() = when (phase) {
+            DataFilePhase.IDLE, DataFilePhase.FAILED -> null
+            DataFilePhase.PREPARING -> "Preparing export..."
+            DataFilePhase.PICKING -> if (action == DataFileAction.EXPORT) {
+                "Choose where to save the export."
+            } else {
+                "Choose an archive to import."
+            }
+            DataFilePhase.WORKING -> if (action == DataFileAction.EXPORT) "Writing export..." else "Importing archive..."
+            DataFilePhase.SUCCEEDED -> when (action) {
+                DataFileAction.EXPORT -> "Export saved."
+                DataFileAction.IMPORT_MERGE -> "Import merged with local data."
+                DataFileAction.IMPORT_REPLACE -> "Local data replaced by the imported archive."
+            }
+            DataFilePhase.CANCELLED -> if (action == DataFileAction.EXPORT) {
+                "Export cancelled. No file was written."
+            } else {
+                "Import cancelled. Local data was not changed."
+            }
+        }
+}
+
 /** One immutable state for the data settings screen. */
 data class DataSettingsUiState(
     val usage: StorageUsage? = null,
@@ -26,9 +61,13 @@ data class DataSettingsUiState(
     val confirmationPhrase: String = "",
     val error: String? = null,
     val status: String? = null,
+    val fileOperation: DataFileOperation = DataFileOperation(),
 ) {
+    val busy: Boolean
+        get() = fileOperation.active || clearing || removingKeyId != null
+
     val canClear: Boolean
-        get() = confirmationPhrase == CLEAR_ALL_CONFIRMATION && !clearing
+        get() = confirmationPhrase == CLEAR_ALL_CONFIRMATION && !busy
 }
 
 /**
@@ -105,6 +144,7 @@ class DataSettingsViewModel(
     }
 
     fun onRequestRemoveKey(providerId: String) {
+        if (_state.value.busy) return
         _state.update {
             it.copy(confirmKeyId = providerId, error = null, status = null)
         }
@@ -115,7 +155,7 @@ class DataSettingsViewModel(
     }
 
     fun onConfirmRemoveKey(providerId: String) {
-        if (_state.value.removingKeyId != null) return
+        if (_state.value.busy || _state.value.confirmKeyId != providerId) return
 
         viewModelScope.launch {
             _state.update {
@@ -146,6 +186,10 @@ class DataSettingsViewModel(
 
     fun onDismissError() {
         _state.update { it.copy(error = null) }
+    }
+
+    fun onStartFileOperation() {
+        _state.update { it.copy(error = null, status = null) }
     }
 
     companion object {

@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.Clock
@@ -23,8 +25,15 @@ fun ConversationRoute(
     modifier: Modifier = Modifier,
     clock: Clock = Clock.systemUTC(),
     zoneId: ZoneId = ZoneId.systemDefault(),
+    listViewModel: ConversationListViewModel? = null,
+    listState: LazyListState = rememberLazyListState(),
+    title: String? = null,
+    showNewChat: Boolean = true,
+    onNewChatRequested: (() -> Unit)? = null,
+    header: (@Composable () -> Unit)? = null,
+    footer: (@Composable () -> Unit)? = null,
 ) {
-    val viewModel: ConversationListViewModel = viewModel(
+    val viewModel: ConversationListViewModel = listViewModel ?: viewModel(
         factory = ConversationListViewModel.factory(service, clock, zoneId),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -40,7 +49,7 @@ fun ConversationRoute(
 
     ConversationListScreen(
         state = state,
-        onNewChat = viewModel::onNewChat,
+        onNewChat = onNewChatRequested ?: viewModel::onNewChat,
         onSelect = viewModel::onSelect,
         onRename = viewModel::onRename,
         onDeleteRequested = viewModel::onDeleteRequested,
@@ -56,5 +65,10 @@ fun ConversationRoute(
         modifier = modifier,
         now = clock.instant(),
         zoneId = zoneId,
+        title = title,
+        showNewChat = showNewChat,
+        listState = listState,
+        header = header,
+        footer = footer,
     )
 }

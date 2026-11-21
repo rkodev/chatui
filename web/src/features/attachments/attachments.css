@@ -86,6 +86,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--density-space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .composer__attachment-error {
@@ -110,4 +112,10 @@
 .message__attachments {
   display: grid;
   gap: var(--density-space-1);
+}
+
+@media (max-width: 599px) {
+  .composer__hint {
+    display: none;
+  }
 }

@@ -37,6 +37,8 @@ data class ProviderDetailUiState(
     val confirmRemove: Boolean = false,
     val cleartextWarning: String? = null,
     val cleartextError: String? = null,
+    val keyChangeVersion: Int = 0,
+    val modelReturnVersion: Int = 0,
 )
 
 /**
@@ -51,6 +53,7 @@ class ProviderDetailViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(ProviderDetailUiState())
     val state: StateFlow<ProviderDetailUiState> = _state.asStateFlow()
+    private var returningFromModels = false
 
     init {
         load()
@@ -84,6 +87,7 @@ class ProviderDetailViewModel(
                     provider = validated,
                     newKey = "",
                     notice = "Key rotated and validated.",
+                    keyChangeVersion = it.keyChangeVersion + 1,
                 )
             }
             validated
@@ -161,6 +165,18 @@ class ProviderDetailViewModel(
 
     fun onRetry() {
         load()
+    }
+
+    fun onModelsOpened() {
+        returningFromModels = true
+    }
+
+    fun onEntry() {
+        if (returningFromModels) {
+            returningFromModels = false
+            load()
+            _state.update { it.copy(modelReturnVersion = it.modelReturnVersion + 1) }
+        }
     }
 
     private fun load() {

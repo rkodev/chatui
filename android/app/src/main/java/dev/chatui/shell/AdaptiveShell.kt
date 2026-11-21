@@ -3,14 +3,17 @@ package dev.chatui.shell
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,10 +28,14 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,8 +43,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.chatui.core.designsystem.BrandMark
-import dev.chatui.core.designsystem.GroupedSection
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.PrimaryButton
@@ -45,6 +50,7 @@ import dev.chatui.core.designsystem.SettingsRow
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.feature.conversations.ConversationRoute
 import dev.chatui.feature.conversations.ConversationService
+import dev.chatui.feature.conversations.ConversationListViewModel
 
 /** Width of the permanent sidebar at expanded widths. */
 val ShellSidebarWidth: Dp = 280.dp
@@ -65,35 +71,39 @@ fun AdaptiveShell(
     modifier: Modifier = Modifier,
     drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed),
     sidebarVisible: Boolean = true,
+    sidebarWindowInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
+    val colors = LocalChatUiColors.current
     if (expanded) {
-        Row(
-            modifier = modifier
-                .fillMaxSize()
-                .testTag(ShellTestTags.ExpandedLayout),
+        Surface(
+            modifier = modifier.fillMaxSize(),
+            color = colors.bgCanvas,
+            contentColor = colors.fgPrimary,
         ) {
-            if (sidebarVisible) {
+            Row(Modifier.fillMaxSize().testTag(ShellTestTags.ExpandedLayout)) {
+                if (sidebarVisible) {
+                    Box(
+                        modifier = Modifier
+                            .width(ShellSidebarWidth)
+                            .fillMaxHeight()
+                            .windowInsetsPadding(sidebarWindowInsets)
+                            .testTag(ShellTestTags.Sidebar),
+                    ) {
+                        sidebar()
+                    }
+                    VerticalDivider()
+                }
                 Box(
                     modifier = Modifier
-                        .width(ShellSidebarWidth)
+                        .weight(1f)
                         .fillMaxHeight()
-                        .testTag(ShellTestTags.Sidebar),
+                        .testTag(ShellTestTags.MainContent),
                 ) {
-                    sidebar()
+                    mainContent()
                 }
-                VerticalDivider()
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .testTag(ShellTestTags.MainContent),
-            ) {
-                mainContent()
             }
         }
     } else {
-        val colors = LocalChatUiColors.current
         ModalNavigationDrawer(
             drawerState = drawerState,
             modifier = modifier
@@ -104,10 +114,7 @@ fun AdaptiveShell(
             drawerContent = {
                 if (sidebarVisible) {
                     ModalDrawerSheet(
-                        // The shell already consumed safe-drawing insets before
-                        // rendering the drawer, so the sheet must not add them
-                        // again.
-                        windowInsets = WindowInsets(0, 0, 0, 0),
+                        windowInsets = sidebarWindowInsets.union(WindowInsets.ime),
                         drawerShape = RoundedCornerShape(
                             topEnd = 16.dp,
                             bottomEnd = 16.dp,
@@ -120,7 +127,7 @@ fun AdaptiveShell(
                                 .fillMaxSize()
                                 .testTag(ShellTestTags.Sidebar),
                         ) {
-                            sidebar()
+                            if (drawerState.isOpen || drawerState.isAnimationRunning) sidebar()
                         }
                     }
                 }
@@ -143,8 +150,8 @@ fun AdaptiveShell(
  *
  * The conversation history is the existing [ConversationRoute], so grouping,
  * search, pin, archive, delete, and new-chat behavior are not duplicated. The
- * destination list is grouped into Chats, Library, and Settings sections with
- * icon-led rows and a selected accent-soft pill.
+ * host owns the title and sole New chat action. Only Providers and Settings
+ * remain in the footer; short windows move that chrome into the scrolling list.
  */
 @Composable
 fun ShellSidebar(
@@ -152,79 +159,52 @@ fun ShellSidebar(
     conversationService: ConversationService,
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
-    onNewChat: () -> Unit = {},
+    onNewChat: (() -> Unit)? = null,
+    listViewModel: ConversationListViewModel? = null,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
 
-    Column(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = dimens.screenPadding,
-                    vertical = dimens.space3,
-                ),
-            verticalArrangement = Arrangement.spacedBy(dimens.space3),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                BrandMark(size = 28.dp)
-                Spacer(Modifier.width(dimens.space2))
-                Text(
-                    text = "ChatUI",
-                    style = Typography.title2,
-                    color = colors.fgPrimary,
+    val footer: @Composable () -> Unit = {
+        Column {
+            HorizontalDivider(color = colors.separator, thickness = 0.5.dp)
+            listOf(ShellSidebarDestination.Providers, ShellSidebarDestination.Settings).forEach { destination ->
+                SidebarRow(
+                    destination = destination,
+                    selected = destination.matches(currentRoute),
+                    onClick = { onNavigate(destination.route) },
                 )
             }
-            PrimaryButton(
-                text = "New chat",
-                onClick = onNewChat,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ShellTestTags.NewChat),
+        }
+    }
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val short = maxHeight < 480.dp || LocalDensity.current.fontScale >= 1.5f
+        Column(Modifier.fillMaxSize()) {
+            ConversationRoute(
+                service = conversationService,
+                listViewModel = listViewModel,
+                listState = listState,
+                showNewChat = onNewChat == null,
+                onNewChatRequested = onNewChat,
+                onOpenConversation = { onNavigate(ChatDestination.createRoute(it)) },
+                modifier = Modifier.weight(1f),
+                header = {
+                    Column(verticalArrangement = Arrangement.spacedBy(dimens.densitySpace2)) {
+                        Text("Chats", style = Typography.title2, color = colors.fgPrimary)
+                        if (onNewChat != null) {
+                            PrimaryButton(
+                                text = "New chat",
+                                onClick = onNewChat,
+                                modifier = Modifier.fillMaxWidth().testTag(ShellTestTags.NewChat),
+                            )
+                        }
+                        if (short) footer()
+                    }
+                },
             )
+            if (!short) footer()
         }
-        HorizontalDivider(color = colors.separator, thickness = 0.5.dp)
-
-        GroupedSection(title = "Chats") {
-            ShellSidebarDestination.Conversations.let { destination ->
-                SidebarRow(
-                    destination = destination,
-                    selected = destination.matches(currentRoute),
-                    onClick = { onNavigate(destination.route) },
-                )
-            }
-        }
-
-        ConversationRoute(
-            service = conversationService,
-            onOpenConversation = { conversationId ->
-                onNavigate(ChatDestination.createRoute(conversationId))
-            },
-            modifier = Modifier.weight(1f),
-        )
-
-        GroupedSection(title = "Library") {
-            ShellSidebarDestination.library.forEach { destination ->
-                SidebarRow(
-                    destination = destination,
-                    selected = destination.matches(currentRoute),
-                    onClick = { onNavigate(destination.route) },
-                )
-            }
-        }
-
-        GroupedSection(title = "Settings") {
-            ShellSidebarDestination.settings.forEach { destination ->
-                SidebarRow(
-                    destination = destination,
-                    selected = destination.matches(currentRoute),
-                    onClick = { onNavigate(destination.route) },
-                )
-            }
-        }
-
-        Spacer(Modifier.height(dimens.space3))
     }
 }
 

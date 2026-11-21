@@ -15,15 +15,17 @@ use chatui_domain::ProviderAuthType;
 use chatui_secrets::SecretValue;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
-use crate::providers::error::describe_provider_error;
+use crate::providers::error::{ProviderManagementError, describe_provider_error};
 use crate::providers::service::ProviderManagementService;
 use crate::providers::state::{
     ConfirmationAction, CustomProviderForm, PendingConfirmation, ProviderManagementViewModel,
 };
 use crate::providers::validation::{parse_headers_text, validate_base_url};
+use crate::tasks::UiTasks;
 
 slint::slint! {
-    import { Button, CheckBox, ComboBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
+    import { AppButton as Button, AppText as Text, Design } from "../design.slint";
+    import { CheckBox, ComboBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
 
     export struct ProviderRow {
         id: string,
@@ -33,8 +35,9 @@ slint::slint! {
 
     export component ProviderManagementWindow inherits Window {
         title: "ChatUI providers";
-        width: 1000px;
-        height: 760px;
+        preferred-width: 1000px;
+        preferred-height: 760px;
+        min-width: 0px;
 
         in property <[ProviderRow]> providers: [];
         in property <bool> add-provider-available: true;
@@ -42,6 +45,9 @@ slint::slint! {
         in property <string> error-title: "";
         in property <string> error-message: "";
         in property <string> error-details: "";
+        in property <bool> busy: false;
+        in property <string> selected-provider-id: "";
+        private property <bool> compact: root.width < 760px;
 
         in property <bool> detail-visible: false;
         in property <string> detail-label: "";
@@ -77,7 +83,7 @@ slint::slint! {
         in property <string> confirm-label: "";
         in property <bool> dark: false;
 
-        background: root.dark ? #0f1115 : #ffffff;
+        background: Design.colors(root.dark).canvas;
         init => {
             Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
         }
@@ -101,131 +107,233 @@ slint::slint! {
         callback form-api-key-changed(string);
         callback form-headers-changed(string);
         callback form-test-connection-changed(bool);
+        callback back-to-list();
+        callback open-docs(string);
+        callback open-models();
+        callback cancel-confirmation();
 
-        HorizontalLayout {
+        Rectangle {
+          x: 0px;
+          y: 0px;
+          width: 100%;
+          height: 100%;
+          VerticalLayout {
             padding: 16px;
-            spacing: 16px;
+            spacing: 12px;
 
-            VerticalLayout {
-                width: 340px;
-                spacing: 8px;
+            if (!root.notice.is-empty) : Text {
+                text: root.notice;
+                accessible-live-region: polite;
+                wrap: word-wrap;
+            }
 
-                Text { text: "Providers"; font-size: 22px; font-weight: 600; }
+            if (!root.error-title.is-empty) : Rectangle {
+                background: Design.colors(root.dark).danger-soft;
+                border-radius: 8px;
+                VerticalLayout {
+                    padding: 8px;
+                    spacing: 4px;
+                    Text {
+                        text: root.error-title;
+                        font-weight: 600;
+                        accessible-live-region: assertive;
+                    }
+                    Text {
+                        text: root.error-message;
+                        accessible-live-region: assertive;
+                        wrap: word-wrap;
+                    }
+                    if (!root.error-details.is-empty) : Text { text: root.error-details; wrap: word-wrap; color: Design.colors(root.dark).muted; }
+                }
+            }
+
+            HorizontalLayout {
+              spacing: 16px;
+              if (!root.compact || (!root.detail-visible && !root.form-visible)) : VerticalLayout {
+                width: root.compact ? root.width - 32px : 250px;
+                spacing: 12px;
+
+                Text { text: "Your providers"; font-size: 18px; font-weight: 600; }
+                Text { text: "Choose where your conversations run."; font-size: 12px; color: Design.colors(root.dark).muted; wrap: word-wrap; }
 
                 if (root.add-provider-available) : Button {
                     text: "Add provider";
+                    primary: true;
+                    icon-kind: 5;
+                    enabled: !root.busy;
                     clicked => { root.add-provider(); }
                 }
-
-                if (!root.notice.is-empty) : Text {
-                    text: root.notice;
-                    accessible-live-region: polite;
-                    wrap: word-wrap;
-                }
-
-                if (!root.error-title.is-empty) : Rectangle {
-                    background: root.dark ? #3b1d1d : #fde8e8;
-                    border-radius: 8px;
-                    VerticalLayout {
-                        padding: 8px;
-                        spacing: 4px;
-                        Text {
-                            text: root.error-title;
-                            font-weight: 600;
-                            accessible-live-region: assertive;
-                        }
-                        Text {
-                            text: root.error-message;
-                            accessible-live-region: assertive;
-                            wrap: word-wrap;
-                        }
-                        if (!root.error-details.is-empty) : Text { text: root.error-details; wrap: word-wrap; color: root.dark ? #9ca3af : #5f6368; }
-                    }
-                }
-
                 ScrollView {
+                    content-width: self.width;
                     VerticalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        if (root.providers.length == 0) : Text {
+                            text: "No providers connected yet. Add an OpenAI-compatible endpoint to get started.";
+                            wrap: word-wrap;
+                            color: Design.colors(root.dark).muted;
+                        }
                         for entry in root.providers : Rectangle {
-                            height: 64px;
-                            background: root.dark ? #171a21 : #f7f7f8;
-                            border-radius: 8px;
+                            height: 76px;
+                            background: entry.id == root.selected-provider-id ? Design.colors(root.dark).accent-soft : Design.colors(root.dark).raised;
+                            border-radius: 12px;
+                            border-width: 1px;
+                            border-color: Design.colors(root.dark).border;
                             HorizontalLayout {
-                                padding: 8px;
+                                padding: 12px;
                                 spacing: 8px;
                                 VerticalLayout {
-                                    Text { text: entry.label; font-weight: 600; }
-                                    Text { text: entry.meta; color: root.dark ? #9ca3af : #5f6368; wrap: word-wrap; }
+                                    Text { text: entry.label; font-weight: 600; overflow: elide; }
+                                    Text { text: entry.meta; font-size: 11px; color: Design.colors(root.dark).muted; overflow: elide; }
                                 }
                                 Button {
                                     text: "Open";
+                                    accessible-label: "Open " + entry.label;
+                                    quiet: true;
+                                    enabled: !root.busy;
                                     clicked => { root.select-provider(entry.id); }
                                 }
                             }
                         }
                     }
                 }
+                Text {
+                    text: "Keys are handled locally and never included in exports.";
+                    font-size: 11px;
+                    color: Design.colors(root.dark).muted;
+                    wrap: word-wrap;
+                }
+                if (!root.confirm-label.is-empty) : Text {
+                    text: root.confirm-label;
+                    wrap: word-wrap;
+                    color: Design.colors(root.dark).warning;
+                }
+                if (root.providers.length > 0) : Button {
+                    text: "Forget all keys";
+                    danger: true;
+                    quiet: true;
+                    enabled: !root.busy;
+                    clicked => { root.forget-all-keys(); }
+                }
+                if (!root.confirm-label.is-empty) : Button {
+                    text: "Cancel";
+                    quiet: true;
+                    enabled: !root.busy;
+                    clicked => { root.cancel-confirmation(); }
+                }
             }
 
-            if (root.detail-visible) : VerticalLayout {
-                spacing: 8px;
-                Text { text: root.detail-label; font-size: 22px; font-weight: 600; }
-                Text { text: root.detail-preset + " · " + root.detail-status; color: root.dark ? #9ca3af : #5f6368; }
-                Text { text: root.detail-base-url; wrap: word-wrap; }
-                if (!root.detail-cleartext-warning.is-empty) : Text { text: root.detail-cleartext-warning; color: root.dark ? #fbbf24 : #b45309; wrap: word-wrap; }
-                if (!root.detail-docs-url.is-empty) : Text { text: "Docs: " + root.detail-docs-url; wrap: word-wrap; }
-                Text { text: "Key label: " + root.detail-key-label; }
-                Text { text: "Usage: " + root.detail-usage; }
-                Text { text: "Limit: " + root.detail-limit; }
-                Text { text: "Free tier: " + root.detail-free-tier; }
-                Text { text: "Rate limit: " + root.detail-rate-limit; }
-                Text { text: "CORS: " + root.detail-cors; }
-                Text { text: root.detail-model-count-text; }
+            if (root.detail-visible && !root.form-visible) : Rectangle {
+                background: Design.colors(root.dark).raised;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: Design.colors(root.dark).border;
+                ScrollView {
+                    x: 16px;
+                    y: 16px;
+                    width: parent.width - 32px;
+                    height: parent.height - 32px;
+                    content-width: self.width;
+                VerticalLayout {
+                spacing: 14px;
+                alignment: start;
+                if (root.compact) : Button { text: "All providers"; quiet: true; enabled: !root.busy; clicked => { root.back-to-list(); } }
+                if (root.busy) : Text { text: "Connecting to your provider..."; color: Design.colors(root.dark).accent; wrap: word-wrap; accessible-live-region: polite; }
+                Text { text: root.detail-label; font-size: 24px; font-weight: 700; wrap: word-wrap; }
+                Text { text: root.detail-preset + " · " + root.detail-status; font-size: 12px; color: Design.colors(root.dark).muted; wrap: word-wrap; }
+                Text { text: root.detail-base-url; font-size: 12px; color: Design.colors(root.dark).secondary; wrap: word-wrap; }
+                if (!root.detail-cleartext-warning.is-empty) : Text { text: root.detail-cleartext-warning; color: Design.colors(root.dark).warning; wrap: word-wrap; }
+                if (!root.detail-docs-url.is-empty) : Button {
+                    text: "Provider documentation";
+                    quiet: true;
+                    align-left: true;
+                    clicked => { root.open-docs(root.detail-docs-url); }
+                }
                 if (!root.detail-headers.is-empty) : Text { text: "Headers: " + root.detail-headers; wrap: word-wrap; }
                 CheckBox {
                     text: "Enable this provider";
                     checked: root.detail-enabled;
+                    enabled: !root.busy;
                     toggled => { root.toggle-enabled(self.checked); }
                 }
                 HorizontalLayout {
                     spacing: 8px;
-                    Button { text: "Test connection"; enabled: root.detail-key-present; clicked => { root.test-connection(); } }
-                    Button { text: "Forget key"; enabled: root.detail-key-present; clicked => { root.forget-key(); } }
-                    Button { text: "Forget all keys"; clicked => { root.forget-all-keys(); } }
-                    Button { text: "Delete provider"; clicked => { root.delete-provider(); } }
+                    Button { text: "Test connection"; enabled: !root.busy; clicked => { root.test-connection(); } }
+                    Button { text: "Browse models"; primary: true; enabled: !root.busy; clicked => { root.open-models(); } }
                 }
-                if (!root.confirm-label.is-empty) : Text { text: root.confirm-label; color: root.dark ? #fbbf24 : #b45309; wrap: word-wrap; }
-                HorizontalLayout {
+                Text { text: root.detail-model-count-text; font-size: 12px; color: Design.colors(root.dark).muted; }
+                if (root.detail-key-present) : VerticalLayout {
                     spacing: 8px;
+                    Text { text: "API access"; font-weight: 600; }
+                    Text { text: "Key label: " + root.detail-key-label; wrap: word-wrap; font-size: 12px; }
+                    Text { text: "Usage: " + root.detail-usage; wrap: word-wrap; font-size: 12px; }
+                    Text { text: "Limit: " + root.detail-limit; wrap: word-wrap; font-size: 12px; }
+                    Text { text: "Free tier: " + root.detail-free-tier; wrap: word-wrap; font-size: 12px; }
+                    Text { text: "Rate limit: " + root.detail-rate-limit; wrap: word-wrap; font-size: 12px; }
+                }
+                Text { text: "Update API key"; font-weight: 600; }
                     LineEdit {
                         placeholder-text: "New API key";
                         accessible-label: "New API key";
+                        enabled: !root.busy;
                         input-type: InputType.password;
                         text: root.rotate-key-input;
                         edited(text) => { root.rotate-key-input = text; }
                     }
-                    Button { text: "Rotate key"; clicked => { root.rotate-key(root.rotate-key-input); } }
+                    Button { text: root.detail-key-present ? "Rotate key" : "Add key"; primary: true; enabled: !root.busy && !root.rotate-key-input.is-empty; clicked => { root.rotate-key(root.rotate-key-input); } }
+                Text { text: "Connection details"; font-weight: 600; }
+                Text { text: "Browser CORS: " + root.detail-cors; wrap: word-wrap; font-size: 12px; color: Design.colors(root.dark).muted; }
+                Text { text: "Manage connection"; font-weight: 600; }
+                if (!root.confirm-label.is-empty) : Text { text: root.confirm-label; color: Design.colors(root.dark).warning; wrap: word-wrap; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Button { text: "Forget key"; quiet: true; danger: true; enabled: !root.busy && root.detail-key-present; clicked => { root.forget-key(); } }
+                    Button { text: "Delete provider"; quiet: true; danger: true; enabled: !root.busy; clicked => { root.delete-provider(); } }
+                }
+                if (!root.confirm-label.is-empty) : Button { text: "Cancel"; quiet: true; enabled: !root.busy; clicked => { root.cancel-confirmation(); } }
+                }
                 }
             }
 
-            if (root.form-visible) : VerticalLayout {
-                spacing: 8px;
-                Text { text: root.form-title; font-size: 20px; font-weight: 600; }
+            if (root.form-visible) : Rectangle {
+                background: Design.colors(root.dark).raised;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: Design.colors(root.dark).border;
+                ScrollView {
+                    x: 16px;
+                    y: 16px;
+                    width: parent.width - 32px;
+                    height: parent.height - 32px;
+                    content-width: self.width;
+                VerticalLayout {
+                spacing: 12px;
+                alignment: start;
+                if (root.compact) : Button { text: "All providers"; quiet: true; enabled: !root.busy; clicked => { root.cancel-form(); } }
+                if (root.busy) : Text { text: "Connecting to your provider..."; color: Design.colors(root.dark).accent; wrap: word-wrap; accessible-live-region: polite; }
+                Text { text: root.form-title; font-size: 22px; font-weight: 700; wrap: word-wrap; }
+                Text { text: "Connect an OpenAI-compatible endpoint. You stay in control of your keys and models."; font-size: 12px; color: Design.colors(root.dark).muted; wrap: word-wrap; }
                 Text { text: "Label (optional)"; }
                 LineEdit {
                     text: root.form-label;
                     accessible-label: "Label";
+                    enabled: !root.busy;
+                    placeholder-text: "My provider";
                     edited(text) => { root.form-label-changed(text); }
                 }
                 Text { text: "Base URL"; }
                 LineEdit {
                     text: root.form-base-url;
                     accessible-label: "Base URL";
+                    enabled: !root.busy;
+                    placeholder-text: "https://api.example.com/v1";
                     edited(text) => { root.form-base-url-changed(text); }
                 }
                 Text { text: "Authentication"; }
                 ComboBox {
                     model: ["Bearer token", "x-api-key header", "No authentication"];
                     accessible-label: "Authentication";
+                    enabled: !root.busy;
                     current-index: root.form-auth-index;
                     selected(value) => { root.form-auth-changed(value); }
                 }
@@ -234,22 +342,25 @@ slint::slint! {
                     LineEdit {
                         text: root.form-api-key;
                         accessible-label: "API key";
+                        enabled: !root.busy;
                         input-type: InputType.password;
                         edited(text) => { root.form-api-key-changed(text); }
                     }
                 }
-                Text { text: "Non-secret headers (Name: value per line)"; }
+                Text { text: "Non-secret headers (Name: value per line)"; wrap: word-wrap; }
                 LineEdit {
                     text: root.form-headers;
                     accessible-label: "Non-secret headers";
+                    enabled: !root.busy;
                     edited(text) => { root.form-headers-changed(text); }
                 }
                 CheckBox {
                     text: "Test connection before saving";
+                    enabled: !root.busy;
                     checked: root.form-test-connection;
                     toggled => { root.form-test-connection-changed(self.checked); }
                 }
-                if (!root.form-cleartext-warning.is-empty) : Text { text: root.form-cleartext-warning; color: root.dark ? #fbbf24 : #b45309; wrap: word-wrap; }
+                if (!root.form-cleartext-warning.is-empty) : Text { text: root.form-cleartext-warning; color: Design.colors(root.dark).warning; wrap: word-wrap; }
                 if (!root.form-notice.is-empty) : Text {
                     text: root.form-notice;
                     accessible-live-region: polite;
@@ -257,22 +368,50 @@ slint::slint! {
                 }
                 if (!root.form-error.is-empty) : Text {
                     text: root.form-error;
-                    color: root.dark ? #f87171 : #b91c1c;
+                    color: Design.colors(root.dark).danger;
                     accessible-live-region: assertive;
                     wrap: word-wrap;
                 }
                 HorizontalLayout {
                     spacing: 8px;
-                    Button { text: "Save"; clicked => { root.save-provider(); } }
-                    Button { text: "Cancel"; clicked => { root.cancel-form(); } }
+                    Button { text: root.busy ? "Connecting..." : "Save provider"; primary: true; enabled: !root.busy; clicked => { root.save-provider(); } }
+                    Button { text: "Cancel"; quiet: true; enabled: !root.busy; clicked => { root.cancel-form(); } }
+                }
+                }
                 }
             }
+
+            if (!root.compact && !root.detail-visible && !root.form-visible) : Rectangle {
+                background: Design.colors(root.dark).raised;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: Design.colors(root.dark).border;
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 16px;
+                    Rectangle { vertical-stretch: 1; }
+                    Text { text: "Your models, your choice."; font-size: 24px; font-weight: 700; wrap: word-wrap; }
+                    Text { text: "Select a provider to manage its connection and browse available models."; color: Design.colors(root.dark).muted; wrap: word-wrap; }
+                    Rectangle { vertical-stretch: 1; }
+                }
+            }
+            }
+          }
         }
     }
 }
 
 /// Push the current view model into a Slint window.
 pub fn sync_window(window: &ProviderManagementWindow, state: &ProviderManagementViewModel) {
+    window.set_busy(state.busy);
+    window.set_selected_provider_id(
+        state
+            .detail
+            .as_ref()
+            .map(|detail| detail.id.clone())
+            .unwrap_or_default()
+            .into(),
+    );
     let rows: Vec<ProviderRow> = state
         .list
         .entries()
@@ -711,22 +850,98 @@ fn toggle_enabled(
     }
 }
 
+fn run_provider_action(
+    service: &Arc<ProviderManagementService>,
+    state: &Rc<RefCell<ProviderManagementViewModel>>,
+    weak: &slint::Weak<ProviderManagementWindow>,
+    tasks: &UiTasks,
+    clear_rotation: bool,
+    action: impl FnOnce(&ProviderManagementService, &Rc<RefCell<ProviderManagementViewModel>>)
+    + Send
+    + 'static,
+) {
+    {
+        let mut state = state.borrow_mut();
+        if state.busy {
+            return;
+        }
+        state.busy = true;
+        state.clear_messages();
+    }
+    if let Some(window) = weak.upgrade() {
+        sync_window(&window, &state.borrow());
+    }
+    let snapshot = state.borrow().clone();
+    let service = Arc::clone(service);
+    let state = Rc::clone(state);
+    let weak = weak.clone();
+    tasks.run(
+        move || {
+            let snapshot = Rc::new(RefCell::new(snapshot));
+            action(&service, &snapshot);
+            snapshot.borrow().clone()
+        },
+        move |outcome| {
+            match outcome {
+                Ok(mut snapshot) => {
+                    snapshot.busy = false;
+                    *state.borrow_mut() = snapshot;
+                }
+                Err(error) => {
+                    let mut state = state.borrow_mut();
+                    state.busy = false;
+                    state.error = Some(describe_provider_error(
+                        &ProviderManagementError::Storage(error.to_string()),
+                        None,
+                    ));
+                }
+            }
+            if let Some(window) = weak.upgrade() {
+                let state = state.borrow();
+                if state.form.is_none() {
+                    window.set_form_api_key("".into());
+                }
+                if clear_rotation && state.error.is_none() {
+                    window.set_rotate_key_input("".into());
+                }
+                sync_window(&window, &state);
+            }
+        },
+    );
+}
+
 /// Owns the provider management view model and the Slint window that renders it.
 pub struct ProviderManagementController {
     service: Arc<ProviderManagementService>,
     state: Rc<RefCell<ProviderManagementViewModel>>,
     window: ProviderManagementWindow,
+    tasks: Rc<UiTasks>,
 }
 
 impl ProviderManagementController {
     /// Create the provider management window and load the provider list.
     pub fn new(service: Arc<ProviderManagementService>) -> Result<Self, slint::PlatformError> {
+        Self::create(service, false)
+    }
+
+    /// Create a provider screen with non-blocking connection validation.
+    pub fn new_background(
+        service: Arc<ProviderManagementService>,
+    ) -> Result<Self, slint::PlatformError> {
+        Self::create(service, true)
+    }
+
+    fn create(
+        service: Arc<ProviderManagementService>,
+        background: bool,
+    ) -> Result<Self, slint::PlatformError> {
         let window = ProviderManagementWindow::new()?;
         let state = Rc::new(RefCell::new(ProviderManagementViewModel::default()));
         let controller = Self {
             service,
             state,
             window,
+            tasks: Rc::new(UiTasks::new(background)),
         };
         reload_list(&controller.service, &controller.state);
         controller.wire();
@@ -749,10 +964,45 @@ impl ProviderManagementController {
         sync_window(&self.window, &self.state.borrow());
     }
 
+    /// Reload non-secret provider details after changes elsewhere in the app.
+    pub fn reload(&self) {
+        if self.state.borrow().busy {
+            return;
+        }
+        let id = self
+            .state
+            .borrow()
+            .detail
+            .as_ref()
+            .map(|detail| detail.id.clone());
+        reload_list(&self.service, &self.state);
+        if let Some(id) = id {
+            self.state.borrow_mut().detail = self.service.provider_detail(&id).ok();
+        }
+        self.state.borrow_mut().pending_confirmation = None;
+        self.sync();
+    }
+
+    /// Drop in-memory form credentials after an explicit local-data reset.
+    pub fn reset(&self) {
+        *self.state.borrow_mut() = ProviderManagementViewModel::default();
+        self.window.set_rotate_key_input("".into());
+        self.window.set_form_api_key("".into());
+        self.reload();
+    }
+
+    /// Apply completed connection work in deterministic hosts.
+    pub fn poll(&self) {
+        self.tasks.poll();
+    }
+
     fn wire(&self) {
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         self.window.on_add_provider(move || {
+            if state.borrow().busy {
+                return;
+            }
             {
                 let mut state = state.borrow_mut();
                 state.form = Some(CustomProviderForm::new());
@@ -771,17 +1021,16 @@ impl ProviderManagementController {
             open_detail(&service, &state, id.as_str());
             if let Some(window) = weak.upgrade() {
                 sync_window(&window, &state.borrow());
+                window.set_rotate_key_input("".into());
             }
         });
 
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_save_provider(move || {
-            save_form(&service, &state);
-            if let Some(window) = weak.upgrade() {
-                sync_window(&window, &state.borrow());
-            }
+            run_provider_action(&service, &state, &weak, &tasks, false, save_form);
         });
 
         let weak = self.window.as_weak();
@@ -801,11 +1050,17 @@ impl ProviderManagementController {
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_rotate_key(move |key| {
-            rotate_key(&service, &state, key.as_str());
-            if let Some(window) = weak.upgrade() {
-                sync_window(&window, &state.borrow());
-            }
+            let key = key.to_string();
+            run_provider_action(
+                &service,
+                &state,
+                &weak,
+                &tasks,
+                true,
+                move |service, state| rotate_key(service, state, &key),
+            );
         });
 
         let weak = self.window.as_weak();
@@ -841,11 +1096,9 @@ impl ProviderManagementController {
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_test_connection(move || {
-            test_connection(&service, &state);
-            if let Some(window) = weak.upgrade() {
-                sync_window(&window, &state.borrow());
-            }
+            run_provider_action(&service, &state, &weak, &tasks, false, test_connection);
         });
 
         let weak = self.window.as_weak();
@@ -922,6 +1175,28 @@ impl ProviderManagementController {
             if let Some(form) = state.borrow_mut().form.as_mut() {
                 form.test_connection = value;
             }
+            if let Some(window) = weak.upgrade() {
+                sync_window(&window, &state.borrow());
+            }
+        });
+
+        let weak = self.window.as_weak();
+        let state = Rc::clone(&self.state);
+        self.window.on_back_to_list(move || {
+            if state.borrow().busy {
+                return;
+            }
+            state.borrow_mut().detail = None;
+            if let Some(window) = weak.upgrade() {
+                window.set_rotate_key_input("".into());
+                sync_window(&window, &state.borrow());
+            }
+        });
+
+        let weak = self.window.as_weak();
+        let state = Rc::clone(&self.state);
+        self.window.on_cancel_confirmation(move || {
+            state.borrow_mut().pending_confirmation = None;
             if let Some(window) = weak.upgrade() {
                 sync_window(&window, &state.borrow());
             }
@@ -1202,6 +1477,29 @@ mod tests {
             secrets,
             Arc::new(FakeValidator),
         ))
+    }
+
+    #[test]
+    fn background_key_rotation_finishes_and_clears_the_secret_field() {
+        i_slint_backend_testing::init_no_event_loop();
+        let controller =
+            ProviderManagementController::new_background(service()).expect("provider window");
+        let window = controller.window();
+        window.invoke_select_provider("provider-1".into());
+        window.set_rotate_key_input("replacement-test-key".into());
+        window.invoke_rotate_key("replacement-test-key".into());
+        assert!(window.get_busy());
+        for _ in 0..200 {
+            controller.poll();
+            if !window.get_busy() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(!window.get_busy());
+        assert!(window.get_rotate_key_input().is_empty());
+        assert!(window.get_error_title().is_empty());
+        assert!(window.get_detail_key_present());
     }
 
     #[test]

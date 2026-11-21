@@ -50,6 +50,7 @@ class DataSettingsScreenTest {
         composeRule.onNodeWithTag(DataSettingsTestTags.Usage)
             .performScrollTo()
             .assertIsDisplayed()
+        composeRule.onNodeWithTag(DataSettingsTestTags.UsageDetails).performScrollTo().performClick()
         composeRule.onNodeWithTag(DataSettingsTestTags.usageRow("conversations"))
             .performScrollTo()
             .assertIsDisplayed()
@@ -196,11 +197,12 @@ class DataSettingsScreenTest {
     }
 
     @Test
-    fun `export reports progress through the snackbar`() {
+    fun `picker launch is not success and completed file work has one inline result`() {
+        var operation by mutableStateOf(DataFileOperation())
         composeRule.setContent {
             ChatUiTheme {
                 DataSettingsScreen(
-                    state = state(),
+                    state = state().copy(fileOperation = operation),
                     onConfirmationPhraseChanged = {},
                     onClearAll = {},
                     onRequestRemoveKey = {},
@@ -209,7 +211,7 @@ class DataSettingsScreenTest {
                     onDismissError = {},
                     onOpenProviders = {},
                     onOpenBackup = {},
-                    onExportAll = {},
+                    onExportAll = { operation = DataFileOperation(phase = DataFilePhase.PICKING) },
                     onImportMerge = {},
                     onImportReplace = {},
                 )
@@ -220,7 +222,20 @@ class DataSettingsScreenTest {
             .performScrollTo()
             .performClick()
 
-        composeRule.onNodeWithText("Export started").assertIsDisplayed()
+        composeRule.onNodeWithText("Export started").assertDoesNotExist()
+        composeRule.onNodeWithText("Export saved.").assertDoesNotExist()
+        composeRule.onNodeWithTag(DataSettingsTestTags.Status).performScrollTo()
+        composeRule.onNodeWithText("Choose where to save the export.").assertIsDisplayed()
+        operation = operation.copy(phase = DataFilePhase.WORKING)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Writing export...").assertIsDisplayed()
+        operation = operation.copy(phase = DataFilePhase.SUCCEEDED)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Export saved.").assertIsDisplayed()
+        operation = operation.copy(phase = DataFilePhase.CANCELLED)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Export cancelled. No file was written.").assertIsDisplayed()
+        composeRule.onNodeWithText("Export saved.").assertDoesNotExist()
     }
 
     @Test
@@ -249,6 +264,48 @@ class DataSettingsScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("Calculating storage usage...").assertDoesNotExist()
         composeRule.onNodeWithText("Loading stored keys...").assertDoesNotExist()
+    }
+
+    @Test
+    fun `key removal replaces an earlier file result and the next file action clears it`() {
+        var operation by mutableStateOf(DataFileOperation(phase = DataFilePhase.WORKING))
+        var removed = false
+        val service = object : DataControls {
+            override suspend fun getUsage() = state().usage!!
+            override suspend fun listProviderKeys() = state().keys.map { it.copy(hasKey = !removed) }
+            override suspend fun removeProviderKey(providerId: String) { removed = true }
+            override suspend fun clearAll() = error("Not part of this flow")
+        }
+        composeRule.setContent {
+            ChatUiTheme {
+                DataSettingsRoute(
+                    service = service,
+                    fileOperation = operation,
+                    onDismissFileError = { operation = DataFileOperation() },
+                    onOpenProviders = {},
+                    onOpenBackup = {},
+                    onExportAll = {},
+                    onImportMerge = {
+                        operation = DataFileOperation(DataFileAction.IMPORT_MERGE, DataFilePhase.PICKING)
+                    },
+                    onImportReplace = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag(DataSettingsTestTags.removeKey("provider-1"))
+            .performScrollTo().assertIsNotEnabled()
+        operation = operation.copy(phase = DataFilePhase.SUCCEEDED)
+        composeRule.onNodeWithTag(DataSettingsTestTags.removeKey("provider-1")).performScrollTo().performClick()
+        composeRule.onNodeWithText("Export saved.").assertDoesNotExist()
+        operation = operation.copy(phase = DataFilePhase.WORKING)
+        composeRule.onNodeWithTag(DataSettingsTestTags.confirmRemoveKey("provider-1"))
+            .performScrollTo().assertIsNotEnabled()
+        operation = operation.copy(phase = DataFilePhase.SUCCEEDED)
+        composeRule.onNodeWithTag(DataSettingsTestTags.confirmRemoveKey("provider-1")).performScrollTo().performClick()
+        composeRule.onNodeWithText("Key removed. Add a new key before sending with this provider.").assertExists()
+        composeRule.onNodeWithTag(DataSettingsTestTags.ImportMerge).performScrollTo().performClick()
+        composeRule.onNodeWithText("Key removed. Add a new key before sending with this provider.").assertDoesNotExist()
+        composeRule.onNodeWithText("Choose an archive to import.").assertExists()
     }
 
     @Test

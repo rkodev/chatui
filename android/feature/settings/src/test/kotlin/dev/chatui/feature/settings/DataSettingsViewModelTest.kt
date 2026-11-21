@@ -82,6 +82,34 @@ class DataSettingsViewModelTest {
     }
 
     @Test
+    fun `a new document action clears an older internal operation result`() = runTest(dispatcher) {
+        val service = FakeDataControls()
+        val viewModel = DataSettingsViewModel(service)
+        advanceUntilIdle()
+        viewModel.onRequestRemoveKey("provider-1")
+        viewModel.onConfirmRemoveKey("provider-1")
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.status).contains("Key removed")
+
+        viewModel.onStartFileOperation()
+
+        assertThat(viewModel.state.value.status).isNull()
+        assertThat(viewModel.state.value.keys.single().hasKey).isFalse()
+    }
+
+    @Test
+    fun `a mismatched key confirmation cannot remove another provider key`() = runTest(dispatcher) {
+        val service = FakeDataControls()
+        val viewModel = DataSettingsViewModel(service)
+        advanceUntilIdle()
+        viewModel.onConfirmRemoveKey("provider-1")
+        viewModel.onRequestRemoveKey("provider-1")
+        viewModel.onConfirmRemoveKey("provider-2")
+        advanceUntilIdle()
+        assertThat(service.removedKeys).isEmpty()
+    }
+
+    @Test
     fun `load failure is surfaced`() = runTest(dispatcher) {
         val service = FakeDataControls().apply {
             error = IllegalStateException("nope")

@@ -15,6 +15,8 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -86,24 +88,41 @@ fun interface ImportDocumentLauncher {
 fun rememberImportDocumentLauncher(
     onDocument: suspend (Uri) -> Unit,
     onError: (Throwable) -> Unit = {},
+    onReading: () -> Unit = {},
+    onSuccess: () -> Unit = {},
+    onCancelled: () -> Unit = {},
+    operationScope: CoroutineScope? = null,
 ): ImportDocumentLauncher {
-    val scope = rememberCoroutineScope()
+    val localScope = rememberCoroutineScope()
+    val scope = operationScope ?: localScope
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
             scope.launch {
                 try {
+                    onReading()
                     onDocument(uri)
+                    onSuccess()
+                } catch (error: CancellationException) {
+                    throw error
                 } catch (error: Throwable) {
                     onError(error)
                 }
             }
+        } else {
+            onCancelled()
         }
     }
 
     return ImportDocumentLauncher {
-        launcher.launch(arrayOf("application/json", "text/plain"))
+        try {
+            launcher.launch(arrayOf("application/json", "text/plain"))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            onError(error)
+        }
     }
 }
 

@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,11 +42,11 @@ object MotionSpecs {
     val springPress: SpringSpec<Float> = spring(stiffness = 600f, dampingRatio = 0.6f)
 
     const val fadeThroughMillis: Int = 180
-    const val sharedAxisMillis: Int = 220
-    const val emphasizedMillis: Int = 300
+    const val sharedAxisMillis: Int = 180
+    const val emphasizedMillis: Int = 180
     const val dialogMillis: Int = 150
     const val bubbleAppearMillis: Int = 180
-    const val snackbarMillis: Int = 200
+    const val snackbarMillis: Int = 160
 
     /** Full blink period for the streaming caret. */
     const val caretBlinkMillis: Int = 1_000
@@ -83,7 +84,7 @@ fun <T> animateContent(
     content: @Composable (T) -> Unit,
 ) {
     if (LocalReducedMotion.current) {
-        content(targetValue)
+        Box(modifier = modifier) { content(targetValue) }
     } else {
         AnimatedContent(
             targetState = targetValue,
@@ -112,7 +113,7 @@ fun Modifier.pressScale(
     val reduced = LocalReducedMotion.current
     val scale by animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
-        animationSpec = if (reduced) snap() else MotionSpecs.springPress,
+        animationSpec = if (reduced) snap() else tween(LocalChatUiMotion.current.fastMillis),
         label = "pressScale",
     )
     return graphicsLayer {
@@ -130,6 +131,7 @@ fun Modifier.pressScale(
 @Composable
 fun Modifier.bubbleAppear(key: Any?): Modifier {
     val reduced = LocalReducedMotion.current
+    if (reduced) return this
     var visible by rememberSaveable(key) { mutableStateOf(false) }
     LaunchedEffect(key) { visible = true }
     val progress by animateFloatAsState(

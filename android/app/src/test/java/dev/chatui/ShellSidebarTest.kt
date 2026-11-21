@@ -4,6 +4,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
 import com.google.common.truth.Truth.assertThat
 import dev.chatui.core.designsystem.ChatUiTheme
 import dev.chatui.feature.conversations.ConversationListTestTags
@@ -25,15 +27,13 @@ class ShellSidebarTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `sidebar exposes every destination`() {
+    fun `sidebar footer exposes only providers and settings`() {
         val routes = mutableListOf<String>()
         setSidebar(onNavigate = { routes += it })
 
         listOf(
             ShellDestination.Providers.route,
             ShellDestination.Settings.route,
-            SettingsDestination.DATA,
-            ShellDestination.Backup.route,
         ).forEach { route ->
             composeRule.onNodeWithTag(ShellTestTags.navigationItem(route)).performClick()
         }
@@ -41,9 +41,11 @@ class ShellSidebarTest {
         assertThat(routes).containsExactly(
             ShellDestination.Providers.route,
             ShellDestination.Settings.route,
-            SettingsDestination.DATA,
-            ShellDestination.Backup.route,
         ).inOrder()
+        composeRule.onNodeWithTag(ShellTestTags.navigationItem(SettingsDestination.DATA))
+            .assertDoesNotExist()
+        composeRule.onNodeWithTag(ShellTestTags.navigationItem(ShellDestination.Backup.route))
+            .assertDoesNotExist()
     }
 
     @Test
@@ -89,18 +91,20 @@ class ShellSidebarTest {
     }
 
     @Test
-    fun `sidebar groups destinations into chats library and settings`() {
+    fun `sidebar owns one title and one new chat action`() {
         setSidebar(onNavigate = {})
 
-        composeRule.onNodeWithText("CHATS").assertExists()
-        composeRule.onNodeWithText("LIBRARY").assertExists()
-        composeRule.onNodeWithText("SETTINGS").assertExists()
+        composeRule.onAllNodesWithText("New chat").assertCountEquals(1)
+        composeRule.onNodeWithText("LIBRARY").assertDoesNotExist()
+        composeRule.onNodeWithTag(
+            ShellTestTags.navigationItem(ShellDestination.Conversations.route),
+        ).assertDoesNotExist()
     }
 
     private fun setSidebar(
         service: FakeConversationService = FakeConversationService(),
         onNavigate: (String) -> Unit,
-        onNewChat: () -> Unit = {},
+        onNewChat: (() -> Unit)? = null,
     ) {
         composeRule.setContent {
             ChatUiTheme {

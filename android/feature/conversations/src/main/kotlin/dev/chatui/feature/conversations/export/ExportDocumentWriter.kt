@@ -18,6 +18,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import java.io.IOException
 import java.io.OutputStream
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,9 +65,16 @@ fun interface ExportDocumentLauncher {
 fun rememberExportDocumentLauncher(
     artifact: suspend () -> ExportArtifact,
     onError: (Throwable) -> Unit = {},
+    onPreparing: () -> Unit = {},
+    onPickerOpened: () -> Unit = {},
+    onWriting: () -> Unit = {},
+    onSuccess: () -> Unit = {},
+    onCancelled: () -> Unit = {},
+    operationScope: CoroutineScope? = null,
 ): ExportDocumentLauncher {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val localScope = rememberCoroutineScope()
+    val scope = operationScope ?: localScope
     val writer = remember(context) { ExportDocumentWriter(context.contentResolver) }
     var pending by remember { mutableStateOf<ExportArtifact?>(null) }
 
@@ -74,24 +83,36 @@ fun rememberExportDocumentLauncher(
     ) { uri ->
         val current = pending
         pending = null
-        if (uri != null && current != null) {
+        if (uri != null) {
             scope.launch {
                 try {
-                    writer.write(uri, current)
+                    onWriting()
+                    // A recreated activity may receive the URI without its in-memory artifact.
+                    writer.write(uri, current ?: artifact())
+                    onSuccess()
+                } catch (error: CancellationException) {
+                    throw error
                 } catch (error: Throwable) {
                     onError(error)
                 }
             }
+        } else {
+            onCancelled()
         }
     }
 
     return ExportDocumentLauncher {
         scope.launch {
             try {
+                onPreparing()
                 val next = artifact()
                 pending = next
+                onPickerOpened()
                 launcher.launch(next.filename)
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Throwable) {
+                pending = null
                 onError(error)
             }
         }

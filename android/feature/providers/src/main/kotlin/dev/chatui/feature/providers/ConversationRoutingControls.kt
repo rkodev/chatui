@@ -2,6 +2,8 @@ package dev.chatui.feature.providers
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -10,10 +12,13 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalDimens
@@ -37,6 +42,7 @@ object ConversationRoutingTestTags {
  * Values are stored in `conversation.params.extra.openrouter.provider` and
  * persisted immediately. The summary is shown only when routing is active.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ConversationRoutingControls(
     state: ConversationRoutingUiState,
@@ -45,10 +51,11 @@ fun ConversationRoutingControls(
     onSortChanged: (RoutingSort?) -> Unit,
     onDenyDataCollectionChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onRetry: () -> Unit = {},
 ) {
     val dimens = LocalDimens.current
     val preferences = state.preferences
-    val enabled = preferences.enabled && !state.busy
+    val enabled = preferences.enabled && !state.busy && !state.loading
 
     Column(
         modifier = modifier
@@ -63,12 +70,13 @@ fun ConversationRoutingControls(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Use custom routing preferences")
+            Text("Use custom routing preferences", modifier = Modifier.weight(1f))
             Switch(
                 checked = preferences.enabled,
                 onCheckedChange = onEnabledChanged,
-                enabled = !state.busy,
-                modifier = Modifier.testTag(ConversationRoutingTestTags.Enabled),
+                enabled = !state.busy && !state.loading,
+                modifier = Modifier.testTag(ConversationRoutingTestTags.Enabled)
+                    .semantics { contentDescription = "Use custom routing preferences" },
             )
         }
 
@@ -77,17 +85,18 @@ fun ConversationRoutingControls(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Allow provider fallbacks")
+            Text("Allow provider fallbacks", modifier = Modifier.weight(1f))
             Switch(
                 checked = preferences.allowFallbacks,
                 onCheckedChange = onAllowFallbacksChanged,
                 enabled = enabled,
-                modifier = Modifier.testTag(ConversationRoutingTestTags.AllowFallbacks),
+                modifier = Modifier.testTag(ConversationRoutingTestTags.AllowFallbacks)
+                    .semantics { contentDescription = "Allow provider fallbacks" },
             )
         }
 
         Text("Sort providers by", style = MaterialTheme.typography.bodyMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(dimens.space1)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(dimens.space1)) {
             SortChip(
                 label = "Default",
                 selected = preferences.sort == null,
@@ -111,12 +120,13 @@ fun ConversationRoutingControls(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Do not use providers that may train on prompts")
+            Text("Do not use providers that may train on prompts", modifier = Modifier.weight(1f))
             Switch(
                 checked = preferences.denyDataCollection,
                 onCheckedChange = onDenyDataCollectionChanged,
                 enabled = enabled,
-                modifier = Modifier.testTag(ConversationRoutingTestTags.DenyDataCollection),
+                modifier = Modifier.testTag(ConversationRoutingTestTags.DenyDataCollection)
+                    .semantics { contentDescription = "Do not use providers that may train on prompts" },
             )
         }
 
@@ -142,6 +152,7 @@ fun ConversationRoutingControls(
                 title = "Could not update routing",
                 body = error,
                 modifier = Modifier.testTag(ConversationRoutingTestTags.Error),
+                action = { TextButton(onClick = onRetry) { Text("Retry") } },
             )
         }
     }

@@ -109,6 +109,7 @@ pub struct MessageListState {
     heights: BTreeMap<String, f32>,
     scroll_top: f32,
     viewport_height: f32,
+    layout_extra_height: f32,
     near_bottom: bool,
     has_older: bool,
     loading_older: bool,
@@ -131,6 +132,7 @@ impl MessageListState {
             heights: BTreeMap::new(),
             scroll_top: 0.0,
             viewport_height: config.viewport_height,
+            layout_extra_height: 0.0,
             near_bottom: true,
             has_older: false,
             loading_older: false,
@@ -230,8 +232,13 @@ impl MessageListState {
 
     /// Update the viewport height and clamp the scroll offset.
     pub fn set_viewport_height(&mut self, height: f32) {
+        let follow = self.near_bottom;
         self.viewport_height = height.max(0.0);
-        self.scroll_top = self.scroll_top.clamp(0.0, self.max_scroll_top());
+        self.scroll_top = if follow {
+            self.max_scroll_top()
+        } else {
+            self.scroll_top.clamp(0.0, self.max_scroll_top())
+        };
         self.update_near_bottom();
     }
 
@@ -370,8 +377,30 @@ impl MessageListState {
             return;
         }
 
+        let follow = self.near_bottom;
+        let previous = self.row_height(id);
+        let mut offset = 0.0;
+        let above_viewport = self
+            .messages
+            .iter()
+            .find_map(|message| {
+                if message.id == id {
+                    Some(offset + previous <= self.scroll_top)
+                } else {
+                    offset += self.row_height(&message.id);
+                    None
+                }
+            })
+            .unwrap_or(false);
         self.heights.insert(id.to_owned(), height);
-        self.scroll_top = self.scroll_top.clamp(0.0, self.max_scroll_top());
+        if follow {
+            self.scroll_top = self.max_scroll_top();
+        } else {
+            if above_viewport {
+                self.scroll_top += height - previous;
+            }
+            self.scroll_top = self.scroll_top.clamp(0.0, self.max_scroll_top());
+        }
         self.update_near_bottom();
     }
 
@@ -391,16 +420,15 @@ impl MessageListState {
 
     /// Estimated height of the isolated streaming row.
     pub fn streaming_height(&self) -> f32 {
-        if self.streaming.is_some() {
-            self.config.estimate_height
-        } else {
-            0.0
-        }
+        self.streaming
+            .as_ref()
+            .map(|stream| self.row_height(&stream.message_id))
+            .unwrap_or(0.0)
     }
 
     /// Total height of the scroll content, including the streaming row.
     pub fn content_height(&self) -> f32 {
-        self.total_height() + self.streaming_height()
+        self.total_height() + self.streaming_height() + self.layout_extra_height
     }
 
     /// Maximum scroll offset for the current content and viewport.
@@ -670,13 +698,16 @@ fn find_end(offsets: &[f32], value: f32) -> usize {
 }
 
 slint::slint! {
-    import { Button, Palette, ScrollView } from "std-widgets.slint";
+    import { AppButton as Button, AppText as Text, AppIcon, Design } from "../design.slint";
+    import { NativeMarkdownBlock, MarkdownContent } from "markdown_view.slint";
+    import { Palette, ScrollView } from "std-widgets.slint";
 
     export struct MessageListRow {
         id: string,
         role: string,
         role-label: string,
         markdown: string,
+        blocks: [NativeMarkdownBlock],
         reasoning: string,
         status: string,
         status-label: string,
@@ -699,54 +730,70 @@ slint::slint! {
     }
 
     component MessageRowView inherits Rectangle {
+        vertical-stretch: 0;
         in property <MessageListRow> message;
         in property <bool> show-actions: true;
         in property <bool> dark: false;
+        in property <length> chat-font-size: 16px;
         callback copy(string);
         callback regenerate(string);
         callback retry(string);
+        callback open-link(string);
+        callback copy-text(string);
+        callback measured(string, length);
+        changed height => { root.measured(root.message.id, self.height + 8px); }
 
-        background: message.is-user ? (root.dark ? #16324f : #e8f0fe) : transparent;
-        border-radius: 8px;
+        background: message.is-user ? (Design.colors(root.dark).accent-soft) : transparent;
+        border-radius: 12px;
+        border-width: message.is-user ? 1px : 0px;
+        border-color: Design.colors(root.dark).border;
 
         accessible-role: list-item;
         accessible-label: message.role-label;
 
         VerticalLayout {
-            padding: 8px;
-            spacing: 4px;
+            padding: 16px;
+            spacing: 10px;
 
             HorizontalLayout {
                 spacing: 8px;
-                Text { text: message.role-label; font-weight: 600; }
+                Text { text: message.role-label; font-size: 12px; font-weight: 600; }
                 Rectangle { horizontal-stretch: 1; }
-                Text { text: message.time; color: root.dark ? #9ca3af : #5f6368; }
+                Text { text: message.time; font-size: 11px; color: Design.colors(root.dark).muted; }
             }
 
             if (!message.reasoning.is-empty) : Text {
                 text: "Reasoning: " + message.reasoning;
-                color: root.dark ? #9ca3af : #5f6368;
+                color: Design.colors(root.dark).muted;
                 wrap: word-wrap;
             }
 
-            if (!message.markdown.is-empty) : Text {
+            if (message.blocks.length > 0) : MarkdownContent {
+                blocks: message.blocks;
+                dark: root.dark;
+                chat-font-size: root.chat-font-size;
+                open-link(url) => { root.open-link(url); }
+                copy-text(text) => { root.copy-text(text); }
+            }
+            if (message.blocks.length == 0 && !message.markdown.is-empty) : Text {
                 text: message.markdown;
+                font-size: root.chat-font-size;
                 wrap: word-wrap;
             }
 
             if (message.show-typing) : Text {
                 text: "…";
-                color: root.dark ? #9ca3af : #5f6368;
+                color: Design.colors(root.dark).muted;
             }
 
             if (!message.status-label.is-empty) : Text {
                 text: message.status-label;
-                color: root.dark ? #fbbf24 : #b45309;
+                color: Design.colors(root.dark).warning;
                 wrap: word-wrap;
             }
 
             if (!message.error-title.is-empty) : Rectangle {
-                background: root.dark ? #3b1d1d : #fde8e8;
+                background: Design.colors(root.dark).danger-soft;
                 border-radius: 8px;
                 VerticalLayout {
                     padding: 8px;
@@ -755,7 +802,7 @@ slint::slint! {
                     Text { text: message.error-message; wrap: word-wrap; }
                     if (!message.error-details.is-empty) : Text {
                         text: message.error-details;
-                        color: root.dark ? #9ca3af : #5f6368;
+                        color: Design.colors(root.dark).muted;
                         wrap: word-wrap;
                     }
                     if (message.can-retry) : Button {
@@ -767,6 +814,7 @@ slint::slint! {
 
             if (root.show-actions && (message.can-copy || message.can-regenerate || message.can-retry)) : HorizontalLayout {
                 spacing: 4px;
+                alignment: start;
                 if (message.can-copy) : Button {
                     text: "Copy";
                     clicked => { root.copy(message.id); }
@@ -783,7 +831,8 @@ slint::slint! {
 
             if (!message.meta.is-empty) : Text {
                 text: message.meta;
-                color: root.dark ? #9ca3af : #5f6368;
+                font-size: 11px;
+                color: Design.colors(root.dark).muted;
                 wrap: word-wrap;
             }
         }
@@ -791,12 +840,12 @@ slint::slint! {
 
     export component MessageListWindow inherits Window {
         title: "ChatUI chat";
-        width: 900px;
-        height: 720px;
+        preferred-width: 900px;
+        preferred-height: 720px;
 
         in property <[MessageListRow]> rows: [];
         in property <MessageListRow> streaming-row: {
-            id: "", role: "", role-label: "", markdown: "", reasoning: "",
+            id: "", role: "", role-label: "", markdown: "", blocks: [], reasoning: "",
             status: "", status-label: "", time: "", meta: "",
             error-title: "", error-message: "", error-details: "",
             can-copy: false, can-regenerate: false, can-retry: false,
@@ -809,7 +858,11 @@ slint::slint! {
         in property <bool> loading-older: false;
         in property <bool> loading: false;
         in property <bool> empty: false;
-        in property <string> empty-message: "No messages yet. Send a message to start the conversation.";
+        in property <string> empty-message: "Make a plan, learn something new, or think an idea through.";
+        in property <bool> needs-setup: false;
+        in property <bool> setup-uses-models: false;
+        in property <bool> starters-enabled: true;
+        in property <length> chat-font-size: 16px;
         in property <string> announcement: "";
         in property <bool> announcement-assertive: false;
         in property <bool> error-visible: false;
@@ -821,7 +874,7 @@ slint::slint! {
         in-out property <length> content-y: 0px;
         in property <bool> dark: false;
 
-        background: root.dark ? #0f1115 : #ffffff;
+        background: Design.colors(root.dark).canvas;
         init => {
             Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
         }
@@ -835,12 +888,37 @@ slint::slint! {
         callback regenerate(string);
         callback retry-message(string);
         callback scroll-changed(length);
+        callback native-scroll-changed(length);
+        callback scroll-to-offset(length);
+        callback use-starter(string);
+        callback open-providers();
+        callback open-link(string);
+        callback copy-text(string);
+        callback row-measured(string, length);
+        callback viewport-measured(length);
+        callback content-measured(length);
+        out property <length> viewport-height: message-scroll.height;
+        out property <length> scroll-content-height: message-scroll.content-height;
+        out property <length> actual-content-y: -message-scroll.content-y;
+        changed viewport-height => { root.viewport-measured(self.viewport-height); }
+        changed scroll-content-height => { root.content-measured(self.scroll-content-height); }
 
-        changed content-y => { root.scroll-changed(self.content-y); }
+        changed content-y => {
+            message-scroll.content-y = -self.content-y;
+        }
+        scroll-to-offset(offset) => {
+            root.content-y = offset;
+            message-scroll.content-y = -offset;
+        }
 
-        VerticalLayout {
-            padding: 12px;
-            spacing: 8px;
+        Rectangle {
+          x: 0px;
+          y: 0px;
+          width: 100%;
+          height: 100%;
+          VerticalLayout {
+            padding: 4px;
+            spacing: 12px;
 
             if (root.announcement != "") : Text {
                 text: root.announcement;
@@ -850,7 +928,7 @@ slint::slint! {
             }
 
             if (root.error-visible) : Rectangle {
-                background: root.dark ? #3b1d1d : #fde8e8;
+                background: Design.colors(root.dark).danger-soft;
                 border-radius: 8px;
                 VerticalLayout {
                     padding: 8px;
@@ -859,7 +937,7 @@ slint::slint! {
                     Text { text: root.error-message; wrap: word-wrap; }
                     if (!root.error-details.is-empty) : Text {
                         text: root.error-details;
-                        color: root.dark ? #9ca3af : #5f6368;
+                        color: Design.colors(root.dark).muted;
                         wrap: word-wrap;
                     }
                     Button { text: "Retry"; clicked => { root.retry(); } }
@@ -868,24 +946,115 @@ slint::slint! {
 
             if (root.loading) : VerticalLayout {
                 spacing: 8px;
-                Text { text: "Loading messages…"; color: root.dark ? #9ca3af : #5f6368; }
-                Rectangle { height: 16px; background: root.dark ? #1f232b : #eeeeee; border-radius: 4px; }
-                Rectangle { height: 16px; background: root.dark ? #1f232b : #eeeeee; border-radius: 4px; }
-                Rectangle { height: 16px; background: root.dark ? #1f232b : #eeeeee; border-radius: 4px; }
+                Text { text: "Loading messages…"; color: Design.colors(root.dark).muted; }
+                Rectangle { height: 16px; background: Design.colors(root.dark).surface; border-radius: 4px; }
+                Rectangle { height: 16px; background: Design.colors(root.dark).surface; border-radius: 4px; }
+                Rectangle { height: 16px; background: Design.colors(root.dark).surface; border-radius: 4px; }
             }
 
-            if (root.empty && !root.loading) : Text {
-                text: root.empty-message;
-                color: root.dark ? #9ca3af : #5f6368;
-                wrap: word-wrap;
-            }
+            message-scroll := ScrollView {
+                content-y: -root.content-y;
+                changed content-y => {
+                    if (abs(root.content-y + self.content-y) > 0.5px) {
+                        root.native-scroll-changed(-self.content-y);
+                    }
+                }
+                scrolled => { root.scroll-changed(-self.content-y); }
+                content-width: self.width;
+                content-height: message-content.preferred-height;
 
-            ScrollView {
-                content-y <=> root.content-y;
-
-                VerticalLayout {
+                message-content := VerticalLayout {
+                    height: self.preferred-height;
                     spacing: 8px;
+                    alignment: start;
                     accessible-role: list;
+
+                    if (root.empty && !root.loading) : VerticalLayout {
+                        padding-top: 16px;
+                        padding-bottom: 16px;
+                        spacing: root.width < 520px ? 10px : 16px;
+                        HorizontalLayout {
+                            Rectangle { horizontal-stretch: 1; }
+                            Rectangle {
+                                width: 48px;
+                                height: 48px;
+                                border-radius: 16px;
+                                background: Design.colors(root.dark).accent-soft;
+                                AppIcon {
+                                    kind: 6;
+                                    x: 12px;
+                                    y: 12px;
+                                    width: 24px;
+                                    height: 24px;
+                                    tint: Design.colors(root.dark).accent;
+                                }
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                        Text {
+                            text: root.needs-setup ? "Make yourself at home." : "What would you like to explore?";
+                            font-size: root.width < 520px ? 24px : 28px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
+                        }
+                        Text {
+                            text: root.needs-setup ? (root.setup-uses-models ? "Choose an available model to start your conversation." : "Connect a provider and choose a model to start your first conversation.") : root.empty-message;
+                            color: Design.colors(root.dark).muted;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
+                        }
+                        if (root.needs-setup) : HorizontalLayout {
+                            Rectangle { horizontal-stretch: 1; }
+                            Button {
+                                text: root.setup-uses-models ? "Choose a model" : "Connect a provider";
+                                primary: true;
+                                dark: root.dark;
+                                clicked => { root.open-providers(); }
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                        if (!root.needs-setup) : GridLayout {
+                            spacing: 8px;
+                            Button {
+                                row: 0;
+                                col: 0;
+                                text: "Make a plan";
+                                dark: root.dark;
+                                min-width: 0px;
+                                horizontal-stretch: 1;
+                                enabled: root.starters-enabled;
+                                clicked => { root.use-starter("Help me make a clear, practical plan for a goal I'm working toward. Start by asking about the goal."); }
+                            }
+                            Button {
+                                row: root.width < 520px ? 1 : 0;
+                                col: root.width < 520px ? 0 : 1;
+                                text: "Learn something";
+                                dark: root.dark;
+                                min-width: 0px;
+                                horizontal-stretch: 1;
+                                enabled: root.starters-enabled;
+                                clicked => { root.use-starter("Help me understand a topic by breaking it into simple ideas and examples. Ask me what I'd like to learn."); }
+                            }
+                            Button {
+                                row: root.width < 520px ? 2 : 0;
+                                col: root.width < 520px ? 0 : 2;
+                                text: "Explore an idea";
+                                dark: root.dark;
+                                min-width: 0px;
+                                horizontal-stretch: 1;
+                                enabled: root.starters-enabled;
+                                clicked => { root.use-starter("Be a thoughtful sounding board for an idea. Ask me about it, then help me explore possibilities and next steps."); }
+                            }
+                        }
+                        Text {
+                            text: "Your history stays local. Your ideas are yours.";
+                            font-size: 11px;
+                            color: Design.colors(root.dark).muted;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
+                        }
+                    }
 
                     if (root.has-older || root.loading-older) : Button {
                         text: root.loading-older ? "Loading older messages…" : "Load older messages";
@@ -899,9 +1068,13 @@ slint::slint! {
                         message: item;
                         show-actions: true;
                         dark: root.dark;
+                        chat-font-size: root.chat-font-size;
                         copy(id) => { root.copy(id); }
                         regenerate(id) => { root.regenerate(id); }
                         retry(id) => { root.retry-message(id); }
+                        open-link(url) => { root.open-link(url); }
+                        copy-text(text) => { root.copy-text(text); }
+                        measured(id, height) => { root.row-measured(id, height); }
                     }
 
                     Rectangle { height: root.bottom-padding; }
@@ -910,12 +1083,17 @@ slint::slint! {
                         message: root.streaming-row;
                         show-actions: false;
                         dark: root.dark;
+                        chat-font-size: root.chat-font-size;
                         copy(id) => { root.copy(id); }
                         regenerate(id) => { root.regenerate(id); }
                         retry(id) => { root.retry-message(id); }
+                        open-link(url) => { root.open-link(url); }
+                        copy-text(text) => { root.copy-text(text); }
+                        measured(id, height) => { root.row-measured(id, height); }
                     }
                 }
             }
+          }
         }
     }
 }
@@ -945,6 +1123,9 @@ fn slint_row(row: &MessageRow) -> MessageListRow {
         role: SharedString::from(role_id(row.role)),
         role_label: SharedString::from(row.role_label.clone()),
         markdown: SharedString::from(row.markdown.clone()),
+        blocks: ModelRc::new(VecModel::from(super::markdown_view::render_native(
+            &row.markdown,
+        ))),
         reasoning: SharedString::from(row.reasoning.clone()),
         status: SharedString::from(status_id(row.status)),
         status_label: SharedString::from(row.status_label.clone().unwrap_or_default()),
@@ -986,8 +1167,6 @@ fn slint_row(row: &MessageRow) -> MessageListRow {
 pub fn sync_window(window: &MessageListWindow, state: &MessageListState) {
     let rows: Vec<MessageListRow> = state.visible_rows().iter().map(slint_row).collect();
     window.set_rows(ModelRc::new(VecModel::from(rows)));
-    window.set_top_padding(state.top_padding());
-    window.set_bottom_padding(state.bottom_padding());
     window.set_has_older(state.has_older());
     window.set_loading_older(state.loading_older());
     window.set_loading(state.is_loading());
@@ -1032,10 +1211,20 @@ pub fn sync_window(window: &MessageListWindow, state: &MessageListState) {
         window.set_streaming_visible(false);
     }
 
-    let scroll_top = state.scroll_top();
+    sync_scroll_geometry(window, state);
+}
 
-    if (window.get_content_y() - scroll_top).abs() > 0.5 {
-        window.set_content_y(scroll_top);
+fn sync_scroll_geometry(window: &MessageListWindow, state: &MessageListState) {
+    window.set_top_padding(state.top_padding());
+    window.set_bottom_padding(state.bottom_padding());
+    set_scroll_offset(window, state.scroll_top());
+}
+
+fn set_scroll_offset(window: &MessageListWindow, scroll_top: f32) {
+    if (window.get_content_y() - scroll_top).abs() > 0.5
+        || (window.get_actual_content_y() - scroll_top).abs() > 0.5
+    {
+        window.invoke_scroll_to_offset(scroll_top);
     }
 }
 
@@ -1048,12 +1237,23 @@ struct MessageListHandlers {
     copy: Option<Rc<dyn Fn(String)>>,
 }
 
+#[derive(Default)]
+struct LayoutMeasurements {
+    rows: BTreeMap<String, f32>,
+    viewport: Option<f32>,
+    content: Option<f32>,
+    scroll: Option<f32>,
+    user_scrolled: bool,
+}
+
 /// Owns the message list state and the Slint window that renders it.
 pub struct MessageListController {
     state: Rc<RefCell<MessageListState>>,
     window: MessageListWindow,
     handlers: Rc<RefCell<MessageListHandlers>>,
     last_window: Rc<Cell<Option<(usize, usize)>>>,
+    measurements: Rc<RefCell<LayoutMeasurements>>,
+    content_height: Cell<Option<f32>>,
 }
 
 impl MessageListController {
@@ -1065,6 +1265,8 @@ impl MessageListController {
             window,
             handlers: Rc::new(RefCell::new(MessageListHandlers::default())),
             last_window: Rc::new(Cell::new(None)),
+            measurements: Rc::new(RefCell::new(LayoutMeasurements::default())),
+            content_height: Cell::new(None),
         };
         controller.wire();
         controller.sync();
@@ -1086,6 +1288,89 @@ impl MessageListController {
         let state = self.state.borrow();
         self.last_window.set(Some(state.visible_range()));
         sync_window(&self.window, &state);
+    }
+
+    fn sync_viewport(&self) {
+        let state = self.state.borrow();
+        if self.last_window.get() != Some(state.visible_range()) {
+            drop(state);
+            self.sync();
+        } else {
+            sync_scroll_geometry(&self.window, &state);
+        }
+    }
+
+    /// Apply native layout measurements without changing models during layout.
+    pub fn poll_layout(&self) {
+        let measurements = std::mem::take(&mut *self.measurements.borrow_mut());
+        if measurements.rows.is_empty()
+            && measurements.viewport.is_none()
+            && measurements.content.is_none()
+            && measurements.scroll.is_none()
+        {
+            return;
+        }
+        let mut state = self.state.borrow_mut();
+        let mut changed = false;
+        for (id, height) in measurements.rows {
+            if !state.messages.iter().any(|message| message.id == id)
+                && !state
+                    .streaming
+                    .as_ref()
+                    .is_some_and(|stream| stream.message_id == id)
+            {
+                continue;
+            }
+            changed |= (state.row_height(&id) - height).abs() >= 1.0;
+            state.measure_row(&id, height);
+        }
+        if let Some(height) = measurements.viewport.filter(|height| *height > 0.0) {
+            changed |= (state.viewport_height - height).abs() >= 1.0;
+            state.set_viewport_height(height);
+        }
+        if let Some(height) = measurements.content {
+            self.content_height.set(Some(height));
+        }
+        if let Some(height) = self.content_height.get() {
+            let extra = if state.is_empty() {
+                0.0
+            } else {
+                (height - state.total_height() - state.streaming_height()).max(0.0)
+            };
+            if (state.layout_extra_height - extra).abs() >= 1.0 {
+                let follow = state.near_bottom;
+                state.layout_extra_height = extra;
+                state.scroll_top = if follow {
+                    state.max_scroll_top()
+                } else {
+                    state.scroll_top.clamp(0.0, state.max_scroll_top())
+                };
+                state.update_near_bottom();
+                changed = true;
+            }
+        }
+        // Reflow clamping must not cancel bottom-following or a preserved anchor.
+        let apply_scroll = measurements.user_scrolled || !changed;
+        let cursor = measurements
+            .scroll
+            .filter(|_| apply_scroll)
+            .and_then(|offset| {
+                changed = true;
+                state
+                    .handle_scroll(offset)
+                    .then(|| state.begin_load_older())
+                    .flatten()
+            });
+        drop(state);
+        if let Some(cursor) = cursor {
+            let handler = self.handlers.borrow().load_older.clone();
+            if let Some(handler) = handler {
+                handler(cursor);
+            }
+            self.sync();
+        } else if changed {
+            self.sync_viewport();
+        }
     }
 
     /// Push only the streaming row and scroll offset into the window.
@@ -1111,11 +1396,7 @@ impl MessageListController {
                 announcement.politeness == crate::accessibility::LiveRegionPoliteness::Assertive
             }));
 
-        let scroll_top = state.scroll_top();
-
-        if (self.window.get_content_y() - scroll_top).abs() > 0.5 {
-            self.window.set_content_y(scroll_top);
-        }
+        set_scroll_offset(&self.window, state.scroll_top());
     }
 
     /// Replace the list with the newest page.
@@ -1172,13 +1453,13 @@ impl MessageListController {
     /// Update the viewport height after a resize.
     pub fn set_viewport_height(&self, height: f32) {
         self.state.borrow_mut().set_viewport_height(height);
-        self.sync();
+        self.sync_viewport();
     }
 
     /// Jump to the bottom and re-enable auto-scroll.
     pub fn scroll_to_bottom(&self) {
         self.state.borrow_mut().scroll_to_bottom();
-        self.sync();
+        self.sync_viewport();
     }
 
     /// Register the older-page loader.
@@ -1207,6 +1488,31 @@ impl MessageListController {
     }
 
     fn wire(&self) {
+        let measurements = Rc::clone(&self.measurements);
+        self.window.on_row_measured(move |id, height| {
+            if !id.is_empty() && height.is_finite() && height > 0.0 {
+                measurements
+                    .borrow_mut()
+                    .rows
+                    .insert(id.to_string(), height);
+            }
+        });
+        let measurements = Rc::clone(&self.measurements);
+        self.window.on_viewport_measured(move |height| {
+            measurements.borrow_mut().viewport = Some(height);
+        });
+        let measurements = Rc::clone(&self.measurements);
+        self.window.on_content_measured(move |height| {
+            measurements.borrow_mut().content = Some(height);
+        });
+        let handlers = Rc::clone(&self.handlers);
+        self.window.on_copy_text(move |text| {
+            let handler = handlers.borrow().copy.clone();
+            if let Some(handler) = handler {
+                handler(text.to_string());
+            }
+        });
+
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let handlers = Rc::clone(&self.handlers);
@@ -1280,38 +1586,18 @@ impl MessageListController {
             }
         });
 
-        let weak = self.window.as_weak();
-        let state = Rc::clone(&self.state);
-        let handlers = Rc::clone(&self.handlers);
-        let last_window = Rc::clone(&self.last_window);
+        let measurements = Rc::clone(&self.measurements);
         self.window.on_scroll_changed(move |offset| {
-            let should_load = state.borrow_mut().handle_scroll(offset);
-
-            if should_load {
-                let cursor = state.borrow_mut().begin_load_older();
-
-                if let Some(cursor) = cursor
-                    && let Some(handler) = handlers.borrow().load_older.clone()
-                {
-                    handler(cursor);
-                }
-
-                if let Some(window) = weak.upgrade() {
-                    last_window.set(Some(state.borrow().visible_range()));
-                    sync_window(&window, &state.borrow());
-                }
-
-                return;
+            if offset.is_finite() {
+                let mut measurements = measurements.borrow_mut();
+                measurements.scroll = Some(offset);
+                measurements.user_scrolled = true;
             }
-
-            let range = state.borrow().visible_range();
-
-            if last_window.get() != Some(range) {
-                last_window.set(Some(range));
-
-                if let Some(window) = weak.upgrade() {
-                    sync_window(&window, &state.borrow());
-                }
+        });
+        let measurements = Rc::clone(&self.measurements);
+        self.window.on_native_scroll_changed(move |offset| {
+            if offset.is_finite() {
+                measurements.borrow_mut().scroll = Some(offset);
             }
         });
     }

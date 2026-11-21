@@ -2,8 +2,12 @@ package dev.chatui.core.designsystem
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,22 +22,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
+import dev.chatui.core.model.Density as UiDensity
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ComponentsTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -318,5 +334,198 @@ class ComponentsTest {
         }
 
         composeRule.onNodeWithTag("shadow").assertIsDisplayed()
+    }
+
+    @Test
+    fun `rows and buttons grow at narrow width and double font scale in both densities`() {
+        var density by mutableStateOf(UiDensity.COMFORTABLE)
+        composeRule.setContent {
+            val display = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(display.density, 2f)) {
+                ChatUiTheme(density = density, reducedMotion = true) {
+                    Column(Modifier.width(320.dp)) {
+                        SettingsRow(
+                            label = "A long accessible setting label",
+                            value = "A secondary value that must not squeeze the label",
+                            modifier = Modifier.testTag("growing-row"),
+                            trailing = {
+                                IconAction(Icons.Rounded.Add, "Row action", {})
+                            },
+                        )
+                        PrimaryButton(
+                            text = "An action label that wraps over several lines",
+                            onClick = {},
+                            modifier = Modifier.fillMaxWidth().testTag("growing-button"),
+                        )
+                    }
+                }
+            }
+        }
+
+        UiDensity.entries.forEach { selected ->
+            composeRule.runOnIdle { density = selected }
+            composeRule.onNodeWithText("A long accessible setting label").assertIsDisplayed()
+            composeRule.onNodeWithText("A secondary value that must not squeeze the label")
+                .assertIsDisplayed()
+            composeRule.onNodeWithTag("growing-row").assertHeightIsAtLeast(96.dp)
+            composeRule.onNodeWithTag("growing-button").assertHeightIsAtLeast(96.dp)
+            composeRule.onNodeWithContentDescription("Row action")
+                .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
+        }
+    }
+
+    @Test
+    fun `compact icon stepper and selectable targets remain at least 48 dp`() {
+        composeRule.setContent {
+            ChatUiTheme(density = UiDensity.COMPACT, reducedMotion = true) {
+                Column {
+                    IconAction(Icons.Rounded.Add, "Add item", {})
+                    Stepper(value = 1, onValueChange = {}, max = 2)
+                    SegmentedControl(listOf("Chats", "Archived"), 0, {})
+                }
+            }
+        }
+
+        listOf("Add item", "Increase", "Decrease").forEach {
+            composeRule.onNodeWithContentDescription(it)
+                .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
+        }
+        composeRule.onNodeWithText("Archived").assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun `compact scaffold uses a stable height and preserves title action and slots`() {
+        var clicked = false
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = true) {
+                ChatUiScaffold(
+                    title = "Chat",
+                    subtitle = "Model",
+                    titleBarStyle = TitleBarStyle.Compact,
+                    contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+                    onSubtitleClick = { clicked = true },
+                    subtitleTestTag = "model",
+                    actions = { IconAction(Icons.Rounded.Add, "More", {}) },
+                    snackbarHost = { Text("Notice", modifier = Modifier.testTag("notice")) },
+                ) { padding ->
+                    Text("Body", modifier = Modifier.padding(padding).testTag("body"))
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("model").performClick().assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithTag("chat-ui-top-bar").assertHeightIsEqualTo(72.dp)
+        composeRule.onNodeWithContentDescription("More").assertIsDisplayed()
+        composeRule.onNodeWithTag("notice").assertIsDisplayed()
+        val barBottom = composeRule.onNodeWithTag("chat-ui-top-bar")
+            .fetchSemanticsNode().boundsInRoot.bottom
+        val bodyTop = composeRule.onNodeWithTag("body").fetchSemanticsNode().boundsInRoot.top
+        composeRule.runOnIdle {
+            assertThat(clicked).isTrue()
+            assertThat(bodyTop).isAtLeast(barBottom)
+        }
+    }
+
+    @Test
+    fun `compact scaffold without a subtitle grows to two large-font title lines with full accessible text`() {
+        var large by mutableStateOf(false)
+        composeRule.setContent {
+            val display = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(display.density, if (large) 2f else 1f),
+            ) {
+                ChatUiTheme(reducedMotion = true) {
+                    Box(Modifier.width(320.dp)) {
+                        ChatUiScaffold(
+                            title = if (large) "A long screen title that must wrap without clipping" else "Chats",
+                            titleBarStyle = TitleBarStyle.Compact,
+                            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+                        ) { Text("Body", Modifier.padding(it)) }
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("chat-ui-top-bar").assertHeightIsEqualTo(56.dp)
+        val normal = composeRule.onNodeWithTag("chat-ui-top-bar").getUnclippedBoundsInRoot()
+        composeRule.runOnIdle { large = true }
+        val grown = composeRule.onNodeWithTag("chat-ui-top-bar").getUnclippedBoundsInRoot()
+        assertThat((grown.bottom - grown.top).value).isGreaterThan((normal.bottom - normal.top).value)
+        composeRule.onNodeWithText("A long screen title that must wrap without clipping")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { getLayout ->
+                val layouts = mutableListOf<TextLayoutResult>()
+                getLayout(layouts)
+                assertThat(layouts.single().lineCount).isEqualTo(2)
+                assertThat(layouts.single().isLineEllipsized(1)).isTrue()
+            }
+    }
+
+    @Test
+    @Config(qualifiers = "w640dp-h360dp-mdpi")
+    fun `short keyboard viewport retains model title semantics and space for body actions`() {
+        val title = "A deliberately long conversation title that remains available to accessibility"
+        val model = "A model name that also needs bounded space at large fonts"
+        var clicks = 0
+        composeRule.setContent {
+            val display = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(display.density, 2f)) {
+                ChatUiTheme(reducedMotion = true) {
+                    ChatUiScaffold(
+                        title = title,
+                        subtitle = model,
+                        titleBarStyle = TitleBarStyle.Compact,
+                        contentWindowInsets = WindowInsets(bottom = 224.dp),
+                        onTitleClick = { clicks++ },
+                        titleContentDescription = "Change model",
+                        subtitleTestTag = "model",
+                        navigationIcon = { IconAction(Icons.Rounded.Add, "History", {}) },
+                        actions = { IconAction(Icons.Rounded.Settings, "More", {}) },
+                    ) { padding ->
+                        Column(Modifier.fillMaxSize().padding(padding)) {
+                            Box(Modifier.weight(1f)) { Text("Body") }
+                            IconAction(Icons.Rounded.Add, "Body action", {})
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("model").assertHeightIsAtLeast(48.dp).performClick()
+        assertThat(clicks).isEqualTo(1)
+        assertThat(
+            composeRule.onNodeWithTag("model").fetchSemanticsNode()
+                .config[SemanticsProperties.StateDescription],
+        ).isEqualTo(title)
+        composeRule.onNodeWithText(model).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("History").assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithContentDescription("More").assertHeightIsAtLeast(48.dp)
+        val action = composeRule.onNodeWithContentDescription("Body action")
+            .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp).getUnclippedBoundsInRoot()
+        assertThat(action.bottom.value).isAtMost(136f)
+    }
+
+    @Test
+    fun `static skeleton does not schedule animation and pending button retains its label`() {
+        var pending by mutableStateOf(true)
+        var clicks = 0
+        composeRule.setContent {
+            ChatUiTheme(reducedMotion = false) {
+                Column {
+                    Skeleton(Modifier.size(48.dp).testTag("static-loading"))
+                    LoadingButton("Add provider", pending, { clicks++ })
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("static-loading").assertIsDisplayed()
+        composeRule.onNodeWithText("Add provider").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Add provider").performClick()
+        composeRule.runOnIdle {
+            assertThat(clicks).isEqualTo(0)
+            pending = false
+        }
+        composeRule.onNodeWithText("Add provider").performClick()
+        composeRule.runOnIdle { assertThat(clicks).isEqualTo(1) }
     }
 }

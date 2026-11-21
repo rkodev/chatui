@@ -102,6 +102,9 @@ interface BackupSettingsServiceLike {
 
     suspend fun testConnection(values: BackupFormValues)
 
+    /** Unlocks the committed configuration in memory without saving form edits. */
+    fun usePassphrase(passphrase: String)
+
     suspend fun backupNow(): SyncResult
 
     suspend fun restore(request: RestoreRequest = RestoreRequest()): RestoreResult
@@ -312,6 +315,11 @@ class BackupSettingsService(
         val config = configFromValues(values, enabled = false)
         val credentials = credentialsFromValues(values)
         createStorage(config, credentials).testConnection()
+    }
+
+    override fun usePassphrase(passphrase: String) {
+        validatePassphrase(passphrase)?.let { throw IllegalArgumentException(it) }
+        this.passphrase = passphrase
     }
 
     override suspend fun backupNow(): SyncResult {

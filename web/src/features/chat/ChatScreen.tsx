@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ModelChip } from '../providers'
+import { Icon } from '../../ui/Icon'
+import { ChatWelcome } from './ChatWelcome'
 import { MessageList } from './MessageList'
 import type { ChatSession } from './useChatSession'
 import './chat.css'
@@ -76,20 +78,25 @@ export function ChatScreen({ session, composer }: ChatScreenProps) {
     <section className="chat-screen" aria-labelledby="chat-title">
       <header className="chat-screen__header">
         <div className="chat-screen__heading">
-          <h2 id="chat-title">{conversation.title}</h2>
-          <p className="chat-screen__subtitle">{modelLabel}</p>
+          <h2 id="chat-title" title={conversation.title}>
+            {conversation.title}
+          </h2>
+          <p className="chat-screen__subtitle">A conversation that's yours to keep.</p>
         </div>
         <div className="chat-screen__actions">
           <ModelChip
             label={modelLabel}
+            provider={availability?.ok ? availability.provider : null}
             warning={unavailable?.reason === 'model_unavailable' ? unavailable.message : null}
           />
           <Link
             to="/chat/$conversationId/settings"
             params={{ conversationId: conversation.id }}
             className="chat-screen__link"
+            aria-label="Conversation settings"
           >
-            Conversation settings
+            <Icon name="sliders" size={16} />
+            <span className="chat-screen__settings-label">Conversation settings</span>
           </Link>
         </div>
       </header>
@@ -120,10 +127,11 @@ export function ChatScreen({ session, composer }: ChatScreenProps) {
 
       <div className="chat-screen__body">
         {isEmpty ? (
-          <div className="chat-screen__empty">
-            <h3>Start the conversation</h3>
-            <p>Send a message to {modelLabel}.</p>
-          </div>
+          <ChatWelcome
+            conversationId={conversation.id}
+            modelLabel={modelLabel}
+            canCompose={availability?.ok === true}
+          />
         ) : (
           <MessageList
             conversation={conversation}

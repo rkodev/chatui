@@ -14,12 +14,15 @@ use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use crate::data::error::DataError;
 use crate::data::route::DataSection;
 use crate::data::service::DataService;
+use crate::data::state::ExportArtifact;
 use crate::data::state::{
     DataOperation, DataViewModel, ExportFormat, ImportMode, KeyRowView, UsageRowView,
 };
+use crate::tasks::{TaskError, UiTasks};
 
 slint::slint! {
-    import { Button, CheckBox, ComboBox, LineEdit, Palette, ScrollView, TextEdit } from "std-widgets.slint";
+    import { AppButton as Button, AppText as Text, AppSectionButton, Design } from "../design.slint";
+    import { CheckBox, ComboBox, LineEdit, Palette, ScrollView, TextEdit } from "std-widgets.slint";
 
     export struct DataNavItem {
         id: string,
@@ -39,63 +42,19 @@ slint::slint! {
         has-key: bool,
     }
 
-    component DataSectionButton inherits Rectangle {
+    component DataSectionButton inherits AppSectionButton {
         in property <string> label;
-        in property <bool> active;
-        in property <bool> dark: false;
-        callback clicked;
-        out property <bool> focus-visible: false;
-
-        height: 36px;
-        background: root.active ? (root.dark ? #1f232b : #f7f7f8) : transparent;
-        border-radius: 6px;
-
-        accessible-role: button;
-        accessible-label: root.label;
-        accessible-action-default => { root.clicked(); }
-
-        forward-focus: fs;
-
-        fs := FocusScope {
-            x: 0;
-            width: 0;
-            focus-changed-event(reason) => {
-                root.focus-visible = reason == FocusReason.tab-navigation;
-            }
-            key-pressed(event) => {
-                if (event.text == Key.Space || event.text == Key.Return) {
-                    root.clicked();
-                    return accept;
-                }
-                return reject;
-            }
-        }
-
-        Text {
-            x: 8px;
-            text: root.label;
-            vertical-alignment: center;
-            accessible-role: none;
-        }
-
-        TouchArea {
-            clicked => { root.clicked(); }
-        }
-
-        if (root.focus-visible) : Rectangle {
-            border-width: 2px;
-            border-color: root.dark ? #60a5fa : #1a56db;
-            border-radius: 6px;
-            background: transparent;
-        }
+        text: root.label;
     }
 
     export component DataWindow inherits Window {
         title: "ChatUI data";
-        width: 1000px;
-        height: 760px;
+        preferred-width: 1000px;
+        preferred-height: 760px;
+        min-width: 0px;
 
         in property <[DataNavItem]> sections: [];
+        in property <[string]> section-labels: ["Storage usage", "Export", "Import", "Clear all data", "Stored API keys", "Backup"];
         in property <int> active-section: 0;
         in property <string> notice: "";
         in property <string> error-title: "";
@@ -103,6 +62,7 @@ slint::slint! {
         in property <string> error-details: "";
         in property <string> status: "";
         in property <string> busy: "";
+        in property <string> external-busy-message: "";
 
         in property <[UsageRow]> usage-rows: [];
         in property <string> usage-total: "";
@@ -135,7 +95,7 @@ slint::slint! {
         in property <string> backup-link-label: "";
         in property <bool> dark: false;
 
-        background: root.dark ? #0f1115 : #ffffff;
+        background: Design.colors(root.dark).canvas;
         init => {
             Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
         }
@@ -154,23 +114,38 @@ slint::slint! {
         callback replace-confirmed-changed(bool);
         callback import-text-changed(string);
         callback import-archive();
+        callback choose-import-file();
         callback clear-confirmation-changed(string);
         callback clear-all();
         callback remove-key(string);
         callback open-backup();
 
-        HorizontalLayout {
-            padding: 16px;
-            spacing: 16px;
+        Rectangle {
+          x: 0px;
+          y: 0px;
+          width: 100%;
+          height: 100%;
+          HorizontalLayout {
+            padding: root.width < 680px ? 4px : 12px;
+            spacing: 20px;
 
-            VerticalLayout {
-                width: 220px;
+            if (root.width >= 680px) : VerticalLayout {
+                width: 184px;
                 spacing: 8px;
+                alignment: start;
 
                 Text {
-                    text: "Data";
-                    font-size: 22px;
+                    text: "YOUR DATA";
+                    color: Design.colors(root.dark).muted;
+                    font-size: 11px;
                     font-weight: 600;
+                }
+
+                Text {
+                    text: "Keep a copy. Stay in control.";
+                    color: Design.colors(root.dark).muted;
+                    font-size: 12px;
+                    wrap: word-wrap;
                 }
 
                 for section[index] in root.sections : DataSectionButton {
@@ -181,9 +156,27 @@ slint::slint! {
                 }
             }
 
-            ScrollView {
+            Rectangle {
+                background: Design.colors(root.dark).raised;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: Design.colors(root.dark).border;
+                ScrollView {
+                    x: 20px;
+                    y: 20px;
+                    width: parent.width - 40px;
+                    height: parent.height - 40px;
+                    content-width: self.width;
                 VerticalLayout {
-                    spacing: 12px;
+                    spacing: 16px;
+                    alignment: start;
+
+                    if (root.width < 680px) : ComboBox {
+                        model: root.section-labels;
+                        current-index: root.active-section;
+                        accessible-label: "Data section";
+                        selected(value) => { root.select-section(self.current-index); }
+                    }
 
                     if (!root.notice.is-empty) : Text {
                         text: root.notice;
@@ -192,7 +185,7 @@ slint::slint! {
                     }
 
                     if (!root.error-title.is-empty) : Rectangle {
-                        background: root.dark ? #3b1d1d : #fde8e8;
+                        background: Design.colors(root.dark).danger-soft;
                         border-radius: 8px;
 
                         VerticalLayout {
@@ -212,20 +205,26 @@ slint::slint! {
                             if (!root.error-details.is-empty) : Text {
                                 text: root.error-details;
                                 wrap: word-wrap;
-                                color: root.dark ? #9ca3af : #5f6368;
+                                color: Design.colors(root.dark).muted;
                             }
                         }
                     }
 
                     if (!root.busy.is-empty) : Text {
                         text: root.busy;
-                        color: root.dark ? #9ca3af : #5f6368;
+                        color: Design.colors(root.dark).muted;
+                        accessible-live-region: polite;
+                    }
+                    if (!root.external-busy-message.is-empty) : Text {
+                        text: root.external-busy-message;
+                        color: Design.colors(root.dark).warning;
+                        wrap: word-wrap;
                         accessible-live-region: polite;
                     }
 
                     if (!root.status.is-empty) : Text {
                         text: root.status;
-                        color: root.dark ? #9ca3af : #5f6368;
+                        color: Design.colors(root.dark).muted;
                         accessible-live-region: polite;
                         wrap: word-wrap;
                     }
@@ -234,31 +233,31 @@ slint::slint! {
                         spacing: 8px;
 
                         Text { text: "Storage usage"; font-size: 20px; font-weight: 600; }
-                        Text { text: root.usage-note; color: root.dark ? #9ca3af : #5f6368; wrap: word-wrap; }
+                        Text { text: root.usage-note; color: Design.colors(root.dark).muted; wrap: word-wrap; }
 
                         HorizontalLayout {
                             spacing: 8px;
-                            Text { text: "Data"; width: 160px; font-weight: 600; }
-                            Text { text: "Count"; width: 80px; font-weight: 600; }
+                            Text { text: "Data"; width: root.width < 680px ? 116px : 160px; font-weight: 600; }
+                            Text { text: "Count"; width: 56px; font-weight: 600; }
                             Text { text: "Size"; font-weight: 600; }
                         }
 
                         for row in root.usage-rows : HorizontalLayout {
                             spacing: 8px;
-                            Text { text: row.label; width: 160px; }
-                            Text { text: row.count; width: 80px; }
+                            Text { text: row.label; width: root.width < 680px ? 116px : 160px; overflow: elide; }
+                            Text { text: row.count; width: 56px; }
                             Text { text: row.size; }
                         }
 
                         HorizontalLayout {
                             spacing: 8px;
-                            Text { text: "Total"; width: 160px; font-weight: 600; }
+                            Text { text: "Total"; width: root.width < 680px ? 116px : 160px; font-weight: 600; }
                             Text { text: root.usage-total; font-weight: 600; }
                         }
 
                         Button {
                             text: "Refresh usage";
-                            enabled: root.busy.is-empty;
+                            enabled: root.busy.is-empty && root.external-busy-message.is-empty;
                             clicked => { root.refresh-usage(); }
                         }
                     }
@@ -269,7 +268,7 @@ slint::slint! {
                         Text { text: "Export"; font-size: 20px; font-weight: 600; }
                         Text {
                             text: root.plaintext-warning;
-                            color: root.dark ? #fbbf24 : #b45309;
+                            color: Design.colors(root.dark).warning;
                             wrap: word-wrap;
                         }
 
@@ -293,14 +292,15 @@ slint::slint! {
 
                         Button {
                             text: "Export all data (JSON)";
-                            enabled: root.busy.is-empty;
+                            primary: true;
+                            enabled: root.busy.is-empty && root.external-busy-message.is-empty;
                             clicked => { root.export-all(); }
                         }
 
                         Text { text: "Conversation export"; font-weight: 600; }
                         if (root.conversations.length == 0) : Text {
                             text: "No conversations are stored yet.";
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                         }
                         if (root.conversations.length > 0) : VerticalLayout {
                             spacing: 8px;
@@ -322,14 +322,14 @@ slint::slint! {
 
                             Button {
                                 text: "Export conversation";
-                                enabled: root.busy.is-empty;
+                                enabled: root.busy.is-empty && root.external-busy-message.is-empty;
                                 clicked => { root.export-conversation(); }
                             }
                         }
 
                         if (!root.last-export.is-empty) : Text {
                             text: root.last-export;
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                             wrap: word-wrap;
                         }
                     }
@@ -340,7 +340,7 @@ slint::slint! {
                         Text { text: "Import"; font-size: 20px; font-weight: 600; }
                         Text {
                             text: "Only import chatui.export archives you trust. Imported content is never executed, and invalid archives leave local data unchanged.";
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                             wrap: word-wrap;
                         }
 
@@ -357,7 +357,7 @@ slint::slint! {
 
                             Text {
                                 text: "Replace deletes local conversations, messages, attachments, providers, models, and settings after you confirm.";
-                                color: root.dark ? #fbbf24 : #b45309;
+                                color: Design.colors(root.dark).warning;
                                 wrap: word-wrap;
                             }
 
@@ -368,6 +368,11 @@ slint::slint! {
                             }
                         }
 
+                        Button {
+                            text: "Choose JSON file";
+                            enabled: root.busy.is-empty && root.external-busy-message.is-empty;
+                            clicked => { root.choose-import-file(); }
+                        }
                         Text { text: "Archive JSON"; }
                         TextEdit {
                             text <=> root.import-text;
@@ -379,13 +384,13 @@ slint::slint! {
 
                         Button {
                             text: "Import archive";
-                            enabled: root.busy.is-empty;
+                            enabled: root.busy.is-empty && root.external-busy-message.is-empty;
                             clicked => { root.import-archive(); }
                         }
 
                         if (!root.last-import.is-empty) : Text {
                             text: root.last-import;
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                             wrap: word-wrap;
                         }
                     }
@@ -396,7 +401,7 @@ slint::slint! {
                         Text { text: "Clear all data"; font-size: 20px; font-weight: 600; }
                         Text {
                             text: "This permanently deletes conversations, messages, attachments, providers, models, and stored API keys from this device. Appearance and chat preferences are kept. This cannot be undone.";
-                            color: root.dark ? #fbbf24 : #b45309;
+                            color: Design.colors(root.dark).warning;
                             wrap: word-wrap;
                         }
 
@@ -409,13 +414,14 @@ slint::slint! {
 
                         Button {
                             text: "Clear all data";
-                            enabled: root.clear-confirmed && root.busy.is-empty;
+                            danger: true;
+                            enabled: root.clear-confirmed && root.busy.is-empty && root.external-busy-message.is-empty;
                             clicked => { root.clear-all(); }
                         }
 
                         if (!root.last-clear.is-empty) : Text {
                             text: root.last-clear;
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                             wrap: word-wrap;
                         }
                     }
@@ -426,13 +432,13 @@ slint::slint! {
                         Text { text: "Stored API keys"; font-size: 20px; font-weight: 600; }
                         Text {
                             text: "Keys are stored separately from conversations and are never included in exports. Removing a key clears its cached metadata and disables sending until a new key is added.";
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                             wrap: word-wrap;
                         }
 
                         if (root.provider-keys.length == 0) : Text {
                             text: "No providers are configured.";
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                         }
 
                         for key in root.provider-keys : HorizontalLayout {
@@ -440,12 +446,12 @@ slint::slint! {
 
                             VerticalLayout {
                                 Text { text: key.label; font-weight: 600; }
-                                Text { text: key.detail; color: root.dark ? #9ca3af : #5f6368; }
+                                Text { text: key.detail; color: Design.colors(root.dark).muted; }
                             }
 
                             Button {
                                 text: key.has-key ? (root.pending-key-removal == key.id ? "Confirm removal" : "Remove key") : "No key";
-                                enabled: key.has-key && root.busy.is-empty;
+                                enabled: key.has-key && root.busy.is-empty && root.external-busy-message.is-empty;
                                 clicked => { root.remove-key(key.id); }
                             }
                         }
@@ -458,7 +464,7 @@ slint::slint! {
                         Text { text: root.backup-message; wrap: word-wrap; }
                         Text {
                             text: root.backup-detail;
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                             wrap: word-wrap;
                         }
                         Button {
@@ -466,7 +472,9 @@ slint::slint! {
                             clicked => { root.open-backup(); }
                         }
                     }
+                  }
                 }
+              }
             }
         }
     }
@@ -474,6 +482,12 @@ slint::slint! {
 
 /// Push the current view model into a Slint window.
 pub fn sync_window(window: &DataWindow, state: &DataViewModel) {
+    window.set_section_labels(ModelRc::new(VecModel::from(
+        DataSection::ALL
+            .iter()
+            .map(|section| SharedString::from(section.label()))
+            .collect::<Vec<_>>(),
+    )));
     let sections: Vec<DataNavItem> = DataSection::ALL
         .iter()
         .map(|section| DataNavItem {
@@ -613,10 +627,84 @@ fn apply_result(
     }
 }
 
-/// Handlers for the backup entry point.
+/// A completed data change that other feature controllers should reflect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataChange {
+    /// An archive was imported.
+    Imported {
+        /// Whether existing local records were replaced.
+        replaced: bool,
+    },
+    /// Local conversations, providers, models, and keys were cleared.
+    Cleared,
+    /// A stored provider credential was removed.
+    KeysChanged,
+}
+
+type ExportSaver = Rc<dyn Fn(&ExportArtifact) -> Result<bool, String>>;
+type ImportChooser = Rc<dyn Fn() -> Result<Option<String>, String>>;
+
 #[derive(Default)]
 struct DataHandlers {
     open_backup: Option<Rc<dyn Fn()>>,
+    save_export: Option<ExportSaver>,
+    choose_import: Option<ImportChooser>,
+    data_changed: Option<Rc<dyn Fn(DataChange)>>,
+    can_operate: Option<Rc<dyn Fn() -> Result<(), String>>>,
+}
+
+fn can_operate(
+    state: &Rc<RefCell<DataViewModel>>,
+    weak: &slint::Weak<DataWindow>,
+    handlers: &Rc<RefCell<DataHandlers>>,
+) -> bool {
+    if state.borrow().busy.is_some() {
+        return false;
+    }
+    let check = handlers.borrow().can_operate.clone();
+    if let Some(check) = check
+        && let Err(message) = check()
+    {
+        state
+            .borrow_mut()
+            .set_error(&DataError::InvalidInput(message));
+        if let Some(window) = weak.upgrade() {
+            sync_window(&window, &state.borrow());
+        }
+        return false;
+    }
+    true
+}
+
+fn operation_result<T>(outcome: Result<Result<T, DataError>, TaskError>) -> Result<T, DataError> {
+    outcome.unwrap_or_else(|error| Err(DataError::Storage(error.to_string())))
+}
+
+fn finish_export(
+    artifact: ExportArtifact,
+    state: &Rc<RefCell<DataViewModel>>,
+    handlers: &Rc<RefCell<DataHandlers>>,
+) -> Result<(), DataError> {
+    let saver = handlers.borrow().save_export.clone();
+    let saved = saver
+        .map(|save| save(&artifact))
+        .transpose()
+        .map_err(DataError::Storage)?;
+    if saved == Some(false) {
+        let mut state = state.borrow_mut();
+        state.clear_busy();
+        state.status = Some("Export cancelled. No file was written.".to_owned());
+    } else {
+        state.borrow_mut().apply_export(&artifact);
+    }
+    Ok(())
+}
+
+fn notify_change(handlers: &Rc<RefCell<DataHandlers>>, change: DataChange) {
+    let handler = handlers.borrow().data_changed.clone();
+    if let Some(handler) = handler {
+        handler(change);
+    }
 }
 
 /// Owns the data view model and the Slint window that renders it.
@@ -625,11 +713,24 @@ pub struct DataController {
     state: Rc<RefCell<DataViewModel>>,
     window: DataWindow,
     handlers: Rc<RefCell<DataHandlers>>,
+    tasks: Rc<UiTasks>,
 }
 
 impl DataController {
     /// Create the data window and load usage, conversations, and keys.
     pub fn new(service: Arc<dyn DataService>) -> Result<Self, slint::PlatformError> {
+        Self::create(service, false)
+    }
+
+    /// Create a data screen with background import, export, and deletion.
+    pub fn new_background(service: Arc<dyn DataService>) -> Result<Self, slint::PlatformError> {
+        Self::create(service, true)
+    }
+
+    fn create(
+        service: Arc<dyn DataService>,
+        background: bool,
+    ) -> Result<Self, slint::PlatformError> {
         let window = DataWindow::new()?;
         let state = Rc::new(RefCell::new(DataViewModel::new()));
         let controller = Self {
@@ -637,6 +738,7 @@ impl DataController {
             state,
             window,
             handlers: Rc::new(RefCell::new(DataHandlers::default())),
+            tasks: Rc::new(UiTasks::new(background)),
         };
         controller.reload();
         controller.wire();
@@ -691,6 +793,43 @@ impl DataController {
         self.handlers.borrow_mut().open_backup = Some(Rc::new(handler));
     }
 
+    /// Save a generated artifact; return false when the user cancels the dialog.
+    pub fn set_on_save_export(
+        &self,
+        handler: impl Fn(&ExportArtifact) -> Result<bool, String> + 'static,
+    ) {
+        self.handlers.borrow_mut().save_export = Some(Rc::new(handler));
+    }
+
+    /// Load a selected archive into the review form without importing it yet.
+    pub fn set_on_choose_import(
+        &self,
+        handler: impl Fn() -> Result<Option<String>, String> + 'static,
+    ) {
+        self.handlers.borrow_mut().choose_import = Some(Rc::new(handler));
+    }
+
+    /// Refresh other screens after a successful local mutation.
+    pub fn set_on_data_changed(&self, handler: impl Fn(DataChange) + 'static) {
+        self.handlers.borrow_mut().data_changed = Some(Rc::new(handler));
+    }
+
+    /// Prevent mutations from racing a response, discovery, or restore.
+    pub fn set_on_can_operate(&self, handler: impl Fn() -> Result<(), String> + 'static) {
+        self.handlers.borrow_mut().can_operate = Some(Rc::new(handler));
+    }
+
+    /// Explain why other application work temporarily blocks data actions.
+    pub fn set_external_busy(&self, reason: Option<&str>) {
+        self.window
+            .set_external_busy_message(reason.unwrap_or_default().into());
+    }
+
+    /// Apply completed local operations in deterministic hosts.
+    pub fn poll(&self) {
+        self.tasks.poll();
+    }
+
     fn wire(&self) {
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
@@ -718,19 +857,40 @@ impl DataController {
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let tasks = Rc::clone(&self.tasks);
+        let handlers = Rc::clone(&self.handlers);
         self.window.on_export_all(move || {
+            if !can_operate(&state, &weak, &handlers) {
+                return;
+            }
             let request = state.borrow().export_all_request();
             state.borrow_mut().set_busy(DataOperation::ExportAll);
-            let result = service.export_all(&request).map(|artifact| {
-                state.borrow_mut().apply_export(&artifact);
-            });
-            apply_result(result, &state, &weak);
+            if let Some(window) = weak.upgrade() {
+                sync_window(&window, &state.borrow());
+            }
+            let work = Arc::clone(&service);
+            let state = Rc::clone(&state);
+            let handlers = Rc::clone(&handlers);
+            let weak = weak.clone();
+            tasks.run(
+                move || work.export_all(&request),
+                move |outcome| {
+                    let result = operation_result(outcome)
+                        .and_then(|artifact| finish_export(artifact, &state, &handlers));
+                    apply_result(result, &state, &weak);
+                },
+            );
         });
 
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let tasks = Rc::clone(&self.tasks);
+        let handlers = Rc::clone(&self.handlers);
         self.window.on_export_conversation(move || {
+            if !can_operate(&state, &weak, &handlers) {
+                return;
+            }
             let request = state.borrow().export_conversation_request();
             let Some(request) = request else {
                 state.borrow_mut().set_error(&DataError::InvalidInput(
@@ -745,12 +905,21 @@ impl DataController {
             state
                 .borrow_mut()
                 .set_busy(DataOperation::ExportConversation);
-            let result = service
-                .export_conversation(&conversation_id, &request)
-                .map(|artifact| {
-                    state.borrow_mut().apply_export(&artifact);
-                });
-            apply_result(result, &state, &weak);
+            if let Some(window) = weak.upgrade() {
+                sync_window(&window, &state.borrow());
+            }
+            let work = Arc::clone(&service);
+            let state = Rc::clone(&state);
+            let handlers = Rc::clone(&handlers);
+            let weak = weak.clone();
+            tasks.run(
+                move || work.export_conversation(&conversation_id, &request),
+                move |outcome| {
+                    let result = operation_result(outcome)
+                        .and_then(|artifact| finish_export(artifact, &state, &handlers));
+                    apply_result(result, &state, &weak);
+                },
+            );
         });
 
         let weak = self.window.as_weak();
@@ -821,8 +990,42 @@ impl DataController {
 
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
+        let handlers = Rc::clone(&self.handlers);
+        self.window.on_choose_import_file(move || {
+            if state.borrow().busy.is_some() {
+                return;
+            }
+            let chooser = handlers.borrow().choose_import.clone();
+            let Some(chooser) = chooser else {
+                return;
+            };
+            match chooser() {
+                Ok(Some(text)) => {
+                    let mut state = state.borrow_mut();
+                    state.set_import_text(text);
+                    state.set_replace_confirmed(false);
+                    state.status = Some(
+                        "Archive loaded. Review the import mode, then choose Import archive."
+                            .to_owned(),
+                    );
+                }
+                Ok(None) => {}
+                Err(error) => state.borrow_mut().set_error(&DataError::Import(error)),
+            }
+            if let Some(window) = weak.upgrade() {
+                sync_window(&window, &state.borrow());
+            }
+        });
+
+        let weak = self.window.as_weak();
+        let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let tasks = Rc::clone(&self.tasks);
+        let handlers = Rc::clone(&self.handlers);
         self.window.on_import_archive(move || {
+            if !can_operate(&state, &weak, &handlers) {
+                return;
+            }
             let request = state.borrow().import_request();
             let request = match request {
                 Ok(request) => request,
@@ -836,26 +1039,34 @@ impl DataController {
             };
 
             state.borrow_mut().set_busy(DataOperation::Import);
-            let result = service
-                .import_text(&request.text, request.mode)
-                .map(|summary| {
-                    state.borrow_mut().apply_import(summary);
-                });
-
-            match result {
-                Ok(()) => {
-                    reload_after_change(&service, &state);
-                    if let Some(window) = weak.upgrade() {
-                        sync_window(&window, &state.borrow());
-                    }
-                }
-                Err(error) => {
-                    state.borrow_mut().set_error(&error);
-                    if let Some(window) = weak.upgrade() {
-                        sync_window(&window, &state.borrow());
-                    }
-                }
+            if let Some(window) = weak.upgrade() {
+                sync_window(&window, &state.borrow());
             }
+            let work = Arc::clone(&service);
+            let service = Arc::clone(&service);
+            let state = Rc::clone(&state);
+            let weak = weak.clone();
+            let handlers = Rc::clone(&handlers);
+            let replaced = request.mode == ImportMode::Replace;
+            tasks.run(
+                move || work.import_text(&request.text, request.mode),
+                move |outcome| match operation_result(outcome) {
+                    Ok(summary) => {
+                        state.borrow_mut().apply_import(summary);
+                        reload_after_change(&service, &state);
+                        if let Some(window) = weak.upgrade() {
+                            sync_window(&window, &state.borrow());
+                        }
+                        notify_change(&handlers, DataChange::Imported { replaced });
+                    }
+                    Err(error) => {
+                        state.borrow_mut().set_error(&error);
+                        if let Some(window) = weak.upgrade() {
+                            sync_window(&window, &state.borrow());
+                        }
+                    }
+                },
+            );
         });
 
         let weak = self.window.as_weak();
@@ -870,7 +1081,12 @@ impl DataController {
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let tasks = Rc::clone(&self.tasks);
+        let handlers = Rc::clone(&self.handlers);
         self.window.on_clear_all(move || {
+            if !can_operate(&state, &weak, &handlers) {
+                return;
+            }
             let request = state.borrow().clear_request();
             if let Err(error) = request {
                 state.borrow_mut().set_error(&error);
@@ -881,30 +1097,43 @@ impl DataController {
             }
 
             state.borrow_mut().set_busy(DataOperation::ClearAll);
-            let result = service.clear_all().map(|summary| {
-                state.borrow_mut().apply_clear(summary);
-            });
-
-            match result {
-                Ok(()) => {
-                    reload_after_change(&service, &state);
-                    if let Some(window) = weak.upgrade() {
-                        sync_window(&window, &state.borrow());
-                    }
-                }
-                Err(error) => {
-                    state.borrow_mut().set_error(&error);
-                    if let Some(window) = weak.upgrade() {
-                        sync_window(&window, &state.borrow());
-                    }
-                }
+            if let Some(window) = weak.upgrade() {
+                sync_window(&window, &state.borrow());
             }
+            let work = Arc::clone(&service);
+            let service = Arc::clone(&service);
+            let state = Rc::clone(&state);
+            let weak = weak.clone();
+            let handlers = Rc::clone(&handlers);
+            tasks.run(
+                move || work.clear_all(),
+                move |outcome| match operation_result(outcome) {
+                    Ok(summary) => {
+                        state.borrow_mut().apply_clear(summary);
+                        reload_after_change(&service, &state);
+                        if let Some(window) = weak.upgrade() {
+                            sync_window(&window, &state.borrow());
+                        }
+                        notify_change(&handlers, DataChange::Cleared);
+                    }
+                    Err(error) => {
+                        state.borrow_mut().set_error(&error);
+                        if let Some(window) = weak.upgrade() {
+                            sync_window(&window, &state.borrow());
+                        }
+                    }
+                },
+            );
         });
 
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.state);
         let service = Arc::clone(&self.service);
+        let handlers = Rc::clone(&self.handlers);
         self.window.on_remove_key(move |provider_id| {
+            if !can_operate(&state, &weak, &handlers) {
+                return;
+            }
             let provider_id = provider_id.to_string();
             let pending = state.borrow().pending_key_removal.clone();
 
@@ -938,6 +1167,7 @@ impl DataController {
                     if let Some(window) = weak.upgrade() {
                         sync_window(&window, &state.borrow());
                     }
+                    notify_change(&handlers, DataChange::KeysChanged);
                 }
                 Err(error) => {
                     state.borrow_mut().set_error(&error);
@@ -1072,6 +1302,62 @@ mod tests {
     fn controller() -> DataController {
         i_slint_backend_testing::init_no_event_loop();
         DataController::new(service()).expect("data window")
+    }
+
+    #[test]
+    fn native_export_save_cancellation_and_failure_are_truthful() {
+        let controller = controller();
+        controller.set_on_save_export(|_| Ok(false));
+        controller.window().invoke_export_all();
+        assert!(controller.state().last_export.is_none());
+        assert!(
+            controller
+                .state()
+                .status
+                .as_deref()
+                .is_some_and(|status| status.contains("cancelled"))
+        );
+        assert!(controller.state().busy.is_none());
+
+        controller.set_on_save_export(|_| Err("Destination is read-only.".to_owned()));
+        controller.window().invoke_export_all();
+        assert!(controller.state().error.is_some());
+        assert!(controller.state().last_export.is_none());
+        assert!(controller.state().busy.is_none());
+    }
+
+    #[test]
+    fn choosing_an_archive_only_populates_the_review_form() {
+        let controller = controller();
+        controller.window().invoke_replace_confirmed_changed(true);
+        controller.set_on_choose_import(|| Ok(Some("{\"review\":true}".to_owned())));
+        controller.window().invoke_choose_import_file();
+        assert_eq!(controller.state().import_text, "{\"review\":true}");
+        assert!(!controller.state().replace_confirmed);
+        assert!(controller.state().last_import.is_none());
+    }
+
+    #[test]
+    fn fresh_operation_guards_block_data_changes() {
+        let controller = controller();
+        let allowed = Rc::new(std::cell::Cell::new(false));
+        let checked = Rc::clone(&allowed);
+        controller.set_on_can_operate(move || {
+            if checked.get() {
+                Ok(())
+            } else {
+                Err("Stop the response first.".to_owned())
+            }
+        });
+        let window = controller.window();
+        window.invoke_clear_confirmation_changed("DELETE ALL DATA".into());
+        window.invoke_clear_all();
+        assert!(controller.state().last_clear.is_none());
+        assert_eq!(controller.state().conversations.len(), 1);
+        allowed.set(true);
+        window.invoke_clear_all();
+        assert!(controller.state().last_clear.is_some());
+        assert!(controller.state().conversations.is_empty());
     }
 
     #[test]

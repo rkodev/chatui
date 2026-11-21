@@ -27,10 +27,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DropdownMenu
@@ -65,6 +66,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -167,6 +169,11 @@ fun ConversationListScreen(
     now: Instant = Instant.now(),
     zoneId: ZoneId = ZoneId.systemDefault(),
     snackbarHostState: SnackbarHostState? = LocalSnackbarHostState.current,
+    title: String? = null,
+    showNewChat: Boolean = true,
+    listState: LazyListState = rememberLazyListState(),
+    header: (@Composable () -> Unit)? = null,
+    footer: (@Composable () -> Unit)? = null,
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
@@ -217,6 +224,7 @@ fun ConversationListScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .testTag(ConversationListTestTags.Screen),
@@ -226,12 +234,24 @@ fun ConversationListScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(dimens.space1),
         ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(dimens.space2),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+            header?.let { item(key = "host-header", contentType = "chrome") { it() } }
+            title?.let {
+                item(key = "history-title", contentType = "chrome") {
+                    Text(it, style = Typography.title2, color = colors.fgPrimary)
+                }
+            }
+            if (showNewChat) {
+                item(key = "new-chat", contentType = "chrome") {
+                    PrimaryButton(
+                        text = "New chat",
+                        onClick = onNewChat,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(ConversationListTestTags.NewChat),
+                    )
+                }
+            }
+            item(key = "history-view", contentType = "chrome") {
                     SegmentedControl(
                         options = listOf("Chats", "Archived"),
                         selectedIndex = if (archived) 1 else 0,
@@ -245,20 +265,12 @@ fun ConversationListScreen(
                             )
                         },
                         modifier = Modifier
-                            .weight(1f)
                             .testTag(ConversationListTestTags.ArchivedToggle),
                     )
-                    Button(
-                        onClick = onNewChat,
-                        modifier = Modifier.testTag(ConversationListTestTags.NewChat),
-                    ) {
-                        Text("New chat")
-                    }
-                }
             }
 
             if (!archived) {
-                item {
+                item(key = "history-search", contentType = "chrome") {
                     OutlinedTextField(
                         value = state.searchQuery,
                         onValueChange = onSearchQueryChanged,
@@ -355,12 +367,13 @@ fun ConversationListScreen(
                     else -> items(
                         state.searchResults,
                         key = { "search-${it.conversation.id}" },
+                        contentType = { "search-result" },
                     ) { result ->
                         SearchResultRow(
                             result = result,
                             query = state.searchQuery,
                             onSelect = { onSelect(result.conversation) },
-                            modifier = Modifier.animateItem(),
+                            modifier = if (reducedMotion) Modifier else Modifier.animateItem(),
                         )
                     }
                 }
@@ -376,7 +389,6 @@ fun ConversationListScreen(
                     groups.isEmpty() -> item {
                         ConversationEmptyState(
                             archived = archived,
-                            onNewChat = onNewChat,
                         )
                     }
 
@@ -399,7 +411,11 @@ fun ConversationListScreen(
                             )
                         }
 
-                        items(group.conversations, key = { it.id }) { conversation ->
+                        items(
+                            group.conversations,
+                            key = { it.id },
+                            contentType = { "conversation" },
+                        ) { conversation ->
                             ConversationRow(
                                 conversation = conversation,
                                 active = conversation.id == state.activeConversationId,
@@ -414,12 +430,13 @@ fun ConversationListScreen(
                                     renameError = null
                                 },
                                 onDelete = { onDeleteRequested(conversation) },
-                                modifier = Modifier.animateItem(),
+                                modifier = if (reducedMotion) Modifier else Modifier.animateItem(),
                             )
                         }
                     }
                 }
             }
+            footer?.let { item(key = "host-footer", contentType = "chrome") { it() } }
         }
 
         if (snackbarHostState == null) {
@@ -613,6 +630,7 @@ private fun ConversationRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = dimens.rowMinHeight)
+                .semantics { selected = active }
                 .background(if (active) colors.accentSoft else Color.Transparent)
                 .clickable {
                     haptics.tick()
@@ -620,7 +638,7 @@ private fun ConversationRow(
                 }
                 .padding(
                     horizontal = dimens.cardPadding,
-                    vertical = dimens.space2,
+                    vertical = dimens.densitySpace2,
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -630,8 +648,6 @@ private fun ConversationRow(
                         text = conversation.title,
                         style = Typography.body.copy(fontWeight = FontWeight.SemiBold),
                         color = colors.fgPrimary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     if (conversation.pinned) {
@@ -648,28 +664,17 @@ private fun ConversationRow(
                     text = conversationPreview(conversation),
                     style = Typography.footnote,
                     color = colors.fgSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = formatConversationTimestamp(
+                        instant = conversation.lastMessageAt,
+                        now = now,
+                        zoneId = zoneId,
+                    ),
+                    style = Typography.caption,
+                    color = colors.fgMuted,
                 )
             }
-
-            Spacer(Modifier.width(dimens.space2))
-            Text(
-                text = formatConversationTimestamp(
-                    instant = conversation.lastMessageAt,
-                    now = now,
-                    zoneId = zoneId,
-                ),
-                style = Typography.caption,
-                color = colors.fgMuted,
-            )
-            Spacer(Modifier.width(dimens.space1))
-            Text(
-                text = "›",
-                style = Typography.title3,
-                color = colors.fgMuted,
-                modifier = Modifier.clearAndSetSemantics {},
-            )
 
             Box {
                 IconButton(
@@ -740,7 +745,6 @@ private fun ConversationRow(
 @Composable
 private fun ConversationEmptyState(
     archived: Boolean,
-    onNewChat: () -> Unit,
 ) {
     EmptyState(
         title = if (archived) "No archived conversations" else "No conversations yet",
@@ -750,17 +754,6 @@ private fun ConversationEmptyState(
             "Start a chat to see it in your history."
         },
         modifier = Modifier.testTag(ConversationListTestTags.Empty),
-        action = if (archived) {
-            null
-        } else {
-            {
-                PrimaryButton(
-                    text = "Start a chat",
-                    onClick = onNewChat,
-                    modifier = Modifier.testTag(ConversationListTestTags.EmptyStartChat),
-                )
-            }
-        },
     )
 }
 
@@ -791,8 +784,6 @@ private fun SearchResultRow(
             text = highlightMatches(result.conversation.title, query, highlight),
             style = Typography.body.copy(fontWeight = FontWeight.SemiBold),
             color = colors.fgPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
 
         if (result.titleMatched) {

@@ -145,6 +145,21 @@ class BackupSettingsServiceTest {
     }
 
     @Test
+    fun `entering a passphrase after restart unlocks existing backup without saving credentials or configuration`() = runTest {
+        coEvery { repository.get() } returns savedConfig()
+        coEvery { secrets.get(BACKUP_CREDENTIALS_SECRET_ID) } returns
+            """{"accessKeyId":"AKIAEXAMPLE","secretAccessKey":"secret-value"}"""
+        val service = service()
+        service.usePassphrase("invented passphrase")
+        service.restore()
+
+        assertThat(engine.restoreOptions).isEqualTo(RestoreOptions(replace = false))
+        coVerify(exactly = 0) { secrets.put(any(), any()) }
+        coVerify(exactly = 0) { repository.put(any()) }
+        assertThat(scheduler.scheduleCalls).isEqualTo(0)
+    }
+
+    @Test
     fun `replace restore requires the typed confirmation`() = runTest {
         coEvery { repository.get() } returns savedConfig()
         coEvery { secrets.get(BACKUP_CREDENTIALS_SECRET_ID) } returns

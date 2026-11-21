@@ -36,7 +36,10 @@ export function AppearanceSettingsScreen() {
         aria-busy={loading}
       >
         <header className="settings-screen__header">
-          <h2 id="appearance-settings-title">Appearance</h2>
+          <div>
+            <h2 id="appearance-settings-title">Appearance</h2>
+            <p className="settings-screen__muted">Make this space feel like your own.</p>
+          </div>
         </header>
         {error ? (
           <p className="settings-screen__error" role="alert">
@@ -52,7 +55,10 @@ export function AppearanceSettingsScreen() {
   return (
     <section className="settings-screen" aria-labelledby="appearance-settings-title">
       <header className="settings-screen__header">
-        <h2 id="appearance-settings-title">Appearance</h2>
+        <div>
+          <h2 id="appearance-settings-title">Appearance</h2>
+          <p className="settings-screen__muted">Make this space feel like your own.</p>
+        </div>
       </header>
 
       {error && (
@@ -97,9 +103,7 @@ export function AppearanceSettingsScreen() {
           <select
             id="appearance-chat-font-size"
             value={settings.chatFontSize}
-            onChange={(event) =>
-              void update({ chatFontSize: event.target.value as ChatFontSize })
-            }
+            onChange={(event) => void update({ chatFontSize: event.target.value as ChatFontSize })}
           >
             {FONT_SIZE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -110,8 +114,8 @@ export function AppearanceSettingsScreen() {
         </label>
 
         <p className="settings-screen__muted">
-          Reduced motion follows your operating-system preference. ChatUI disables transitions
-          and animations when the system requests reduced motion.
+          Reduced motion follows your operating-system preference. ChatUI disables transitions and
+          animations when the system requests reduced motion.
         </p>
       </div>
     </section>

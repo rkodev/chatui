@@ -25,8 +25,8 @@ class MotionSpecsTest {
     @Test
     fun `named specs expose the design review durations`() {
         assertThat(MotionSpecs.fadeThroughMillis).isEqualTo(180)
-        assertThat(MotionSpecs.sharedAxisMillis).isEqualTo(220)
-        assertThat(MotionSpecs.emphasizedMillis).isEqualTo(300)
+        assertThat(MotionSpecs.sharedAxisMillis).isEqualTo(180)
+        assertThat(MotionSpecs.emphasizedMillis).isEqualTo(180)
         assertThat(MotionSpecs.dialogMillis).isEqualTo(150)
         assertThat(MotionSpecs.bubbleAppearMillis).isEqualTo(180)
         assertThat(MotionSpecs.caretBlinkMillis).isEqualTo(1_000)
@@ -69,5 +69,19 @@ class MotionSpecsTest {
         composeRule.onNodeWithTag("bubble").assertExists()
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.onNodeWithTag("bubble").assertExists()
+    }
+
+    @Test
+    fun `reduced motion retains the animated content modifier`() {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalReducedMotion provides true) {
+                animateContent("Ready", modifier = Modifier.testTag("state-container")) {
+                    Text(it)
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("state-container").assertExists()
+        composeRule.onNodeWithText("Ready").assertExists()
     }
 }

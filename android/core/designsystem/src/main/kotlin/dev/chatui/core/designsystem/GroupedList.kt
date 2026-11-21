@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /** Vertical list of grouped sections. */
@@ -117,7 +117,7 @@ fun SettingsRow(
                 )
                 .padding(
                     horizontal = dimens.cardPadding,
-                    vertical = dimens.space2,
+                    vertical = dimens.densitySpace2,
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -126,29 +126,33 @@ fun SettingsRow(
                     imageVector = icon,
                     contentDescription = null,
                     tint = colors.accent,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .padding(end = dimens.space3),
+                    modifier = Modifier.size(24.dp),
                 )
+                Spacer(Modifier.width(dimens.densitySpace3))
             }
-            Text(
-                text = label,
-                style = Typography.body,
-                color = colors.fgPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            if (value != null) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = value,
+                    text = label,
                     style = Typography.body,
-                    color = colors.fgSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    color = colors.fgPrimary,
                 )
+                if (value != null) {
+                    Text(
+                        text = value,
+                        style = Typography.subhead,
+                        color = colors.fgSecondary,
+                    )
+                }
             }
             if (trailing != null) {
                 Spacer(Modifier.width(dimens.space2))
-                trailing()
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier.sizeIn(
+                        minWidth = dimens.touchTargetMin,
+                        minHeight = dimens.touchTargetMin,
+                    ),
+                    contentAlignment = Alignment.Center,
+                ) { trailing() }
             }
             if (showChevron) {
                 Spacer(Modifier.width(dimens.space2))

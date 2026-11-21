@@ -152,4 +152,38 @@ class RoutingTest {
 
         assertThat(readRoutingPreferences(params)).isEqualTo(preferences)
     }
+
+    @Test
+    fun `curated edits preserve unknown provider routing fields and other namespaces`() {
+        val params = testChatParams(
+            extra = JsonObject(
+                mapOf(
+                    "other" to JsonObject(mapOf("future" to JsonPrimitive(true))),
+                    "openrouter" to JsonObject(
+                        mapOf(
+                            "unknown" to JsonPrimitive("keep"),
+                            "provider" to JsonObject(
+                                mapOf(
+                                    "future_routing" to JsonPrimitive("keep"),
+                                    "sort" to JsonPrimitive("latency"),
+                                    "data_collection" to JsonPrimitive("deny"),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val updated = withRoutingPreferences(
+            params,
+            RoutingPreferences(enabled = true, sort = null, denyDataCollection = false),
+        )
+        val provider = updated.extra.getValue("openrouter").jsonObject.getValue("provider").jsonObject
+        assertThat(provider["future_routing"]).isEqualTo(JsonPrimitive("keep"))
+        assertThat(provider["sort"]).isNull()
+        assertThat(provider["data_collection"]).isNull()
+        assertThat(updated.extra["other"]).isEqualTo(params.extra["other"])
+        assertThat(updated.extra.getValue("openrouter").jsonObject["unknown"])
+            .isEqualTo(JsonPrimitive("keep"))
+    }
 }

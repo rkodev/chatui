@@ -2,8 +2,7 @@
 //!
 //! The row model is framework-independent so it can be tested without a window.
 //! The Slint component in [`crate::chat::message_list`] renders these rows. The
-//! Markdown slot is plain text in this task; M3.5-09.4 replaces the renderer
-//! without changing the row contract.
+//! Markdown source is projected into safe native blocks by the message list.
 //!
 //! Rows carry the role layout, the Markdown slot, the action set, metadata, the
 //! lifecycle status, and the normalized error copy. The streaming row is built
@@ -140,7 +139,7 @@ pub struct MessageRow {
     pub role: MessageRole,
     /// Visible role label.
     pub role_label: String,
-    /// Markdown slot. Plain text until M3.5-09.4.
+    /// Original Markdown source, retained for copy and native rendering.
     pub markdown: String,
     /// Reasoning text, kept separate from the answer.
     pub reasoning: String,

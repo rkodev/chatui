@@ -1,16 +1,19 @@
-//! Desktop backup service over the sync engine and S3 adapter.
+//! Desktop backup service over the sync engine and storage adapters.
 //!
 //! The service is the synchronous boundary used by the settings controller. It
-//! stores the S3 access key and secret access key in the existing secret store,
+//! stores backend credentials in the existing secret store,
 //! persists the non-secret [`BackupConfig`], and builds a [`SyncEngine`] for
 //! each operation. The passphrase is accepted per call and is never persisted.
 
 use std::sync::{Arc, Mutex};
 
 use chatui_backup::{
-    RestoreOptions, S3StorageAdapter, S3StorageConfig, StorageAdapter, SyncEngine, SyncError,
+    AzureBlobStorageAdapter, AzureBlobStorageConfig, GcsStorageAdapter, GcsStorageConfig,
+    GoogleDriveStorageAdapter, GoogleDriveStorageConfig, RestoreOptions, S3StorageAdapter,
+    S3StorageConfig, StorageAdapter, SyncEngine, SyncError, WebDavStorageAdapter,
+    WebDavStorageConfig,
 };
-use chatui_domain::BackupConfig;
+use chatui_domain::{BackupBackend, BackupConfig};
 use chatui_secrets::{SecretId, SecretStore, SecretValue};
 use chatui_storage::{
     AttachmentRepository, BackupConfigRepository, SqliteBackupConfigRepository,
@@ -27,10 +30,17 @@ use crate::services::ServiceRuntime;
 use crate::services::sync::SyncBridge;
 
 /// Credentials stored as one JSON secret.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 struct BackupCredentials {
     access_key_id: String,
     secret_access_key: String,
+    sas_token: String,
+    service_account_json: String,
+    access_token: String,
+    folder_id: String,
+    username: String,
+    password: String,
 }
 
 /// Desktop backup service.
@@ -83,6 +93,12 @@ impl BackupServiceAdapter {
         let credentials = BackupCredentials {
             access_key_id: form.access_key_id.trim().to_owned(),
             secret_access_key: form.secret_access_key.clone(),
+            sas_token: form.sas_token.clone(),
+            service_account_json: form.service_account_json.clone(),
+            access_token: form.access_token.clone(),
+            folder_id: form.folder_id.clone(),
+            username: form.username.clone(),
+            password: form.password.clone(),
         };
         let json = serde_json::to_string(&credentials)
             .map_err(|error| BackupError::Storage(error.to_string()))?;
@@ -103,35 +119,90 @@ impl BackupServiceAdapter {
             .map_err(|error| BackupError::Storage(error.to_string()))
     }
 
-    fn adapter_from_form(&self, form: &BackupForm) -> Result<S3StorageAdapter, BackupError> {
-        S3StorageAdapter::new(S3StorageConfig {
-            endpoint: form.endpoint.trim().to_owned(),
-            bucket: form.bucket.trim().to_owned(),
-            region: form.region.trim().to_owned(),
-            access_key_id: form.access_key_id.trim().to_owned(),
-            secret_access_key: form.secret_access_key.clone(),
-            prefix: Some(form.prefix.trim().to_owned()).filter(|value| !value.is_empty()),
-            ..S3StorageConfig::default()
-        })
-        .map_err(|error| BackupError::Connection(error.to_string()))
+    fn adapter_from_form(&self, form: &BackupForm) -> Result<Arc<dyn StorageAdapter>, BackupError> {
+        let endpoint = Some(form.endpoint.trim().to_owned()).filter(|value| !value.is_empty());
+        let prefix = Some(form.prefix.trim().to_owned()).filter(|value| !value.is_empty());
+        let adapter: Arc<dyn StorageAdapter> = match form.backend {
+            BackupBackend::S3 => Arc::new(
+                S3StorageAdapter::new(S3StorageConfig {
+                    endpoint: endpoint.unwrap_or_default(),
+                    bucket: form.bucket.trim().to_owned(),
+                    region: form.region.trim().to_owned(),
+                    access_key_id: form.access_key_id.trim().to_owned(),
+                    secret_access_key: form.secret_access_key.clone(),
+                    prefix,
+                    ..S3StorageConfig::default()
+                })
+                .map_err(|error| BackupError::Connection(error.to_string()))?,
+            ),
+            BackupBackend::AzureBlob => Arc::new(
+                AzureBlobStorageAdapter::new(AzureBlobStorageConfig {
+                    account_name: form.access_key_id.trim().to_owned(),
+                    account_key: Some(form.secret_access_key.clone())
+                        .filter(|value| !value.is_empty()),
+                    sas_token: form
+                        .secret_access_key
+                        .is_empty()
+                        .then(|| form.sas_token.clone())
+                        .filter(|value| !value.is_empty()),
+                    container: form.bucket.trim().to_owned(),
+                    endpoint,
+                    prefix,
+                    ..AzureBlobStorageConfig::default()
+                })
+                .map_err(|error| BackupError::Connection(error.to_string()))?,
+            ),
+            BackupBackend::Gcs => Arc::new(
+                GcsStorageAdapter::new(GcsStorageConfig {
+                    bucket: form.bucket.trim().to_owned(),
+                    service_account_json: form.service_account_json.clone(),
+                    endpoint,
+                    prefix,
+                    ..GcsStorageConfig::default()
+                })
+                .map_err(|error| BackupError::Connection(error.to_string()))?,
+            ),
+            BackupBackend::GoogleDrive => Arc::new(
+                GoogleDriveStorageAdapter::new(GoogleDriveStorageConfig {
+                    access_token: form.access_token.clone(),
+                    folder_id: Some(form.folder_id.trim().to_owned())
+                        .filter(|value| !value.is_empty()),
+                    endpoint,
+                    prefix,
+                    ..GoogleDriveStorageConfig::default()
+                })
+                .map_err(|error| BackupError::Connection(error.to_string()))?,
+            ),
+            BackupBackend::Webdav => Arc::new(
+                WebDavStorageAdapter::new(WebDavStorageConfig {
+                    url: endpoint.unwrap_or_default(),
+                    username: form.username.clone(),
+                    password: form.password.clone(),
+                    prefix,
+                    ..WebDavStorageConfig::default()
+                })
+                .map_err(|error| BackupError::Connection(error.to_string()))?,
+            ),
+        };
+        Ok(adapter)
     }
 
     fn engine(&self, config: &BackupConfig, passphrase: &str) -> Result<SyncEngine, BackupError> {
         let credentials = self.load_credentials()?;
-        let adapter = S3StorageAdapter::new(S3StorageConfig {
-            endpoint: config.endpoint.clone().unwrap_or_default(),
-            bucket: config.bucket.clone(),
-            region: config.region.clone().unwrap_or_default(),
-            access_key_id: credentials.access_key_id,
-            secret_access_key: credentials.secret_access_key,
-            prefix: Some(config.prefix.clone()).filter(|value| !value.is_empty()),
-            ..S3StorageConfig::default()
-        })
-        .map_err(|error| BackupError::Connection(error.to_string()))?;
+        let mut form = BackupForm::from_config(config);
+        form.access_key_id = credentials.access_key_id;
+        form.secret_access_key = credentials.secret_access_key;
+        form.sas_token = credentials.sas_token;
+        form.service_account_json = credentials.service_account_json;
+        form.access_token = credentials.access_token;
+        form.folder_id = credentials.folder_id;
+        form.username = credentials.username;
+        form.password = credentials.password;
+        let adapter = self.adapter_from_form(&form)?;
 
         Ok(SyncEngine::new(
             Arc::clone(&self.local_store),
-            Arc::new(adapter),
+            adapter,
             passphrase,
         ))
     }
@@ -194,6 +265,7 @@ impl BackupService for BackupServiceAdapter {
 
     fn enable(&self, form: &BackupForm) -> Result<BackupStatus, BackupError> {
         form.validate()?;
+        self.adapter_from_form(form)?;
         self.store_credentials(form)?;
         let existing = self.load_config()?;
         let config = form.to_config(existing.as_ref());
@@ -298,6 +370,43 @@ mod tests {
         let secrets = Arc::new(SessionStore::new());
         let service = BackupServiceAdapter::from_runtime(runtime, secrets.clone());
         (secrets, service)
+    }
+
+    #[test]
+    fn legacy_s3_credentials_still_deserialize() {
+        let credentials: BackupCredentials = serde_json::from_str(
+            r#"{"access_key_id":"legacy-id","secret_access_key":"legacy-secret"}"#,
+        )
+        .expect("legacy credentials");
+        assert_eq!(credentials.access_key_id, "legacy-id");
+        assert_eq!(credentials.secret_access_key, "legacy-secret");
+        assert!(credentials.access_token.is_empty());
+        assert!(credentials.folder_id.is_empty());
+    }
+
+    #[test]
+    fn drive_configuration_round_trips_without_using_the_s3_adapter() {
+        let (_directory, runtime) = runtime();
+        let (_secrets, service) = service(&runtime);
+        let mut drive = BackupForm {
+            backend: BackupBackend::GoogleDrive,
+            access_token: "test-drive-token".to_owned(),
+            folder_id: "backup-folder".to_owned(),
+            passphrase: "test passphrase".to_owned(),
+            ..BackupForm::default()
+        };
+        drive.endpoint.clear();
+        service.enable(&drive).expect("enable Drive backup");
+        let config = service
+            .config()
+            .expect("load config")
+            .expect("Drive config");
+        assert_eq!(config.backend, BackupBackend::GoogleDrive);
+        assert_eq!(
+            service.load_credentials().expect("credentials").folder_id,
+            "backup-folder"
+        );
+        assert!(service.engine(&config, &drive.passphrase).is_ok());
     }
 
     #[test]

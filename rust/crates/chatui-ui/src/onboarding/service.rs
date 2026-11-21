@@ -127,7 +127,7 @@ pub struct CatalogLoad {
 }
 
 /// The onboarding service surface used by the view controller.
-pub trait OnboardingServiceLike {
+pub trait OnboardingServiceLike: Send + Sync {
     /// Load the public catalog.
     fn load_catalog(&self) -> Result<CatalogLoad, OnboardingError>;
     /// Connect with the default progress reporting.

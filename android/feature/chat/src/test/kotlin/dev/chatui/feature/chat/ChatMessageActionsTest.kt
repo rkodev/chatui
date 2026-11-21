@@ -99,7 +99,9 @@ class ChatMessageActionsTest {
             canRegenerate = false,
         )
 
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Overflow).performClick()
         composeRule.onNodeWithTag(ChatMessageActionsTestTags.Regenerate).assertDoesNotExist()
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Edit).assertDoesNotExist()
     }
 
     @Test
@@ -112,6 +114,9 @@ class ChatMessageActionsTest {
         )
 
         render(message, canRegenerate = true, onRegenerate = { regenerated = it })
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Copy).assertExists()
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Regenerate).assertDoesNotExist()
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Overflow).performClick()
         composeRule.onNodeWithTag(ChatMessageActionsTestTags.Regenerate).performClick()
 
         assertThat(regenerated?.id).isEqualTo("assistant-1")
@@ -130,6 +135,7 @@ class ChatMessageActionsTest {
             edited = target to text
         })
 
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Overflow).performClick()
         composeRule.onNodeWithTag(ChatMessageActionsTestTags.Edit).performClick()
         composeRule.onNodeWithTag(ChatMessageActionsTestTags.EditDialog).assertExists()
         composeRule.onNodeWithText(
@@ -157,6 +163,7 @@ class ChatMessageActionsTest {
             onEditLastUser = { _, _ -> edits += 1 },
         )
 
+        composeRule.onNodeWithTag(ChatMessageActionsTestTags.Overflow).performClick()
         composeRule.onNodeWithTag(ChatMessageActionsTestTags.Edit).performClick()
         composeRule.onNodeWithTag(ChatMessageActionsTestTags.EditCancel).performClick()
         composeRule.onNodeWithTag(ChatMessageActionsTestTags.EditDialog).assertDoesNotExist()

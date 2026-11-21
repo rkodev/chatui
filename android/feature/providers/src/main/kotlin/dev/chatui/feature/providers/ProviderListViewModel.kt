@@ -55,6 +55,7 @@ data class ProviderListUiState(
     val customForm: CustomProviderFormState = CustomProviderFormState(),
     val creatingCustom: Boolean = false,
     val notice: String? = null,
+    val creationVersion: Int = 0,
 )
 
 /**
@@ -101,7 +102,7 @@ class ProviderListViewModel(
 
     fun onCreatePresetProvider() {
         val current = _state.value
-        if (current.creatingPreset) {
+        if (current.creatingPreset || current.creatingCustom) {
             return
         }
 
@@ -160,6 +161,7 @@ class ProviderListViewModel(
                         creatingPreset = false,
                         presetForm = PresetProviderFormState(),
                         notice = "${option.label} added.",
+                        creationVersion = it.creationVersion + 1,
                     )
                 }
             } catch (error: CancellationException) {
@@ -233,7 +235,7 @@ class ProviderListViewModel(
 
     fun onCreateCustomProvider() {
         val current = _state.value
-        if (current.creatingCustom) {
+        if (current.creatingPreset || current.creatingCustom) {
             return
         }
 
@@ -264,6 +266,7 @@ class ProviderListViewModel(
                         creatingCustom = false,
                         customForm = CustomProviderFormState(),
                         notice = "Custom provider added.",
+                        creationVersion = it.creationVersion + 1,
                     )
                 }
             } catch (error: CancellationException) {

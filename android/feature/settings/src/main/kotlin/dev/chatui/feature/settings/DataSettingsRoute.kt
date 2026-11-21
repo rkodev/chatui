@@ -1,6 +1,7 @@
 package dev.chatui.feature.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,25 +23,56 @@ fun DataSettingsRoute(
     onImportMerge: () -> Unit,
     onImportReplace: () -> Unit,
     modifier: Modifier = Modifier,
+    fileOperation: DataFileOperation = DataFileOperation(),
+    onDismissFileError: () -> Unit = {},
 ) {
     val viewModel: DataSettingsViewModel = viewModel(
         factory = DataSettingsViewModel.factory(service),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(fileOperation.phase) {
+        if (fileOperation.phase == DataFilePhase.SUCCEEDED) viewModel.refresh()
+    }
 
     DataSettingsScreen(
-        state = state,
+        state = state.copy(fileOperation = fileOperation),
         onConfirmationPhraseChanged = viewModel::onConfirmationPhraseChanged,
-        onClearAll = viewModel::onClearAll,
-        onRequestRemoveKey = viewModel::onRequestRemoveKey,
+        onClearAll = {
+            if (!fileOperation.active) {
+                onDismissFileError()
+                viewModel.onClearAll()
+            }
+        },
+        onRequestRemoveKey = {
+            if (!fileOperation.active) {
+                onDismissFileError()
+                viewModel.onRequestRemoveKey(it)
+            }
+        },
         onCancelRemoveKey = viewModel::onCancelRemoveKey,
-        onConfirmRemoveKey = viewModel::onConfirmRemoveKey,
-        onDismissError = viewModel::onDismissError,
+        onConfirmRemoveKey = {
+            if (!fileOperation.active) {
+                onDismissFileError()
+                viewModel.onConfirmRemoveKey(it)
+            }
+        },
+        onDismissError = {
+            if (fileOperation.error != null) onDismissFileError() else viewModel.onDismissError()
+        },
         onOpenProviders = onOpenProviders,
         onOpenBackup = onOpenBackup,
-        onExportAll = onExportAll,
-        onImportMerge = onImportMerge,
-        onImportReplace = onImportReplace,
+        onExportAll = {
+            viewModel.onStartFileOperation()
+            onExportAll()
+        },
+        onImportMerge = {
+            viewModel.onStartFileOperation()
+            onImportMerge()
+        },
+        onImportReplace = {
+            viewModel.onStartFileOperation()
+            onImportReplace()
+        },
         modifier = modifier,
     )
 }

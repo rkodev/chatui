@@ -15,6 +15,7 @@ pub mod onboarding;
 pub mod providers;
 pub mod settings;
 pub mod shell;
+mod tasks;
 pub mod theme;
 pub mod tokens;
 

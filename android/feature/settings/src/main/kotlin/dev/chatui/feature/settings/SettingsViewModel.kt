@@ -20,8 +20,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** One immutable state for the settings screens. */
 data class SettingsUiState(
@@ -30,6 +35,10 @@ data class SettingsUiState(
     val models: List<Model> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
+    val warning: String? = null,
+    val pendingSaves: Int = 0,
+    val savedRevision: Long = 0,
+    val fieldErrors: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -45,86 +54,106 @@ class SettingsViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
+    private val writes = Mutex()
+    private data class FailedWrite(val action: suspend () -> Unit, val message: String)
+    private val failedWrites = linkedMapOf<String, FailedWrite>()
+    private var loadError: String? = null
 
     init {
         observeSettings()
-        loadProviders()
-    }
-
-    fun onThemeChanged(theme: Theme) = persist { it.setTheme(theme) }
-
-    fun onDensityChanged(density: Density) = persist { it.setDensity(density) }
-
-    fun onChatFontSizeChanged(size: ChatFontSize) = persist { it.setChatFontSize(size) }
-
-    fun onSendKeyChanged(sendKey: SendKey) = persist { it.setSendKey(sendKey) }
-
-    fun onShowTokenUsageChanged(show: Boolean) = persist { it.setShowTokenUsage(show) }
-
-    fun onLoadRemoteImagesChanged(load: Boolean) = persist { it.setLoadRemoteImages(load) }
-
-    fun onHapticFeedbackChanged(enabled: Boolean) = persist { it.setHapticFeedback(enabled) }
-
-    fun onDynamicColorChanged(enabled: Boolean) = persist { it.setDynamicColor(enabled) }
-
-    fun onDefaultSystemPromptChanged(prompt: String) = persist {
-        it.setDefaultSystemPrompt(prompt)
-    }
-
-    fun onDefaultProviderChanged(providerId: String?) {
         viewModelScope.launch {
-            try {
-                service.setDefaults(providerId, null)
-                val models = providerId?.let { service.listModels(it) } ?: emptyList()
-                _state.update { it.copy(models = models, error = null) }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                _state.update { it.copy(error = error.message ?: "Could not save defaults.") }
-            }
+            settingsStore.settings
+                .map { it.defaultProviderId to it.defaultModelId }
+                .distinctUntilChanged()
+                .collectLatest { reloadDefaults() }
         }
+    }
+
+    fun onThemeChanged(theme: Theme) = persist("theme") { settingsStore.setTheme(theme) }
+
+    fun onDensityChanged(density: Density) = persist("density") { settingsStore.setDensity(density) }
+
+    fun onChatFontSizeChanged(size: ChatFontSize) =
+        persist("font") { settingsStore.setChatFontSize(size) }
+
+    fun onSendKeyChanged(sendKey: SendKey) = persist("send-key") { settingsStore.setSendKey(sendKey) }
+
+    fun onShowTokenUsageChanged(show: Boolean) =
+        persist("usage") { settingsStore.setShowTokenUsage(show) }
+
+    fun onLoadRemoteImagesChanged(load: Boolean) =
+        persist("images") { settingsStore.setLoadRemoteImages(load) }
+
+    fun onHapticFeedbackChanged(enabled: Boolean) =
+        persist("haptics") { settingsStore.setHapticFeedback(enabled) }
+
+    fun onDynamicColorChanged(enabled: Boolean) =
+        persist("dynamic-color") { settingsStore.setDynamicColor(enabled) }
+
+    fun onDefaultSystemPromptChanged(prompt: String) = persist("prompt") {
+        settingsStore.setDefaultSystemPrompt(prompt)
+    }
+
+    fun onDefaultProviderChanged(providerId: String?) = persist("provider") {
+        service.setDefaults(providerId, null)
+        reloadDefaults()
     }
 
     fun onDefaultModelChanged(modelId: String?) {
         val providerId = _state.value.settings.defaultProviderId
-        viewModelScope.launch {
-            try {
-                service.setDefaults(providerId, modelId)
-                _state.update { it.copy(error = null) }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                _state.update { it.copy(error = error.message ?: "Could not save defaults.") }
-            }
+        persist("model") {
+            service.setDefaults(providerId, modelId)
+            reloadDefaults()
         }
     }
 
-    fun onTemperatureChanged(value: String) = updateParams {
-        it.copy(temperature = nullableDouble(value, 0.0, 2.0))
+    fun onTemperatureChanged(value: String) = numberChanged("temperature", value, 0.0, 2.0) { number ->
+        updateParams("temperature") { it.copy(temperature = number) }
     }
 
-    fun onTopPChanged(value: String) = updateParams {
-        it.copy(topP = nullableDouble(value, 0.0, 1.0))
+    fun onTopPChanged(value: String) = numberChanged("top-p", value, 0.0, 1.0) { number ->
+        updateParams("top-p") { it.copy(topP = number) }
     }
 
-    fun onMaxOutputTokensChanged(value: String) = updateParams {
-        it.copy(maxOutputTokens = nullableInt(value, 1))
+    fun onMaxOutputTokensChanged(value: String) {
+        val parsed = value.trim().toIntOrNull()
+        if (value.isNotBlank() && (parsed == null || parsed < 1)) {
+            fieldError("max-output", "Enter a whole number of at least 1, or leave empty.")
+            return
+        }
+        fieldError("max-output", null)
+        updateParams("max-output") { it.copy(maxOutputTokens = parsed) }
     }
 
-    fun onStopChanged(value: String) = updateParams {
+    fun onStopChanged(value: String) = updateParams("stop") {
         it.copy(stop = parseStopSequences(value))
     }
 
-    fun onReasoningEffortChanged(effort: ReasoningEffort?) = updateParams {
+    fun onReasoningEffortChanged(effort: ReasoningEffort?) = updateParams("reasoning") {
         it.copy(reasoningEffort = effort)
     }
 
-    fun onStreamingChanged(enabled: Boolean) = updateParams {
+    fun onStreamingChanged(enabled: Boolean) = updateParams("streaming") {
         it.copy(streaming = enabled)
     }
 
+    fun onPickerReturned() {
+        viewModelScope.launch { reloadDefaults() }
+    }
+
+    fun onRetry() {
+        if (failedWrites.isEmpty()) {
+            onPickerReturned()
+        } else {
+            failedWrites.toMap().forEach { (key, failure) -> persist(key, failure.action) }
+        }
+    }
+
     fun onDismissError() {
-        _state.update { it.copy(error = null) }
+        if (failedWrites.isEmpty()) {
+            loadError = null
+            _state.update { it.copy(error = null) }
+        }
     }
 
     private fun observeSettings() {
@@ -135,46 +164,79 @@ class SettingsViewModel(
         }
     }
 
-    private fun loadProviders() {
-        viewModelScope.launch {
-            try {
-                val providers = service.listProviders()
-                val defaults = service.getDefaults()
-                val models = defaults.providerId?.let { service.listModels(it) } ?: emptyList()
-                _state.update {
-                    it.copy(providers = providers, models = models, loading = false)
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                _state.update {
-                    it.copy(
-                        loading = false,
-                        error = error.message ?: "Could not load settings.",
-                    )
-                }
+    private suspend fun reloadDefaults() {
+        try {
+            val providers = service.listProviders()
+            val defaults = service.getDefaults()
+            val models = defaults.providerId?.let { service.listModels(it) } ?: emptyList()
+            val warning = service.getDefaultModelWarning()?.takeIf { it.isNotBlank() }
+            loadError = null
+            _state.update {
+                it.copy(
+                    providers = providers,
+                    models = models,
+                    warning = warning,
+                    loading = false,
+                    error = failedWrites.values.lastOrNull()?.message,
+                )
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            loadError = error.message ?: "Could not load settings."
+            _state.update {
+                it.copy(loading = false, error = failedWrites.values.lastOrNull()?.message ?: loadError)
             }
         }
     }
 
-    private fun updateParams(transform: (ChatParams) -> ChatParams) {
-        val next = transform(_state.value.settings.defaultParams)
-        _state.update {
-            it.copy(settings = it.settings.copy(defaultParams = next))
+    private fun numberChanged(
+        key: String,
+        value: String,
+        min: Double,
+        max: Double,
+        onValid: (Double?) -> Unit,
+    ) {
+        val parsed = value.trim().toDoubleOrNull()
+        if (value.isNotBlank() && (parsed == null || !parsed.isFinite() || parsed !in min..max)) {
+            fieldError(key, "Enter a number from $min to $max, or leave empty.")
+            return
         }
-        persist { it.setDefaultParams(next) }
+        fieldError(key, null)
+        onValid(parsed)
     }
 
-    private fun persist(block: suspend (SettingsDataStore) -> Unit) {
+    private fun fieldError(key: String, message: String?) {
+        _state.update {
+            it.copy(fieldErrors = if (message == null) it.fieldErrors - key else it.fieldErrors + (key to message))
+        }
+    }
+
+    private fun updateParams(key: String, transform: (ChatParams) -> ChatParams) = persist(key) {
+        settingsStore.update { it.copy(defaultParams = transform(it.defaultParams)) }
+    }
+
+    private fun persist(key: String, block: suspend () -> Unit) {
+        _state.update { it.copy(pendingSaves = it.pendingSaves + 1) }
         viewModelScope.launch {
-            try {
-                block(settingsStore)
-                _state.update { it.copy(error = null) }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                _state.update {
-                    it.copy(error = error.message ?: "Could not save settings.")
+            writes.withLock {
+                try {
+                    block()
+                    failedWrites.remove(key)
+                    _state.update {
+                        it.copy(
+                            savedRevision = it.savedRevision + 1,
+                            error = failedWrites.values.lastOrNull()?.message ?: loadError,
+                        )
+                    }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    val message = error.message ?: "Could not save settings."
+                    failedWrites[key] = FailedWrite(block, message)
+                    _state.update { it.copy(error = message) }
+                } finally {
+                    _state.update { it.copy(pendingSaves = it.pendingSaves - 1) }
                 }
             }
         }
@@ -188,18 +250,6 @@ class SettingsViewModel(
             initializer { SettingsViewModel(settingsStore, service) }
         }
     }
-}
-
-private fun nullableDouble(value: String, min: Double, max: Double): Double? {
-    if (value.trim().isEmpty()) return null
-    val parsed = value.trim().toDoubleOrNull() ?: return null
-    return parsed.coerceIn(min, max)
-}
-
-private fun nullableInt(value: String, min: Int): Int? {
-    if (value.trim().isEmpty()) return null
-    val parsed = value.trim().toIntOrNull() ?: return null
-    return parsed.coerceAtLeast(min)
 }
 
 private fun parseStopSequences(value: String): List<String> = value

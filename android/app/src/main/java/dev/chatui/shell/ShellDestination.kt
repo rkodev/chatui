@@ -26,9 +26,9 @@ enum class ShellDestination(
     ),
     Conversations(
         route = "conversations",
-        label = "Conversations",
+        label = "Chats",
         shortLabel = "CV",
-        title = "Conversations",
+        title = "Chats",
     ),
     Providers(
         route = "providers",

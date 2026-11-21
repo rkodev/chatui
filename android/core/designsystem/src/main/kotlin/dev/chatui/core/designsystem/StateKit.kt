@@ -34,15 +34,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-/** Shimmering placeholder block. */
+/** Static by default; shimmer is an explicit opt-in and respects reduced motion. */
 @Composable
 fun Skeleton(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(LocalDimens.current.radiusXs),
+    animated: Boolean = false,
 ) {
     val colors = LocalChatUiColors.current
     val reduced = LocalReducedMotion.current
-    val brush: Brush = if (reduced) {
+    val brush: Brush = if (reduced || !animated) {
         SolidColor(colors.skeletonBase)
     } else {
         val transition = rememberInfiniteTransition(label = "skeleton")
@@ -74,6 +75,7 @@ fun Skeleton(
 fun SkeletonList(
     modifier: Modifier = Modifier,
     count: Int = 3,
+    animated: Boolean = false,
 ) {
     val dimens = LocalDimens.current
     Column(
@@ -82,6 +84,7 @@ fun SkeletonList(
     ) {
         repeat(count) {
             Skeleton(
+                animated = animated,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(dimens.rowMinHeight),

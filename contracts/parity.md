@@ -1,7 +1,7 @@
 # ChatUI Feature Parity
 
 - Source: [IMPLEMENTATION.md section 5.4](../docs/IMPLEMENTATION.md#54-parity-checklist)
-- Updated: 2026-11-10
+- Updated: 2026-11-17
 - Purpose: authoritative cross-client requirement and commitment table.
 
 | Feature | Web | Android | Rust |
@@ -30,6 +30,75 @@
 
 ## Notes
 
+- Android minimalist UX-01.2 through UX-03.7 implements compact density/
+  targets, real Chats and adaptive history, contextual More/Back, and an
+  app-owned model picker with isolated conversation/default targets. Sharing,
+  shortcuts, history operations and underlying settings/data/backup routes
+  remain available. Approved bounded title/model presentation retains full
+  accessible text; it does not alter stored titles or content.
+- The same Android slice widens messages, consolidates visible actions/usage,
+  warnings and Latest messages, and makes URI ingestion lifecycle-owned IO.
+  Drafts, attachment types/limits/consent, historical attribution, stream/
+  recovery cadence, request parameters, schemas and protocols are preserved.
+  Remote Markdown images use bounded existing-stack requests behind the same
+  policy; the `loadRemoteImages = true` default is unchanged. Code follows the
+  applied app theme and retains exact content and raw-source math fallback.
+- Android minimalist UX-04.1 through UX-04.9 makes the shared searchable picker
+  compact, wires provider-scoped Manage models with hidden-model recovery, and
+  focuses provider setup/detail/key editing. Conversation/default/management
+  targets, full catalog/pricing/capabilities, labeled actions, validation,
+  credential storage and key-removal record semantics are preserved.
+- Conversation settings now use the app-owned picker and expose existing
+  curated OpenRouter routing alongside full validated extras JSON. Exact
+  generation/default distinctions still persist immediately; coordinated
+  field patches preserve newer settings and unknown routing/extra fields.
+  Routing/privacy defaults, protected request fields, drafts and historical
+  model attribution remain unchanged.
+- Onboarding keeps the existing OpenRouter `/key` first-run service and public
+  catalog, with its broader existing provider-option limitation explained.
+  Backup is explicitly optional; only Set up backup mounts the real secure
+  setup entry. All five backend/encryption/enable semantics remain unchanged.
+  Skip/Done preserve pending shares, deep links, existing drafts and useful
+  Chats navigation without auto-sending or creating a duplicate chat.
+- Android minimalist UX-05.1 through UX-05.7 implements the concise Settings
+  root, wrapping Appearance choices, app-owned Defaults picker and grouped
+  Generation/Composer/Privacy. Immediate atomic preference writes, unset versus
+  explicit generation values, both send-key modes, all fonts/densities and
+  existing-chat/historical-model isolation are retained. Save feedback follows
+  actual mutations, not initial/catalog emissions; errors remain explicit.
+- Data & storage orders ordinary export/import before destructive actions and
+  reports actual document/service completion, cancellation or failure. Existing
+  plaintext warning, merge/replace selection, archive/secret exclusion, key
+  removal and exact clear-data confirmation are unchanged. Preparation and
+  validation use IO; activity launch alone is not success.
+- Encrypted backup now separates Configuration from status-first Overview,
+  merge restore and disclosed advanced recovery. All five backends/fields,
+  secure credential handling, memory-only passphrase, exact replace/delete
+  phrases and optional onboarding remain. Re-entering a passphrase unlocks
+  committed configuration in service memory without saving edits/credentials
+  or rescheduling. Test/edit does not enable backup; failed first upload does
+  not falsely enable Done. Existing connected-network/battery-not-low,
+  six-hour unique periodic work and exponential 30-second backoff are unchanged.
+- UX-06 adds reviewed production-shell goldens, route/data/focus regressions and
+  an asserted disposable-fixture profile journey; it does not establish a
+  generated profile, physical speed, TalkBack/IME/SAF behavior or usability.
+  Every requested task remains acceptance-blocked, with all 54 preservation
+  rows and thirteen source definition-of-done items mapped in
+  [UX-06.6](../docs/operations/android-minimalist-design-plan/UX-06.6-parity-and-closeout.md).
+  Local commands, known unrelated full-gate failures and missing device/profile/
+  performance/usability evidence are in the
+  [UX-05/06 verification record](../docs/operations/android-minimalist-design-plan/README.md#ux-0506-verification-record).
+- These are Android presentation/integration changes, not reduced parity or a
+  release/performance pass. Real-IME/focus and picker/grant acceptance remain
+  blocked as recorded in the minimalist task pack; UX-00.3 is still explicitly
+  owner-deferred and UX-06 retains physical-device acceptance. UX-04's selected
+  312 passing tests and 66 affected widget goldens do not replace those gates;
+  evidence and per-task blockers are in the
+  [UX-04 verification record](../docs/operations/android-minimalist-design-plan/README.md#ux-04-verification-record).
+- Android [UX-01.1](../docs/operations/android-minimalist-design-plan/UX-01.1-colors-and-contrast.md)
+  refines semantic accent/selected/status contrast only. Feature commitments,
+  provider behavior, persisted preferences, and the opt-in dynamic-color policy
+  are unchanged; no capability is removed or reduced.
 - OpenRouter is the first release blocker. These rows are release-blocking on every published client: OpenRouter first-run onboarding, key introspection, catalog/pricing/modalities, streaming/reasoning/usage/cost, and provider routing preferences.
 - The Rust column may be `Optional` until the Rust desktop client is enabled for release. Once enabled and published, Rust must meet the same contracts, conformance, parity, and security bar as web and Android. The Rust client is desktop-only for Windows, macOS, and Linux; it is not an Android, iOS, or WASM client.
 - Current Rust status (2026-11-12): shipping and required for M5 onward (`M5-decisions.md` `DEC-M5-03`); the `Backup/sync` row is complete for Rust. The earlier M3.5 preview note is superseded.

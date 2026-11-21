@@ -1,0 +1,194 @@
+import { Palette } from "std-widgets.slint";
+
+export struct DesignColors {
+    canvas: color,
+    surface: color,
+    raised: color,
+    text: color,
+    secondary: color,
+    muted: color,
+    accent: color,
+    accent-hover: color,
+    on-accent: color,
+    accent-soft: color,
+    border: color,
+    danger: color,
+    danger-soft: color,
+    warning: color,
+    warning-soft: color,
+    success: color,
+}
+
+export global Design {
+    public pure function colors(dark: bool) -> DesignColors {
+        return {
+            canvas: dark ? #18191f : #fcfcfe,
+            surface: dark ? #202128 : #f3f3f8,
+            raised: dark ? #262730 : #ffffff,
+            text: dark ? #eeeef4 : #252533,
+            secondary: dark ? #c2c2d0 : #545463,
+            muted: dark ? #aaaabc : #686878,
+            accent: dark ? #a9a2ff : #5c50c7,
+            accent-hover: dark ? #bcb6ff : #4b3fb1,
+            on-accent: dark ? #181720 : #ffffff,
+            accent-soft: dark ? #2b2940 : #eeedf9,
+            border: dark ? #393a46 : #e2e2ec,
+            danger: dark ? #ff979a : #b91c1c,
+            danger-soft: dark ? #3b252c : #fff0f1,
+            warning: dark ? #edc576 : #92400e,
+            warning-soft: dark ? #352e22 : #fff8e8,
+            success: dark ? #91d5b0 : #166534,
+        };
+    }
+}
+
+export component AppText inherits Text {
+    color: Design.colors(Palette.color-scheme == ColorScheme.dark).text;
+    font-size: 14px;
+    // Keep wrapped text in the scroll extent at its actual laid-out width.
+    min-height: self.preferred-height;
+}
+
+export component AppIcon inherits Image {
+    in property <int> kind: 0;
+    in property <color> tint: Design.colors(Palette.color-scheme == ColorScheme.dark).muted;
+    width: 20px;
+    height: 20px;
+    image-fit: contain;
+    colorize: root.tint;
+    accessible-role: none;
+    source: root.kind == 0 ? @image-url("icons/chat.svg")
+        : root.kind == 1 ? @image-url("icons/history.svg")
+        : root.kind == 2 ? @image-url("icons/providers.svg")
+        : root.kind == 3 ? @image-url("icons/settings.svg")
+        : root.kind == 4 ? @image-url("icons/data.svg")
+        : root.kind == 5 ? @image-url("icons/plus.svg")
+        : root.kind == 6 ? @image-url("icons/sparkles.svg")
+        : @image-url("icons/shield.svg");
+}
+
+export component AppButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    in property <bool> primary: false;
+    in property <bool> danger: false;
+    in property <bool> quiet: false;
+    in property <bool> selected: false;
+    in property <bool> align-left: false;
+    in property <int> icon-kind: -1;
+    in property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+    out property <bool> has-focus: focus.has-focus;
+    out property <bool> pressed: touch.pressed;
+    callback clicked;
+
+    private property <DesignColors> colors: Design.colors(root.dark);
+    private property <color> foreground: root.primary ? root.colors.on-accent
+        : root.danger ? root.colors.danger
+        : root.selected ? root.colors.accent : root.colors.text;
+    private property <bool> focus-visible: false;
+
+    min-width: 60px;
+    min-height: 36px;
+    preferred-width: label.preferred-width + 28px + (root.icon-kind >= 0 ? 26px : 0px);
+    preferred-height: 38px;
+    max-height: self.preferred-height;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    border-radius: 8px;
+    border-width: root.primary || root.quiet ? 0px : 1px;
+    border-color: root.colors.border;
+    opacity: root.enabled ? 1 : 0.48;
+    background: root.primary
+        ? (root.danger ? root.colors.danger : touch.has-hover || touch.pressed ? root.colors.accent-hover : root.colors.accent)
+        : root.selected ? root.colors.accent-soft
+        : touch.has-hover || touch.pressed ? (root.danger ? root.colors.danger-soft : root.colors.surface)
+        : root.quiet ? transparent : root.colors.raised;
+
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if (root.enabled) {
+            root.clicked();
+        }
+    }
+    forward-focus: focus;
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        width: 0px;
+        height: 0px;
+        focus-changed-event(reason) => {
+            root.focus-visible = reason == FocusReason.tab-navigation;
+        }
+        key-pressed(event) => {
+            if (root.enabled && (event.text == Key.Return || event.text == Key.Space)) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 8px;
+        alignment: root.align-left ? start : center;
+        if (root.icon-kind >= 0) : Rectangle {
+            width: 18px;
+            AppIcon {
+                kind: root.icon-kind;
+                tint: root.foreground;
+                x: 0px;
+                y: (parent.height - self.height) / 2;
+                width: 18px;
+                height: 18px;
+            }
+        }
+        label := AppText {
+            text: root.text;
+            color: root.foreground;
+            font-weight: root.primary || root.selected ? 600 : 500;
+            min-width: 0px;
+            horizontal-stretch: root.align-left ? 1 : 0;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            focus.focus();
+            root.clicked();
+        }
+    }
+
+    if (root.focus-visible && focus.has-focus) : Rectangle {
+        border-width: 2px;
+        border-color: root.colors.accent;
+        border-radius: root.border-radius;
+        background: transparent;
+    }
+}
+
+export component AppSectionButton inherits AppButton {
+    in property <bool> active: false;
+    selected: root.active;
+    quiet: true;
+    align-left: true;
+    horizontal-stretch: 1;
+    preferred-height: 40px;
+}
+
+export component AppCard inherits Rectangle {
+    in property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+    background: Design.colors(root.dark).raised;
+    border-width: 1px;
+    border-color: Design.colors(root.dark).border;
+    border-radius: 12px;
+    @children
+}

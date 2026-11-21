@@ -106,4 +106,44 @@ class ProviderDetailViewModelTest {
 
         assertThat(viewModel.state.value.error).isEqualTo("Provider not found.")
     }
+
+    @Test
+    fun `failed rotation retains the replacement for correction`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ProviderDetailViewModel(service, "provider-1")
+        advanceUntilIdle()
+        viewModel.onNewKeyChanged("fake-replacement")
+        service.error = IllegalStateException("Try again")
+
+        viewModel.onRotateKey()
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.newKey).isEqualTo("fake-replacement")
+        assertThat(viewModel.state.value.error).isEqualTo("Try again")
+        assertThat(viewModel.state.value.keyChangeVersion).isEqualTo(0)
+        service.error = null
+        viewModel.onRotateKey()
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.newKey).isEmpty()
+        assertThat(viewModel.state.value.keyChangeVersion).isEqualTo(1)
+    }
+
+    @Test
+    fun `cancel and confirm key removal retain provider models and conversations`() = runTest(dispatcher) {
+        val service = FakeProviderManagementService()
+        val viewModel = ProviderDetailViewModel(service, "provider-1")
+        advanceUntilIdle()
+
+        viewModel.onRemoveKey()
+        viewModel.onCancelRemove()
+        assertThat(viewModel.state.value.confirmRemove).isFalse()
+        assertThat(service.providersFlow.value.single().secretId).isNotNull()
+        viewModel.onRemoveKey()
+        viewModel.onRemoveKey()
+        advanceUntilIdle()
+
+        assertThat(service.providersFlow.value.single().secretId).isNull()
+        assertThat(service.models).hasSize(1)
+        assertThat(service.conversations).containsKey("conversation-1")
+    }
 }

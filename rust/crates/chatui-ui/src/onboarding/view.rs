@@ -19,6 +19,7 @@ use crate::onboarding::error::{
 };
 use crate::onboarding::service::{ConnectInput, OnboardingServiceLike};
 use crate::onboarding::state::{OnboardingStep, OnboardingViewModel};
+use crate::tasks::UiTasks;
 
 /// Where the app should route after the onboarding controller is created or
 /// completes.
@@ -38,12 +39,15 @@ impl OnboardingRoute {
 }
 
 slint::slint! {
-    import { Button, CheckBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
+    import { AppButton as Button, AppText as Text, AppIcon, Design } from "../design.slint";
+    import { CheckBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
 
     export component OnboardingWindow inherits Window {
-        title: "ChatUI onboarding";
+        title: "Welcome to ChatUI";
         preferred-width: 720px;
-        preferred-height: 640px;
+        preferred-height: 760px;
+        min-width: 420px;
+        min-height: 560px;
 
         in property <int> step: 0;
         in property <string> preset-label: "OpenRouter";
@@ -64,9 +68,11 @@ slint::slint! {
         in property <bool> can-send: false;
         in property <bool> can-skip: false;
         in property <bool> onboarding-completed: false;
+        in-out property <bool> continue-requested: false;
+        in-out property <string> link-error: "";
         in property <bool> dark: false;
 
-        background: root.dark ? #0f1115 : #ffffff;
+        background: Design.colors(root.dark).canvas;
         init => {
             Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
         }
@@ -80,194 +86,255 @@ slint::slint! {
         callback remember-changed(bool);
         callback connect();
         callback skip();
+        callback open-key-portal();
 
-        VerticalLayout {
+        Rectangle {
+          x: 0px;
+          y: 0px;
+          width: 100%;
+          height: 100%;
+          VerticalLayout {
             padding: 24px;
-            spacing: 12px;
+            spacing: 24px;
 
-            Text {
-                text: "Welcome to ChatUI";
-                font-size: 24px;
-                font-weight: 600;
+            HorizontalLayout {
+                spacing: 10px;
+                AppIcon { kind: 0; tint: Design.colors(root.dark).accent; width: 26px; height: 26px; }
+                Text { text: "ChatUI"; font-size: 20px; font-weight: 700; }
+                Rectangle { horizontal-stretch: 1; }
+                Text { text: "YOUR PRIVATE WORKSPACE"; color: Design.colors(root.dark).muted; font-size: 10px; }
             }
 
-            Text {
-                text: "ChatUI is bring-your-own-key (BYOK). Your key and conversations stay on this device.";
+            if (!root.link-error.is-empty) : Text {
+                text: root.link-error;
+                color: Design.colors(root.dark).danger;
                 wrap: word-wrap;
-            }
-
-            Rectangle {
-                height: 48px;
-                background: root.dark ? #171a21 : #f7f7f8;
-                border-radius: 8px;
-
-                HorizontalLayout {
-                    padding: 12px;
-                    spacing: 8px;
-
-                    Text {
-                        text: root.preset-label;
-                        vertical-alignment: center;
-                    }
-
-                    if (root.recommended) : Text {
-                        text: "Recommended";
-                        color: root.dark ? #4ade80 : #166534;
-                        vertical-alignment: center;
-                    }
-                }
-            }
-
-            if (root.step == 0) : Button {
-                text: "Connect OpenRouter";
-                clicked => { root.begin-key-entry(); }
-            }
-
-            if (root.step >= 1 && root.step <= 3) : VerticalLayout {
-                spacing: 8px;
-
-                Text { text: "OpenRouter API key"; }
-
-                LineEdit {
-                    input-type: InputType.password;
-                    accessible-label: "OpenRouter API key";
-                    text: root.key-input;
-                    edited(text) => { root.key-changed(text); }
-                }
-
-                Text {
-                    text: "Your key is stored on this device and is never sent to a ChatUI server.";
-                    wrap: word-wrap;
-                }
-
-                Text { text: "Label (optional)"; }
-
-                LineEdit {
-                    text: root.key-label;
-                    accessible-label: "Key label";
-                    edited(text) => { root.label-changed(text); }
-                }
-
-                CheckBox {
-                    text: "Remember this key on this device";
-                    checked: root.remember-key;
-                    toggled => { root.remember-changed(self.checked); }
-                }
-
-                HorizontalLayout {
-                    spacing: 8px;
-
-                    Button {
-                        text: root.step == 2 ? "Testing…" : "Connect";
-                        enabled: root.step != 2 && !root.key-input.is-empty;
-                        clicked => { root.connect(); }
-                    }
-
-                    if (root.can-skip) : Button {
-                        text: "Skip";
-                        clicked => { root.skip(); }
-                    }
-                }
-
-                if (root.step == 2) : Text {
-                    text: "Testing key…";
-                    accessible-live-region: polite;
-                }
-
-                if (root.step == 3) : Rectangle {
-                    background: root.dark ? #3b1d1d : #fde8e8;
-                    border-radius: 8px;
-
-                    VerticalLayout {
-                        padding: 12px;
-                        spacing: 4px;
-
-                        Text {
-                            text: root.error-title;
-                            font-weight: 600;
-                            accessible-live-region: assertive;
-                        }
-
-                        Text {
-                            text: root.error-message;
-                            accessible-live-region: assertive;
-                            wrap: word-wrap;
-                        }
-
-                        if (!root.error-details.is-empty) : Text {
-                            text: root.error-details;
-                            wrap: word-wrap;
-                            color: root.dark ? #9ca3af : #5f6368;
-                        }
-                    }
-                }
-            }
-
-            if (root.step == 4) : Text {
-                text: "Loading the public model catalog…";
                 accessible-live-region: polite;
             }
 
-            if (root.step == 5) : VerticalLayout {
-                spacing: 8px;
+            HorizontalLayout {
+                alignment: center;
+                vertical-stretch: 0;
+                VerticalLayout {
+                    width: min(520px, root.width - 48px);
+                    spacing: 12px;
 
-                Text {
-                    text: "Available models";
-                    font-size: 18px;
-                    font-weight: 600;
-                }
+                    Text {
+                        text: root.step == 0 ? "Good ideas start with\na conversation."
+                            : root.step == 6 ? "You're all set."
+                            : "Make your first connection.";
+                        font-size: root.width < 520px ? 28px : 34px;
+                        font-weight: 700;
+                        wrap: word-wrap;
+                    }
+                    Text {
+                        text: root.step == 6 ? "Your models are ready. Let's make something great."
+                            : "Your favorite AI models, one calm place to think. Bring your own key to get started.";
+                        color: Design.colors(root.dark).muted;
+                        wrap: word-wrap;
+                        font-size: 14px;
+                    }
 
-                if (!root.catalog-notice.is-empty) : Text {
-                    text: root.catalog-notice;
-                    wrap: word-wrap;
-                }
-
-                Text {
-                    text: root.catalog-summary;
-                    wrap: word-wrap;
-                }
-
-                ScrollView {
-                    min-height: 160px;
-
-                    VerticalLayout {
-                        for model in root.models : Text {
-                            text: model;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        for label[index] in ["1  Connect", "2  Verify", "3  Start"] : VerticalLayout {
+                            spacing: 6px;
+                            Rectangle {
+                                height: 3px;
+                                border-radius: 2px;
+                                background: (index == 0 || (index == 1 && root.step >= 2) || root.step == 6)
+                                    ? Design.colors(root.dark).accent : Design.colors(root.dark).border;
+                            }
+                            Text {
+                                text: label;
+                                color: Design.colors(root.dark).muted;
+                                font-size: 11px;
+                            }
                         }
                     }
                 }
+            }
 
-                if (!root.default-model-notice.is-empty) : Text {
-                    text: root.default-model-notice;
-                    wrap: word-wrap;
+            HorizontalLayout {
+                alignment: center;
+                vertical-stretch: 1;
+                Rectangle {
+                    width: min(520px, root.width - 48px);
+                    min-height: 200px;
+                    preferred-height: 340px;
+                    vertical-stretch: 1;
+                    background: Design.colors(root.dark).raised;
+                    border-color: Design.colors(root.dark).border;
+                    border-width: 1px;
+                    border-radius: 16px;
+
+                    ScrollView {
+                        x: 24px;
+                        y: 24px;
+                        width: parent.width - 48px;
+                        height: parent.height - 48px;
+                        content-width: self.width;
+
+                        VerticalLayout {
+                            spacing: 16px;
+                            alignment: start;
+                            HorizontalLayout {
+                                spacing: 12px;
+                                Rectangle {
+                                    width: 42px;
+                                    height: 42px;
+                                    border-radius: 12px;
+                                    background: Design.colors(root.dark).accent-soft;
+                                    AppIcon { kind: 2; x: 11px; y: 11px; tint: Design.colors(root.dark).accent; }
+                                }
+                                VerticalLayout {
+                                    spacing: 3px;
+                                    Text { text: root.preset-label; font-size: 17px; font-weight: 600; }
+                                    Text { text: "One key. A world of models."; color: Design.colors(root.dark).muted; font-size: 12px; }
+                                }
+                                if (root.recommended && root.width >= 520px) : Text {
+                                    text: "Recommended";
+                                    color: Design.colors(root.dark).success;
+                                    font-size: 11px;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            if (root.step == 0) : VerticalLayout {
+                                spacing: 14px;
+                                Text { text: "A quick, secure setup"; font-weight: 600; }
+                                Text {
+                                    text: "Connect your OpenRouter account to browse leading models and start your first conversation. No ChatUI account is needed.";
+                                    color: Design.colors(root.dark).secondary;
+                                    wrap: word-wrap;
+                                }
+                                Button {
+                                    text: "Connect OpenRouter";
+                                    primary: true;
+                                    dark: root.dark;
+                                    horizontal-stretch: 1;
+                                    clicked => { root.begin-key-entry(); }
+                                }
+                                Button {
+                                    text: "Get an API key";
+                                    quiet: true;
+                                    dark: root.dark;
+                                    horizontal-stretch: 1;
+                                    clicked => { root.open-key-portal(); }
+                                }
+                            }
+
+                            if (root.step >= 1 && root.step <= 3) : VerticalLayout {
+                                spacing: 10px;
+                                Text { text: "OpenRouter API key"; font-weight: 600; }
+                                LineEdit {
+                                    input-type: InputType.password;
+                                    accessible-label: "OpenRouter API key";
+                                    placeholder-text: "Paste your API key";
+                                    enabled: root.step != 2;
+                                    text: root.key-input;
+                                    edited(text) => { root.key-changed(text); }
+                                    accepted(text) => { if (!root.key-input.is-empty && root.step != 2) { root.connect(); } }
+                                }
+                                Text {
+                                    text: "Used only to connect directly to OpenRouter. Never sent to a ChatUI server.";
+                                    color: Design.colors(root.dark).muted;
+                                    font-size: 12px;
+                                    wrap: word-wrap;
+                                }
+                                Text { text: "Key label (optional)"; }
+                                LineEdit {
+                                    text: root.key-label;
+                                    placeholder-text: "For example, Personal";
+                                    accessible-label: "Key label";
+                                    enabled: root.step != 2;
+                                    edited(text) => { root.label-changed(text); }
+                                }
+                                CheckBox {
+                                    text: "Remember this key on this device";
+                                    checked: root.remember-key;
+                                    enabled: root.step != 2;
+                                    toggled => { root.remember-changed(self.checked); }
+                                }
+                                Button {
+                                    text: root.step == 2 ? "Verifying connection..." : root.step == 3 ? "Try connecting again" : "Connect and continue";
+                                    primary: true;
+                                    dark: root.dark;
+                                    horizontal-stretch: 1;
+                                    enabled: root.step != 2 && !root.key-input.is-empty;
+                                    clicked => { root.connect(); }
+                                }
+                                if (root.can-skip) : Button {
+                                    text: "Skip";
+                                    quiet: true;
+                                    dark: root.dark;
+                                    clicked => { root.skip(); }
+                                }
+                                if (root.step == 2) : Text {
+                                    text: "Checking your key and preparing your models...";
+                                    color: Design.colors(root.dark).muted;
+                                    wrap: word-wrap;
+                                    accessible-live-region: polite;
+                                }
+                                if (root.step == 3) : Rectangle {
+                                    background: Design.colors(root.dark).danger-soft;
+                                    border-radius: 10px;
+                                    VerticalLayout {
+                                        padding: 14px;
+                                        spacing: 6px;
+                                        Text { text: root.error-title; color: Design.colors(root.dark).danger; font-weight: 600; wrap: word-wrap; accessible-live-region: assertive; }
+                                        Text { text: root.error-message; wrap: word-wrap; }
+                                        if (!root.error-details.is-empty) : Text {
+                                            text: root.error-details;
+                                            wrap: word-wrap;
+                                            color: Design.colors(root.dark).muted;
+                                            font-size: 12px;
+                                        }
+                                    }
+                                }
+                                Button {
+                                    text: "Get an API key";
+                                    quiet: true;
+                                    dark: root.dark;
+                                    clicked => { root.open-key-portal(); }
+                                }
+                            }
+
+                            if (root.step == 4 || root.step == 5) : VerticalLayout {
+                                spacing: 12px;
+                                Text { text: root.step == 4 ? "Preparing your model library..." : "Choosing your first model..."; wrap: word-wrap; accessible-live-region: polite; }
+                                Text { text: root.catalog-summary; color: Design.colors(root.dark).muted; wrap: word-wrap; }
+                                if (!root.catalog-notice.is-empty) : Text { text: root.catalog-notice; wrap: word-wrap; }
+                            }
+
+                            if (root.step == 6) : VerticalLayout {
+                                spacing: 14px;
+                                Text { text: "Connected and ready"; color: Design.colors(root.dark).success; font-size: 18px; font-weight: 600; }
+                                Text { text: "Your first model"; color: Design.colors(root.dark).muted; font-size: 12px; }
+                                Text { text: root.selected-model; font-size: 18px; font-weight: 600; wrap: word-wrap; }
+                                Text { text: "You can choose a different model at any time."; color: Design.colors(root.dark).muted; wrap: word-wrap; }
+                                if (!root.default-model-notice.is-empty) : Text { text: root.default-model-notice; wrap: word-wrap; }
+                                Button {
+                                    text: "Start chatting";
+                                    primary: true;
+                                    dark: root.dark;
+                                    horizontal-stretch: 1;
+                                    clicked => { root.continue-requested = true; }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            if (root.step == 6) : VerticalLayout {
-                spacing: 8px;
-
-                Text {
-                    text: "Connected";
-                    font-size: 20px;
-                    font-weight: 600;
-                }
-
-                Text {
-                    text: "Default model: " + root.selected-model;
-                }
-
-                if (!root.default-model-notice.is-empty) : Text {
-                    text: root.default-model-notice;
-                    wrap: word-wrap;
-                }
-
-                Text {
-                    text: root.can-send ? "You can start chatting." : "Sending is disabled until a provider and key are configured.";
-                    wrap: word-wrap;
-                }
+            Text {
+                text: "Local history. Direct connections. Your choice.";
+                color: Design.colors(root.dark).muted;
+                font-size: 12px;
+                horizontal-alignment: center;
+                wrap: word-wrap;
             }
-
-            Rectangle { vertical-stretch: 1; }
+          }
         }
     }
 }
@@ -336,32 +403,44 @@ pub struct OnboardingController {
     service: Arc<dyn OnboardingServiceLike>,
     view_model: Rc<RefCell<OnboardingViewModel>>,
     window: OnboardingWindow,
+    tasks: Rc<UiTasks>,
 }
 
 impl OnboardingController {
     /// Create the onboarding window and load the public catalog.
     ///
-    /// The catalog load is synchronous. Production callers should run the
-    /// controller on a worker thread or provide a non-blocking service.
+    /// Services run synchronously. Desktop hosts should use
+    /// [`Self::new_background`] to keep network calls off the UI thread.
     pub fn new(
         service: Arc<dyn OnboardingServiceLike>,
         preset: &ProviderPreset,
     ) -> Result<Self, slint::PlatformError> {
-        let mut view_model = OnboardingViewModel::from_preset(preset);
-        match service.load_catalog() {
-            Ok(load) => view_model.set_catalog(load.models, load.notice),
-            Err(error) => view_model.catalog_failed(describe_catalog_error_from_onboarding(&error)),
-        }
+        Self::create(service, preset, false)
+    }
 
-        let view_model = Rc::new(RefCell::new(view_model));
+    /// Create an onboarding window with background catalog and key validation.
+    pub fn new_background(
+        service: Arc<dyn OnboardingServiceLike>,
+        preset: &ProviderPreset,
+    ) -> Result<Self, slint::PlatformError> {
+        Self::create(service, preset, true)
+    }
+
+    fn create(
+        service: Arc<dyn OnboardingServiceLike>,
+        preset: &ProviderPreset,
+        background: bool,
+    ) -> Result<Self, slint::PlatformError> {
         let window = OnboardingWindow::new()?;
         let controller = Self {
             service,
-            view_model,
+            view_model: Rc::new(RefCell::new(OnboardingViewModel::from_preset(preset))),
             window,
+            tasks: Rc::new(UiTasks::new(background)),
         };
         controller.wire();
         controller.sync();
+        controller.load_catalog();
         Ok(controller)
     }
 
@@ -387,6 +466,35 @@ impl OnboardingController {
     /// Push the current view model into the window.
     pub fn sync(&self) {
         sync_window(&self.window, &self.view_model.borrow());
+    }
+
+    /// Apply completed background work. Native hosts also poll automatically.
+    pub fn poll(&self) {
+        self.tasks.poll();
+    }
+
+    fn load_catalog(&self) {
+        let service = Arc::clone(&self.service);
+        let state = Rc::clone(&self.view_model);
+        let weak = self.window.as_weak();
+        self.tasks.run(
+            move || service.load_catalog().map_err(Box::new),
+            move |outcome| {
+                if state.borrow().onboarding_completed() {
+                    return;
+                }
+                match outcome {
+                    Ok(Ok(load)) => state.borrow_mut().set_catalog(load.models, load.notice),
+                    Ok(Err(error)) => state
+                        .borrow_mut()
+                        .catalog_failed(describe_catalog_error_from_onboarding(&error)),
+                    Err(error) => state.borrow_mut().catalog_failed(error.to_string()),
+                }
+                if let Some(window) = weak.upgrade() {
+                    sync_window(&window, &state.borrow());
+                }
+            },
+        );
     }
 
     fn wire(&self) {
@@ -429,6 +537,7 @@ impl OnboardingController {
         let weak = self.window.as_weak();
         let state = Rc::clone(&self.view_model);
         let service = Arc::clone(&self.service);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_connect(move || {
             let (key, label, remember) = {
                 let mut view_model = state.borrow_mut();
@@ -454,44 +563,67 @@ impl OnboardingController {
                 label,
                 remember_key: remember,
             };
-            let mut on_step = |step: OnboardingStep| {
-                {
-                    let mut view_model = state.borrow_mut();
-                    match step {
-                        OnboardingStep::CatalogLoading => view_model.catalog_loading(),
-                        OnboardingStep::ModelSelection => view_model.model_selection(),
-                        _ => {}
+            let service = Arc::clone(&service);
+            let progress_state = Rc::clone(&state);
+            let progress_window = weak.clone();
+            let finished_state = Rc::clone(&state);
+            let finished_window = weak.clone();
+            tasks.run_with_progress(
+                move |progress| {
+                    service
+                        .connect_with_progress(input, &mut |step| {
+                            let _ = progress.send(step);
+                        })
+                        .map_err(Box::new)
+                },
+                move |step| {
+                    {
+                        let mut view_model = progress_state.borrow_mut();
+                        match step {
+                            OnboardingStep::CatalogLoading => view_model.catalog_loading(),
+                            OnboardingStep::ModelSelection => view_model.model_selection(),
+                            _ => {}
+                        }
                     }
-                }
-                if let Some(window) = weak.upgrade() {
-                    sync_window(&window, &state.borrow());
-                }
-            };
-            let result = service.connect_with_progress(input, &mut on_step);
-
-            {
-                let mut view_model = state.borrow_mut();
-                match result {
-                    Ok(result) => {
-                        view_model
-                            .set_catalog(result.catalog.clone(), result.catalog_notice.clone());
-                        view_model.complete(
-                            result.provider_id.clone(),
-                            result.model_id.clone(),
-                            result.selected_model.clone(),
-                            result.notice.clone(),
-                        );
+                    if let Some(window) = progress_window.upgrade() {
+                        sync_window(&window, &progress_state.borrow());
                     }
-                    Err(error) => {
-                        let copy = describe_onboarding_error(&error, Some(&key));
-                        view_model.validation_failed(copy);
+                },
+                move |outcome| {
+                    {
+                        let mut view_model = finished_state.borrow_mut();
+                        match outcome {
+                            Ok(Ok(result)) => {
+                                view_model.set_catalog(result.catalog, result.catalog_notice);
+                                view_model.complete(
+                                    result.provider_id,
+                                    result.model_id,
+                                    result.selected_model,
+                                    result.notice,
+                                );
+                            }
+                            Ok(Err(error)) => {
+                                view_model.validation_failed(describe_onboarding_error(
+                                    &error,
+                                    Some(&key),
+                                ));
+                            }
+                            Err(error) => {
+                                view_model.validation_failed(
+                                    crate::onboarding::error::OnboardingErrorCopy {
+                                        title: "Connection interrupted".to_owned(),
+                                        message: error.to_string(),
+                                        details: None,
+                                    },
+                                );
+                            }
+                        }
                     }
-                }
-            }
-
-            if let Some(window) = weak.upgrade() {
-                sync_window(&window, &state.borrow());
-            }
+                    if let Some(window) = finished_window.upgrade() {
+                        sync_window(&window, &finished_state.borrow());
+                    }
+                },
+            );
         });
 
         let weak = self.window.as_weak();
@@ -632,6 +764,63 @@ mod tests {
             connect: Mutex::new(connect),
             complete: Mutex::new(false),
         })
+    }
+
+    #[test]
+    fn background_connection_waits_for_explicit_start_chatting() {
+        use i_slint_backend_testing::ElementRoot;
+        i_slint_backend_testing::init_no_event_loop();
+        let service = service(
+            Ok(CatalogLoad {
+                models: vec![catalog_model("openrouter/auto")],
+                notice: None,
+            }),
+            Ok(success()),
+        );
+        let controller =
+            OnboardingController::new_background(service, &preset()).expect("onboarding");
+        for _ in 0..200 {
+            controller.poll();
+            if controller.window().get_catalog_count() == 1 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let window = controller.window();
+        window.show().expect("show onboarding");
+        window
+            .window()
+            .dispatch_event(slint::platform::WindowEvent::Resized {
+                size: slint::LogicalSize::new(720.0, 760.0),
+            });
+        window.invoke_begin_key_entry();
+        window.invoke_key_changed("test-key".into());
+        window.invoke_connect();
+        assert!(!window.get_can_send());
+        for _ in 0..200 {
+            controller.poll();
+            if window.get_can_send() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(window.get_can_send());
+        assert!(!window.get_continue_requested());
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::ZERO);
+        let controls = window.root_element().query_descendants().find_all();
+        let start = controls
+            .into_iter()
+            .find(|element| element.accessible_label().as_deref() == Some("Start chatting"))
+            .unwrap_or_else(|| {
+                panic!(
+                    "missing Start chatting at step {} in {:?}",
+                    window.get_step(),
+                    window.root_element().size()
+                )
+            });
+        start.invoke_accessible_default_action();
+        assert!(window.get_continue_requested());
+        window.hide().expect("hide onboarding");
     }
 
     #[test]

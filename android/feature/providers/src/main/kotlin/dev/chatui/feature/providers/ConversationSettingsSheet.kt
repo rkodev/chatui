@@ -2,8 +2,9 @@ package dev.chatui.feature.providers
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -12,47 +13,56 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.model.ReasoningEffort
 
-/** Test tags exposed by the conversation settings sheet. */
 object ConversationSettingsTestTags {
     const val Sheet = "conversation-settings-sheet"
     const val Title = "conversation-settings-title"
     const val Model = "conversation-settings-model"
-    const val ModelMenu = "conversation-settings-model-menu"
     const val SystemPrompt = "conversation-settings-system-prompt"
+    const val Generation = "conversation-settings-generation"
+    const val GenerationSummary = "conversation-settings-generation-summary"
     const val Temperature = "conversation-settings-temperature"
     const val TopP = "conversation-settings-top-p"
     const val MaxOutputTokens = "conversation-settings-max-output"
     const val Stop = "conversation-settings-stop"
     const val Streaming = "conversation-settings-streaming"
+    const val Advanced = "conversation-settings-advanced"
+    const val AdvancedSummary = "conversation-settings-advanced-summary"
     const val Extras = "conversation-settings-extras"
     const val ExtrasError = "conversation-settings-extras-error"
     const val UnsupportedNote = "conversation-settings-unsupported-note"
@@ -61,20 +71,13 @@ object ConversationSettingsTestTags {
     const val Delete = "conversation-settings-delete"
     const val ConfirmDelete = "conversation-settings-confirm-delete"
     const val Error = "conversation-settings-error"
+    const val Retry = "conversation-settings-retry"
 
-    fun model(modelId: String): String = "conversation-settings-model-$modelId"
-
+    fun reset(field: String): String = "conversation-settings-reset-$field"
     fun reasoning(effort: String): String = "conversation-settings-reasoning-$effort"
 }
 
-/**
- * Full-height conversation settings sheet.
- *
- * Renders the model, system prompt, generation parameters, provider extras,
- * routing summary, export entry point, and delete action from one immutable
- * state. Every intent is forwarded to the ViewModel.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ConversationSettingsSheet(
     state: ConversationSettingsUiState,
@@ -87,287 +90,269 @@ fun ConversationSettingsSheet(
     onReasoningEffortChanged: (ReasoningEffort?) -> Unit,
     onStreamingChanged: (Boolean) -> Unit,
     onExtrasChanged: (String) -> Unit,
-    onModelSelected: (String) -> Unit,
+    onOpenModelPicker: () -> Unit,
     onDelete: () -> Unit,
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier,
+    onRetry: () -> Unit = {},
+    routingControls: (@Composable () -> Unit)? = null,
+    pickerOpen: Boolean = false,
+    pickerReturnVersion: Int = 0,
+    modelPickerAvailable: Boolean = true,
 ) {
     val dimens = LocalDimens.current
     var confirmDelete by remember { mutableStateOf(false) }
-    var modelMenuExpanded by remember { mutableStateOf(false) }
-    val temperatureText = rememberNumericText(state.params.temperature)
-    val topPText = rememberNumericText(state.params.topP)
-    val maxOutputText = rememberIntText(state.params.maxOutputTokens)
+    var generationExpanded by rememberSaveable(state.conversation?.id) { mutableStateOf(false) }
+    var advancedExpanded by rememberSaveable(state.conversation?.id) { mutableStateOf(false) }
+    val modelFocus = remember { FocusRequester() }
+    var handledPickerReturn by rememberSaveable(state.conversation?.id) { mutableStateOf(0) }
+    val suspended by rememberUpdatedState(pickerOpen)
+    val enabled = state.conversation != null && !state.loading && !state.busy && !pickerOpen
 
-    // The sheet and its delete confirmation are separate windows and normally
-    // consume back themselves. These fallbacks share the same close functions
-    // as onDismissRequest so back can never close both layers at once.
-    BackHandler(enabled = !confirmDelete) { onDismiss() }
-    BackHandler(enabled = confirmDelete) { confirmDelete = false }
+    LaunchedEffect(pickerReturnVersion, state.loading, pickerOpen) {
+        if (pickerReturnVersion > handledPickerReturn && !state.loading && !pickerOpen) {
+            withFrameNanos { }
+            modelFocus.requestFocus()
+            handledPickerReturn = pickerReturnVersion
+        }
+    }
+
+    BackHandler(enabled = !confirmDelete && !pickerOpen) { onDismiss() }
+    BackHandler(enabled = confirmDelete && !pickerOpen) { confirmDelete = false }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { if (!pickerOpen) onDismiss() },
+        sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { it != SheetValue.Hidden || !suspended },
+        ),
+        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = !pickerOpen),
         modifier = modifier.testTag(ConversationSettingsTestTags.Sheet),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = dimens.padding)
-                .padding(bottom = dimens.padding),
+                .padding(dimens.padding),
             verticalArrangement = Arrangement.spacedBy(dimens.space2),
         ) {
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(dimens.space2),
             ) {
                 Text(
-                    text = "Conversation settings",
+                    "Conversation settings",
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.testTag(ConversationSettingsTestTags.Title),
                 )
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.heightIn(min = dimens.touchTargetMin),
-                ) {
-                    Text("Close")
-                }
+                TextButton(onClick = onDismiss, enabled = !pickerOpen) { Text("Close") }
             }
-
+            Text(
+                "Changes apply immediately to this conversation.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (state.loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             state.error?.let { error ->
                 InlineBanner(
                     severity = BannerSeverity.Error,
-                    title = "Could not update conversation settings",
+                    title = if (state.hasPendingChanges) "Changes have not been saved" else "Could not update conversation settings",
                     body = error,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(ConversationSettingsTestTags.Error),
+                    modifier = Modifier.testTag(ConversationSettingsTestTags.Error),
                     action = {
-                        TextButton(onClick = onDismissError) { Text("Dismiss") }
+                        FlowRow {
+                            TextButton(
+                                onClick = onRetry,
+                                modifier = Modifier.testTag(ConversationSettingsTestTags.Retry),
+                            ) { Text("Retry") }
+                            if (!state.hasPendingChanges) {
+                                TextButton(onClick = onDismissError) { Text("Dismiss") }
+                            }
+                        }
                     },
                 )
             }
-
-            HorizontalDivider()
+            if (state.saving) Text("Saving changes...", style = MaterialTheme.typography.bodySmall)
 
             Text("Model", style = MaterialTheme.typography.titleMedium)
-            Box(modifier = Modifier.fillMaxWidth()) {
-                TextButton(
-                    onClick = { modelMenuExpanded = true },
-                    enabled = !state.busy,
-                    modifier = Modifier
-                        .heightIn(min = dimens.touchTargetMin)
-                        .testTag(ConversationSettingsTestTags.Model),
-                ) {
-                    Text(
-                        text = state.model?.label
-                            ?: state.conversation?.modelLabel
-                            ?: "Choose model",
-                    )
-                }
-                DropdownMenu(
-                    expanded = modelMenuExpanded,
-                    onDismissRequest = { modelMenuExpanded = false },
-                    modifier = Modifier.testTag(ConversationSettingsTestTags.ModelMenu),
-                ) {
-                    state.models.forEach { model ->
-                        DropdownMenuItem(
-                            text = { Text(model.label) },
-                            onClick = {
-                                modelMenuExpanded = false
-                                onModelSelected(model.id)
-                            },
-                            modifier = Modifier.testTag(
-                                ConversationSettingsTestTags.model(model.id),
-                            ),
-                        )
-                    }
+            TextButton(
+                onClick = onOpenModelPicker,
+                enabled = enabled && modelPickerAvailable,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(modelFocus)
+                    .heightIn(min = dimens.touchTargetMin)
+                    .testTag(ConversationSettingsTestTags.Model),
+            ) {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(state.model?.label ?: state.conversation?.modelLabel ?: "Choose model")
+                    Text("Change model for this conversation", style = MaterialTheme.typography.bodySmall)
                 }
             }
             Text(
-                text = "Model changes apply to the next message and never rewrite history.",
+                "Model changes apply to the next message and never rewrite history.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-
-            HorizontalDivider()
-
-            Text("System prompt and parameters", style = MaterialTheme.typography.titleMedium)
-
             OutlinedTextField(
                 value = state.systemPrompt,
                 onValueChange = onSystemPromptChanged,
                 label = { Text("System prompt") },
                 placeholder = { Text("Optional instructions sent before the history") },
+                enabled = enabled,
                 minLines = 3,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ConversationSettingsTestTags.SystemPrompt),
+                modifier = Modifier.fillMaxWidth().testTag(ConversationSettingsTestTags.SystemPrompt),
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(dimens.space2),
-            ) {
-                OutlinedTextField(
-                    value = temperatureText.value,
-                    onValueChange = {
-                        temperatureText.value = it
-                        onTemperatureChanged(it)
-                    },
-                    label = { Text("Temperature") },
-                    placeholder = { Text("Model default") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag(ConversationSettingsTestTags.Temperature),
+            HorizontalDivider()
+            ProviderSectionToggle(
+                title = "Generation",
+                expanded = generationExpanded,
+                onClick = { generationExpanded = !generationExpanded },
+                modifier = Modifier.testTag(ConversationSettingsTestTags.Generation),
+            )
+            Text(
+                state.generationSummary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag(ConversationSettingsTestTags.GenerationSummary),
+            )
+            if (generationExpanded) {
+                GenerationNumber(
+                    label = "Temperature",
+                    text = state.temperatureText,
+                    error = state.parameterErrors[CoreParameterKey.TEMPERATURE],
+                    onChange = onTemperatureChanged,
+                    keyboardType = KeyboardType.Decimal,
+                    enabled = enabled,
+                    tag = ConversationSettingsTestTags.Temperature,
+                    resetTag = ConversationSettingsTestTags.reset("temperature"),
+                )
+                GenerationNumber(
+                    label = "Top P",
+                    text = state.topPText,
+                    error = state.parameterErrors[CoreParameterKey.TOP_P],
+                    onChange = onTopPChanged,
+                    keyboardType = KeyboardType.Decimal,
+                    enabled = enabled,
+                    tag = ConversationSettingsTestTags.TopP,
+                    resetTag = ConversationSettingsTestTags.reset("top-p"),
+                )
+                GenerationNumber(
+                    label = "Max output tokens",
+                    text = state.maxOutputText,
+                    error = state.parameterErrors[CoreParameterKey.MAX_OUTPUT_TOKENS],
+                    onChange = onMaxOutputTokensChanged,
+                    keyboardType = KeyboardType.Number,
+                    enabled = enabled,
+                    tag = ConversationSettingsTestTags.MaxOutputTokens,
+                    resetTag = ConversationSettingsTestTags.reset("max-output"),
                 )
                 OutlinedTextField(
-                    value = topPText.value,
-                    onValueChange = {
-                        topPText.value = it
-                        onTopPChanged(it)
-                    },
-                    label = { Text("Top P") },
-                    placeholder = { Text("Model default") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag(ConversationSettingsTestTags.TopP),
+                    value = state.stopText,
+                    onValueChange = onStopChanged,
+                    label = { Text("Stop sequences") },
+                    placeholder = { Text("One sequence per line; empty uses model default") },
+                    enabled = enabled,
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth().testTag(ConversationSettingsTestTags.Stop),
                 )
-            }
-
-            OutlinedTextField(
-                value = maxOutputText.value,
-                onValueChange = {
-                    maxOutputText.value = it
-                    onMaxOutputTokensChanged(it)
-                },
-                label = { Text("Max output tokens") },
-                placeholder = { Text("Model default") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ConversationSettingsTestTags.MaxOutputTokens),
-            )
-
-            OutlinedTextField(
-                value = state.stopText,
-                onValueChange = onStopChanged,
-                label = { Text("Stop sequences") },
-                placeholder = { Text("One sequence per line") },
-                minLines = 2,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ConversationSettingsTestTags.Stop),
-            )
-
-            Text("Reasoning effort", style = MaterialTheme.typography.bodyMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(dimens.space1)) {
-                ReasoningChip(
-                    label = "Default",
-                    selected = state.params.reasoningEffort == null,
-                    tag = ConversationSettingsTestTags.reasoning("default"),
-                    onClick = { onReasoningEffortChanged(null) },
-                )
-                ReasoningEffort.entries.forEach { effort ->
+                Text("Reasoning effort", style = MaterialTheme.typography.bodyMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(dimens.space1)) {
                     ReasoningChip(
-                        label = effort.name.lowercase().replaceFirstChar { it.uppercase() },
-                        selected = state.params.reasoningEffort == effort,
-                        tag = ConversationSettingsTestTags.reasoning(effort.name.lowercase()),
-                        onClick = { onReasoningEffortChanged(effort) },
+                        label = "Default",
+                        selected = state.params.reasoningEffort == null,
+                        enabled = enabled,
+                        tag = ConversationSettingsTestTags.reasoning("default"),
+                        onClick = { onReasoningEffortChanged(null) },
+                    )
+                    ReasoningEffort.entries.forEach { effort ->
+                        ReasoningChip(
+                            label = effort.name.lowercase().replaceFirstChar { it.uppercase() },
+                            selected = state.params.reasoningEffort == effort,
+                            enabled = enabled,
+                            tag = ConversationSettingsTestTags.reasoning(effort.name.lowercase()),
+                            onClick = { onReasoningEffortChanged(effort) },
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Stream responses", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = state.params.streaming,
+                        onCheckedChange = onStreamingChanged,
+                        enabled = enabled,
+                        modifier = Modifier.testTag(ConversationSettingsTestTags.Streaming)
+                            .semantics { contentDescription = "Stream responses" },
                     )
                 }
             }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Stream responses")
-                Switch(
-                    checked = state.params.streaming,
-                    onCheckedChange = onStreamingChanged,
-                    modifier = Modifier.testTag(ConversationSettingsTestTags.Streaming),
-                )
-            }
-
             state.unsupportedNote?.let { note ->
                 Text(
-                    text = note,
+                    note,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag(ConversationSettingsTestTags.UnsupportedNote),
                 )
             }
 
             HorizontalDivider()
-
-            Text("Provider extras", style = MaterialTheme.typography.titleMedium)
+            ProviderSectionToggle(
+                title = "Advanced",
+                expanded = advancedExpanded,
+                onClick = { advancedExpanded = !advancedExpanded },
+                modifier = Modifier.testTag(ConversationSettingsTestTags.Advanced),
+            )
             Text(
-                text = "Advanced JSON for the ${state.presetId} namespace. " +
-                    "Core fields such as model, messages, and stream cannot be overridden.",
+                state.advancedSummary,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(ConversationSettingsTestTags.AdvancedSummary),
             )
-            OutlinedTextField(
-                value = state.extrasText,
-                onValueChange = onExtrasChanged,
-                label = { Text("Extra JSON") },
-                placeholder = { Text("{}") },
-                minLines = 3,
-                isError = state.extrasError != null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ConversationSettingsTestTags.Extras),
-            )
-            state.extrasError?.let { error ->
+            if (advancedExpanded) {
                 Text(
-                    text = error,
-                    color = MaterialTheme.colorScheme.error,
+                    "Full provider extras JSON for ${state.presetId}. Core fields such as " +
+                        "model, messages, stream, and stream_options cannot be overridden.",
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.testTag(ConversationSettingsTestTags.ExtrasError),
                 )
-            }
-
-            state.routingSummary?.let { summary ->
-                Text(
-                    text = "Routing: $summary",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.testTag(ConversationSettingsTestTags.RoutingSummary),
+                OutlinedTextField(
+                    value = state.extrasText,
+                    onValueChange = onExtrasChanged,
+                    label = { Text("Extra JSON") },
+                    placeholder = { Text("{}") },
+                    enabled = enabled,
+                    minLines = 3,
+                    isError = state.extrasError != null,
+                    modifier = Modifier.fillMaxWidth().testTag(ConversationSettingsTestTags.Extras),
                 )
+                state.extrasError?.let { error ->
+                    Text(
+                        error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag(ConversationSettingsTestTags.ExtrasError),
+                    )
+                }
+                routingControls?.invoke()
+                state.routingSummary?.let { summary ->
+                    Text(
+                        "Routing: $summary",
+                        modifier = Modifier.testTag(ConversationSettingsTestTags.RoutingSummary),
+                    )
+                }
             }
 
             HorizontalDivider()
-
-            Button(
-                onClick = {},
-                enabled = false,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ConversationSettingsTestTags.Export),
-            ) {
-                Text("Export conversation (coming soon)")
-            }
-
+            Text(
+                "File export is not available yet. Share text or Markdown from More.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag(ConversationSettingsTestTags.Export),
+            )
             TextButton(
                 onClick = { confirmDelete = true },
-                enabled = !state.busy,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(ConversationSettingsTestTags.Delete),
+                enabled = enabled,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier.fillMaxWidth().testTag(ConversationSettingsTestTags.Delete),
             ) {
-                Text("Delete conversation", color = MaterialTheme.colorScheme.error)
+                Text("Delete conversation")
             }
         }
     }
-
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -375,14 +360,9 @@ fun ConversationSettingsSheet(
             text = { Text("This permanently removes the conversation and its messages.") },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        confirmDelete = false
-                        onDelete()
-                    },
+                    onClick = { confirmDelete = false; onDelete() },
                     modifier = Modifier.testTag(ConversationSettingsTestTags.ConfirmDelete),
-                ) {
-                    Text("Delete")
-                }
+                ) { Text("Delete") }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
@@ -392,55 +372,51 @@ fun ConversationSettingsSheet(
 }
 
 @Composable
+private fun GenerationNumber(
+    label: String,
+    text: String,
+    error: String?,
+    onChange: (String) -> Unit,
+    keyboardType: KeyboardType,
+    enabled: Boolean,
+    tag: String,
+    resetTag: String,
+) {
+    OutlinedTextField(
+        value = text,
+        onValueChange = onChange,
+        label = { Text(label) },
+        placeholder = { Text("Model default") },
+        supportingText = { Text(error ?: "Empty uses model default.") },
+        isError = error != null,
+        singleLine = true,
+        enabled = enabled,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        modifier = Modifier.fillMaxWidth().testTag(tag),
+    )
+    TextButton(
+        onClick = { onChange("") },
+        enabled = enabled && text.isNotEmpty(),
+        modifier = Modifier.testTag(resetTag)
+            .semantics { contentDescription = "Use model default for $label" },
+    ) {
+        Text("Use model default")
+    }
+}
+
+@Composable
 private fun ReasoningChip(
     label: String,
     selected: Boolean,
+    enabled: Boolean,
     tag: String,
     onClick: () -> Unit,
 ) {
-    val dimens = LocalDimens.current
-
     FilterChip(
         selected = selected,
         onClick = onClick,
+        enabled = enabled,
         label = { Text(label) },
-        modifier = Modifier
-            .heightIn(min = dimens.touchTargetMin)
-            .testTag(tag),
+        modifier = Modifier.heightIn(min = LocalDimens.current.touchTargetMin).testTag(tag),
     )
-}
-
-/**
- * Editable text for a nullable numeric field.
- *
- * The local text is the source of truth while typing so partial input such as
- * `0.` is not rewritten. It resyncs only when the persisted value changes to
- * something the local text does not already represent.
- */
-@Composable
-private fun rememberNumericText(value: Double?): MutableState<String> {
-    val state = remember { mutableStateOf(value?.toString().orEmpty()) }
-
-    LaunchedEffect(value) {
-        val parsed = state.value.trim().toDoubleOrNull()
-        if (parsed != value) {
-            state.value = value?.toString().orEmpty()
-        }
-    }
-
-    return state
-}
-
-@Composable
-private fun rememberIntText(value: Int?): MutableState<String> {
-    val state = remember { mutableStateOf(value?.toString().orEmpty()) }
-
-    LaunchedEffect(value) {
-        val parsed = state.value.trim().toIntOrNull()
-        if (parsed != value) {
-            state.value = value?.toString().orEmpty()
-        }
-    }
-
-    return state
 }

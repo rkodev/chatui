@@ -3,6 +3,8 @@ package dev.chatui.feature.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,41 +25,42 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.designsystem.BannerSeverity
-import dev.chatui.core.designsystem.ChatUiSnackbarHost
 import dev.chatui.core.designsystem.GroupedList
 import dev.chatui.core.designsystem.GroupedSection
 import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
-import dev.chatui.core.designsystem.LocalSnackbarHostState
 import dev.chatui.core.designsystem.SettingsRow
 import dev.chatui.core.designsystem.Skeleton
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.designsystem.rememberHaptics
 import java.util.Locale
-import kotlinx.coroutines.launch
 
 /** Test tags exposed by the data settings screen. */
 object DataSettingsTestTags {
     const val Root = "data-settings-root"
     const val Usage = "data-usage"
     const val UsageTotal = "data-usage-total"
+    const val UsageDetails = "data-usage-details"
     const val Keys = "data-keys"
     const val Clear = "data-clear"
     const val ClearConfirmation = "data-clear-confirmation"
@@ -106,8 +109,7 @@ fun formatBytes(bytes: Long): String {
 }
 
 /**
- * Data settings: storage usage, clear-all, per-key deletion, export/import
- * entry points, and the backup placeholder.
+ * Data settings with ordinary file operations before destructive actions.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,21 +127,16 @@ fun DataSettingsScreen(
     onImportMerge: () -> Unit,
     onImportReplace: () -> Unit,
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState? = LocalSnackbarHostState.current,
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
     val haptics = rememberHaptics()
-    val scope = rememberCoroutineScope()
-    val host = snackbarHostState ?: remember { SnackbarHostState() }
     var showClearSheet by remember { mutableStateOf(false) }
-
-    LaunchedEffect(state.status) {
-        state.status?.let { host.showSnackbar(it) }
-    }
-    LaunchedEffect(state.error) {
-        state.error?.let { host.showSnackbar(it) }
-    }
+    var showBreakdown by rememberSaveable { mutableStateOf(false) }
+    val operation = state.fileOperation
+    val busy = state.busy
+    val error = operation.error ?: state.error
+    val status = (operation.description ?: state.status).takeIf { error == null }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -149,11 +146,11 @@ fun DataSettingsScreen(
                 .padding(vertical = dimens.sectionGap)
                 .testTag(DataSettingsTestTags.Root),
         ) {
-            state.error?.let { error ->
+            error?.let { message ->
                 InlineBanner(
                     severity = BannerSeverity.Error,
                     title = "Data operation failed",
-                    body = error,
+                    body = message,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = dimens.screenPadding)
@@ -165,14 +162,20 @@ fun DataSettingsScreen(
                 Spacer(Modifier.height(dimens.space3))
             }
 
-            state.status?.let { status ->
+            if (operation.phase == DataFilePhase.PREPARING || operation.phase == DataFilePhase.WORKING) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = dimens.screenPadding),
+                )
+            }
+            status?.let { message ->
                 Text(
-                    text = status,
+                    text = message,
                     style = Typography.footnote,
                     color = colors.fgMuted,
                     modifier = Modifier
                         .padding(horizontal = dimens.screenPadding)
-                        .testTag(DataSettingsTestTags.Status),
+                        .testTag(DataSettingsTestTags.Status)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
                 )
                 Spacer(Modifier.height(dimens.space3))
             }
@@ -199,13 +202,6 @@ fun DataSettingsScreen(
                         } else {
                             val usage = state.usage
                             if (usage != null) {
-                                UsageRow("conversations", "Conversations", usage.conversations)
-                                UsageRow("messages", "Messages", usage.messages)
-                                UsageRow("attachments", "Attachments", usage.attachments)
-                                UsageRow("secrets", "Stored keys", usage.secrets)
-                                UsageRow("providers", "Providers", usage.providers)
-                                UsageRow("models", "Models", usage.models)
-                                HorizontalDivider(color = colors.separator, thickness = 0.5.dp)
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -223,62 +219,25 @@ fun DataSettingsScreen(
                                         color = colors.fgSecondary,
                                     )
                                 }
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(
-                    title = "Stored API keys",
-                    modifier = Modifier.testTag(DataSettingsTestTags.Keys),
-                    footer = "Keys are stored separately from conversations and are never " +
-                        "included in exports. Removing a key clears its cached metadata and " +
-                        "disables sending until a new key is added.",
-                ) {
-                    Column(
-                        modifier = Modifier.padding(dimens.cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(dimens.space2),
-                    ) {
-                        if (state.loading) {
-                            repeat(2) {
-                                Skeleton(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(20.dp),
-                                )
-                            }
-                        } else {
-                            val storedKeys = state.keys.filter { it.hasKey }
-                            if (storedKeys.isEmpty()) {
-                                Text(
-                                    text = "No API keys are stored on this device.",
-                                    style = Typography.body,
-                                    color = colors.fgMuted,
-                                )
-                            } else {
-                                storedKeys.forEach { key ->
-                                    StoredKeyRow(
-                                        key = key,
-                                        state = state,
-                                        onRequestRemoveKey = onRequestRemoveKey,
-                                        onCancelRemoveKey = onCancelRemoveKey,
-                                        onConfirmRemoveKey = onConfirmRemoveKey,
-                                    )
+                                TextButton(
+                                    onClick = { showBreakdown = !showBreakdown },
+                                    modifier = Modifier.testTag(DataSettingsTestTags.UsageDetails)
+                                        .semantics {
+                                            stateDescription = if (showBreakdown) "Expanded" else "Collapsed"
+                                        },
+                                ) { Text("Storage breakdown") }
+                                if (showBreakdown) {
+                                    UsageRow("conversations", "Conversations", usage.conversations)
+                                    UsageRow("messages", "Messages", usage.messages)
+                                    UsageRow("attachments", "Attachments", usage.attachments)
+                                    UsageRow("secrets", "Stored keys", usage.secrets)
+                                    UsageRow("providers", "Providers", usage.providers)
+                                    UsageRow("models", "Models", usage.models)
                                 }
                             }
                         }
-                        TextButton(
-                            onClick = onOpenProviders,
-                            modifier = Modifier.heightIn(min = 48.dp),
-                        ) {
-                            Text("Manage providers and keys")
-                        }
                     }
                 }
-                Spacer(Modifier.height(dimens.sectionGap))
-                DangerZone(
-                    onOpenClearSheet = { showClearSheet = true },
-                )
                 Spacer(Modifier.height(dimens.sectionGap))
                 GroupedSection(
                     title = "Export",
@@ -289,13 +248,10 @@ fun DataSettingsScreen(
                         label = "Export all data (JSON)",
                         icon = Icons.Rounded.FileUpload,
                         showChevron = true,
-                        onClick = {
+                        onClick = if (busy) null else ({
                             haptics.confirm()
                             onExportAll()
-                            scope.launch {
-                                host.showSnackbar("Export started")
-                            }
-                        },
+                        }),
                         modifier = Modifier.testTag(DataSettingsTestTags.ExportButton),
                         showDivider = false,
                     )
@@ -310,36 +266,61 @@ fun DataSettingsScreen(
                         label = "Import data (merge)",
                         icon = Icons.Rounded.FileDownload,
                         showChevron = true,
-                        onClick = {
+                        onClick = if (busy) null else ({
                             haptics.confirm()
                             onImportMerge()
-                            scope.launch {
-                                host.showSnackbar("Import started")
-                            }
-                        },
+                        }),
                         modifier = Modifier.testTag(DataSettingsTestTags.ImportMerge),
                     )
                     SettingsRow(
                         label = "Import data (replace)",
                         icon = Icons.Rounded.FileDownload,
                         showChevron = true,
-                        onClick = {
+                        onClick = if (busy) null else ({
                             haptics.confirm()
                             onImportReplace()
-                            scope.launch {
-                                host.showSnackbar("Import started")
-                            }
-                        },
+                        }),
                         modifier = Modifier.testTag(DataSettingsTestTags.ImportReplace),
                         showDivider = false,
                     )
                 }
                 Spacer(Modifier.height(dimens.sectionGap))
                 GroupedSection(
-                    title = "Backup",
+                    title = "Stored API keys",
+                    modifier = Modifier.testTag(DataSettingsTestTags.Keys),
+                    footer = "Keys are never included in exports. Removing a key clears its " +
+                        "cached metadata and disables sending until a new key is added.",
+                ) {
+                    Column(
+                        modifier = Modifier.padding(dimens.cardPadding),
+                        verticalArrangement = Arrangement.spacedBy(dimens.space2),
+                    ) {
+                        val storedKeys = state.keys.filter { it.hasKey }
+                        if (state.loading) {
+                            Skeleton(Modifier.fillMaxWidth().height(20.dp))
+                        } else if (storedKeys.isEmpty()) {
+                            Text("No API keys are stored on this device.", style = Typography.body)
+                        } else {
+                            storedKeys.forEach { key ->
+                                StoredKeyRow(
+                                    key, state,
+                                    onRequestRemoveKey = { if (!busy) onRequestRemoveKey(it) },
+                                    onCancelRemoveKey = onCancelRemoveKey,
+                                    onConfirmRemoveKey = { if (!busy) onConfirmRemoveKey(it) },
+                                )
+                            }
+                        }
+                        TextButton(onClick = onOpenProviders, enabled = !busy) {
+                            Text("Manage providers and keys")
+                        }
+                    }
+                }
+                Spacer(Modifier.height(dimens.sectionGap))
+                GroupedSection(
+                    title = "Encrypted backup",
                     modifier = Modifier.testTag(DataSettingsTestTags.Backup),
-                    footer = "ChatUI does not back up or sync data in this release. Backup " +
-                        "configuration arrives in M5.",
+                    footer = "Optional encrypted backup to your own storage. " +
+                        "Configuration, status, and recovery are available here.",
                 ) {
                     SettingsRow(
                         label = "Open backup settings",
@@ -350,13 +331,9 @@ fun DataSettingsScreen(
                         showDivider = false,
                     )
                 }
+                Spacer(Modifier.height(dimens.sectionGap))
+                DangerZone(onOpenClearSheet = { if (!busy) showClearSheet = true })
             }
-        }
-        if (snackbarHostState == null) {
-            ChatUiSnackbarHost(
-                hostState = host,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
         }
     }
 
@@ -365,6 +342,7 @@ fun DataSettingsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(dimens.screenPadding),
                 verticalArrangement = Arrangement.spacedBy(dimens.space3),
             ) {
@@ -466,10 +444,11 @@ private fun DangerZone(onOpenClearSheet: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun UsageRow(key: String, label: String, entry: StorageUsageEntry) {
     val colors = LocalChatUiColors.current
-    Row(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(DataSettingsTestTags.usageRow(key)),
@@ -488,6 +467,7 @@ private fun UsageRow(key: String, label: String, entry: StorageUsageEntry) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StoredKeyRow(
     key: ProviderKeySummary,
@@ -503,14 +483,13 @@ private fun StoredKeyRow(
             .fillMaxWidth()
             .testTag(DataSettingsTestTags.key(key.id)),
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = dimens.rowMinHeight)
                 .padding(vertical = dimens.space2),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column {
                 Text(
                     text = key.label,
                     style = Typography.body,
@@ -523,38 +502,40 @@ private fun StoredKeyRow(
                 )
             }
 
-            if (state.confirmKeyId == key.id) {
-                TextButton(
-                    onClick = { onConfirmRemoveKey(key.id) },
-                    enabled = state.removingKeyId == null,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .testTag(DataSettingsTestTags.confirmRemoveKey(key.id)),
-                ) {
-                    Text(
-                        if (state.removingKeyId == key.id) {
-                            "Removing..."
-                        } else {
-                            "Confirm removal"
-                        },
-                    )
-                }
-                TextButton(
-                    onClick = onCancelRemoveKey,
-                    enabled = state.removingKeyId == null,
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) {
-                    Text("Cancel")
-                }
-            } else {
-                TextButton(
-                    onClick = { onRequestRemoveKey(key.id) },
-                    enabled = state.removingKeyId == null,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .testTag(DataSettingsTestTags.removeKey(key.id)),
-                ) {
-                    Text("Remove key")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(dimens.space2)) {
+                if (state.confirmKeyId == key.id) {
+                    TextButton(
+                        onClick = { onConfirmRemoveKey(key.id) },
+                        enabled = !state.busy,
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag(DataSettingsTestTags.confirmRemoveKey(key.id)),
+                    ) {
+                        Text(
+                            if (state.removingKeyId == key.id) {
+                                "Removing..."
+                            } else {
+                                "Confirm removal"
+                            },
+                        )
+                    }
+                    TextButton(
+                        onClick = onCancelRemoveKey,
+                        enabled = !state.busy,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text("Cancel")
+                    }
+                } else {
+                    TextButton(
+                        onClick = { onRequestRemoveKey(key.id) },
+                        enabled = !state.busy,
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag(DataSettingsTestTags.removeKey(key.id)),
+                    ) {
+                        Text("Remove key")
+                    }
                 }
             }
         }

@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,10 +32,10 @@ import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -44,38 +46,43 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.chatui.core.datastore.settings.AndroidSettings
 import dev.chatui.core.designsystem.BannerSeverity
-import dev.chatui.core.designsystem.BrandMark
-import dev.chatui.core.designsystem.ChatUiSnackbarHost
 import dev.chatui.core.designsystem.GroupedList
 import dev.chatui.core.designsystem.GroupedSection
 import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LabeledSlider
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
-import dev.chatui.core.designsystem.LocalSnackbarHostState
 import dev.chatui.core.designsystem.SettingsRow
-import dev.chatui.core.designsystem.Stepper
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.ChatFontSize
+import dev.chatui.core.model.ChatParams
 import dev.chatui.core.model.Density
 import dev.chatui.core.model.ReasoningEffort
 import dev.chatui.core.model.SendKey
 import dev.chatui.core.model.Theme
 import java.util.Locale
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /** Test tags exposed by the settings screens. */
 object SettingsTestTags {
@@ -103,7 +110,14 @@ object SettingsTestTags {
     const val DefaultStop = "settings-default-stop"
     const val DefaultStreaming = "settings-default-streaming"
     const val Error = "settings-error"
+    const val Saved = "settings-saved"
+    const val Preview = "settings-preview"
+    const val Generation = "settings-generation"
+    const val Composer = "settings-composer"
+    const val Privacy = "settings-privacy"
+    const val ModelWarning = "settings-model-warning"
 
+    fun reset(field: String): String = "settings-reset-$field"
     fun theme(value: String): String = "settings-theme-$value"
 
     fun density(value: String): String = "settings-density-$value"
@@ -142,6 +156,7 @@ fun SettingsRootScreen(
             GroupedSection(title = "Preferences") {
                 SettingsRow(
                     label = "Appearance",
+                    value = "Theme, text size, and feedback",
                     icon = Icons.Rounded.Palette,
                     showChevron = true,
                     onClick = onOpenAppearance,
@@ -149,6 +164,7 @@ fun SettingsRootScreen(
                 )
                 SettingsRow(
                     label = "Chat defaults",
+                    value = "Model, prompt, and behavior",
                     icon = Icons.AutoMirrored.Rounded.Chat,
                     showChevron = true,
                     onClick = onOpenChatDefaults,
@@ -165,14 +181,14 @@ fun SettingsRootScreen(
             Spacer(Modifier.height(dimens.sectionGap))
             GroupedSection(title = "Data") {
                 SettingsRow(
-                    label = "Data",
+                    label = "Data & storage",
                     icon = Icons.Rounded.Storage,
                     showChevron = true,
                     onClick = onOpenData,
                     modifier = Modifier.testTag(SettingsTestTags.Data),
                 )
                 SettingsRow(
-                    label = "Backup",
+                    label = "Encrypted backup",
                     icon = Icons.Rounded.Backup,
                     showChevron = true,
                     onClick = onOpenBackup,
@@ -203,142 +219,83 @@ fun AppearanceSettingsScreen(
     onHapticFeedbackChanged: (Boolean) -> Unit = {},
     onDynamicColorChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState? = LocalSnackbarHostState.current,
+    feedback: SettingsUiState = SettingsUiState(loading = false),
+    onRetry: () -> Unit = {},
+    onDismissError: () -> Unit = {},
 ) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
-    val haptics = rememberHaptics()
-    val scope = rememberCoroutineScope()
-    val host = snackbarHostState ?: remember { SnackbarHostState() }
-    var loaded by remember { mutableStateOf(false) }
-
-    LaunchedEffect(settings) {
-        if (loaded) {
-            haptics.confirm()
-            scope.launch { host.showSnackbar("Appearance saved") }
-        }
-        loaded = true
-    }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = dimens.sectionGap)
-                .testTag(SettingsTestTags.Appearance),
-        ) {
-            GroupedList {
-                GroupedSection(
-                    title = "Theme",
-                    footer = "Live preview updates as you choose.",
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = dimens.sectionGap)
+            .testTag(SettingsTestTags.Appearance),
+    ) {
+        SettingsFeedback(feedback, onRetry)
+        GroupedList {
+            GroupedSection(
+                title = "Display",
+                footer = "Changes apply immediately. Reduced motion follows the system.",
+            ) {
+                Column(
+                    modifier = Modifier.padding(dimens.cardPadding),
+                    verticalArrangement = Arrangement.spacedBy(dimens.space3),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(dimens.cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(dimens.space3),
-                    ) {
-                        SettingsSegmentedControl(
-                            options = Theme.entries.map { it.label() },
-                            selectedIndex = Theme.entries.indexOf(settings.theme),
-                            onSelected = { onThemeChanged(Theme.entries[it]) },
-                            tags = Theme.entries.map {
-                                SettingsTestTags.theme(it.name.lowercase())
-                            },
-                            modifier = Modifier.testTag(SettingsTestTags.Theme),
-                            swatches = listOf(
-                                Color.White,
-                                Color(0xFF1C1C1E),
-                                colors.accent,
-                            ),
-                        )
-                        ThemePreview(theme = settings.theme)
-                    }
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(
-                    title = "Density",
-                    footer = "Preview text reflows with the selected density.",
-                ) {
-                    SettingsStepperRow(
-                        label = "Density",
-                        value = Density.entries.indexOf(settings.density),
-                        onValueChange = { onDensityChanged(Density.entries[it]) },
-                        min = 0,
-                        max = Density.entries.lastIndex,
-                        valueTag = SettingsTestTags.density(settings.density.name.lowercase()),
+                    Text("Theme", style = Typography.body, color = colors.fgPrimary)
+                    SettingsSegmentedControl(
+                        options = Theme.entries.map { it.label() },
+                        selectedIndex = Theme.entries.indexOf(settings.theme),
+                        onSelected = { onThemeChanged(Theme.entries[it]) },
+                        tags = Theme.entries.map { SettingsTestTags.theme(it.name.lowercase()) },
+                        modifier = Modifier.testTag(SettingsTestTags.Theme),
+                        swatches = Theme.entries.map {
+                            when (it) {
+                                Theme.LIGHT -> Color.White
+                                Theme.DARK -> Color(0xFF1C1C1E)
+                                Theme.SYSTEM -> colors.accent
+                            }
+                        },
+                    )
+                    Text("Density", style = Typography.body, color = colors.fgPrimary)
+                    SettingsSegmentedControl(
+                        options = Density.entries.map { it.label() },
+                        selectedIndex = Density.entries.indexOf(settings.density),
+                        onSelected = { onDensityChanged(Density.entries[it]) },
+                        tags = Density.entries.map { SettingsTestTags.density(it.name.lowercase()) },
                         modifier = Modifier.testTag(SettingsTestTags.Density),
-                        preview = {
-                            Text(
-                                text = "Preview text at ${settings.density.label()} spacing",
-                                style = Typography.subhead,
-                                color = colors.fgSecondary,
-                            )
-                        },
                     )
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(
-                    title = "Chat font size",
-                    footer = "Preview text uses the selected chat font size.",
-                ) {
-                    SettingsStepperRow(
-                        label = "Chat font size",
-                        value = ChatFontSize.entries.indexOf(settings.chatFontSize),
-                        onValueChange = { onChatFontSizeChanged(ChatFontSize.entries[it]) },
-                        min = 0,
-                        max = ChatFontSize.entries.lastIndex,
-                        valueTag = SettingsTestTags.fontSize(
-                            settings.chatFontSize.name.lowercase(),
-                        ),
+                    Text("Chat font size", style = Typography.body, color = colors.fgPrimary)
+                    SettingsSegmentedControl(
+                        options = ChatFontSize.entries.map { it.label() },
+                        selectedIndex = ChatFontSize.entries.indexOf(settings.chatFontSize),
+                        onSelected = { onChatFontSizeChanged(ChatFontSize.entries[it]) },
+                        tags = ChatFontSize.entries.map { SettingsTestTags.fontSize(it.name.lowercase()) },
                         modifier = Modifier.testTag(SettingsTestTags.ChatFontSize),
-                        preview = {
-                            Text(
-                                text = "The quick brown fox jumps over the lazy dog.",
-                                style = Typography.chatStyle(settings.chatFontSize),
-                                color = colors.fgPrimary,
-                            )
-                        },
                     )
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(title = "Feedback") {
-                    SettingsToggleRow(
-                        label = "Haptic feedback",
-                        description = "Vibrate on selection and confirmation. Follows the " +
-                            "system setting when off.",
-                        icon = Icons.Rounded.Vibration,
-                        checked = settings.hapticFeedback,
-                        onCheckedChange = onHapticFeedbackChanged,
-                        tag = SettingsTestTags.HapticFeedback,
-                    )
-                    SettingsToggleRow(
-                        label = "Dynamic color",
-                        description = "Use the system wallpaper palette on Android 12 and later.",
-                        icon = Icons.Rounded.ColorLens,
-                        checked = settings.dynamicColor,
-                        onCheckedChange = onDynamicColorChanged,
-                        tag = SettingsTestTags.DynamicColor,
-                        showDivider = false,
-                    )
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(
-                    title = "Motion",
-                    footer = "Reduced motion follows the operating-system preference.",
-                ) {
-                    SettingsRow(
-                        label = "Reduced motion",
-                        value = "System",
-                        showDivider = false,
-                    )
+                    ThemePreview(settings)
                 }
             }
-        }
-        if (snackbarHostState == null) {
-            ChatUiSnackbarHost(
-                hostState = host,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
+            Spacer(Modifier.height(dimens.sectionGap))
+            GroupedSection(title = "Feedback") {
+                SettingsToggleRow(
+                    label = "Haptic feedback",
+                    description = "Allow app haptics when system vibration is enabled.",
+                    icon = Icons.Rounded.Vibration,
+                    checked = settings.hapticFeedback,
+                    onCheckedChange = onHapticFeedbackChanged,
+                    tag = SettingsTestTags.HapticFeedback,
+                )
+                SettingsToggleRow(
+                    label = "Dynamic color",
+                    description = "Use the system wallpaper palette on Android 12 and later.",
+                    icon = Icons.Rounded.ColorLens,
+                    checked = settings.dynamicColor,
+                    onCheckedChange = onDynamicColorChanged,
+                    tag = SettingsTestTags.DynamicColor,
+                    showDivider = false,
+                )
+            }
         }
     }
 }
@@ -361,61 +318,49 @@ fun ChatDefaultsSettingsScreen(
     onLoadRemoteImagesChanged: (Boolean) -> Unit,
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState? = LocalSnackbarHostState.current,
+    onOpenModelPicker: () -> Unit = {},
+    pickerReturnVersion: Int = 0,
+    onRetry: () -> Unit = {},
 ) {
     val settings = state.settings
     val params = settings.defaultParams
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
-    val haptics = rememberHaptics()
-    val scope = rememberCoroutineScope()
-    val host = snackbarHostState ?: remember { SnackbarHostState() }
     var providerMenu by remember { mutableStateOf(false) }
-    var modelMenu by remember { mutableStateOf(false) }
-    var loaded by remember { mutableStateOf(false) }
+    var generationExpanded by rememberSaveable { mutableStateOf(false) }
+    var composerExpanded by rememberSaveable { mutableStateOf(false) }
+    var privacyExpanded by rememberSaveable { mutableStateOf(false) }
+    val modelFocus = remember { FocusRequester() }
+    val temperatureText = rememberNumberText(params.temperature)
+    val topPText = rememberNumberText(params.topP)
     val maxOutputText = rememberIntText(params.maxOutputTokens)
     val stopText = rememberStopText(params.stop)
     val providerLabel = state.providers.firstOrNull { it.id == settings.defaultProviderId }?.label
-        ?: "First enabled provider"
+        ?: settings.defaultProviderId ?: "First enabled provider"
     val modelLabel = state.models.firstOrNull { it.id == settings.defaultModelId }?.label
-        ?: "Provider default"
+        ?: settings.defaultModelId ?: "Provider default"
 
-    LaunchedEffect(settings) {
-        if (loaded) {
-            haptics.confirm()
-            scope.launch { host.showSnackbar("Chat defaults saved") }
+    LaunchedEffect(pickerReturnVersion) {
+        if (pickerReturnVersion > 0) {
+            withFrameNanos { }
+            modelFocus.requestFocus()
         }
-        loaded = true
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(vertical = dimens.sectionGap)
                 .testTag(SettingsTestTags.ChatDefaults),
         ) {
-            state.error?.let { error ->
-                InlineBanner(
-                    severity = BannerSeverity.Error,
-                    title = "Could not save settings",
-                    body = error,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = dimens.screenPadding)
-                        .testTag(SettingsTestTags.Error),
-                    action = {
-                        TextButton(onClick = onDismissError) { Text("Dismiss") }
-                    },
-                )
-                Spacer(Modifier.height(dimens.space3))
-            }
+            SettingsFeedback(state, onRetry)
 
             GroupedList {
                 GroupedSection(
                     title = "Model",
-                    footer = "New conversations start from these defaults.",
+                    footer = "Provider, model, prompt, and generation defaults affect new " +
+                        "conversations, not existing chats. Composer and privacy apply app-wide.",
                 ) {
                     Box {
                         SettingsRow(
@@ -450,45 +395,30 @@ fun ChatDefaultsSettingsScreen(
                             }
                         }
                     }
-                    Box {
                         SettingsRow(
                             label = "Default model",
                             value = modelLabel,
                             showChevron = true,
-                            onClick = {
-                                if (settings.defaultProviderId != null) modelMenu = true
-                            },
-                            modifier = Modifier.testTag(SettingsTestTags.DefaultModel),
+                            onClick = onOpenModelPicker,
+                            modifier = Modifier.focusRequester(modelFocus)
+                                .testTag(SettingsTestTags.DefaultModel),
                             showDivider = false,
                         )
-                        DropdownMenu(
-                            expanded = modelMenu,
-                            onDismissRequest = { modelMenu = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Provider default") },
-                                onClick = {
-                                    modelMenu = false
-                                    onDefaultModelChanged(null)
-                                },
-                            )
-                            state.models.forEach { model ->
-                                DropdownMenuItem(
-                                    text = { Text(model.label) },
-                                    onClick = {
-                                        modelMenu = false
-                                        onDefaultModelChanged(model.id)
-                                    },
-                                    modifier = Modifier.testTag(
-                                        SettingsTestTags.model(model.id),
-                                    ),
-                                )
-                            }
+                        if (settings.defaultModelId != null) {
+                            TextButton(
+                                onClick = { onDefaultModelChanged(null) },
+                                modifier = Modifier.testTag(SettingsTestTags.reset("model")),
+                            ) { Text("Use provider default") }
                         }
+                    state.warning?.let {
+                        InlineBanner(
+                            severity = BannerSeverity.Warning,
+                            title = "Default model unavailable",
+                            body = it,
+                            modifier = Modifier.padding(dimens.cardPadding)
+                                .testTag(SettingsTestTags.ModelWarning),
+                        )
                     }
-                }
-                Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(title = "Generation") {
                     Column(
                         modifier = Modifier.padding(dimens.cardPadding),
                         verticalArrangement = Arrangement.spacedBy(dimens.space3),
@@ -502,40 +432,67 @@ fun ChatDefaultsSettingsScreen(
                                 .fillMaxWidth()
                                 .testTag(SettingsTestTags.DefaultSystemPrompt),
                         )
+                    }
+                }
+                Spacer(Modifier.height(dimens.sectionGap))
+                SettingsDisclosure(
+                    title = "Generation",
+                    summary = generationSummary(params),
+                    tag = SettingsTestTags.Generation,
+                    expanded = generationExpanded,
+                    onExpandedChange = { generationExpanded = it },
+                ) {
+                        SettingsNumber(
+                            label = "Temperature",
+                            text = temperatureText.value,
+                            error = state.fieldErrors["temperature"],
+                            tag = SettingsTestTags.DefaultTemperature,
+                            field = "temperature",
+                            onChange = { temperatureText.value = it; onTemperatureChanged(it) },
+                        )
                         LabeledSlider(
                             label = "Temperature",
                             value = params.temperature?.toFloat() ?: 0.7f,
-                            onValueChange = { onTemperatureChanged(it.toString()) },
+                            onValueChange = {
+                                temperatureText.value = it.toString()
+                                onTemperatureChanged(it.toString())
+                            },
                             valueRange = 0f..2f,
                             valueText = params.temperature?.let {
                                 String.format(Locale.US, "%.2f", it)
                             } ?: "Default",
-                            modifier = Modifier.testTag(SettingsTestTags.DefaultTemperature),
+                        )
+                        SettingsNumber(
+                            label = "Top P",
+                            text = topPText.value,
+                            error = state.fieldErrors["top-p"],
+                            tag = SettingsTestTags.DefaultTopP,
+                            field = "top-p",
+                            onChange = { topPText.value = it; onTopPChanged(it) },
                         )
                         LabeledSlider(
                             label = "Top P",
                             value = params.topP?.toFloat() ?: 1f,
-                            onValueChange = { onTopPChanged(it.toString()) },
+                            onValueChange = {
+                                topPText.value = it.toString()
+                                onTopPChanged(it.toString())
+                            },
                             valueRange = 0f..1f,
                             valueText = params.topP?.let {
                                 String.format(Locale.US, "%.2f", it)
                             } ?: "Default",
-                            modifier = Modifier.testTag(SettingsTestTags.DefaultTopP),
                         )
-                        OutlinedTextField(
-                            value = maxOutputText.value,
-                            onValueChange = {
+                        SettingsNumber(
+                            text = maxOutputText.value,
+                            onChange = {
                                 maxOutputText.value = it
                                 onMaxOutputTokensChanged(it)
                             },
-                            label = { Text("Max output tokens") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number,
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag(SettingsTestTags.DefaultMaxOutput),
+                            label = "Max output tokens",
+                            error = state.fieldErrors["max-output"],
+                            keyboardType = KeyboardType.Number,
+                            field = "max-output",
+                            tag = SettingsTestTags.DefaultMaxOutput,
                         )
                         OutlinedTextField(
                             value = stopText.value,
@@ -582,14 +539,15 @@ fun ChatDefaultsSettingsScreen(
                             tag = SettingsTestTags.DefaultStreaming,
                             showDivider = false,
                         )
-                    }
                 }
                 Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(title = "Composer") {
-                    Column(
-                        modifier = Modifier.padding(dimens.cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(dimens.space3),
-                    ) {
+                SettingsDisclosure(
+                    title = "Composer",
+                    summary = settings.sendKey.label(),
+                    tag = SettingsTestTags.Composer,
+                    expanded = composerExpanded,
+                    onExpandedChange = { composerExpanded = it },
+                ) {
                         Text(
                             text = "Send key",
                             style = Typography.body,
@@ -604,25 +562,33 @@ fun ChatDefaultsSettingsScreen(
                             },
                             modifier = Modifier.testTag(SettingsTestTags.SendKey),
                         )
-                        SettingsToggleRow(
-                            label = "Show token usage",
-                            description = "Show prompt and completion token counts under each " +
-                                "response.",
-                            checked = settings.showTokenUsage,
-                            onCheckedChange = onShowTokenUsageChanged,
-                            tag = SettingsTestTags.ShowTokenUsage,
-                            showDivider = false,
+                        Text(
+                            "Shift+Enter inserts a new line. Mod means Ctrl on most " +
+                                "keyboards or Command on macOS. The Send button is always available.",
+                            style = Typography.footnote,
+                            color = colors.fgSecondary,
                         )
-                    }
                 }
                 Spacer(Modifier.height(dimens.sectionGap))
-                GroupedSection(
+                SettingsDisclosure(
                     title = "Privacy",
-                    footer = "Remote images are blocked by default. When enabled, image URLs " +
-                        "from model output are requested directly from their host.",
+                    summary = "Token usage ${if (settings.showTokenUsage) "shown" else "hidden"}; " +
+                        "remote images ${if (settings.loadRemoteImages) "on" else "off"}",
+                    tag = SettingsTestTags.Privacy,
+                    expanded = privacyExpanded,
+                    onExpandedChange = { privacyExpanded = it },
                 ) {
                     SettingsToggleRow(
+                        label = "Show token usage",
+                        description = "Show reported prompt and completion token counts.",
+                        checked = settings.showTokenUsage,
+                        onCheckedChange = onShowTokenUsageChanged,
+                        tag = SettingsTestTags.ShowTokenUsage,
+                    )
+                    SettingsToggleRow(
                         label = "Load remote images",
+                        description = "When on, images in responses contact their hosts directly. " +
+                            "Turn off to block those requests. Enabled for new installs.",
                         checked = settings.loadRemoteImages,
                         onCheckedChange = onLoadRemoteImagesChanged,
                         tag = SettingsTestTags.LoadRemoteImages,
@@ -631,38 +597,6 @@ fun ChatDefaultsSettingsScreen(
                 }
             }
         }
-        if (snackbarHostState == null) {
-            ChatUiSnackbarHost(
-                hostState = host,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-        }
-    }
-}
-
-/** Backup placeholder for the post-M2 backup feature. */
-@Composable
-fun BackupSettingsScreen(modifier: Modifier = Modifier) {
-    val dimens = LocalDimens.current
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(vertical = dimens.sectionGap)
-            .testTag(SettingsTestTags.Backup),
-    ) {
-        GroupedList {
-            GroupedSection(
-                title = "Backup",
-                footer = "When backup arrives it will encrypt data before upload and keep " +
-                    "provider keys out of backup metadata.",
-            ) {
-                SettingsRow(
-                    label = "ChatUI does not back up or sync data in this release.",
-                    showDivider = false,
-                )
-            }
-        }
-    }
 }
 
 /** About and privacy information. */
@@ -683,10 +617,8 @@ fun AboutSettingsScreen(modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(dimens.cardPadding),
-                    horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(dimens.space2),
                 ) {
-                    BrandMark(size = 72.dp)
                     Text(
                         text = "ChatUI",
                         style = Typography.title3,
@@ -711,8 +643,15 @@ fun AboutSettingsScreen(modifier: Modifier = Modifier) {
                     "Provider keys are encrypted with a device-bound key and are never " +
                         "placed in URLs, logs, or exports.",
                 )
-                PrivacyRow("Chat content is sent only to the selected provider.")
-                PrivacyRow("Remote images in model output are blocked until you allow them.")
+                PrivacyRow("Chat requests go directly to your configured provider.")
+                PrivacyRow(
+                    "When Load remote images is on, response images also contact their hosts. " +
+                        "You can turn this off in Chat defaults.",
+                )
+                PrivacyRow(
+                    "Optional encrypted backup uploads to the storage destination you configure. " +
+                        "Plaintext exports are readable by anyone with the file.",
+                )
                 PrivacyRow(
                     "No analytics or telemetry are collected by ChatUI itself.",
                     showDivider = false,
@@ -728,15 +667,15 @@ private fun PrivacyRow(text: String, showDivider: Boolean = true) {
 }
 
 @Composable
-private fun ThemePreview(theme: Theme) {
+private fun ThemePreview(settings: AndroidSettings) {
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
-    val background = when (theme) {
+    val background = when (settings.theme) {
         Theme.LIGHT -> Color.White
         Theme.DARK -> Color(0xFF1C1C1E)
         Theme.SYSTEM -> colors.bgGrouped
     }
-    val foreground = when (theme) {
+    val foreground = when (settings.theme) {
         Theme.LIGHT -> Color(0xFF1C1C1E)
         Theme.DARK -> Color.White
         Theme.SYSTEM -> colors.fgPrimary
@@ -744,10 +683,12 @@ private fun ThemePreview(theme: Theme) {
     Surface(
         color = background,
         shape = RoundedCornerShape(dimens.radiusMd),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag(SettingsTestTags.Preview),
     ) {
         Column(
-            modifier = Modifier.padding(dimens.cardPadding),
+            modifier = Modifier.padding(
+                if (settings.density == Density.COMPACT) dimens.space2 else dimens.cardPadding,
+            ),
             verticalArrangement = Arrangement.spacedBy(dimens.space2),
         ) {
             Text(
@@ -757,13 +698,14 @@ private fun ThemePreview(theme: Theme) {
             )
             Text(
                 text = "Hello from ChatUI",
-                style = Typography.body,
+                style = Typography.chatStyle(settings.chatFontSize),
                 color = foreground,
             )
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SettingsSegmentedControl(
     options: List<String>,
@@ -776,43 +718,21 @@ private fun SettingsSegmentedControl(
     val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
     val haptics = rememberHaptics()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(colors.bgGrouped, RoundedCornerShape(dimens.radiusXs))
-            .padding(2.dp),
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(dimens.space2),
     ) {
         options.forEachIndexed { index, option ->
             val selected = index == selectedIndex
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(dimens.radiusXs - 2.dp))
-                    .background(if (selected) colors.bgSurfaceRaised else Color.Transparent)
-                    .clickable {
-                        haptics.tick()
-                        onSelected(index)
-                    }
-                    .padding(vertical = dimens.space2, horizontal = dimens.space1)
-                    .testTag(tags[index]),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (swatches != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(swatches[index]),
-                    )
-                    Spacer(Modifier.width(dimens.space1))
-                }
-                Text(
-                    text = option,
-                    style = Typography.subhead,
-                    color = if (selected) colors.fgPrimary else colors.fgSecondary,
-                )
-            }
+            FilterChip(
+                selected = selected,
+                onClick = { haptics.tick(); onSelected(index) },
+                label = { Text(option) },
+                leadingIcon = if (swatches == null) null else ({
+                    Box(Modifier.size(14.dp).clip(CircleShape).background(swatches[index]))
+                }),
+                modifier = Modifier.heightIn(min = dimens.touchTargetMin).testTag(tags[index]),
+            )
         }
     }
 }
@@ -869,7 +789,7 @@ private fun SettingsToggleRow(
                     haptics.tick()
                     onCheckedChange(it)
                 },
-                modifier = Modifier.testTag(tag),
+                modifier = Modifier.testTag(tag).semantics { contentDescription = label },
             )
         }
         if (showDivider) {
@@ -888,63 +808,132 @@ private fun SettingsToggleRow(
     }
 }
 
-@Composable
-private fun SettingsStepperRow(
-    label: String,
-    value: Int,
-    onValueChange: (Int) -> Unit,
-    min: Int,
-    max: Int,
-    valueTag: String,
-    preview: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = LocalChatUiColors.current
-    val dimens = LocalDimens.current
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = dimens.rowMinHeight)
-                .padding(horizontal = dimens.cardPadding, vertical = dimens.space2),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = Typography.body,
-                    color = colors.fgPrimary,
-                )
-                Box(modifier = Modifier.testTag(valueTag)) {
-                    preview()
-                }
-            }
-            Stepper(
-                value = value,
-                onValueChange = onValueChange,
-                min = min,
-                max = max,
-            )
-        }
-        HorizontalDivider(
-            color = colors.separator,
-            thickness = 0.5.dp,
-            modifier = Modifier.padding(start = dimens.cardPadding),
-        )
-    }
-}
-
 private fun Theme.label(): String = name.lowercase().replaceFirstChar { it.uppercase() }
 
 private fun Density.label(): String = name.lowercase().replaceFirstChar { it.uppercase() }
 
-private fun ChatFontSize.label(): String = name.lowercase().replaceFirstChar { it.uppercase() }
+private fun ChatFontSize.label(): String = when (this) {
+    ChatFontSize.SM -> "Small (14 sp)"
+    ChatFontSize.MD -> "Medium (16 sp)"
+    ChatFontSize.LG -> "Large (18 sp)"
+}
 
 private fun ReasoningEffort.label(): String = name.lowercase().replaceFirstChar { it.uppercase() }
 
 private fun SendKey.label(): String = when (this) {
     SendKey.ENTER -> "Enter sends"
     SendKey.MOD_ENTER -> "Mod+Enter sends"
+}
+
+@Composable
+private fun rememberNumberText(value: Double?): MutableState<String> {
+    val state = remember { mutableStateOf(value?.toString().orEmpty()) }
+    LaunchedEffect(value) {
+        if (state.value.trim().toDoubleOrNull() != value) {
+            state.value = value?.toString().orEmpty()
+        }
+    }
+    return state
+}
+
+@Composable
+private fun SettingsNumber(
+    label: String,
+    text: String,
+    error: String?,
+    tag: String,
+    field: String,
+    onChange: (String) -> Unit,
+    keyboardType: KeyboardType = KeyboardType.Decimal,
+) {
+    OutlinedTextField(
+        value = text,
+        onValueChange = onChange,
+        label = { Text(label) },
+        supportingText = { Text(error ?: "Empty uses the model default.") },
+        isError = error != null,
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        modifier = Modifier.fillMaxWidth().testTag(tag),
+    )
+    TextButton(
+        onClick = { onChange("") },
+        enabled = text.isNotEmpty(),
+        modifier = Modifier.testTag(SettingsTestTags.reset(field))
+            .semantics { contentDescription = "Use model default for $label" },
+    ) { Text("Use model default") }
+}
+
+@Composable
+private fun SettingsDisclosure(
+    title: String,
+    summary: String,
+    tag: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    GroupedSection {
+        SettingsRow(
+            label = title,
+            value = summary,
+            showChevron = true,
+            onClick = { onExpandedChange(!expanded) },
+            showDivider = expanded,
+            modifier = Modifier.testTag(tag).semantics {
+                stateDescription = if (expanded) "Expanded" else "Collapsed"
+            },
+        )
+        if (expanded) Column(
+            modifier = Modifier.padding(LocalDimens.current.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(LocalDimens.current.space3),
+        ) { content() }
+    }
+}
+
+private fun generationSummary(params: ChatParams): String = listOf(
+    "Temperature ${params.temperature ?: "default"}",
+    "Top P ${params.topP ?: "default"}",
+    "output ${params.maxOutputTokens ?: "default"}",
+    "${params.stop.size} stop sequences",
+    "reasoning ${params.reasoningEffort?.label() ?: "default"}",
+    "streaming ${if (params.streaming) "on" else "off"}",
+).joinToString("; ")
+
+@Composable
+private fun SettingsFeedback(state: SettingsUiState, onRetry: () -> Unit) {
+    val dimens = LocalDimens.current
+    val initialRevision = remember { state.savedRevision }
+    var showSaved by remember { mutableStateOf(false) }
+    LaunchedEffect(state.savedRevision, state.pendingSaves, state.error) {
+        showSaved = false
+        if (state.savedRevision > initialRevision && state.pendingSaves == 0 && state.error == null) {
+            delay(450)
+            showSaved = true
+        }
+    }
+    state.error?.let { error ->
+        InlineBanner(
+            severity = BannerSeverity.Error,
+            title = "Settings need attention",
+            body = error,
+            action = { TextButton(onClick = onRetry) { Text("Retry") } },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = dimens.screenPadding)
+                .testTag(SettingsTestTags.Error),
+        )
+        Spacer(Modifier.height(dimens.space3))
+    }
+    if (showSaved || state.pendingSaves > 0) {
+        Text(
+            text = if (showSaved) "Changes saved" else "Saving changes...",
+            style = Typography.footnote,
+            color = LocalChatUiColors.current.fgSecondary,
+            modifier = Modifier.padding(horizontal = dimens.screenPadding)
+                .testTag(SettingsTestTags.Saved)
+                .semantics { if (showSaved) liveRegion = LiveRegionMode.Polite },
+        )
+        Spacer(Modifier.height(dimens.space2))
+    }
 }
 
 @Composable

@@ -43,7 +43,7 @@ object Typography {
     val chatLineHeightMd: TextUnit = 24.sp
     val chatLineHeightLg: TextUnit = 29.sp
 
-    // Apple-like type ramp from the design review section 4.2.
+    // Retained for legacy large-title consumers; compact screens use title2/3.
     val largeTitle: TextStyle = TextStyle(
         fontFamily = bodyFamily,
         fontSize = 34.sp,
@@ -54,9 +54,9 @@ object Typography {
 
     val title1: TextStyle = TextStyle(
         fontFamily = bodyFamily,
-        fontSize = 28.sp,
-        lineHeight = 34.sp,
-        fontWeight = FontWeight.Bold,
+        fontSize = 24.sp,
+        lineHeight = 30.sp,
+        fontWeight = FontWeight.SemiBold,
         letterSpacing = (-0.3).sp,
     )
 
@@ -85,7 +85,7 @@ object Typography {
 
     val body: TextStyle = TextStyle(
         fontFamily = bodyFamily,
-        fontSize = 17.sp,
+        fontSize = 16.sp,
         lineHeight = 24.sp,
         fontWeight = FontWeight.Normal,
     )
@@ -99,7 +99,7 @@ object Typography {
 
     val subhead: TextStyle = TextStyle(
         fontFamily = bodyFamily,
-        fontSize = 15.sp,
+        fontSize = 14.sp,
         lineHeight = 20.sp,
         fontWeight = FontWeight.Normal,
     )
@@ -113,8 +113,8 @@ object Typography {
 
     val caption: TextStyle = TextStyle(
         fontFamily = bodyFamily,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
         fontWeight = FontWeight.Normal,
         letterSpacing = 0.2.sp,
     )

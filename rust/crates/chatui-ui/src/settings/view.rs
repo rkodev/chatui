@@ -16,7 +16,8 @@ use crate::chat::composer::ComposerState;
 use crate::chat::message_list::MessageListState;
 use crate::markdown::RenderOptions;
 use crate::settings::backup::{
-    BackupError, BackupService, BackupSettingsState, backend_from_index, backend_index,
+    BackupConfirmation, BackupError, BackupForm, BackupService, BackupSettingsState,
+    backend_from_index, backend_index,
 };
 use crate::settings::error::{SettingsError, describe_settings_error};
 use crate::settings::route::SettingsRoute;
@@ -27,72 +28,30 @@ use crate::settings::state::{
     theme_index,
 };
 use crate::shell::ShellState;
+use crate::tasks::UiTasks;
 
 slint::slint! {
-    import { Button, CheckBox, ComboBox, LineEdit, Palette, ScrollView, TextEdit } from "std-widgets.slint";
+    import { AppButton as Button, AppText as Text, AppSectionButton, Design } from "../design.slint";
+    import { CheckBox, ComboBox, LineEdit, Palette, ScrollView, TextEdit } from "std-widgets.slint";
 
     export struct SettingsNavItem {
         id: string,
         label: string,
     }
 
-    component SettingsSectionButton inherits Rectangle {
+    component SettingsSectionButton inherits AppSectionButton {
         in property <string> label;
-        in property <bool> active;
-        in property <bool> dark: false;
-        callback clicked;
-        out property <bool> focus-visible: false;
-
-        height: 36px;
-        background: root.active ? (root.dark ? #1f232b : #f7f7f8) : transparent;
-        border-radius: 6px;
-
-        accessible-role: button;
-        accessible-label: root.label;
-        accessible-action-default => { root.clicked(); }
-
-        forward-focus: fs;
-
-        fs := FocusScope {
-            x: 0;
-            width: 0;
-            focus-changed-event(reason) => {
-                root.focus-visible = reason == FocusReason.tab-navigation;
-            }
-            key-pressed(event) => {
-                if (event.text == Key.Space || event.text == Key.Return) {
-                    root.clicked();
-                    return accept;
-                }
-                return reject;
-            }
-        }
-
-        Text {
-            x: 8px;
-            text: root.label;
-            vertical-alignment: center;
-            accessible-role: none;
-        }
-
-        TouchArea {
-            clicked => { root.clicked(); }
-        }
-
-        if (root.focus-visible) : Rectangle {
-            border-width: 2px;
-            border-color: root.dark ? #60a5fa : #1a56db;
-            border-radius: 6px;
-            background: transparent;
-        }
+        text: root.label;
     }
 
     export component SettingsWindow inherits Window {
         title: "ChatUI settings";
-        width: 1000px;
-        height: 760px;
+        preferred-width: 1000px;
+        preferred-height: 760px;
+        min-width: 0px;
 
         in property <[SettingsNavItem]> sections: [];
+        in property <[string]> section-labels: ["Appearance", "Chat defaults", "Providers", "Models", "Data", "Backup", "About"];
         in property <int> active-section: 0;
         in property <string> notice: "";
         in property <string> error-title: "";
@@ -140,6 +99,9 @@ slint::slint! {
         in-out property <string> backup-username: "";
         in-out property <string> backup-password: "";
         in-out property <string> backup-passphrase: "";
+        in property <bool> backup-busy: false;
+        in property <bool> backup-dirty: false;
+        in property <bool> backup-has-error: false;
         in property <string> backup-status-last: "";
         in property <string> backup-status-pending: "";
         in property <string> backup-status-error: "";
@@ -175,6 +137,8 @@ slint::slint! {
         callback open-providers();
         callback open-models();
         callback open-data();
+        callback open-docs();
+        callback backup-discard-changes();
         callback backup-backend-changed(int);
         callback backup-endpoint-changed(string);
         callback backup-region-changed(string);
@@ -201,7 +165,7 @@ slint::slint! {
 
         in property <bool> dark: false;
 
-        background: root.dark ? #0f1115 : #ffffff;
+        background: Design.colors(root.dark).canvas;
         init => {
             Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
         }
@@ -209,18 +173,32 @@ slint::slint! {
             Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
         }
 
-        HorizontalLayout {
-            padding: 16px;
-            spacing: 16px;
+        Rectangle {
+          x: 0px;
+          y: 0px;
+          width: 100%;
+          height: 100%;
+          HorizontalLayout {
+            padding: root.width < 680px ? 4px : 12px;
+            spacing: 20px;
 
-            VerticalLayout {
-                width: 220px;
+            if (root.width >= 680px) : VerticalLayout {
+                width: 184px;
                 spacing: 8px;
+                alignment: start;
 
                 Text {
-                    text: "Settings";
-                    font-size: 22px;
+                    text: "PREFERENCES";
+                    color: Design.colors(root.dark).muted;
+                    font-size: 11px;
                     font-weight: 600;
+                }
+
+                Text {
+                    text: "Changes are saved automatically.";
+                    color: Design.colors(root.dark).muted;
+                    font-size: 12px;
+                    wrap: word-wrap;
                 }
 
                 for section[index] in root.sections : SettingsSectionButton {
@@ -231,9 +209,27 @@ slint::slint! {
                 }
             }
 
-            ScrollView {
+            Rectangle {
+                background: Design.colors(root.dark).raised;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: Design.colors(root.dark).border;
+                ScrollView {
+                    x: 20px;
+                    y: 20px;
+                    width: parent.width - 40px;
+                    height: parent.height - 40px;
+                    content-width: self.width;
                 VerticalLayout {
-                    spacing: 12px;
+                    spacing: 16px;
+                    alignment: start;
+
+                    if (root.width < 680px) : ComboBox {
+                        model: root.section-labels;
+                        current-index: root.active-section;
+                        accessible-label: "Settings section";
+                        selected(value) => { root.select-section(self.current-index); }
+                    }
 
                     if (!root.notice.is-empty) : Text {
                         text: root.notice;
@@ -241,7 +237,7 @@ slint::slint! {
                     }
 
                     if (!root.error-title.is-empty) : Rectangle {
-                        background: root.dark ? #3b1d1d : #fde8e8;
+                        background: Design.colors(root.dark).danger-soft;
                         border-radius: 8px;
 
                         VerticalLayout {
@@ -253,7 +249,7 @@ slint::slint! {
                             if (!root.error-details.is-empty) : Text {
                                 text: root.error-details;
                                 wrap: word-wrap;
-                                color: root.dark ? #9ca3af : #5f6368;
+                                color: Design.colors(root.dark).muted;
                             }
                         }
                     }
@@ -289,7 +285,7 @@ slint::slint! {
 
                         Text {
                             text: root.reduced-motion-text;
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                             wrap: word-wrap;
                         }
                     }
@@ -390,12 +386,12 @@ slint::slint! {
 
                         Text {
                             text: root.onboarding-status;
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                         }
 
                         Text {
                             text: root.remember-keys-text;
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                             wrap: word-wrap;
                         }
                     }
@@ -443,6 +439,7 @@ slint::slint! {
                         ComboBox {
                             model: ["S3-compatible", "Azure Blob", "Google Cloud Storage", "Google Drive", "WebDAV"];
                             accessible-label: "Backup backend";
+                            enabled: !root.backup-busy;
                             current-index: root.backup-backend-index;
                             selected(value) => { root.backup-backend-changed(self.current-index); }
                         }
@@ -453,30 +450,35 @@ slint::slint! {
                             LineEdit {
                                 text: root.backup-endpoint;
                                 accessible-label: "Backup endpoint";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-endpoint-changed(text); }
                             }
                             Text { text: "Region"; }
                             LineEdit {
                                 text: root.backup-region;
                                 accessible-label: "Backup region";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-region-changed(text); }
                             }
                             Text { text: "Bucket"; }
                             LineEdit {
                                 text: root.backup-bucket;
                                 accessible-label: "Backup bucket";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-bucket-changed(text); }
                             }
                             Text { text: "Access key id"; }
                             LineEdit {
                                 text: root.backup-access-key;
                                 accessible-label: "Backup access key id";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-access-key-changed(text); }
                             }
                             Text { text: "Secret access key"; }
                             LineEdit {
                                 text: root.backup-secret-key;
                                 accessible-label: "Backup secret access key";
+                                enabled: !root.backup-busy;
                                 input-type: InputType.password;
                                 edited(text) => { root.backup-secret-key-changed(text); }
                             }
@@ -488,24 +490,28 @@ slint::slint! {
                             LineEdit {
                                 text: root.backup-endpoint;
                                 accessible-label: "Azure endpoint";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-endpoint-changed(text); }
                             }
                             Text { text: "Container"; }
                             LineEdit {
                                 text: root.backup-bucket;
                                 accessible-label: "Azure container";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-bucket-changed(text); }
                             }
                             Text { text: "Account name"; }
                             LineEdit {
                                 text: root.backup-access-key;
                                 accessible-label: "Azure account name";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-access-key-changed(text); }
                             }
                             Text { text: "Account key"; }
                             LineEdit {
                                 text: root.backup-secret-key;
                                 accessible-label: "Azure account key";
+                                enabled: !root.backup-busy;
                                 input-type: InputType.password;
                                 edited(text) => { root.backup-secret-key-changed(text); }
                             }
@@ -513,6 +519,7 @@ slint::slint! {
                             LineEdit {
                                 text: root.backup-sas-token;
                                 accessible-label: "Azure SAS token";
+                                enabled: !root.backup-busy;
                                 input-type: InputType.password;
                                 edited(text) => { root.backup-sas-token-changed(text); }
                             }
@@ -524,18 +531,21 @@ slint::slint! {
                             LineEdit {
                                 text: root.backup-endpoint;
                                 accessible-label: "GCS endpoint";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-endpoint-changed(text); }
                             }
                             Text { text: "Bucket"; }
                             LineEdit {
                                 text: root.backup-bucket;
                                 accessible-label: "GCS bucket";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-bucket-changed(text); }
                             }
                             Text { text: "Service account JSON"; }
                             TextEdit {
                                 text: root.backup-service-account-json;
                                 accessible-label: "GCS service account JSON";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-service-account-json-changed(text); }
                                 height: 100px;
                                 wrap: word-wrap;
@@ -548,18 +558,21 @@ slint::slint! {
                             LineEdit {
                                 text: root.backup-endpoint;
                                 accessible-label: "Google Drive endpoint";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-endpoint-changed(text); }
                             }
                             Text { text: "Folder id (blank for app data folder)"; }
                             LineEdit {
                                 text: root.backup-folder-id;
                                 accessible-label: "Google Drive folder id";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-folder-id-changed(text); }
                             }
                             Text { text: "OAuth access token"; }
                             LineEdit {
                                 text: root.backup-access-token;
                                 accessible-label: "Google Drive access token";
+                                enabled: !root.backup-busy;
                                 input-type: InputType.password;
                                 edited(text) => { root.backup-access-token-changed(text); }
                             }
@@ -571,18 +584,21 @@ slint::slint! {
                             LineEdit {
                                 text: root.backup-endpoint;
                                 accessible-label: "WebDAV URL";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-endpoint-changed(text); }
                             }
                             Text { text: "Username"; }
                             LineEdit {
                                 text: root.backup-username;
                                 accessible-label: "WebDAV username";
+                                enabled: !root.backup-busy;
                                 edited(text) => { root.backup-username-changed(text); }
                             }
                             Text { text: "Password"; }
                             LineEdit {
                                 text: root.backup-password;
                                 accessible-label: "WebDAV password";
+                                enabled: !root.backup-busy;
                                 input-type: InputType.password;
                                 edited(text) => { root.backup-password-changed(text); }
                             }
@@ -592,6 +608,7 @@ slint::slint! {
                         LineEdit {
                             text: root.backup-prefix;
                             accessible-label: "Backup prefix";
+                            enabled: !root.backup-busy;
                             edited(text) => { root.backup-prefix-changed(text); }
                         }
 
@@ -599,6 +616,7 @@ slint::slint! {
                         LineEdit {
                             text: root.backup-passphrase;
                             accessible-label: "Backup passphrase";
+                            enabled: !root.backup-busy;
                             input-type: InputType.password;
                             edited(text) => { root.backup-passphrase-changed(text); }
                         }
@@ -607,52 +625,85 @@ slint::slint! {
                             spacing: 8px;
                             Button {
                                 text: "Test connection";
+                                enabled: !root.backup-busy;
                                 clicked => { root.backup-test-connection(); }
                             }
                             Button {
-                                text: root.backup-enabled ? "Disable backup" : "Enable backup";
-                                clicked => {
-                                    if (root.backup-enabled) {
-                                        root.backup-disable();
-                                    } else {
-                                        root.backup-enable();
-                                    }
-                                }
+                                text: root.backup-enabled ? "Save configuration" : "Enable backup";
+                                primary: true;
+                                enabled: !root.backup-busy;
+                                clicked => { root.backup-enable(); }
                             }
                         }
 
-                        HorizontalLayout {
+                        if (root.backup-dirty) : VerticalLayout {
+                            spacing: 8px;
+                            Text {
+                                text: "Save your connection changes before using the remote backup.";
+                                wrap: word-wrap;
+                                color: Design.colors(root.dark).warning;
+                            }
+                            Button {
+                                text: "Discard connection changes";
+                                quiet: true;
+                                enabled: !root.backup-busy;
+                                clicked => { root.backup-discard-changes(); }
+                            }
+                        }
+
+                        if (root.backup-busy) : Text {
+                            text: "Working with your encrypted backup...";
+                            color: Design.colors(root.dark).accent;
+                            wrap: word-wrap;
+                            accessible-live-region: polite;
+                        }
+
+                        VerticalLayout {
                             spacing: 8px;
                             Button {
                                 text: "Back up now";
+                                primary: true;
+                                enabled: root.backup-enabled && !root.backup-busy && !root.backup-dirty;
                                 clicked => { root.backup-now(); }
                             }
                             Button {
                                 text: "Restore from backup";
+                                enabled: root.backup-enabled && !root.backup-busy && !root.backup-dirty;
                                 clicked => { root.backup-restore(); }
                             }
                             Button {
                                 text: "Restore and replace local data";
+                                enabled: root.backup-enabled && !root.backup-busy && !root.backup-dirty;
                                 clicked => { root.backup-restore-replace(); }
                             }
                             Button {
                                 text: "Delete remote backup";
+                                danger: true;
+                                enabled: root.backup-enabled && !root.backup-busy && !root.backup-dirty;
                                 clicked => { root.backup-delete-remote(); }
+                            }
+                            if (root.backup-enabled) : Button {
+                                text: "Disable backup";
+                                quiet: true;
+                                enabled: !root.backup-busy;
+                                clicked => { root.backup-disable(); }
                             }
                         }
 
-                        Text { text: "Last backup: " + root.backup-status-last; }
-                        Text { text: "Pending changes: " + root.backup-status-pending; }
-                        Text { text: "Storage usage: " + root.backup-status-usage; }
-                        Text { text: "Last error: " + root.backup-status-error; }
+                        Text { text: "Last backup: " + root.backup-status-last; wrap: word-wrap; }
+                        Text { text: "Pending changes: " + root.backup-status-pending; wrap: word-wrap; }
+                        Text { text: "Storage usage: " + root.backup-status-usage; wrap: word-wrap; }
+                        Text { text: "Last error: " + root.backup-status-error; wrap: word-wrap; }
 
                         if (!root.backup-notice.is-empty) : Text {
                             text: root.backup-notice;
+                            color: root.backup-has-error ? Design.colors(root.dark).danger : Design.colors(root.dark).secondary;
                             wrap: word-wrap;
+                            accessible-live-region: polite;
                         }
 
                         if (root.backup-confirmation-visible) : Rectangle {
-                            background: root.dark ? #3b1d1d : #fde8e8;
+                            background: Design.colors(root.dark).danger-soft;
                             border-radius: 8px;
 
                             VerticalLayout {
@@ -663,15 +714,19 @@ slint::slint! {
                                 LineEdit {
                                     text <=> root.backup-confirmation-input;
                                     accessible-label: "Backup confirmation";
+                                    enabled: !root.backup-busy;
                                 }
                                 HorizontalLayout {
                                     spacing: 8px;
                                     Button {
                                         text: "Confirm";
+                                        danger: true;
+                                        enabled: !root.backup-busy && !root.backup-dirty;
                                         clicked => { root.backup-confirm(); }
                                     }
                                     Button {
                                         text: "Cancel";
+                                        enabled: !root.backup-busy;
                                         clicked => { root.backup-cancel-confirmation(); }
                                     }
                                 }
@@ -680,7 +735,7 @@ slint::slint! {
 
                         Text {
                             text: root.backup-passphrase-warning;
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                             wrap: word-wrap;
                         }
                     }
@@ -689,8 +744,12 @@ slint::slint! {
                         spacing: 8px;
 
                         Text { text: root.about-title; font-size: 20px; font-weight: 600; }
-                        Text { text: root.about-version; color: root.dark ? #9ca3af : #5f6368; }
+                        Text { text: root.about-version; color: Design.colors(root.dark).muted; }
                         Text { text: root.about-body; wrap: word-wrap; }
+                        Button {
+                            text: "Open documentation";
+                            clicked => { root.open-docs(); }
+                        }
                         for line in root.privacy-lines : Text {
                             text: "• " + line;
                             wrap: word-wrap;
@@ -698,13 +757,21 @@ slint::slint! {
                         Text { text: "Docs: " + root.docs-url; wrap: word-wrap; }
                     }
                 }
+                }
             }
+          }
         }
     }
 }
 
 /// Push the current view model into a Slint window.
 pub fn sync_window(window: &SettingsWindow, state: &SettingsViewModel) {
+    window.set_section_labels(ModelRc::new(VecModel::from(
+        SettingsRoute::ALL
+            .iter()
+            .map(|route| SharedString::from(route.label()))
+            .collect::<Vec<_>>(),
+    )));
     let sections: Vec<SettingsNavItem> = SettingsRoute::ALL
         .iter()
         .map(|route| SettingsNavItem {
@@ -800,6 +867,9 @@ pub fn sync_window(window: &SettingsWindow, state: &SettingsViewModel) {
 
 /// Push the backup form and status into a Slint window.
 pub fn sync_backup_window(window: &SettingsWindow, state: &BackupSettingsState) {
+    window.set_backup_busy(state.busy);
+    window.set_backup_dirty(state.configuration_changed);
+    window.set_backup_has_error(state.error.is_some());
     window.set_backup_enabled(state.status.enabled);
     window.set_backup_backend_index(backend_index(state.form.backend) as i32);
     window.set_backup_endpoint(state.form.endpoint.clone().into());
@@ -821,9 +891,9 @@ pub fn sync_backup_window(window: &SettingsWindow, state: &BackupSettingsState) 
     window.set_backup_status_usage(state.status.storage_usage_text().into());
     window.set_backup_notice(
         state
-            .notice
+            .error
             .clone()
-            .or_else(|| state.error.clone())
+            .or_else(|| state.notice.clone())
             .unwrap_or_default()
             .into(),
     );
@@ -945,19 +1015,83 @@ fn run_backup_action<F>(
     backup: &Rc<RefCell<Option<Arc<dyn BackupService>>>>,
     state: &Rc<RefCell<BackupSettingsState>>,
     weak: &slint::Weak<SettingsWindow>,
+    tasks: &UiTasks,
+    restored: Option<Rc<dyn Fn(bool)>>,
+    mutates_local: bool,
     action: F,
 ) where
-    F: FnOnce(&dyn BackupService, &mut BackupSettingsState) -> Result<(), BackupError>,
+    F: FnOnce(&dyn BackupService, &mut BackupSettingsState) -> Result<(), BackupError>
+        + Send
+        + 'static,
 {
+    if state.borrow().busy {
+        return;
+    }
     let service = backup.borrow().clone();
-    match service {
-        Some(service) => {
-            let result = action(service.as_ref(), &mut state.borrow_mut());
-            if let Err(error) = result {
-                state.borrow_mut().error = Some(error.message().to_owned());
+    let Some(service) = service else {
+        backup_unavailable(state);
+        sync_backup(state, weak);
+        return;
+    };
+    {
+        let mut state = state.borrow_mut();
+        state.busy = true;
+        state.restoring = mutates_local;
+        state.notice = None;
+        state.error = None;
+    }
+    sync_backup(state, weak);
+    let mut snapshot = state.borrow().clone();
+    let state = Rc::clone(state);
+    let weak = weak.clone();
+    tasks.run(
+        move || {
+            let result = action(service.as_ref(), &mut snapshot);
+            (snapshot, result)
+        },
+        move |outcome| {
+            let mut restored_outcome = None;
+            match outcome {
+                Ok((mut snapshot, result)) => {
+                    snapshot.busy = false;
+                    snapshot.restoring = false;
+                    match result {
+                        Ok(()) => restored_outcome = snapshot.last_restore.clone(),
+                        Err(error) => snapshot.error = Some(error.message().to_owned()),
+                    }
+                    *state.borrow_mut() = snapshot;
+                }
+                Err(error) => {
+                    let mut state = state.borrow_mut();
+                    state.busy = false;
+                    state.restoring = false;
+                    state.error = Some(error.to_string());
+                }
             }
+            sync_backup(&state, &weak);
+            if let (Some(restored), Some(outcome)) = (&restored, restored_outcome) {
+                restored(outcome.replaced);
+            }
+        },
+    );
+}
+
+fn update_backup_form(
+    state: &Rc<RefCell<BackupSettingsState>>,
+    weak: &slint::Weak<SettingsWindow>,
+    connection_changed: bool,
+    update: impl FnOnce(&mut BackupForm),
+) {
+    {
+        let mut state = state.borrow_mut();
+        if state.busy {
+            return;
         }
-        None => backup_unavailable(state),
+        update(&mut state.form);
+        if connection_changed {
+            state.configuration_changed = true;
+            state.cancel_confirmation();
+        }
     }
     sync_backup(state, weak);
 }
@@ -982,6 +1116,27 @@ struct SettingsHandlers {
     open_providers: Option<Rc<dyn Fn()>>,
     open_models: Option<Rc<dyn Fn()>>,
     open_data: Option<Rc<dyn Fn()>>,
+    restored: Option<Rc<dyn Fn(bool)>>,
+    can_restore: Option<Rc<dyn Fn() -> Result<(), String>>>,
+}
+
+fn can_restore(
+    handlers: &Rc<RefCell<SettingsHandlers>>,
+    state: &Rc<RefCell<BackupSettingsState>>,
+    weak: &slint::Weak<SettingsWindow>,
+) -> bool {
+    if state.borrow().busy {
+        return false;
+    }
+    let check = handlers.borrow().can_restore.clone();
+    if let Some(check) = check
+        && let Err(message) = check()
+    {
+        state.borrow_mut().error = Some(message);
+        sync_backup(state, weak);
+        return false;
+    }
+    true
 }
 
 /// Owns the settings view model and the Slint window that renders it.
@@ -992,11 +1147,19 @@ pub struct SettingsController {
     backup_state: Rc<RefCell<BackupSettingsState>>,
     window: SettingsWindow,
     handlers: Rc<RefCell<SettingsHandlers>>,
+    tasks: Rc<UiTasks>,
 }
 
 impl SettingsController {
     /// Create the settings window and load the persisted settings.
     pub fn new(service: Arc<SettingsService>) -> Result<Self, slint::PlatformError> {
+        Self::create(service, false)
+    }
+
+    fn create(
+        service: Arc<SettingsService>,
+        background: bool,
+    ) -> Result<Self, slint::PlatformError> {
         let window = SettingsWindow::new()?;
         let view_model = match service.load() {
             Ok(view_model) => view_model,
@@ -1022,6 +1185,7 @@ impl SettingsController {
             ))),
             window,
             handlers: Rc::new(RefCell::new(SettingsHandlers::default())),
+            tasks: Rc::new(UiTasks::new(background)),
         };
         controller.wire();
         controller.sync();
@@ -1033,7 +1197,23 @@ impl SettingsController {
         service: Arc<SettingsService>,
         backup_service: Arc<dyn BackupService>,
     ) -> Result<Self, slint::PlatformError> {
-        let controller = Self::new(service)?;
+        Self::with_backup_mode(service, backup_service, false)
+    }
+
+    /// Create a settings screen whose backup operations run in the background.
+    pub fn with_backup_background(
+        service: Arc<SettingsService>,
+        backup_service: Arc<dyn BackupService>,
+    ) -> Result<Self, slint::PlatformError> {
+        Self::with_backup_mode(service, backup_service, true)
+    }
+
+    fn with_backup_mode(
+        service: Arc<SettingsService>,
+        backup_service: Arc<dyn BackupService>,
+        background: bool,
+    ) -> Result<Self, slint::PlatformError> {
+        let controller = Self::create(service, background)?;
         let config = backup_service.config().ok().flatten();
         let status = backup_service.status().unwrap_or_default();
         *controller.backup_state.borrow_mut() =
@@ -1062,6 +1242,50 @@ impl SettingsController {
     pub fn sync(&self) {
         sync_window(&self.window, &self.state.borrow());
         sync_backup_window(&self.window, &self.backup_state.borrow());
+    }
+
+    /// Refresh persisted defaults while preserving the current section.
+    pub fn reload(&self) {
+        let route = self.state.borrow().route.route();
+        apply_result(
+            self.service.load_with_route(route),
+            &self.state,
+            &self.window.as_weak(),
+        );
+    }
+
+    /// Reload the saved backup after an explicit local-data reset.
+    pub fn refresh_backup(&self) {
+        if self.backup_state.borrow().busy {
+            return;
+        }
+        if let Some(service) = self.backup.borrow().as_ref() {
+            match (service.config(), service.status()) {
+                (Ok(config), Ok(status)) => {
+                    *self.backup_state.borrow_mut() =
+                        BackupSettingsState::from_config(config.as_ref(), status);
+                }
+                (Err(error), _) | (_, Err(error)) => {
+                    self.backup_state.borrow_mut().error = Some(error.to_string())
+                }
+            }
+        }
+        self.sync();
+    }
+
+    /// Refresh the rest of the application after a successful restore.
+    pub fn set_on_restored(&self, handler: impl Fn(bool) + 'static) {
+        self.handlers.borrow_mut().restored = Some(Rc::new(handler));
+    }
+
+    /// Check other application work before starting a local restore.
+    pub fn set_on_can_restore(&self, handler: impl Fn() -> Result<(), String> + 'static) {
+        self.handlers.borrow_mut().can_restore = Some(Rc::new(handler));
+    }
+
+    /// Apply completed backup work in deterministic hosts.
+    pub fn poll(&self) {
+        self.tasks.poll();
     }
 
     /// Select a settings section and refresh the window.
@@ -1306,154 +1530,222 @@ impl SettingsController {
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_backend_changed(move |index| {
-            backup_state.borrow_mut().form.backend = backend_from_index(index as usize);
-            sync_backup(&backup_state, &weak);
+            let backend = backend_from_index(index as usize);
+            if backup_state.borrow().form.backend == backend {
+                return;
+            }
+            update_backup_form(&backup_state, &weak, true, |form| {
+                *form = BackupForm {
+                    backend,
+                    ..BackupForm::default()
+                };
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_endpoint_changed(move |value| {
-            backup_state.borrow_mut().form.endpoint = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.endpoint = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_region_changed(move |value| {
-            backup_state.borrow_mut().form.region = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.region = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_bucket_changed(move |value| {
-            backup_state.borrow_mut().form.bucket = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.bucket = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_prefix_changed(move |value| {
-            backup_state.borrow_mut().form.prefix = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.prefix = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_access_key_changed(move |value| {
-            backup_state.borrow_mut().form.access_key_id = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.access_key_id = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_secret_key_changed(move |value| {
-            backup_state.borrow_mut().form.secret_access_key = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.secret_access_key = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_sas_token_changed(move |value| {
-            backup_state.borrow_mut().form.sas_token = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.sas_token = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window
             .on_backup_service_account_json_changed(move |value| {
-                backup_state.borrow_mut().form.service_account_json = value.to_string();
-                sync_backup(&backup_state, &weak);
+                update_backup_form(&backup_state, &weak, true, |form| {
+                    form.service_account_json = value.to_string()
+                });
             });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_access_token_changed(move |value| {
-            backup_state.borrow_mut().form.access_token = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.access_token = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_folder_id_changed(move |value| {
-            backup_state.borrow_mut().form.folder_id = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.folder_id = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_username_changed(move |value| {
-            backup_state.borrow_mut().form.username = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.username = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_password_changed(move |value| {
-            backup_state.borrow_mut().form.password = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, true, |form| {
+                form.password = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_passphrase_changed(move |value| {
-            backup_state.borrow_mut().form.passphrase = value.to_string();
-            sync_backup(&backup_state, &weak);
+            update_backup_form(&backup_state, &weak, false, |form| {
+                form.passphrase = value.to_string()
+            });
         });
 
         let weak = self.window.as_weak();
         let backup = Rc::clone(&self.backup);
         let backup_state = Rc::clone(&self.backup_state);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_backup_test_connection(move || {
-            run_backup_action(&backup, &backup_state, &weak, |service, state| {
-                state.test_connection(service)
-            });
+            run_backup_action(
+                &backup,
+                &backup_state,
+                &weak,
+                &tasks,
+                None,
+                false,
+                |service, state| state.test_connection(service),
+            );
         });
 
         let weak = self.window.as_weak();
         let backup = Rc::clone(&self.backup);
         let backup_state = Rc::clone(&self.backup_state);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_backup_enable(move || {
-            run_backup_action(&backup, &backup_state, &weak, |service, state| {
-                state.enable(service)
-            });
+            run_backup_action(
+                &backup,
+                &backup_state,
+                &weak,
+                &tasks,
+                None,
+                false,
+                |service, state| state.enable(service),
+            );
         });
 
         let weak = self.window.as_weak();
         let backup = Rc::clone(&self.backup);
         let backup_state = Rc::clone(&self.backup_state);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_backup_disable(move || {
-            run_backup_action(&backup, &backup_state, &weak, |service, state| {
-                state.disable(service)
-            });
+            run_backup_action(
+                &backup,
+                &backup_state,
+                &weak,
+                &tasks,
+                None,
+                false,
+                |service, state| state.disable(service),
+            );
         });
 
         let weak = self.window.as_weak();
         let backup = Rc::clone(&self.backup);
         let backup_state = Rc::clone(&self.backup_state);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_backup_now(move || {
-            run_backup_action(&backup, &backup_state, &weak, |service, state| {
-                state.backup_now(service)
-            });
+            run_backup_action(
+                &backup,
+                &backup_state,
+                &weak,
+                &tasks,
+                None,
+                false,
+                |service, state| state.backup_now(service),
+            );
         });
 
         let weak = self.window.as_weak();
         let backup = Rc::clone(&self.backup);
         let backup_state = Rc::clone(&self.backup_state);
+        let tasks = Rc::clone(&self.tasks);
+        let handlers = Rc::clone(&self.handlers);
         self.window.on_backup_restore(move || {
-            run_backup_action(&backup, &backup_state, &weak, |service, state| {
-                state.restore(service, false)
-            });
+            if !can_restore(&handlers, &backup_state, &weak) {
+                return;
+            }
+            let restored = handlers.borrow().restored.clone();
+            run_backup_action(
+                &backup,
+                &backup_state,
+                &weak,
+                &tasks,
+                restored,
+                true,
+                |service, state| state.restore(service, false),
+            );
         });
 
         let weak = self.window.as_weak();
         let backup = Rc::clone(&self.backup);
         let backup_state = Rc::clone(&self.backup_state);
+        let tasks = Rc::clone(&self.tasks);
         self.window.on_backup_restore_replace(move || {
-            run_backup_action(&backup, &backup_state, &weak, |service, state| {
-                state.restore(service, true)
-            });
+            run_backup_action(
+                &backup,
+                &backup_state,
+                &weak,
+                &tasks,
+                None,
+                false,
+                |service, state| state.restore(service, true),
+            );
         });
 
         let weak = self.window.as_weak();
@@ -1466,21 +1758,63 @@ impl SettingsController {
         let weak = self.window.as_weak();
         let backup = Rc::clone(&self.backup);
         let backup_state = Rc::clone(&self.backup_state);
+        let tasks = Rc::clone(&self.tasks);
+        let handlers = Rc::clone(&self.handlers);
         self.window.on_backup_confirm(move || {
             if let Some(window) = weak.upgrade() {
                 backup_state.borrow_mut().confirmation_input =
                     window.get_backup_confirmation_input().to_string();
             }
-            run_backup_action(&backup, &backup_state, &weak, |service, state| {
-                state.confirm(service)
-            });
+            let replace =
+                backup_state.borrow().confirmation == Some(BackupConfirmation::ReplaceRestore);
+            if replace && !can_restore(&handlers, &backup_state, &weak) {
+                return;
+            }
+            let restored = if replace {
+                handlers.borrow().restored.clone()
+            } else {
+                None
+            };
+            run_backup_action(
+                &backup,
+                &backup_state,
+                &weak,
+                &tasks,
+                restored,
+                replace,
+                |service, state| state.confirm(service),
+            );
         });
 
         let weak = self.window.as_weak();
         let backup_state = Rc::clone(&self.backup_state);
         self.window.on_backup_cancel_confirmation(move || {
+            if backup_state.borrow().busy {
+                return;
+            }
             backup_state.borrow_mut().cancel_confirmation();
             sync_backup(&backup_state, &weak);
+        });
+
+        let weak = self.window.as_weak();
+        let backup = Rc::clone(&self.backup);
+        let backup_state = Rc::clone(&self.backup_state);
+        let tasks = Rc::clone(&self.tasks);
+        self.window.on_backup_discard_changes(move || {
+            run_backup_action(
+                &backup,
+                &backup_state,
+                &weak,
+                &tasks,
+                None,
+                false,
+                |service, state| {
+                    let config = service.config()?;
+                    let status = service.status()?;
+                    *state = BackupSettingsState::from_config(config.as_ref(), status);
+                    Ok(())
+                },
+            );
         });
     }
 }
@@ -1736,6 +2070,8 @@ mod tests {
         let (controller, backup) = backup_controller();
         let window = controller.window();
         fill_backup_form(window);
+        window.invoke_backup_enable();
+        backup.calls.lock().unwrap().clear();
 
         window.invoke_backup_restore();
         assert_eq!(
@@ -1781,6 +2117,53 @@ mod tests {
             backup.calls().last().map(String::as_str),
             Some("delete_remote:correct horse battery staple:DELETE REMOTE BACKUP")
         );
+    }
+
+    #[test]
+    fn backup_connection_edits_must_be_saved_and_do_not_leak_between_backends() {
+        let (controller, backup) = backup_controller();
+        let window = controller.window();
+        fill_backup_form(window);
+        window.invoke_backup_backend_changed(0);
+        assert_eq!(
+            controller.backup_state().form.endpoint,
+            "https://s3.example.com"
+        );
+        window.invoke_backup_now();
+        assert!(backup.calls().is_empty());
+        assert!(
+            controller
+                .backup_state()
+                .error
+                .as_deref()
+                .is_some_and(|error| error.contains("Save"))
+        );
+        window.invoke_backup_enable();
+        window.invoke_backup_endpoint_changed("https://new.example.com".into());
+        window.invoke_backup_restore();
+        assert_eq!(backup.calls(), vec!["enable"]);
+        window.invoke_backup_backend_changed(4);
+        let state = controller.backup_state();
+        assert!(state.form.endpoint.is_empty());
+        assert!(state.form.access_key_id.is_empty());
+        assert!(state.form.secret_access_key.is_empty());
+        assert!(state.form.passphrase.is_empty());
+    }
+
+    #[test]
+    fn restore_checks_other_work_before_calling_the_service() {
+        let (controller, backup) = backup_controller();
+        let window = controller.window();
+        fill_backup_form(window);
+        window.invoke_backup_enable();
+        controller.set_on_can_restore(|| Err("Stop the response first.".to_owned()));
+        window.invoke_backup_restore();
+        assert_eq!(backup.calls(), vec!["enable"]);
+        assert_eq!(
+            controller.backup_state().error.as_deref(),
+            Some("Stop the response first.")
+        );
+        assert!(!controller.backup_state().restoring);
     }
 
     #[test]

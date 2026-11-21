@@ -7,6 +7,8 @@ import dev.chatui.feature.conversations.CreateConversationResult
 import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.serialization.json.JsonObject
 
 /** Lightweight conversation facade for shell composition tests. */
@@ -17,8 +19,20 @@ class FakeConversationService(
     private val conversationsFlow = MutableStateFlow(conversations)
     private val archivedFlow = MutableStateFlow(emptyList<Conversation>())
     private val active = MutableStateFlow<String?>(null)
+    var activeHistoryCollectors = 0
+        private set
+    var maximumHistoryCollectors = 0
+        private set
 
-    override fun observeConversations(): Flow<List<Conversation>> = conversationsFlow
+    override fun observeConversations(): Flow<List<Conversation>> = flow {
+        activeHistoryCollectors++
+        maximumHistoryCollectors = maxOf(maximumHistoryCollectors, activeHistoryCollectors)
+        try {
+            emitAll(conversationsFlow)
+        } finally {
+            activeHistoryCollectors--
+        }
+    }
 
     override fun observeArchivedConversations(): Flow<List<Conversation>> = archivedFlow
 

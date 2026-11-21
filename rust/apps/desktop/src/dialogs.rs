@@ -7,6 +7,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use chatui_storage::AttachmentStore;
 use chatui_ui::chat::{
@@ -149,6 +150,8 @@ pub enum DialogError {
     Io(std::io::Error),
     /// The requested file does not exist in the backend.
     NotFound(PathBuf),
+    /// Only browser and email links can be opened outside the application.
+    InvalidLink,
 }
 
 impl std::fmt::Display for DialogError {
@@ -156,6 +159,7 @@ impl std::fmt::Display for DialogError {
         match self {
             Self::Io(error) => write!(formatter, "file dialog I/O error: {error}"),
             Self::NotFound(path) => write!(formatter, "file not found: {}", path.display()),
+            Self::InvalidLink => formatter.write_str("This link cannot be opened in a browser."),
         }
     }
 }
@@ -166,6 +170,34 @@ impl From<std::io::Error> for DialogError {
     fn from(error: std::io::Error) -> Self {
         Self::Io(error)
     }
+}
+
+fn external_url_command(url: &str) -> Result<Command, DialogError> {
+    let url = chatui_ui::markdown::sanitize_link_url(url)
+        .filter(|url| !url.starts_with('#'))
+        .ok_or(DialogError::InvalidLink)?;
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = Command::new("rundll32.exe");
+        command.arg("url.dll,FileProtocolHandler");
+        command
+    };
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = Command::new("open");
+        command.arg("--");
+        command
+    };
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let mut command = Command::new("xdg-open");
+    command.arg(url);
+    Ok(command)
+}
+
+/// Open an allowlisted link without interpolating it into a shell command.
+pub fn open_external_url(url: &str) -> Result<(), DialogError> {
+    external_url_command(url)?.spawn()?;
+    Ok(())
 }
 
 /// Convert a dropped path to attachment metadata.
@@ -309,6 +341,30 @@ pub fn store_validated_file(
 mod tests {
     use super::*;
     use chatui_domain::settings::SendKey;
+
+    #[test]
+    fn browser_commands_reject_unsafe_links_and_keep_the_url_as_one_argument() {
+        for url in [
+            "javascript:alert(1)",
+            "file:///private",
+            "#anchor",
+            "https://user:pass@example.com",
+        ] {
+            assert!(matches!(
+                external_url_command(url),
+                Err(DialogError::InvalidLink)
+            ));
+        }
+        let url = "https://example.com/?q=hello&next=%22quoted%22";
+        let command = external_url_command(url).expect("safe browser command");
+        assert_eq!(
+            command
+                .get_args()
+                .last()
+                .and_then(|argument| argument.to_str()),
+            Some(url)
+        );
+    }
 
     #[test]
     fn memory_dialog_returns_queued_paths() {

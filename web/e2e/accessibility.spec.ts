@@ -282,6 +282,76 @@ test.describe('accessibility: live regions', () => {
 })
 
 test.describe('accessibility: responsive layout', () => {
+  test('keeps data import controls inside narrow settings panels', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await completeOnboarding(page)
+    await page.goto('/settings/data')
+
+    const merge = page.getByRole('radio', { name: /^Merge/ })
+    const replace = page.getByRole('radio', { name: /^Replace/ })
+    await expect(merge).toBeChecked()
+    await replace.check()
+    await expect(replace).toBeChecked()
+    await expect(page.getByRole('alert')).toHaveText(
+      'Replace mode deletes local data after you confirm.',
+    )
+    await merge.check()
+    await expect(page.getByRole('alert')).toBeHidden()
+
+    expect(await page.locator('main').evaluate((main) => main.scrollWidth > main.clientWidth)).toBe(
+      false,
+    )
+  })
+
+  test('keeps the composer in view and history dismissible on a narrow, short screen', async ({
+    page,
+    openRouter,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 568 })
+    await completeOnboarding(page)
+
+    const historyTrigger = page.getByRole('button', { name: 'Open history' })
+    await expect(historyTrigger).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByRole('searchbox', { name: 'Search conversations' })).toBeHidden()
+    await historyTrigger.click()
+    await expect(historyTrigger).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByRole('searchbox', { name: 'Search conversations' })).toBeVisible()
+    await page
+      .getByRole('button', { name: 'Dismiss history' })
+      .click({ position: { x: 310, y: 280 } })
+    await expect(historyTrigger).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByRole('searchbox', { name: 'Search conversations' })).toBeHidden()
+
+    openRouter.setChat({
+      type: 'success',
+      text: Array.from({ length: 30 }, () => 'A longer response with room to think.').join('\n\n'),
+    })
+    await sendMessage(page, 'Keep the composer within reach')
+    await expect(assistantMessages(page).last()).toHaveAttribute('data-status', 'complete')
+
+    const composer = await page.locator('.chat-screen__composer').boundingBox()
+    expect(composer).not.toBeNull()
+    expect(composer!.y).toBeGreaterThanOrEqual(0)
+    expect(composer!.y + composer!.height).toBeLessThanOrEqual(568)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+    ).toBe(false)
+
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = '32px'
+    })
+    await expect(historyTrigger).toBeInViewport()
+    await expect(page.getByRole('button', { name: 'Send message' })).toBeInViewport()
+    expect(
+      await page.evaluate(() => {
+        const main = document.querySelector('main')!
+        return (
+          document.documentElement.scrollWidth > innerWidth || main.scrollWidth > main.clientWidth
+        )
+      }),
+    ).toBe(false)
+  })
+
   test('uses the section 11.9 breakpoints and a 48 rem message column', async ({ page }) => {
     await completeOnboarding(page)
 
@@ -377,20 +447,12 @@ test.describe('accessibility: motion, scaling, and overflow', () => {
     await waitForAssistantText(page, 'Column one')
     await expect(assistantMessages(page).last()).toHaveAttribute('data-status', 'complete')
 
-    const overflow = await page.evaluate(() => {
-      const table = document.querySelector('.markdown table')
-      const code = document.querySelector('.code-block__pre')
-
-      return {
-        tableOverflow: table ? getComputedStyle(table).overflowX : '',
-        codeOverflow: code ? getComputedStyle(code).overflowX : '',
-        pageOverflow: document.documentElement.scrollWidth > window.innerWidth,
-      }
-    })
-
-    expect(overflow.tableOverflow).toBe('auto')
-    expect(overflow.codeOverflow).toBe('auto')
-    expect(overflow.pageOverflow).toBe(false)
+    const response = assistantMessages(page).last()
+    await expect(response.getByRole('table')).toHaveCSS('overflow-x', 'auto')
+    await expect(response.locator('.code-block__pre')).toHaveCSS('overflow-x', 'auto')
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+    ).toBe(false)
   })
 })
 

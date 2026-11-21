@@ -180,6 +180,9 @@ class FakeProviderManagementService : ProviderManagementService {
     var lastPresetInput: CreatePresetProviderInput? = null
     var createError: Throwable? = null
     var refreshCalls: Int = 0
+    var validateCalls: Int = 0
+    var presetCreateCalls: Int = 0
+    var customCreateCalls: Int = 0
 
     override fun observeProviders(): Flow<List<Provider>> =
         providersError?.let { failure -> kotlinx.coroutines.flow.flow { throw failure } }
@@ -193,6 +196,7 @@ class FakeProviderManagementService : ProviderManagementService {
     }
 
     override suspend fun createPresetProvider(input: CreatePresetProviderInput): Provider {
+        presetCreateCalls += 1
         createError?.let { throw it }
         lastPresetInput = input
         val provider = testProvider(
@@ -206,6 +210,7 @@ class FakeProviderManagementService : ProviderManagementService {
     }
 
     override suspend fun createCustomProvider(input: CreateCustomProviderInput): Provider {
+        customCreateCalls += 1
         createError?.let { throw it }
         lastCustomInput = input
         val provider = testProvider(
@@ -223,6 +228,7 @@ class FakeProviderManagementService : ProviderManagementService {
     }
 
     override suspend fun validateProviderKey(providerId: String): Provider {
+        validateCalls += 1
         error?.let { throw it }
         return requireProvider(providerId)
     }

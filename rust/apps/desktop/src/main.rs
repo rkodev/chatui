@@ -32,18 +32,18 @@ mod single_instance;
 mod updater;
 mod window_state;
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::error::Error;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Duration;
 
 use chatui_contracts::{AppConfig, AppConfigError, provider_catalog};
-use chatui_domain::settings::SendKey;
-use chatui_domain::{ChatError, Settings};
+use chatui_domain::{ChatError, Conversation, Model, ProviderAuthType, Settings};
 use chatui_providers::{HttpClient, NetworkError};
 use chatui_secrets::SecretStore;
 use chatui_storage::{ConversationFilter, SearchRepository, SqliteSearchRepository, StorageError};
@@ -51,15 +51,17 @@ use chatui_ui::accessibility::Modifiers;
 use chatui_ui::chat::runner::DEFAULT_PERSIST_INTERVAL;
 use chatui_ui::chat::{
     AttachmentFileInfo, ChatController, ChatControllerDeps, ChatRunner, ChatRunnerOptions,
-    ChatRuntime, ChatService, DraftStore, MemoryStreamingStore, MessageListConfig,
+    ChatRuntime, ChatService, ComposerSend, DraftStore, MemoryStreamingStore, MessageListConfig,
     PersistentDraftStore, ProviderChatAdapter, SettingsDraftPersistence, StreamingStore,
     SystemClock, store_pending_attachment,
 };
 use chatui_ui::conversations::{
     ConversationFactory, ConversationHistory, ConversationSearchService,
-    DefaultConversationFactory, HistoryConfig, HistoryController, HistoryRuntime,
+    DefaultConversationFactory, HistoryConfig, HistoryController, HistoryError, HistoryRuntime,
 };
-use chatui_ui::data::{DataController, DataService, ExportRequest, ImportMode, format_bytes};
+use chatui_ui::data::{
+    DataChange, DataController, DataOperation, DataSection, DataService, ExportArtifact,
+};
 use chatui_ui::models::{ModelManagementController, ModelManagementService};
 use chatui_ui::onboarding::{OnboardingController, OnboardingRoute};
 use chatui_ui::providers::{ProviderManagementController, ProviderManagementService};
@@ -73,8 +75,11 @@ use slint::{ComponentFactory, ComponentHandle, ModelRc, VecModel};
 
 use clipboard::{ClipboardKind, ClipboardPayload, ClipboardService, NativeClipboard, copy_payload};
 use deep_link::{DeepLinkRoute, DeepLinkState};
-use dialogs::{AttachmentDropSummary, DialogService, NativeDialogService, attachment_info};
+use dialogs::{
+    AttachmentDropSummary, DialogService, NativeDialogService, attachment_info, open_external_url,
+};
 use menu::{Command, CommandOutcome, MenuBar};
+use services::backup::BackupServiceAdapter;
 use services::data::SqliteDataService;
 use services::models::{
     ModelRepository as ModelRepositoryAdapter, ProviderModelDiscovery,
@@ -96,8 +101,8 @@ use services::{
 use shortcuts::{ShortcutAction, ShortcutContext, ShortcutKey, ShortcutMap};
 use single_instance::{InstanceGuard, SingleInstance, SingleInstanceError};
 use window_state::{
-    DEFAULT_WIDTH, FileWindowStateStore, NativeSystemThemeProbe, SystemThemeProbe,
-    WindowStateController,
+    DEFAULT_WIDTH, FileWindowStateStore, MemoryWindowStateStore, NativeSystemThemeProbe,
+    SystemThemeProbe, WindowStateController,
 };
 
 #[cfg(unix)]
@@ -144,9 +149,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         None => None,
     };
 
-    let window_state = WindowStateController::new(Box::new(FileWindowStateStore::new(
-        FileWindowStateStore::default_path(),
-    )));
+    let window_state = WindowStateController::new(if smoke {
+        Box::new(MemoryWindowStateStore::new())
+    } else {
+        Box::new(FileWindowStateStore::new(
+            FileWindowStateStore::default_path(),
+        ))
+    });
     let saved = window_state.load();
     let mut state = ShellState::new(saved.map(|state| state.width).unwrap_or(DEFAULT_WIDTH));
     let theme = NativeSystemThemeProbe.probe();
@@ -507,8 +516,20 @@ fn run_onboarding(services: &DesktopServices, dark: bool) -> Result<bool, Startu
         .cloned()
         .ok_or_else(|| StartupError::Message("The OpenRouter preset is missing.".to_owned()))?;
     let service = build_onboarding_service(&services.runtime, &preset, services.secrets.clone())?;
-    let controller = OnboardingController::new(Arc::new(service), &preset)?;
+    let controller = OnboardingController::new_background(Arc::new(service), &preset)?;
     controller.window().set_dark(dark);
+    let portal_window = controller.window().as_weak();
+    controller.window().on_open_key_portal(move || {
+        if let Some(window) = portal_window.upgrade() {
+            window.set_link_error(
+                open_external_url("https://openrouter.ai/keys")
+                    .err()
+                    .map(|error| error.to_string())
+                    .unwrap_or_default()
+                    .into(),
+            );
+        }
+    });
 
     if controller.route() == OnboardingRoute::Shell {
         return Ok(true);
@@ -521,7 +542,7 @@ fn run_onboarding(services: &DesktopServices, dark: bool) -> Result<bool, Startu
         Duration::from_millis(100),
         move || {
             if let Some(window) = weak.upgrade()
-                && window.get_onboarding_completed()
+                && window.get_continue_requested()
             {
                 let _ = slint::quit_event_loop();
             }
@@ -531,7 +552,8 @@ fn run_onboarding(services: &DesktopServices, dark: bool) -> Result<bool, Startu
     controller.window().run()?;
     drop(timer);
 
-    let completed = controller.route() == OnboardingRoute::Shell;
+    let completed = controller.route() == OnboardingRoute::Shell
+        && controller.window().get_continue_requested();
     if completed {
         let store = services.runtime.settings_store();
         let mut settings = store.load()?;
@@ -606,6 +628,20 @@ impl HistoryRuntime for RuntimeSpawner {
 // Composition
 // ---------------------------------------------------------------------------
 
+enum DesktopEvent {
+    ChatCreated {
+        request: u64,
+        result: Result<Box<Conversation>, HistoryError>,
+    },
+    CancelledChatRemoved {
+        result: Result<bool, StorageError>,
+    },
+    ModelChanged {
+        conversation_id: String,
+        result: Result<(), StorageError>,
+    },
+}
+
 /// Owns the production services and the lazily created feature controllers.
 struct DesktopComposition {
     services: DesktopServices,
@@ -613,7 +649,7 @@ struct DesktopComposition {
     shell: slint::Weak<ShellWindow>,
     window_state: WindowStateController,
     clipboard: NativeClipboard,
-    dialogs: NativeDialogService,
+    dialogs: Rc<dyn DialogService>,
     shortcut_map: ShortcutMap,
     menu_bar: MenuBar,
     deep_links: RefCell<DeepLinkState>,
@@ -627,6 +663,12 @@ struct DesktopComposition {
     data: RefCell<Option<Rc<DataController>>>,
     models: RefCell<Option<Rc<ModelManagementController>>>,
     applied_settings: RefCell<Option<Settings>>,
+    event_sender: Sender<DesktopEvent>,
+    events: RefCell<Receiver<DesktopEvent>>,
+    chat_request: Cell<u64>,
+    chat_creation_jobs: Cell<usize>,
+    pending_first_send: RefCell<Option<ComposerSend>>,
+    model_change_pending: Cell<bool>,
 }
 
 impl DesktopComposition {
@@ -644,6 +686,7 @@ impl DesktopComposition {
 
         let data_service: Arc<dyn DataService> =
             Arc::new(SqliteDataService::from_runtime(&services.runtime));
+        let (event_sender, events) = mpsc::channel();
 
         Ok(Self {
             services,
@@ -651,7 +694,7 @@ impl DesktopComposition {
             shell,
             window_state,
             clipboard: NativeClipboard,
-            dialogs: NativeDialogService,
+            dialogs: Rc::new(NativeDialogService),
             shortcut_map: ShortcutMap::default(),
             menu_bar: MenuBar::default_menu_bar(),
             deep_links: RefCell::new(DeepLinkState::new()),
@@ -665,6 +708,12 @@ impl DesktopComposition {
             data: RefCell::new(None),
             models: RefCell::new(None),
             applied_settings: RefCell::new(None),
+            event_sender,
+            events: RefCell::new(events),
+            chat_request: Cell::new(0),
+            chat_creation_jobs: Cell::new(0),
+            pending_first_send: RefCell::new(None),
+            model_change_pending: Cell::new(false),
         })
     }
 
@@ -722,6 +771,7 @@ impl DesktopComposition {
 
         if let Some(chat) = self.chat.borrow().as_ref() {
             chat.set_dark(dark);
+            chat.set_chat_font_size(self.shell_state.borrow().chat_typography().size);
         }
         if let Some(history) = self.history.borrow().as_ref() {
             history.window().set_dark(dark);
@@ -741,22 +791,84 @@ impl DesktopComposition {
     }
 
     fn navigate(self: &Rc<Self>, window: &ShellWindow, destination: Destination) {
+        if self.is_data_mutating() {
+            self.set_notice("Finishing your local data update. Please wait.");
+            return;
+        }
+        window.set_show_models(false);
         self.shell_state.borrow_mut().navigate(destination);
         sync_window(window, &self.shell_state.borrow());
         self.ensure_and_sync(window, destination);
+        if destination == Destination::Chat {
+            self.refresh_chat_configuration();
+        }
+        if destination == Destination::Settings
+            && let Some(settings) = self.settings.borrow().as_ref()
+        {
+            settings.reload();
+        }
+        if destination == Destination::Providers
+            && let Some(providers) = self.providers.borrow().as_ref()
+        {
+            providers.reload();
+        }
+        if destination == Destination::Data
+            && let Some(data) = self.data.borrow().as_ref()
+        {
+            data.reload();
+            data.set_external_busy(self.data_busy_reason());
+            data.sync();
+        }
     }
 
     fn open_conversation(self: &Rc<Self>, window: &ShellWindow, id: &str) {
+        if self.is_data_mutating() {
+            self.set_notice("Finishing your local data update. Please wait.");
+            return;
+        }
+        self.cancel_first_send();
         self.navigate(window, Destination::Chat);
         if let Some(chat) = self.chat.borrow().as_ref() {
             chat.open(id);
         }
-        self.set_notice(format!("Opened conversation {id}."));
+        self.persist_active_conversation(Some(id));
+        self.set_notice("");
     }
 
     fn open_models(self: &Rc<Self>, window: &ShellWindow) {
+        if self.is_data_mutating() || self.model_change_pending.get() {
+            return;
+        }
         self.ensure_models(window);
+        if let Some(models) = self.models.borrow().as_ref() {
+            models.reload();
+            models.set_picker_mode(true);
+            if let Some(chat) = self.chat.borrow().as_ref() {
+                let model = chat.state().model.clone();
+                if let Some(model) = model.as_ref() {
+                    models.select_provider(&model.provider_id);
+                }
+                models.set_selected_model(model.map(|model| model.id));
+            }
+        }
         window.set_show_models(true);
+    }
+
+    fn manage_models(self: &Rc<Self>, window: &ShellWindow) {
+        self.open_models(window);
+        if let Some(models) = self.models.borrow().as_ref() {
+            models.set_picker_mode(false);
+        }
+    }
+
+    fn persist_active_conversation(&self, id: Option<&str>) {
+        let store = self.services.runtime.settings_store();
+        if let Ok(mut settings) = store.load() {
+            settings.last_active_conversation_id = id.map(str::to_owned);
+            if let Err(error) = store.save(&settings) {
+                self.set_notice(format!("Could not remember this conversation: {error}"));
+            }
+        }
     }
 
     fn set_notice(&self, message: impl Into<String>) {
@@ -786,6 +898,7 @@ impl DesktopComposition {
                 chat.set_dark(self.feature_dark());
                 self.wire_chat_handlers(&chat);
                 *self.chat.borrow_mut() = Some(chat);
+                self.refresh_chat_configuration();
             }
             Err(error) => {
                 window.set_notice(format!("Could not open chat: {error}").into());
@@ -823,6 +936,19 @@ impl DesktopComposition {
         );
 
         let drafts: Arc<dyn DraftStore> = self.drafts.clone();
+        let initial_conversation_id = self
+            .services
+            .settings
+            .last_active_conversation_id
+            .as_ref()
+            .filter(|id| {
+                runtime
+                    .block_on(conversations.get(id))
+                    .ok()
+                    .flatten()
+                    .is_some_and(|conversation| !conversation.archived)
+            })
+            .cloned();
         let controller = ChatController::new(ChatControllerDeps {
             service,
             runner,
@@ -834,12 +960,55 @@ impl DesktopComposition {
             send_key: self.services.settings.send_key,
             runtime: Arc::new(RuntimeSpawner::new(runtime)),
             config: MessageListConfig::default(),
-            initial_conversation_id: None,
+            initial_conversation_id,
         })?;
+        controller.set_chat_font_size(self.shell_state.borrow().chat_typography().size);
+        controller.set_show_token_usage(self.services.settings.show_token_usage);
         Ok(controller)
     }
 
     fn wire_chat_handlers(self: &Rc<Self>, chat: &Rc<ChatController>) {
+        let weak = Rc::downgrade(self);
+        chat.set_on_start_conversation(move |send| {
+            if let Some(composition) = weak.upgrade() {
+                composition.create_first_conversation(send);
+            }
+        });
+
+        let weak = Rc::downgrade(self);
+        chat.set_on_cancel_start(move || {
+            if let Some(composition) = weak.upgrade() {
+                composition.cancel_first_send();
+            }
+        });
+
+        let weak = Rc::downgrade(self);
+        chat.set_on_open_providers(move || {
+            if let Some(composition) = weak.upgrade()
+                && let Some(window) = composition.shell.upgrade()
+            {
+                let choose_model = composition
+                    .chat
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(|chat| chat.messages_window().get_setup_uses_models());
+                if choose_model {
+                    composition.open_models(&window);
+                } else {
+                    composition.navigate(&window, Destination::Providers);
+                }
+            }
+        });
+
+        let weak = Rc::downgrade(self);
+        chat.set_on_open_link(move |url| {
+            if let Some(composition) = weak.upgrade()
+                && let Err(error) = open_external_url(&url)
+            {
+                composition.set_notice(error.to_string());
+            }
+        });
+
         let weak = Rc::downgrade(self);
         chat.set_on_copy(move |text| {
             if let Some(composition) = weak.upgrade() {
@@ -931,6 +1100,13 @@ impl DesktopComposition {
                 composition.open_conversation(&window, id);
             }
         });
+        let weak = Rc::downgrade(self);
+        let window_weak = window.as_weak();
+        controller.window().on_new_chat(move || {
+            if let (Some(composition), Some(window)) = (weak.upgrade(), window_weak.upgrade()) {
+                composition.new_chat(&window);
+            }
+        });
 
         Ok(controller)
     }
@@ -958,7 +1134,7 @@ impl DesktopComposition {
         }
     }
 
-    fn build_providers(&self) -> Result<ProviderManagementController, StartupError> {
+    fn build_providers(self: &Rc<Self>) -> Result<ProviderManagementController, StartupError> {
         let runtime = &self.services.runtime;
         let providers = Arc::new(ProviderStoreAdapter::from_runtime(runtime));
         let models = Arc::new(ProviderModelStore::from_runtime(runtime));
@@ -973,7 +1149,43 @@ impl DesktopComposition {
             self.services.secrets.clone(),
             validator,
         ));
-        Ok(ProviderManagementController::new(service)?)
+        let controller = ProviderManagementController::new_background(service)?;
+        let weak = Rc::downgrade(self);
+        controller.window().on_open_docs(move |url| {
+            if let Some(composition) = weak.upgrade()
+                && let Err(error) = open_external_url(&url)
+            {
+                composition.set_notice(error.to_string());
+            }
+        });
+        let weak = Rc::downgrade(self);
+        controller.window().on_open_models(move || {
+            if let Some(composition) = weak.upgrade()
+                && let Some(window) = composition.shell.upgrade()
+            {
+                let id = composition
+                    .providers
+                    .borrow()
+                    .as_ref()
+                    .and_then(|providers| {
+                        providers
+                            .state()
+                            .detail
+                            .as_ref()
+                            .map(|detail| detail.id.clone())
+                    });
+                composition.manage_models(&window);
+                if let Some(models) = composition.models.borrow().as_ref() {
+                    if let Some(id) = id {
+                        models.select_provider(&id);
+                    }
+                    if models.state().list.total == 0 {
+                        models.window().invoke_refresh();
+                    }
+                }
+            }
+        });
+        Ok(controller)
     }
 
     // -- Settings -----------------------------------------------------------
@@ -1008,7 +1220,25 @@ impl DesktopComposition {
         let store = Arc::new(SettingsStoreAdapter::from_runtime(runtime));
         let catalog = Arc::new(SettingsCatalog::from_runtime(runtime));
         let service = Arc::new(SettingsService::new(store, catalog));
-        let mut controller = SettingsController::new(service)?;
+        let backup = Arc::new(BackupServiceAdapter::from_runtime(
+            runtime,
+            self.services.secrets.clone(),
+        ));
+        let mut controller = SettingsController::with_backup_background(service, backup)?;
+        let weak = Rc::downgrade(self);
+        controller.set_on_restored(move |replaced| {
+            if let Some(composition) = weak.upgrade() {
+                composition.refresh_after_data_change(DataChange::Imported { replaced });
+            }
+        });
+        let weak = Rc::downgrade(self);
+        controller.window().on_open_docs(move || {
+            if let Some(composition) = weak.upgrade()
+                && let Some(window) = composition.shell.upgrade()
+            {
+                composition.open_docs(&window);
+            }
+        });
 
         let weak = Rc::downgrade(self);
         let window_weak = window.as_weak();
@@ -1022,7 +1252,7 @@ impl DesktopComposition {
         let window_weak = window.as_weak();
         controller.set_on_open_models(move || {
             if let (Some(composition), Some(window)) = (weak.upgrade(), window_weak.upgrade()) {
-                composition.open_models(&window);
+                composition.manage_models(&window);
             }
         });
 
@@ -1032,6 +1262,22 @@ impl DesktopComposition {
             if let (Some(composition), Some(window)) = (weak.upgrade(), window_weak.upgrade()) {
                 composition.navigate(&window, Destination::Data);
             }
+        });
+        let weak = Rc::downgrade(self);
+        controller.set_on_can_restore(move || {
+            let Some(composition) = weak.upgrade() else {
+                return Ok(());
+            };
+            if composition.is_data_mutating() {
+                return Err(
+                    "Wait for the local data update to finish before restoring a backup."
+                        .to_owned(),
+                );
+            }
+            composition
+                .data_busy_reason()
+                .map(str::to_owned)
+                .map_or(Ok(()), Err)
         });
 
         Ok(controller)
@@ -1059,8 +1305,53 @@ impl DesktopComposition {
         }
     }
 
-    fn build_data(&self) -> Result<DataController, StartupError> {
-        Ok(DataController::new(self.data_service.clone())?)
+    fn build_data(self: &Rc<Self>) -> Result<DataController, StartupError> {
+        let mut controller = DataController::new_background(self.data_service.clone())?;
+        let weak = Rc::downgrade(self);
+        controller.set_on_save_export(move |artifact| {
+            let Some(composition) = weak.upgrade() else {
+                return Ok(false);
+            };
+            composition.save_export(artifact)
+        });
+        let weak = Rc::downgrade(self);
+        controller.set_on_choose_import(move || {
+            let Some(composition) = weak.upgrade() else {
+                return Ok(None);
+            };
+            let Some(path) = composition.dialogs.pick_import_path() else {
+                return Ok(None);
+            };
+            composition
+                .dialogs
+                .read_text(&path)
+                .map(Some)
+                .map_err(|error| error.to_string())
+        });
+        let weak = Rc::downgrade(self);
+        controller.set_on_open_backup(move || {
+            if let Some(composition) = weak.upgrade()
+                && let Some(window) = composition.shell.upgrade()
+            {
+                composition.navigate(&window, Destination::Settings);
+                if let Some(settings) = composition.settings.borrow().as_ref() {
+                    settings.select_route(SettingsRoute::Backup);
+                }
+            }
+        });
+        let weak = Rc::downgrade(self);
+        controller.set_on_data_changed(move |change| {
+            if let Some(composition) = weak.upgrade() {
+                composition.refresh_after_data_change(change);
+            }
+        });
+        let weak = Rc::downgrade(self);
+        controller.set_on_can_operate(move || {
+            weak.upgrade()
+                .and_then(|composition| composition.data_busy_reason().map(str::to_owned))
+                .map_or(Ok(()), Err)
+        });
+        Ok(controller)
     }
 
     // -- Models overlay -----------------------------------------------------
@@ -1086,7 +1377,7 @@ impl DesktopComposition {
         }
     }
 
-    fn build_models(&self) -> Result<ModelManagementController, StartupError> {
+    fn build_models(self: &Rc<Self>) -> Result<ModelManagementController, StartupError> {
         let runtime = &self.services.runtime;
         let models = Arc::new(ModelRepositoryAdapter::from_runtime(runtime));
         let providers = Arc::new(ModelProviderRepository::from_runtime(runtime));
@@ -1098,12 +1389,51 @@ impl DesktopComposition {
         let service = Arc::new(ModelManagementService::new(
             models, providers, discovery, settings,
         ));
-        Ok(ModelManagementController::new(service)?)
+        let controller = ModelManagementController::new_background(service)?;
+        let weak = Rc::downgrade(self);
+        controller.set_on_selected(move |model| {
+            if let Some(composition) = weak.upgrade() {
+                let picker = composition
+                    .models
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(|models| models.state().picker_mode);
+                if picker {
+                    composition.select_chat_model(model);
+                } else {
+                    composition.refresh_chat_configuration();
+                }
+                if let Some(settings) = composition.settings.borrow().as_ref() {
+                    settings.reload();
+                }
+            }
+        });
+        let weak = Rc::downgrade(self);
+        controller.window().on_open_docs(move |url| {
+            if let Some(composition) = weak.upgrade()
+                && let Err(error) = open_external_url(&url)
+            {
+                composition.set_notice(error.to_string());
+            }
+        });
+        let weak = Rc::downgrade(self);
+        controller.window().on_open_providers(move || {
+            if let Some(composition) = weak.upgrade()
+                && let Some(window) = composition.shell.upgrade()
+            {
+                composition.navigate(&window, Destination::Providers);
+            }
+        });
+        Ok(controller)
     }
 
     // -- Commands -----------------------------------------------------------
 
     fn execute(self: &Rc<Self>, window: &ShellWindow, command: Command) -> CommandOutcome {
+        if self.is_data_mutating() && !matches!(command, Command::Quit | Command::StopOrClose) {
+            self.set_notice("Finishing your local data update. Please wait.");
+            return CommandOutcome::Handled;
+        }
         match command {
             Command::NewChat => {
                 self.new_chat(window);
@@ -1166,9 +1496,227 @@ impl DesktopComposition {
     }
 
     fn new_chat(self: &Rc<Self>, window: &ShellWindow) {
-        self.ensure_and_sync(window, Destination::History);
-        if let Some(history) = self.history.borrow().as_ref() {
-            history.window().invoke_new_chat();
+        if self.is_data_mutating() {
+            return;
+        }
+        self.cancel_first_send();
+        self.navigate(window, Destination::Chat);
+        if let Some(chat) = self.chat.borrow().as_ref() {
+            chat.clear();
+            chat.composer_window().invoke_focus_editor();
+        }
+        self.persist_active_conversation(None);
+        self.refresh_chat_configuration();
+        self.set_notice("");
+    }
+
+    fn create_first_conversation(self: &Rc<Self>, send: ComposerSend) {
+        if self.pending_first_send.borrow().is_some() {
+            return;
+        }
+        let request = self.chat_request.get().wrapping_add(1);
+        self.chat_request.set(request);
+        self.chat_creation_jobs
+            .set(self.chat_creation_jobs.get() + 1);
+        *self.pending_first_send.borrow_mut() = Some(send);
+        let runtime = &self.services.runtime;
+        let factory = DefaultConversationFactory::new(
+            runtime.conversations(),
+            runtime.providers(),
+            runtime.models(),
+            runtime.settings(),
+        );
+        let sender = self.event_sender.clone();
+        RuntimeSpawner::new(runtime).spawn_future(Box::pin(async move {
+            let result = factory.create(None).await.map(Box::new);
+            let _ = sender.send(DesktopEvent::ChatCreated { request, result });
+        }));
+    }
+
+    fn cancel_first_send(&self) {
+        let pending = self.pending_first_send.borrow_mut().take();
+        if let Some(send) = pending {
+            self.chat_request
+                .set(self.chat_request.get().wrapping_add(1));
+            if let Some(chat) = self.chat.borrow().as_ref() {
+                chat.restore_unsent_message(send, None);
+            }
+        }
+    }
+
+    fn refresh_chat_configuration(&self) {
+        let Some(chat) = self.chat.borrow().as_ref().cloned() else {
+            return;
+        };
+        let runtime = &self.services.runtime;
+        let Ok(settings) = runtime.settings_store().load() else {
+            return;
+        };
+        let model = settings
+            .default_model_id
+            .as_ref()
+            .and_then(|id| runtime.block_on(runtime.models().get(id)).ok().flatten());
+        let provider = settings
+            .default_provider_id
+            .as_ref()
+            .and_then(|id| runtime.block_on(runtime.providers().get(id)).ok().flatten());
+        let connected = provider.as_ref().is_some_and(|provider| {
+            provider.enabled
+                && (provider.auth_type == ProviderAuthType::None || provider.secret_id.is_some())
+        });
+        let ready = connected
+            && model.as_ref().is_some_and(|model| {
+                !model.hidden && Some(&model.provider_id) == settings.default_provider_id.as_ref()
+            });
+        chat.messages_window().set_needs_setup(!ready);
+        chat.messages_window().set_setup_uses_models(connected);
+        chat.set_default_model(model);
+        chat.set_send_key(settings.send_key);
+        chat.set_show_token_usage(settings.show_token_usage);
+    }
+
+    fn poll_events(self: &Rc<Self>, window: &ShellWindow) {
+        loop {
+            let event = self.events.borrow_mut().try_recv();
+            match event {
+                Ok(DesktopEvent::ChatCreated { request, result }) => {
+                    if request != self.chat_request.get() {
+                        if let Ok(conversation) = result {
+                            let conversations = self.services.runtime.conversations();
+                            let sender = self.event_sender.clone();
+                            RuntimeSpawner::new(&self.services.runtime).spawn_future(Box::pin(
+                                async move {
+                                    let result = conversations.delete(&conversation.id).await;
+                                    let _ =
+                                        sender.send(DesktopEvent::CancelledChatRemoved { result });
+                                },
+                            ));
+                        } else {
+                            self.finish_chat_creation();
+                        }
+                        continue;
+                    }
+                    self.finish_chat_creation();
+                    let Some(mut send) = self.pending_first_send.borrow_mut().take() else {
+                        continue;
+                    };
+                    match result {
+                        Ok(conversation) => {
+                            if self.shell_state.borrow().active == Destination::Chat {
+                                self.open_conversation(window, &conversation.id);
+                            } else {
+                                if let Some(chat) = self.chat.borrow().as_ref() {
+                                    chat.open(&conversation.id);
+                                }
+                                self.persist_active_conversation(Some(&conversation.id));
+                            }
+                            send.conversation_id = conversation.id;
+                            if let Some(chat) = self.chat.borrow().as_ref() {
+                                chat.restore_unsent_message(send, None);
+                                chat.send();
+                            }
+                            if let Some(history) = self.history.borrow().as_ref() {
+                                history.refresh();
+                            }
+                        }
+                        Err(error) => {
+                            if let Some(chat) = self.chat.borrow().as_ref() {
+                                chat.restore_unsent_message(
+                                    send,
+                                    Some(format!("Could not start this chat: {error}")),
+                                );
+                            }
+                        }
+                    }
+                }
+                Ok(DesktopEvent::CancelledChatRemoved { result }) => {
+                    self.finish_chat_creation();
+                    if let Err(error) = result {
+                        self.set_notice(format!("Could not remove the cancelled chat: {error}"));
+                    }
+                    if let Some(history) = self.history.borrow().as_ref() {
+                        history.refresh();
+                    }
+                }
+                Ok(DesktopEvent::ModelChanged {
+                    conversation_id,
+                    result,
+                }) => {
+                    self.model_change_pending.set(false);
+                    if let Some(models) = self.models.borrow().as_ref() {
+                        models.window().set_selection_pending(false);
+                    }
+                    let current = self
+                        .chat
+                        .borrow()
+                        .as_ref()
+                        .filter(|chat| chat.conversation_id().as_deref() == Some(&conversation_id))
+                        .cloned();
+                    if let Some(chat) = current {
+                        chat.set_model_switching(false);
+                        match result {
+                            Ok(()) => {
+                                chat.open(conversation_id);
+                                window.set_show_models(false);
+                                self.refresh_chat_configuration();
+                            }
+                            Err(error) => {
+                                self.set_notice(format!("Could not change the model: {error}"))
+                            }
+                        }
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    }
+
+    fn finish_chat_creation(&self) {
+        self.chat_creation_jobs
+            .set(self.chat_creation_jobs.get().saturating_sub(1));
+    }
+
+    fn select_chat_model(self: &Rc<Self>, model: Model) {
+        if self.model_change_pending.get() {
+            return;
+        }
+        let Some(chat) = self.chat.borrow().as_ref().cloned() else {
+            return;
+        };
+        if let Some(id) = chat.conversation_id() {
+            if chat.state().sending || chat.is_streaming() {
+                self.set_notice("Stop the current response before changing its model.");
+                return;
+            }
+            self.model_change_pending.set(true);
+            chat.set_model_switching(true);
+            if let Some(models) = self.models.borrow().as_ref() {
+                models.window().set_selection_pending(true);
+            }
+            let conversations = self.services.runtime.conversations();
+            let sender = self.event_sender.clone();
+            RuntimeSpawner::new(&self.services.runtime).spawn_future(Box::pin(async move {
+                let result = async {
+                    let mut conversation = conversations.get(&id).await?.ok_or_else(|| {
+                        StorageError::NotFound("The conversation was not found.".to_owned())
+                    })?;
+                    conversation.model_id = model.id;
+                    conversation.provider_id = model.provider_id;
+                    conversation.model_label = model.label;
+                    conversation.updated_at = chatui_domain::Timestamp::now();
+                    conversations.update(&conversation).await
+                }
+                .await;
+                let _ = sender.send(DesktopEvent::ModelChanged {
+                    conversation_id: id,
+                    result,
+                });
+            }));
+        } else {
+            if let Some(window) = self.shell.upgrade() {
+                window.set_show_models(false);
+            }
+            self.refresh_chat_configuration();
         }
     }
 
@@ -1178,67 +1726,140 @@ impl DesktopComposition {
     }
 
     fn export(self: &Rc<Self>, window: &ShellWindow) {
-        let Some(path) = self.dialogs.pick_export_path("chatui-export.json") else {
-            return;
-        };
-
-        match self.data_service.export_all(&ExportRequest::all()) {
-            Ok(artifact) => match self.dialogs.write_text(&path, &artifact.content) {
-                Ok(()) => window.set_notice(
-                    format!(
-                        "Exported {} ({}).",
-                        path.display(),
-                        format_bytes(artifact.summary.bytes as u64)
-                    )
-                    .into(),
-                ),
-                Err(error) => window.set_notice(error.to_string().into()),
-            },
-            Err(error) => window.set_notice(error.to_string().into()),
-        }
-
+        self.navigate(window, Destination::Data);
         if let Some(data) = self.data.borrow().as_ref() {
-            data.reload();
-            data.sync();
+            data.select_section(DataSection::Export);
+            data.window().invoke_export_all();
         }
     }
 
     fn import(self: &Rc<Self>, window: &ShellWindow) {
-        let Some(path) = self.dialogs.pick_import_path() else {
-            return;
-        };
-        let text = match self.dialogs.read_text(&path) {
-            Ok(text) => text,
-            Err(error) => {
-                window.set_notice(error.to_string().into());
-                return;
-            }
-        };
-
-        match self.data_service.import_text(&text, ImportMode::Merge) {
-            Ok(summary) => {
-                window.set_notice(
-                    format!(
-                        "Imported {} conversation(s), {} message(s), and {} attachment(s).",
-                        summary.conversations, summary.messages, summary.attachments
-                    )
-                    .into(),
-                );
-                if let Some(history) = self.history.borrow().as_ref() {
-                    history.refresh();
-                }
-                if let Some(data) = self.data.borrow().as_ref() {
-                    data.reload();
-                    data.sync();
-                }
-                if let Some(chat) = self.chat.borrow().as_ref()
-                    && let Some(id) = chat.conversation_id()
-                {
-                    chat.open(id);
-                }
-            }
-            Err(error) => window.set_notice(error.to_string().into()),
+        self.navigate(window, Destination::Data);
+        if let Some(data) = self.data.borrow().as_ref() {
+            data.select_section(DataSection::Import);
+            data.window().invoke_choose_import_file();
         }
+    }
+
+    fn save_export(&self, artifact: &ExportArtifact) -> Result<bool, String> {
+        let Some(path) = self.dialogs.pick_export_path(&artifact.filename) else {
+            return Ok(false);
+        };
+        self.dialogs
+            .write_text(&path, &artifact.content)
+            .map_err(|error| error.to_string())?;
+        Ok(true)
+    }
+
+    fn refresh_after_data_change(&self, change: DataChange) {
+        let reset = matches!(
+            change,
+            DataChange::Cleared | DataChange::Imported { replaced: true }
+        );
+        if reset {
+            self.cancel_first_send();
+            if let Some(chat) = self.chat.borrow().as_ref() {
+                chat.stop();
+                chat.clear();
+                chat.discard_draft();
+            }
+            let _ = self.services.runtime.block_on(self.drafts.load());
+            self.persist_active_conversation(None);
+        } else if let Some(chat) = self.chat.borrow().as_ref()
+            && let Some(id) = chat.conversation_id()
+        {
+            chat.open(id);
+        }
+        if let Some(history) = self.history.borrow().as_ref() {
+            history.refresh();
+        }
+        if let Some(settings) = self.settings.borrow().as_ref() {
+            settings.reload();
+            if reset {
+                settings.refresh_backup();
+            }
+        }
+        if let Some(models) = self.models.borrow().as_ref() {
+            models.reload();
+        }
+        if let Some(providers) = self.providers.borrow().as_ref() {
+            if reset {
+                providers.reset();
+            } else {
+                providers.reload();
+            }
+        }
+        self.refresh_chat_configuration();
+    }
+
+    fn is_data_mutating(&self) -> bool {
+        self.data.borrow().as_ref().is_some_and(|data| {
+            matches!(
+                data.state().busy,
+                Some(DataOperation::Import | DataOperation::ClearAll | DataOperation::RemoveKey)
+            )
+        }) || self
+            .settings
+            .borrow()
+            .as_ref()
+            .is_some_and(|settings| settings.backup_state().restoring)
+    }
+
+    fn data_busy_reason(&self) -> Option<&'static str> {
+        if self.chat_creation_jobs.get() > 0 {
+            return Some("Wait for the chat update to finish before changing local data.");
+        }
+        if self.model_change_pending.get()
+            || self.pending_first_send.borrow().is_some()
+            || self
+                .chat
+                .borrow()
+                .as_ref()
+                .is_some_and(|chat| chat.state().sending || chat.is_streaming())
+        {
+            return Some("Finish or stop the current response before changing local data.");
+        }
+        if self
+            .providers
+            .borrow()
+            .as_ref()
+            .is_some_and(|providers| providers.window().get_busy())
+        {
+            return Some("Wait for the provider connection to finish before changing local data.");
+        }
+        if self
+            .models
+            .borrow()
+            .as_ref()
+            .is_some_and(|models| models.window().get_loading())
+        {
+            return Some("Wait for model discovery to finish before changing local data.");
+        }
+        if self
+            .settings
+            .borrow()
+            .as_ref()
+            .is_some_and(|settings| settings.backup_state().busy)
+        {
+            return Some("Wait for the backup operation to finish before changing local data.");
+        }
+        if self
+            .history
+            .borrow()
+            .as_ref()
+            .is_some_and(|history| history.state().history.pending_delete.is_some())
+        {
+            return Some("Undo or wait for the pending deletion before changing local data.");
+        }
+        if self
+            .history
+            .borrow()
+            .as_ref()
+            .is_some_and(|history| history.window().get_busy())
+        {
+            return Some("Wait for the conversation update to finish before changing local data.");
+        }
+        None
     }
 
     fn copy_last_response(self: &Rc<Self>, window: &ShellWindow) {
@@ -1308,6 +1929,14 @@ impl DesktopComposition {
     }
 
     fn stop_or_close(self: &Rc<Self>, window: &ShellWindow) {
+        if window.get_show_models() {
+            window.set_show_models(false);
+            return;
+        }
+        if self.pending_first_send.borrow().is_some() {
+            self.cancel_first_send();
+            return;
+        }
         let streaming = self
             .chat
             .borrow()
@@ -1346,7 +1975,9 @@ impl DesktopComposition {
         if let Some(settings) = self.settings.borrow().as_ref() {
             settings.select_route(SettingsRoute::About);
         }
-        window.set_notice(format!("Documentation: {DOCS_URL}").into());
+        if let Err(error) = open_external_url(DOCS_URL) {
+            window.set_notice(error.to_string().into());
+        }
     }
 
     fn about(self: &Rc<Self>, window: &ShellWindow) {
@@ -1380,6 +2011,10 @@ impl DesktopComposition {
     }
 
     fn add_paths(self: &Rc<Self>, paths: &[PathBuf]) {
+        if self.is_data_mutating() {
+            self.set_notice("Wait for the local data update before adding attachments.");
+            return;
+        }
         let Some(chat) = self.chat.borrow().as_ref().cloned() else {
             return;
         };
@@ -1519,11 +2154,40 @@ impl DesktopComposition {
     }
 
     fn poll_controllers(self: &Rc<Self>, window: &ShellWindow) {
+        self.poll_events(window);
+        window.set_navigation_enabled(!self.is_data_mutating());
         if let Some(chat) = self.chat.borrow().as_ref() {
             chat.poll();
+            let state = chat.state();
+            let label = state
+                .model
+                .as_ref()
+                .map(|model| model.label.as_str())
+                .unwrap_or("Choose model");
+            window.set_chat_model_label(label.into());
+            window.set_model_selection_enabled(
+                !state.loading
+                    && !state.sending
+                    && !chat.is_streaming()
+                    && !self.model_change_pending.get(),
+            );
+            window.set_composer_height(chat.composer_window().get_preferred_content_height());
         }
         if let Some(history) = self.history.borrow().as_ref() {
             history.poll();
+        }
+        if let Some(providers) = self.providers.borrow().as_ref() {
+            providers.poll();
+        }
+        if let Some(data) = self.data.borrow().as_ref() {
+            data.set_external_busy(self.data_busy_reason());
+            data.poll();
+        }
+        if let Some(models) = self.models.borrow().as_ref() {
+            models.poll();
+        }
+        if let Some(settings) = self.settings.borrow().as_ref() {
+            settings.poll();
         }
         self.poll_settings(window);
     }
@@ -1553,11 +2217,7 @@ impl DesktopComposition {
         sync_window(window, &self.shell_state.borrow());
 
         if let Some(chat) = self.chat.borrow().as_ref() {
-            let hint = match current.send_key {
-                SendKey::Enter => "Enter to send, Shift+Enter for a new line",
-                SendKey::ModEnter => "Ctrl/Cmd+Enter to send, Enter for a new line",
-            };
-            chat.composer_window().set_send_key_hint(hint.into());
+            chat.set_send_key(current.send_key);
             chat.set_show_token_usage(current.show_token_usage);
         }
 
@@ -1638,17 +2298,21 @@ fn wire_close(controller: &ShellController, composition: &Rc<DesktopComposition>
 }
 
 fn wire_navigation(controller: &ShellController, composition: &Rc<DesktopComposition>) {
+    let weak = Rc::downgrade(composition);
+    let window_weak = controller.window().as_weak();
+    controller.window().on_open_models(move || {
+        if let (Some(composition), Some(window)) = (weak.upgrade(), window_weak.upgrade()) {
+            composition.open_models(&window);
+        }
+    });
     let weak = controller.window().as_weak();
-    let state = controller.state_handle();
     let composition = Rc::clone(composition);
     controller.window().on_navigate(move |index| {
         let Some(destination) = Destination::from_index(index as usize) else {
             return;
         };
-        state.borrow_mut().navigate(destination);
         if let Some(window) = weak.upgrade() {
-            sync_window(&window, &state.borrow());
-            composition.ensure_and_sync(&window, destination);
+            composition.navigate(&window, destination);
         }
     });
 }
@@ -1787,10 +2451,17 @@ fn wire_smoke(controller: &ShellController, composition: &Rc<DesktopComposition>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dialogs::MemoryDialogService;
     use chatui_domain::Theme;
     use window_state::MemoryWindowStateStore;
 
     fn composition() -> (tempfile::TempDir, Rc<DesktopComposition>, ShellController) {
+        composition_with_dialogs(Rc::new(MemoryDialogService::new()))
+    }
+
+    fn composition_with_dialogs(
+        dialogs: Rc<dyn DialogService>,
+    ) -> (tempfile::TempDir, Rc<DesktopComposition>, ShellController) {
         i_slint_backend_testing::init_no_event_loop();
         let directory = tempfile::tempdir().expect("create temporary directory");
         let runtime =
@@ -1804,17 +2475,208 @@ mod tests {
             _profile: None,
         };
         let shell = ShellController::new(ShellState::new(1024.0)).expect("create shell");
-        let composition = Rc::new(
-            DesktopComposition::new(
-                services,
-                shell.state_handle(),
-                shell.window().as_weak(),
-                WindowStateController::new(Box::new(MemoryWindowStateStore::new())),
-                true,
-            )
-            .expect("create composition"),
+        let mut composition = DesktopComposition::new(
+            services,
+            shell.state_handle(),
+            shell.window().as_weak(),
+            WindowStateController::new(Box::new(MemoryWindowStateStore::new())),
+            true,
+        )
+        .expect("create composition");
+        composition.dialogs = dialogs;
+        (directory, Rc::new(composition), shell)
+    }
+
+    fn wait_for(
+        composition: &Rc<DesktopComposition>,
+        shell: &ShellController,
+        mut done: impl FnMut() -> bool,
+    ) {
+        for _ in 0..200 {
+            composition.poll_controllers(shell.window());
+            if done() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        panic!("desktop operation did not finish");
+    }
+
+    #[test]
+    fn new_chat_does_not_create_empty_history_rows_and_failed_first_send_keeps_draft() {
+        let (_directory, composition, shell) = composition();
+        composition.new_chat(shell.window());
+        composition.new_chat(shell.window());
+        assert!(
+            composition
+                .data_service
+                .list_conversations()
+                .expect("conversations")
+                .is_empty()
         );
-        (directory, composition, shell)
+        let chat = composition.chat.borrow().as_ref().cloned().expect("chat");
+        chat.composer_window()
+            .invoke_text_changed("Keep this first message".into());
+        chat.composer_window().invoke_send();
+        assert!(composition.pending_first_send.borrow().is_some());
+        wait_for(&composition, &shell, || {
+            composition.pending_first_send.borrow().is_none()
+        });
+        assert_eq!(chat.composer_window().get_text(), "Keep this first message");
+        assert!(!chat.state().sending);
+        assert!(chat.state().error.is_some());
+        assert!(
+            composition
+                .data_service
+                .list_conversations()
+                .expect("conversations")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn cancelled_first_send_does_not_apply_a_late_creation_result() {
+        let (_directory, composition, shell) = composition();
+        composition.new_chat(shell.window());
+        let chat = composition.chat.borrow().as_ref().cloned().expect("chat");
+        chat.composer_window()
+            .invoke_text_changed("Keep this cancelled draft".into());
+        chat.composer_window().invoke_send();
+        composition.cancel_first_send();
+        assert!(composition.data_busy_reason().is_some());
+        wait_for(&composition, &shell, || {
+            composition.chat_creation_jobs.get() == 0
+        });
+        assert!(composition.data_busy_reason().is_none());
+        assert_eq!(
+            chat.composer_window().get_text(),
+            "Keep this cancelled draft"
+        );
+        assert!(chat.conversation_id().is_none());
+        assert!(!chat.state().sending);
+        assert!(chat.state().error.is_none());
+    }
+
+    #[test]
+    fn cancelled_creation_blocks_data_changes_until_its_late_row_is_removed() {
+        let (_directory, composition, shell) = composition();
+        let now = chatui_domain::Timestamp::now();
+        let conversation = Conversation {
+            id: "cancelled-chat".to_owned(),
+            title: "Cancelled".to_owned(),
+            system_prompt: String::new(),
+            provider_id: "provider".to_owned(),
+            model_id: "model".to_owned(),
+            model_label: "Model".to_owned(),
+            params: Default::default(),
+            pinned: false,
+            archived: false,
+            temporary: false,
+            created_at: now,
+            updated_at: now,
+            last_message_at: now,
+            message_count: 0,
+            last_error: None,
+            sync: None,
+            storage_key: String::new(),
+            revision: 0,
+        };
+        composition
+            .services
+            .runtime
+            .block_on(
+                composition
+                    .services
+                    .runtime
+                    .conversations()
+                    .create(&conversation),
+            )
+            .expect("create late conversation");
+        composition.chat_request.set(2);
+        composition.chat_creation_jobs.set(1);
+        assert!(
+            composition
+                .event_sender
+                .send(DesktopEvent::ChatCreated {
+                    request: 1,
+                    result: Ok(Box::new(conversation)),
+                })
+                .is_ok()
+        );
+        assert!(composition.data_busy_reason().is_some());
+        composition.poll_events(shell.window());
+        wait_for(&composition, &shell, || {
+            composition.chat_creation_jobs.get() == 0
+        });
+        assert!(composition.data_busy_reason().is_none());
+        assert!(
+            composition
+                .services
+                .runtime
+                .block_on(
+                    composition
+                        .services
+                        .runtime
+                        .conversations()
+                        .get("cancelled-chat")
+                )
+                .expect("read cancelled conversation")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn data_screen_export_uses_the_native_save_handler() {
+        let path = PathBuf::from("saved-chatui.json");
+        let dialogs = Rc::new(MemoryDialogService::new().with_export(&path));
+        let (_directory, composition, shell) = composition_with_dialogs(dialogs.clone());
+        composition.navigate(shell.window(), Destination::Data);
+        let data = composition.data.borrow().as_ref().cloned().expect("data");
+        data.window().invoke_export_all();
+        wait_for(&composition, &shell, || data.state().busy.is_none());
+        let json = dialogs.written(&path).expect("saved export");
+        assert!(serde_json::from_str::<serde_json::Value>(&json).is_ok());
+        assert!(data.state().last_export.is_some());
+    }
+
+    #[test]
+    fn menu_import_opens_a_review_instead_of_importing_immediately() {
+        let dialogs = Rc::new(
+            MemoryDialogService::new()
+                .with_import("review.json")
+                .with_file("review.json", "{\"review\":true}"),
+        );
+        let (_directory, composition, shell) = composition_with_dialogs(dialogs);
+        composition.execute(shell.window(), Command::Import);
+        let data = composition.data.borrow().as_ref().cloned().expect("data");
+        assert_eq!(data.state().section(), DataSection::Import);
+        assert_eq!(data.state().import_text, "{\"review\":true}");
+        assert!(data.state().last_import.is_none());
+        assert!(!data.state().replace_confirmed);
+    }
+
+    #[test]
+    fn restoring_local_data_prevents_navigation_until_the_operation_finishes() {
+        let (_directory, composition, shell) = composition();
+        composition.navigate(shell.window(), Destination::Settings);
+        let settings = composition
+            .settings
+            .borrow()
+            .as_ref()
+            .cloned()
+            .expect("settings");
+        settings
+            .window()
+            .invoke_backup_passphrase_changed("test passphrase".into());
+        settings.window().invoke_backup_restore();
+        assert!(composition.is_data_mutating());
+        composition.navigate(shell.window(), Destination::Data);
+        assert_eq!(
+            composition.shell_state.borrow().active,
+            Destination::Settings
+        );
+        wait_for(&composition, &shell, || !composition.is_data_mutating());
+        assert!(settings.backup_state().error.is_some());
     }
 
     #[test]

@@ -110,6 +110,7 @@ class ChatRouteFlowTest {
         composeRule.onAllNodesWithTag(ChatMessageListTestTags.Streaming)
             .assertCountEquals(1)
         composeRule.onNodeWithText("Hi there").assertExists()
+        assertThat(viewModel.state.value.announcement).isEqualTo("Response started")
 
         adapter.events.trySend(StreamEvent.Finish(FinishReason.STOP))
         adapter.events.close()

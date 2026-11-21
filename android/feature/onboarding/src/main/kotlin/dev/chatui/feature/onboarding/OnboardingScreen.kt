@@ -1,97 +1,85 @@
 package dev.chatui.feature.onboarding
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.DarkMode
-import androidx.compose.material.icons.rounded.LightMode
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.SettingsBrightness
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.chatui.core.designsystem.BannerSeverity
 import dev.chatui.core.designsystem.BrandMark
 import dev.chatui.core.designsystem.EmptyState
 import dev.chatui.core.designsystem.ErrorState
+import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
-import dev.chatui.core.designsystem.LocalReducedMotion
-import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.designsystem.SecureScreen
 import dev.chatui.core.designsystem.SkeletonList
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.designsystem.rememberHaptics
 import dev.chatui.core.model.Theme
-import dev.chatui.feature.backup.BackupSettingsRoute
 import dev.chatui.feature.backup.BackupSettingsServiceLike
+import dev.chatui.feature.backup.BackupSetupRoute
 
-/** Test tags exposed by the onboarding screen. */
 object OnboardingTestTags {
     const val Screen = "onboarding-screen"
     const val Welcome = "onboarding-welcome"
@@ -103,6 +91,7 @@ object OnboardingTestTags {
     const val ShowKeyToggle = "onboarding-show-key"
     const val PasteKey = "onboarding-paste-key"
     const val HelpLink = "onboarding-help"
+    const val LabelDisclosure = "onboarding-label-disclosure"
     const val LabelField = "onboarding-label"
     const val ConnectButton = "onboarding-connect"
     const val TestingStatus = "onboarding-testing"
@@ -123,23 +112,15 @@ object OnboardingTestTags {
     const val BackButton = "onboarding-back"
     const val ThemeSelector = "onboarding-theme-selector"
     const val BackupStep = "onboarding-backup-step"
+    const val BackupSetup = "onboarding-backup-setup"
     const val BackupSkip = "onboarding-backup-skip"
     const val BackupUnavailable = "onboarding-backup-unavailable"
 
     fun providerOption(id: String): String = "onboarding-provider-$id"
-
-    fun themeOption(theme: Theme): String =
-        "onboarding-theme-${theme.name.lowercase()}"
+    fun themeOption(theme: Theme): String = "onboarding-theme-${theme.name.lowercase()}"
+    fun catalogModel(id: String): String = "onboarding-catalog-$id"
 }
 
-/**
- * Stateless onboarding screen.
- *
- * The welcome step explains BYOK/on-device storage, offers an appearance
- * choice, and shows the provider picker with OpenRouter preselected. The
- * key-entry step shows the form and public catalog. Successful validation moves
- * to the optional encrypted-backup step before the user starts chatting.
- */
 @Composable
 fun OnboardingScreen(
     state: OnboardingUiState,
@@ -155,32 +136,26 @@ fun OnboardingScreen(
     backupService: BackupSettingsServiceLike? = null,
     modifier: Modifier = Modifier,
 ) {
+    BackHandler(enabled = state.step == OnboardingStep.KEY_ENTRY) {
+        if (!state.testing && !state.connected) onBack()
+    }
     val content: @Composable () -> Unit = {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            CompositionLocalProvider(LocalContentColor provides LocalChatUiColors.current.fgPrimary) {
+        Box(
+            modifier = modifier.fillMaxSize().imePadding(),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides LocalChatUiColors.current.fgPrimary,
+            ) {
                 OnboardingContent(
-                    state = state,
-                    onApiKeyChanged = onApiKeyChanged,
-                    onLabelChanged = onLabelChanged,
-                    onProviderSelected = onProviderSelected,
-                    onThemeSelected = onThemeSelected,
-                    onContinue = onContinue,
-                    onBack = onBack,
-                    onConnect = onConnect,
-                    onRetryCatalog = onRetryCatalog,
-                    onStartChatting = onStartChatting,
-                    backupService = backupService,
-                    modifier = Modifier.widthIn(max = 560.dp).fillMaxSize(),
+                    state, onApiKeyChanged, onLabelChanged, onProviderSelected, onThemeSelected,
+                    onContinue, onBack, onConnect, onRetryCatalog, onStartChatting, backupService,
+                    Modifier.widthIn(max = 560.dp).fillMaxSize(),
                 )
             }
         }
     }
-
-    if (state.step == OnboardingStep.WELCOME) {
-        content()
-    } else {
-        SecureScreen(content = content)
-    }
+    if (state.step == OnboardingStep.WELCOME) content() else SecureScreen(content = content)
 }
 
 @Composable
@@ -196,394 +171,172 @@ private fun OnboardingContent(
     onRetryCatalog: () -> Unit,
     onStartChatting: () -> Unit,
     backupService: BackupSettingsServiceLike?,
-    modifier: Modifier = Modifier,
+    modifier: Modifier,
 ) {
     if (state.step == OnboardingStep.BACKUP) {
-        OnboardingBackupStep(
-            state = state,
-            backupService = backupService,
-            onStartChatting = onStartChatting,
-            modifier = modifier,
-        )
+        OnboardingBackupStep(state, backupService, onStartChatting, modifier)
         return
     }
-
     val dimens = LocalDimens.current
-
-    Column(modifier = modifier.fillMaxSize()) {
+    var catalogExpanded by rememberSaveable { mutableStateOf(false) }
+    Column(modifier) {
         LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .testTag(OnboardingTestTags.Screen),
+            modifier = Modifier.weight(1f).fillMaxWidth().testTag(OnboardingTestTags.Screen),
             contentPadding = PaddingValues(dimens.screenPadding),
-            verticalArrangement = Arrangement.spacedBy(dimens.space5),
+            verticalArrangement = Arrangement.spacedBy(dimens.space3),
         ) {
-            item { StepIndicator(state.step) }
-
-            when (state.step) {
-                OnboardingStep.WELCOME -> {
-                    item { WelcomeHero() }
-                    item { ThemeSelector(state.theme, onThemeSelected) }
-                    item { ProviderPicker(state, onProviderSelected) }
+            item(key = "steps") { StepIndicator(state.step) }
+            if (state.step == OnboardingStep.WELCOME) {
+                item(key = "welcome") { WelcomeHero() }
+                item(key = "provider") { ProviderPicker(state, onProviderSelected) }
+                item(key = "theme") { ThemeSelector(state.theme, onThemeSelected) }
+            } else {
+                item(key = "connection-header") { KeyEntryHeader(state) }
+                item(key = "key-form") {
+                    KeyEntryForm(state, onApiKeyChanged, onLabelChanged, onConnect, onBack)
                 }
-
-                OnboardingStep.KEY_ENTRY -> {
-                    item { KeyEntryHeader(state) }
-                    item {
-                        KeyEntryForm(
-                            state = state,
-                            onApiKeyChanged = onApiKeyChanged,
-                            onLabelChanged = onLabelChanged,
-                            onConnect = onConnect,
-                            onBack = onBack,
-                        )
-                    }
-                    item { CatalogSection(state.catalog, onRetryCatalog) }
+                item(key = "catalog-disclosure") {
+                    OnboardingDisclosure(
+                        title = "View available models",
+                        expanded = catalogExpanded,
+                        onClick = { catalogExpanded = !catalogExpanded },
+                        modifier = Modifier.testTag(OnboardingTestTags.CatalogDisclosure),
+                    )
                 }
-
-                OnboardingStep.BACKUP -> Unit
+                if (catalogExpanded) catalogItems(state, onRetryCatalog)
             }
         }
         if (state.step == OnboardingStep.WELCOME) {
-            HorizontalDivider(color = LocalChatUiColors.current.separator)
+            HorizontalDivider()
             Button(
                 onClick = onContinue,
                 modifier = Modifier
                     .padding(horizontal = dimens.screenPadding, vertical = dimens.space3)
                     .fillMaxWidth()
-                    .heightIn(min = dimens.rowMinHeight)
+                    .heightIn(min = dimens.touchTargetMin)
                     .testTag(OnboardingTestTags.ContinueButton),
-            ) {
-                Text("Get started", style = Typography.headline)
-                Spacer(Modifier.width(dimens.space2))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+            ) { Text("Get started") }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StepIndicator(step: OnboardingStep) {
-    val colors = LocalChatUiColors.current
-    val dimens = LocalDimens.current
-    val reducedMotion = LocalReducedMotion.current
-    val target = when (step) {
-        OnboardingStep.WELCOME -> 1f / 3f
-        OnboardingStep.KEY_ENTRY -> 2f / 3f
-        OnboardingStep.BACKUP -> 1f
-    }
-    val progress by animateFloatAsState(
-        targetValue = target,
-        animationSpec = if (reducedMotion) {
-            androidx.compose.animation.core.snap()
-        } else {
-            MotionSpecs.emphasized()
-        },
-        label = "onboardingStepProgress",
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(OnboardingTestTags.StepIndicator),
-        verticalArrangement = Arrangement.spacedBy(dimens.space2),
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(LocalDimens.current.space3),
+        modifier = Modifier.testTag(OnboardingTestTags.StepIndicator)
+            .semantics { stateDescription = "Step ${step.ordinal + 1} of 3" },
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(dimens.space2)) {
-            StepLabel(
-                text = "Welcome",
-                active = step.ordinal >= OnboardingStep.WELCOME.ordinal,
-                modifier = Modifier.weight(1f),
+        listOf("Welcome", "Connect", "Backup").forEachIndexed { index, label ->
+            Text(
+                label,
+                style = Typography.footnote,
+                color = if (index == step.ordinal) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            StepLabel(
-                text = "Connect",
-                active = step.ordinal >= OnboardingStep.KEY_ENTRY.ordinal,
-                modifier = Modifier.weight(1f),
-            )
-            StepLabel(
-                text = "Backup",
-                active = step == OnboardingStep.BACKUP,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(dimens.space2)) {
-            repeat(3) { index ->
-                LinearProgressIndicator(
-                    progress = { (progress * 3 - index).coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(3.dp)
-                        .clip(CircleShape),
-                    color = colors.accent,
-                    trackColor = colors.separator,
-                    gapSize = 0.dp,
-                    drawStopIndicator = {},
-                )
-            }
         }
     }
-}
-
-@Composable
-private fun StepLabel(
-    text: String,
-    active: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val colors = LocalChatUiColors.current
-    Text(
-        text = text,
-        modifier = modifier,
-        style = Typography.footnote,
-        color = if (active) colors.accent else colors.fgMuted,
-    )
 }
 
 @Composable
 private fun WelcomeHero() {
-    val dimens = LocalDimens.current
-    val colors = LocalChatUiColors.current
-    val reducedMotion = LocalReducedMotion.current
-    val enter = if (reducedMotion) {
-        EnterTransition.None
-    } else {
-        fadeIn(animationSpec = tween(MotionSpecs.emphasizedMillis)) +
-            slideInVertically(
-                animationSpec = tween(MotionSpecs.emphasizedMillis),
-                initialOffsetY = { it / 4 },
-            )
-    }
-
-    AnimatedVisibility(visible = true, enter = enter) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(OnboardingTestTags.Welcome),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(dimens.space3),
-        ) {
-            Row(
-                modifier = Modifier.padding(top = dimens.space2, bottom = dimens.space2),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(dimens.space3),
-            ) {
-                BrandMark(size = 48.dp)
-                Text(
-                    text = "ChatUI",
-                    style = Typography.title2,
-                    color = colors.fgPrimary,
-                )
-            }
-            Text(
-                text = "Your keys. Your device. Your conversations.",
-                style = Typography.title1,
-                color = colors.fgPrimary,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = "Bring your own API key to chat with the models you choose.",
-                style = Typography.callout,
-                color = colors.fgSecondary,
-                textAlign = TextAlign.Center,
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.bgSurface, RoundedCornerShape(dimens.radiusLg))
-                    .padding(dimens.space3),
-                horizontalArrangement = Arrangement.spacedBy(dimens.space3),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Lock,
-                    contentDescription = null,
-                    tint = colors.accent,
-                    modifier = Modifier.size(20.dp),
-                )
-                Text(
-                    text = "Chats and keys stay on this device. Requests go directly " +
-                        "to your provider, never a ChatUI server.",
-                    style = Typography.footnote,
-                    color = colors.fgSecondary,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProviderPicker(
-    state: OnboardingUiState,
-    onProviderSelected: (String) -> Unit,
-) {
-    val dimens = LocalDimens.current
-
     Column(
-        modifier = Modifier
-            .selectableGroup()
-            .testTag(OnboardingTestTags.ProviderPicker),
-        verticalArrangement = Arrangement.spacedBy(dimens.space2),
-    ) {
-        Text(
-            text = "Choose a provider",
-            style = Typography.headline,
-        )
-        Text(
-            text = "You can add other providers from Providers after setup.",
-            style = Typography.footnote,
-            color = LocalChatUiColors.current.fgSecondary,
-        )
-
-        state.providers.forEach { option ->
-            ProviderCard(
-                option = option,
-                selected = option.id == state.selectedProviderId,
-                onClick = { onProviderSelected(option.id) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProviderCard(
-    option: ProviderOption,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val colors = LocalChatUiColors.current
-    val dimens = LocalDimens.current
-    val haptics = rememberHaptics()
-    val reducedMotion = LocalReducedMotion.current
-    val container by androidx.compose.animation.animateColorAsState(
-        targetValue = if (selected) colors.accentSoft else colors.bgSurfaceRaised,
-        animationSpec = if (reducedMotion) {
-            androidx.compose.animation.core.snap()
-        } else {
-            tween(MotionSpecs.fadeThroughMillis)
-        },
-        label = "providerCardColor",
-    )
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = dimens.rowMinHeight)
-            .semantics(mergeDescendants = true) {}
-            .selectable(
-                selected = selected,
-                enabled = option.enabled,
-                role = Role.RadioButton,
-                onClick = {
-                    haptics.tick()
-                    onClick()
-                },
-            )
-            .testTag(OnboardingTestTags.providerOption(option.id)),
-        colors = CardDefaults.cardColors(containerColor = container),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (selected) colors.accent else colors.borderSubtle,
-        ),
-        shape = RoundedCornerShape(dimens.radiusLg),
+        modifier = Modifier.fillMaxWidth().testTag(OnboardingTestTags.Welcome),
+        verticalArrangement = Arrangement.spacedBy(LocalDimens.current.space2),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = dimens.cardPadding, vertical = dimens.space3),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.space3),
+            horizontalArrangement = Arrangement.spacedBy(LocalDimens.current.space2),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(
-                        color = if (selected) colors.accent else colors.bgSurface,
-                        shape = CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = option.label.take(1).uppercase(),
-                    style = Typography.headline,
-                    color = if (selected) colors.fgOnAccent else colors.fgSecondary,
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(dimens.space1),
-            ) {
-                Text(
-                    text = option.label,
-                    style = Typography.headline,
-                    color = if (option.enabled) colors.fgPrimary else colors.fgMuted,
-                )
-                if (option.recommended) {
-                    Box(
+            BrandMark(size = 28.dp)
+            Text("ChatUI", style = Typography.title2)
+        }
+        Text(
+            "Bring your own API key. Chats and keys are stored on your device; " +
+                "requests go directly to your provider, never a ChatUI server.",
+            style = Typography.body,
+        )
+    }
+}
+
+@Composable
+private fun ProviderPicker(state: OnboardingUiState, onProviderSelected: (String) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val haptics = rememberHaptics()
+    Column(verticalArrangement = Arrangement.spacedBy(LocalDimens.current.space1)) {
+        OnboardingDisclosure(
+            title = "Provider: ${state.selectedProvider?.label ?: "OpenRouter"}",
+            expanded = expanded,
+            onClick = { expanded = !expanded },
+            modifier = Modifier.testTag(OnboardingTestTags.ProviderPicker),
+        )
+        if (expanded) {
+            Column(Modifier.selectableGroup()) {
+                state.providers.forEach { option ->
+                    Row(
                         modifier = Modifier
-                            .background(
-                                color = colors.bgSurfaceRaised,
-                                shape = RoundedCornerShape(dimens.radiusFull),
+                            .fillMaxWidth()
+                            .heightIn(min = LocalDimens.current.touchTargetMin)
+                            .selectable(
+                                selected = option.id == state.selectedProviderId,
+                                enabled = option.enabled,
+                                role = Role.RadioButton,
+                                onClick = { haptics.tick(); onProviderSelected(option.id) },
                             )
-                            .padding(horizontal = dimens.space2, vertical = 2.dp),
+                            .semantics(mergeDescendants = true) {}
+                            .padding(vertical = LocalDimens.current.space2)
+                            .testTag(OnboardingTestTags.providerOption(option.id)),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = "Recommended",
-                            style = Typography.caption,
-                            color = colors.fgSecondary,
+                        Column(Modifier.weight(1f)) {
+                            Text(option.label)
+                            if (option.recommended) Text("Recommended", style = Typography.footnote)
+                            option.statusLabel?.let { Text(it, style = Typography.footnote) }
+                        }
+                        RadioButton(
+                            selected = option.id == state.selectedProviderId,
+                            enabled = option.enabled,
+                            onClick = null,
                         )
                     }
                 }
-                option.statusLabel?.takeUnless { option.recommended && it == "Recommended" }?.let { status ->
-                    Text(
-                        text = status,
-                        style = Typography.footnote,
-                        color = colors.fgMuted,
-                    )
-                }
-            }
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Rounded.CheckCircle,
-                    contentDescription = "Selected",
-                    tint = colors.accent,
-                )
             }
         }
+        Text(
+            "You can add other providers from Providers after setup.",
+            style = Typography.footnote,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (state.selectedProviderId != "openrouter") OpenRouterSetupNotice(state)
     }
 }
 
 @Composable
 private fun KeyEntryHeader(state: OnboardingUiState) {
-    val dimens = LocalDimens.current
-    val colors = LocalChatUiColors.current
-
     Column(
         modifier = Modifier.testTag(OnboardingTestTags.KeyEntry),
-        verticalArrangement = Arrangement.spacedBy(dimens.space2),
+        verticalArrangement = Arrangement.spacedBy(LocalDimens.current.space2),
     ) {
+        Text("Connect OpenRouter", style = Typography.title2)
         Text(
-            text = "Connect OpenRouter",
-            style = Typography.title1,
-            color = colors.fgPrimary,
+            "Your key is stored on this device and is never sent to a ChatUI server.",
+            style = Typography.footnote,
         )
-        Text(
-            text = "Your key is stored on this device and is never sent to a " +
-                "ChatUI server.",
-            style = Typography.callout,
-            color = colors.fgSecondary,
-        )
-        state.selectedProvider?.let { provider ->
-            Text(
-                text = "Provider: ${provider.label}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        if (state.selectedProviderId != "openrouter") OpenRouterSetupNotice(state)
     }
 }
 
+@Composable
+private fun OpenRouterSetupNotice(state: OnboardingUiState) {
+    Text(
+        "${state.selectedProvider?.label ?: "This provider"} can be added from Providers after setup. " +
+            "First-run connection currently validates an OpenRouter key.",
+        style = Typography.footnote,
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun KeyEntryForm(
     state: OnboardingUiState,
@@ -592,236 +345,207 @@ private fun KeyEntryForm(
     onConnect: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val colors = LocalChatUiColors.current
     val dimens = LocalDimens.current
-    val reducedMotion = LocalReducedMotion.current
     val clipboard = LocalClipboardManager.current
     val uriHandler = LocalUriHandler.current
     val enabled = !state.testing && !state.connected
     var keyVisible by remember { mutableStateOf(false) }
-    var keyFocused by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = colors.bgSurfaceRaised),
-        border = BorderStroke(
-            width = if (keyFocused) 2.dp else 1.dp,
-            color = if (keyFocused) colors.accent else colors.borderSubtle,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(dimens.cardPadding),
-            verticalArrangement = Arrangement.spacedBy(dimens.space2),
-        ) {
-            OutlinedTextField(
-                value = state.apiKey,
-                onValueChange = onApiKeyChanged,
-                label = { Text("OpenRouter API key") },
-                singleLine = true,
-                visualTransformation = if (keyVisible) {
-                    VisualTransformation.None
-                } else {
-                    PasswordVisualTransformation()
-                },
-                isError = state.error != null,
-                supportingText = {
-                    if (state.apiKey.isBlank()) {
-                        Text("Paste your OpenRouter key to continue.")
-                    } else if (state.error != null) {
-                        Text("Check the key and try again.")
-                    }
-                },
-                trailingIcon = {
-                    IconButton(
-                        onClick = { keyVisible = !keyVisible },
-                        enabled = enabled,
-                        modifier = Modifier.testTag(OnboardingTestTags.ShowKeyToggle),
-                    ) {
-                        Icon(
-                            imageVector = if (keyVisible) {
-                                Icons.Rounded.VisibilityOff
-                            } else {
-                                Icons.Rounded.Visibility
-                            },
-                            contentDescription = if (keyVisible) "Hide key" else "Show key",
-                        )
-                    }
-                },
-                enabled = enabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { keyFocused = it.isFocused }
-                    .testTag(OnboardingTestTags.ApiKeyField),
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(dimens.space2),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(
-                    onClick = {
-                        clipboard.getText()?.text?.let(onApiKeyChanged)
-                    },
+    var labelExpanded by rememberSaveable { mutableStateOf(state.label.isNotBlank()) }
+    Column(verticalArrangement = Arrangement.spacedBy(dimens.space2)) {
+        OutlinedTextField(
+            value = state.apiKey,
+            onValueChange = onApiKeyChanged,
+            label = { Text("OpenRouter API key") },
+            singleLine = true,
+            visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
+            isError = state.error != null,
+            supportingText = {
+                if (state.apiKey.isBlank()) Text("Paste your OpenRouter key to continue.")
+                else if (state.error != null) Text("Check the key and try again.")
+            },
+            trailingIcon = {
+                IconButton(
+                    onClick = { keyVisible = !keyVisible },
                     enabled = enabled,
-                    modifier = Modifier.testTag(OnboardingTestTags.PasteKey),
+                    modifier = Modifier.size(dimens.touchTargetMin).testTag(OnboardingTestTags.ShowKeyToggle),
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.ContentPaste,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                        if (keyVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                        contentDescription = if (keyVisible) "Hide key" else "Show key",
                     )
-                    Spacer(Modifier.width(dimens.space1))
-                    Text("Paste")
                 }
-                TextButton(
-                    onClick = { uriHandler.openUri("https://openrouter.ai/keys") },
-                    modifier = Modifier.testTag(OnboardingTestTags.HelpLink),
-                ) {
-                    Text("Where do I find this?")
-                }
+            },
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth().testTag(OnboardingTestTags.ApiKeyField),
+        )
+        state.error?.let { ErrorCard(it) }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(dimens.space2)) {
+            TextButton(
+                onClick = { clipboard.getText()?.text?.let(onApiKeyChanged) },
+                enabled = enabled,
+                modifier = Modifier.testTag(OnboardingTestTags.PasteKey),
+            ) { Text("Paste") }
+            TextButton(
+                onClick = { uriHandler.openUri("https://openrouter.ai/keys") },
+                modifier = Modifier.testTag(OnboardingTestTags.HelpLink),
+            ) { Text("Where do I find this?") }
+        }
+        Button(
+            onClick = onConnect,
+            enabled = state.canConnect,
+            modifier = Modifier.fillMaxWidth().heightIn(min = dimens.touchTargetMin)
+                .testTag(OnboardingTestTags.ConnectButton)
+                .semantics { liveRegion = LiveRegionMode.Polite },
+        ) {
+            if (state.testing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp).testTag(OnboardingTestTags.TestingStatus),
+                    strokeWidth = 2.dp,
+                )
+                Spacer(Modifier.width(dimens.space2))
             }
-
+            Text(when {
+                state.testing -> "Connecting..."
+                state.connected -> "Connected"
+                else -> "Connect"
+            })
+        }
+        OnboardingDisclosure(
+            title = "Optional label",
+            expanded = labelExpanded,
+            onClick = { labelExpanded = !labelExpanded },
+            modifier = Modifier.testTag(OnboardingTestTags.LabelDisclosure),
+        )
+        if (labelExpanded) {
             OutlinedTextField(
                 value = state.label,
                 onValueChange = onLabelChanged,
                 label = { Text("Label (optional)") },
                 singleLine = true,
                 enabled = enabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(OnboardingTestTags.LabelField),
+                modifier = Modifier.fillMaxWidth().testTag(OnboardingTestTags.LabelField),
             )
-
-            Button(
-                onClick = onConnect,
-                enabled = state.canConnect,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = dimens.touchTargetMin)
-                    .testTag(OnboardingTestTags.ConnectButton),
-            ) {
-                AnimatedContent(
-                    targetState = when {
-                        state.testing -> "Testing"
-                        state.connected -> "Connected"
-                        else -> "Connect"
-                    },
-                    transitionSpec = {
-                        if (reducedMotion) {
-                            EnterTransition.None togetherWith ExitTransition.None
-                        } else {
-                            fadeIn(animationSpec = tween(MotionSpecs.fadeThroughMillis)) togetherWith
-                                fadeOut(animationSpec = tween(MotionSpecs.fadeThroughMillis))
-                        }
-                    },
-                    label = "connectButton",
-                ) { label ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(dimens.space2),
-                    ) {
-                        when (label) {
-                            "Testing" -> CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = LocalContentColor.current,
-                            )
-
-                            "Connected" -> Icon(
-                                imageVector = Icons.Rounded.Check,
-                                contentDescription = null,
-                            )
-
-                            else -> Unit
-                        }
-                        Text(label)
-                    }
-                }
-            }
-
-            if (state.testing) {
-                Row(
-                    modifier = Modifier.testTag(OnboardingTestTags.TestingStatus),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                    Spacer(Modifier.width(dimens.space2))
-                    Text("Testing key…")
-                }
-            }
-
-            if (state.connected) {
-                Text(
-                    text = "Connected. Opening a new chat…",
-                    modifier = Modifier.testTag(OnboardingTestTags.ConnectedStatus),
-                )
-            }
-
-            state.notice?.let { notice ->
-                Text(
-                    text = notice,
-                    modifier = Modifier.testTag(OnboardingTestTags.Notice),
-                )
-            }
-
-            state.error?.let { error ->
-                ErrorCard(error)
-            }
-
-            TextButton(
-                onClick = onBack,
-                enabled = enabled,
-                modifier = Modifier.testTag(OnboardingTestTags.BackButton),
-            ) {
-                Text("Back")
-            }
         }
+        state.notice?.let { Text(it, modifier = Modifier.testTag(OnboardingTestTags.Notice)) }
+        TextButton(
+            onClick = onBack,
+            enabled = enabled,
+            modifier = Modifier.testTag(OnboardingTestTags.BackButton),
+        ) { Text("Back") }
     }
 }
 
 @Composable
 private fun ErrorCard(error: OnboardingErrorCopy) {
-    val dimens = LocalDimens.current
     var showDetails by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(OnboardingTestTags.ErrorCard),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(dimens.space3),
-            verticalArrangement = Arrangement.spacedBy(dimens.space1),
-        ) {
-            Text(
-                text = error.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-            Text(
-                text = error.message,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-            error.details?.let { details ->
-                TextButton(
-                    onClick = { showDetails = !showDetails },
-                    modifier = Modifier.testTag(OnboardingTestTags.ErrorDetailsToggle),
-                ) {
-                    Text(if (showDetails) "Hide details" else "Details")
+    InlineBanner(
+        severity = BannerSeverity.Error,
+        title = error.title,
+        body = error.message,
+        modifier = Modifier.fillMaxWidth().testTag(OnboardingTestTags.ErrorCard),
+        action = error.details?.let { details ->
+            {
+                Column {
+                    TextButton(
+                        onClick = { showDetails = !showDetails },
+                        modifier = Modifier.testTag(OnboardingTestTags.ErrorDetailsToggle),
+                    ) { Text(if (showDetails) "Hide details" else "Details") }
+                    if (showDetails) {
+                        Text(
+                            details,
+                            style = Typography.footnote,
+                            modifier = Modifier.testTag(OnboardingTestTags.ErrorDetails),
+                        )
+                    }
                 }
-                if (showDetails) {
-                    Text(
-                        text = details,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.testTag(OnboardingTestTags.ErrorDetails),
+            }
+        },
+    )
+}
+
+private fun LazyListScope.catalogItems(state: OnboardingUiState, onRetry: () -> Unit) {
+    item(key = "catalog-header") {
+        Column(Modifier.testTag(OnboardingTestTags.Catalog)) {
+            Text("Available models", style = Typography.headline)
+            Text("Public OpenRouter catalog. Browsing does not validate your key.", style = Typography.footnote)
+        }
+    }
+    val models = when (val catalog = state.catalog) {
+        is CatalogUiState.Ready -> catalog.models
+        else -> state.cachedCatalog
+    }
+    when (val catalog = state.catalog) {
+        CatalogUiState.Loading -> item(key = "catalog-loading") {
+            if (models.isEmpty()) {
+                SkeletonList(count = 3, modifier = Modifier.testTag(OnboardingTestTags.CatalogLoading))
+            } else {
+                Text("Refreshing models...", modifier = Modifier.testTag(OnboardingTestTags.CatalogLoading))
+            }
+        }
+        is CatalogUiState.Error -> item(key = "catalog-error") {
+            ErrorState(
+                title = "Could not load models",
+                body = catalog.message,
+                onRetry = onRetry,
+                retryModifier = Modifier.testTag(OnboardingTestTags.RetryCatalog),
+                modifier = Modifier.testTag(OnboardingTestTags.CatalogError),
+            )
+        }
+        is CatalogUiState.Ready -> if (models.isEmpty()) item(key = "catalog-empty") {
+            EmptyState(
+                title = "No models returned",
+                body = "You can still connect; models will load after validation.",
+                modifier = Modifier.testTag(OnboardingTestTags.CatalogEmpty),
+            )
+        }
+    }
+    if (models.isNotEmpty()) {
+        item(key = "catalog-count") {
+            Text("${models.size} models", modifier = Modifier.testTag(OnboardingTestTags.CatalogList))
+        }
+        items(models, key = { "catalog-model-${it.remoteId}" }) { model ->
+            Column(
+                modifier = Modifier.fillMaxWidth().testTag(OnboardingTestTags.catalogModel(model.remoteId)),
+                verticalArrangement = Arrangement.spacedBy(LocalDimens.current.space1),
+            ) {
+                Text(model.label, style = Typography.body)
+                Text(model.remoteId, style = Typography.footnote)
+                Text(
+                    listOfNotNull(
+                        model.contextWindow?.let { "$it context tokens" },
+                        "Free".takeIf { model.isFree },
+                    ).joinToString(" · "),
+                    style = Typography.footnote,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ThemeSelector(theme: Theme, onThemeSelected: (Theme) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Column {
+        OnboardingDisclosure(
+            title = "Appearance: ${theme.name.lowercase().replaceFirstChar { it.uppercase() }}",
+            expanded = expanded,
+            onClick = { expanded = !expanded },
+            modifier = Modifier.testTag(OnboardingTestTags.ThemeSelector),
+        )
+        if (expanded) {
+            FlowRow(
+                modifier = Modifier.selectableGroup(),
+                horizontalArrangement = Arrangement.spacedBy(LocalDimens.current.space2),
+            ) {
+                listOf(Theme.LIGHT, Theme.DARK, Theme.SYSTEM).forEach { option ->
+                    FilterChip(
+                        selected = theme == option,
+                        onClick = { onThemeSelected(option) },
+                        label = { Text(option.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                        modifier = Modifier.heightIn(min = LocalDimens.current.touchTargetMin)
+                            .testTag(OnboardingTestTags.themeOption(option)),
                     )
                 }
             }
@@ -830,215 +554,21 @@ private fun ErrorCard(error: OnboardingErrorCopy) {
 }
 
 @Composable
-private fun CatalogSection(
-    catalog: CatalogUiState,
-    onRetryCatalog: () -> Unit,
-) {
-    val dimens = LocalDimens.current
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(OnboardingTestTags.Catalog),
-        verticalArrangement = Arrangement.spacedBy(dimens.space2),
-    ) {
-        Text(
-            text = "Available models",
-            style = MaterialTheme.typography.titleMedium,
-        )
-
-        when (catalog) {
-            CatalogUiState.Loading -> SkeletonList(
-                modifier = Modifier.testTag(OnboardingTestTags.CatalogLoading),
-                count = 3,
-            )
-
-            is CatalogUiState.Error -> ErrorState(
-                title = "Could not load models",
-                body = catalog.message,
-                onRetry = onRetryCatalog,
-                retryModifier = Modifier.testTag(OnboardingTestTags.RetryCatalog),
-                modifier = Modifier.testTag(OnboardingTestTags.CatalogError),
-            )
-
-            is CatalogUiState.Ready -> if (catalog.models.isEmpty()) {
-                EmptyState(
-                    title = "No models returned",
-                    body = "You can still connect; models will load after validation.",
-                    modifier = Modifier.testTag(OnboardingTestTags.CatalogEmpty),
-                )
-            } else {
-                CatalogList(catalog.models)
-            }
-        }
-    }
-}
-
-@Composable
-private fun CatalogList(models: List<CatalogModel>) {
-    val dimens = LocalDimens.current
-    var showAll by remember(models) { mutableStateOf(false) }
-    val visible = if (showAll) models else models.take(COLLAPSED_MODEL_COUNT)
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(OnboardingTestTags.CatalogList),
-        verticalArrangement = Arrangement.spacedBy(dimens.space1),
-    ) {
-        visible.forEach { model ->
-            CatalogModelRow(model)
-        }
-        if (models.size > COLLAPSED_MODEL_COUNT) {
-            TextButton(
-                onClick = { showAll = !showAll },
-                modifier = Modifier.testTag(OnboardingTestTags.CatalogDisclosure),
-            ) {
-                Text(
-                    if (showAll) {
-                        "Show fewer models"
-                    } else {
-                        "Show all ${models.size} models"
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CatalogModelRow(model: CatalogModel) {
-    val dimens = LocalDimens.current
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = dimens.space1),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = model.label,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = model.remoteId,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (model.isFree) {
-            Text(
-                text = "Free",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ThemeSelector(
-    theme: Theme,
-    onThemeSelected: (Theme) -> Unit,
-) {
-    val dimens = LocalDimens.current
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .selectableGroup()
-            .testTag(OnboardingTestTags.ThemeSelector),
-        verticalArrangement = Arrangement.spacedBy(dimens.space2),
-    ) {
-        Text(
-            text = "Appearance",
-            style = Typography.headline,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(dimens.space2),
-        ) {
-            ThemeOption(
-                theme = Theme.LIGHT,
-                icon = Icons.Rounded.LightMode,
-                label = "Light",
-                selected = theme == Theme.LIGHT,
-                onClick = { onThemeSelected(Theme.LIGHT) },
-                modifier = Modifier.weight(1f),
-            )
-            ThemeOption(
-                theme = Theme.DARK,
-                icon = Icons.Rounded.DarkMode,
-                label = "Dark",
-                selected = theme == Theme.DARK,
-                onClick = { onThemeSelected(Theme.DARK) },
-                modifier = Modifier.weight(1f),
-            )
-            ThemeOption(
-                theme = Theme.SYSTEM,
-                icon = Icons.Rounded.SettingsBrightness,
-                label = "System",
-                selected = theme == Theme.SYSTEM,
-                onClick = { onThemeSelected(Theme.SYSTEM) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ThemeOption(
-    theme: Theme,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    selected: Boolean,
+private fun OnboardingDisclosure(
+    title: String,
+    expanded: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalChatUiColors.current
-    val dimens = LocalDimens.current
-    val haptics = rememberHaptics()
-    val shape = RoundedCornerShape(dimens.radiusMd)
-
-    Row(
-        modifier = modifier
-            .heightIn(min = dimens.touchTargetMin)
-            .clip(shape)
-            .background(
-                color = if (selected) colors.accentSoft else colors.bgSurfaceRaised,
-                shape = shape,
-            )
-            .border(
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = if (selected) colors.accent else colors.borderSubtle,
-                ),
-                shape = shape,
-            )
-            .selectable(
-                selected = selected,
-                role = Role.RadioButton,
-                onClick = {
-                    haptics.tick()
-                    onClick()
-                },
-            )
-            .padding(vertical = dimens.space2, horizontal = dimens.space1)
-            .testTag(OnboardingTestTags.themeOption(theme)),
-        horizontalArrangement = Arrangement.spacedBy(dimens.space1, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
+    TextButton(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().heightIn(min = LocalDimens.current.touchTargetMin)
+            .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
     ) {
+        Text(title, modifier = Modifier.weight(1f))
         Icon(
-            imageVector = icon,
+            if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
             contentDescription = null,
-            tint = if (selected) colors.accent else colors.fgSecondary,
-            modifier = Modifier.size(18.dp),
-        )
-        Text(
-            text = label,
-            style = Typography.footnote,
-            color = if (selected) colors.accent else colors.fgSecondary,
         )
     }
 }
@@ -1048,98 +578,75 @@ private fun OnboardingBackupStep(
     state: OnboardingUiState,
     backupService: BackupSettingsServiceLike?,
     onStartChatting: () -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier,
 ) {
-    val colors = LocalChatUiColors.current
+    var configureBackup by rememberSaveable { mutableStateOf(false) }
+    var restoreFocus by remember { mutableStateOf(false) }
+    val setupFocus = remember { FocusRequester() }
+    val choiceListState = rememberLazyListState()
+    LaunchedEffect(configureBackup, restoreFocus) {
+        if (!configureBackup && restoreFocus) {
+            choiceListState.scrollToItem(3)
+            withFrameNanos { }
+            setupFocus.requestFocus()
+            restoreFocus = false
+        }
+    }
+    if (configureBackup && backupService != null) {
+        BackupSetupRoute(
+            service = backupService,
+            onCancel = { configureBackup = false; restoreFocus = true },
+            onComplete = onStartChatting,
+            modifier = modifier,
+        )
+        return
+    }
     val dimens = LocalDimens.current
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag(OnboardingTestTags.BackupStep),
+    LazyColumn(
+        state = choiceListState,
+        modifier = modifier.testTag(OnboardingTestTags.BackupStep),
+        contentPadding = PaddingValues(dimens.screenPadding),
+        verticalArrangement = Arrangement.spacedBy(dimens.space3),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = dimens.padding, vertical = dimens.padding),
-            verticalArrangement = Arrangement.spacedBy(dimens.space2),
-        ) {
-            StepIndicator(state.step)
-            Text(
-                text = "Back up your conversations",
-                style = Typography.title2,
-                color = colors.fgPrimary,
-            )
-            Text(
-                text = "Optional. Add encrypted remote backup now, or skip and set it " +
-                    "up later in Settings → Backup. Your passphrase never leaves this device.",
-                style = Typography.body,
-                color = colors.fgSecondary,
-            )
-            state.notice?.let { notice ->
-                Text(
-                    text = notice,
-                    style = Typography.footnote,
-                    color = colors.fgMuted,
-                    modifier = Modifier.testTag(OnboardingTestTags.Notice),
-                )
-            }
+        item { StepIndicator(state.step) }
+        item {
+            Text("Connected", style = Typography.footnote, modifier = Modifier.testTag(OnboardingTestTags.ConnectedStatus))
+            Text("Backup is optional", style = Typography.title2)
+            Text("Add encrypted backup now, or later in Settings > Backup.", style = Typography.body)
         }
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-        ) {
-            if (backupService != null) {
-                BackupSettingsRoute(
-                    service = backupService,
-                    setupMode = true,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .testTag(OnboardingTestTags.BackupUnavailable),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "Backup setup is unavailable right now. You can configure " +
-                            "it later in Settings → Backup.",
-                        style = Typography.body,
-                        color = colors.fgSecondary,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(dimens.padding),
-            horizontalArrangement = Arrangement.spacedBy(dimens.space2),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(
-                onClick = onStartChatting,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = dimens.touchTargetMin)
-                    .testTag(OnboardingTestTags.BackupSkip),
-            ) {
-                Text("Skip for now")
-            }
+        item {
             Button(
                 onClick = onStartChatting,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = dimens.touchTargetMin)
+                enabled = state.connected,
+                modifier = Modifier.fillMaxWidth().heightIn(min = dimens.touchTargetMin)
                     .testTag(OnboardingTestTags.StartChattingButton),
-            ) {
-                Text("Start chatting")
-            }
+            ) { Text("Start chatting") }
+        }
+        item {
+            TextButton(
+                onClick = { configureBackup = true },
+                enabled = state.connected && backupService != null,
+                modifier = Modifier.fillMaxWidth().focusRequester(setupFocus)
+                    .heightIn(min = dimens.touchTargetMin).testTag(OnboardingTestTags.BackupSetup),
+            ) { Text("Set up backup") }
+        }
+        item {
+            TextButton(
+                onClick = onStartChatting,
+                enabled = state.connected,
+                modifier = Modifier.fillMaxWidth().heightIn(min = dimens.touchTargetMin)
+                    .testTag(OnboardingTestTags.BackupSkip),
+            ) { Text("Skip for now") }
+        }
+        state.notice?.let { notice ->
+            item { Text(notice, modifier = Modifier.testTag(OnboardingTestTags.Notice)) }
+        }
+        if (backupService == null) item {
+            Text(
+                "Backup setup is unavailable right now. You can configure it later in Settings > Backup.",
+                style = Typography.footnote,
+                modifier = Modifier.testTag(OnboardingTestTags.BackupUnavailable),
+            )
         }
     }
 }
-
-private const val COLLAPSED_MODEL_COUNT = 3

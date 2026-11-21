@@ -1,23 +1,11 @@
 package dev.chatui.feature.chat
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,13 +13,16 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
@@ -41,16 +32,18 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,7 +52,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -70,10 +64,15 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.chatui.core.database.attachment.formatAttachmentSize
@@ -82,10 +81,8 @@ import dev.chatui.core.designsystem.InlineBanner
 import dev.chatui.core.designsystem.LocalChatUiColors
 import dev.chatui.core.designsystem.LocalDimens
 import dev.chatui.core.designsystem.LocalReducedMotion
-import dev.chatui.core.designsystem.MotionSpecs
 import dev.chatui.core.designsystem.Typography
 import dev.chatui.core.designsystem.rememberHaptics
-import dev.chatui.core.designsystem.softShadow
 import dev.chatui.core.model.Attachment
 import dev.chatui.core.model.AttachmentKind
 import dev.chatui.core.model.SendKey
@@ -104,6 +101,7 @@ object ChatComposerTestTags {
     const val Paste = "chat-composer-paste"
     const val AttachmentWarning = "chat-composer-attachment-warning"
     const val AttachmentError = "chat-composer-attachment-error"
+    const val Processing = "chat-composer-processing"
 
     fun attachmentChip(id: String): String = "chat-composer-attachment-$id"
 
@@ -111,15 +109,10 @@ object ChatComposerTestTags {
 }
 
 /**
- * Floating chat composer.
+ * One composer surface with a bounded input viewport and accessory strip.
  *
- * The component is presentational: the draft, send-key mode, streaming flag,
- * pending attachments, and availability come from the ViewModel. Drafts are
- * hoisted to [ChatDrafts] so switching conversations restores what the user
- * typed.
- *
- * Attach and paste live in a bottom sheet opened by the leading `+` button.
- * The trailing circular button morphs between send and stop while streaming.
+ * Text and attachments remain owned by the caller. Send and Stop share an
+ * immediate action target; attachments never block editing or cancellation.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -143,53 +136,321 @@ fun ChatComposer(
     onPasteImage: (() -> Unit)? = null,
     onRemoveAttachment: ((String) -> Unit)? = null,
     onDismissAttachmentError: (() -> Unit)? = null,
+    processingAttachments: Boolean = false,
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
     val haptics = rememberHaptics()
-    val canSend = enabled &&
-        !offline &&
-        !streaming &&
-        !sending &&
+    val canStop = streaming || sending
+    val canSend = enabled && !offline && !canStop && !processingAttachments &&
         (draft.isNotBlank() || attachments.isNotEmpty())
     var sheetOpen by remember { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
-    val reducedMotion = LocalReducedMotion.current
-    val sendInteraction = remember { MutableInteractionSource() }
-    val pressed by sendInteraction.collectIsPressedAsState()
-    val sendScale by animateFloatAsState(
-        targetValue = if (pressed) 0.9f else 1f,
-        animationSpec = if (reducedMotion) snap() else MotionSpecs.springPress,
-        label = "sendScale",
-    )
-    val barShape = RoundedCornerShape(dimens.radiusXl)
+    val attachFocus = remember { FocusRequester() }
+    var restoreAttachFocus by remember { mutableStateOf(false) }
+    val closeSheet = {
+        sheetOpen = false
+        restoreAttachFocus = true
+    }
+    LaunchedEffect(sheetOpen, restoreAttachFocus) {
+        if (!sheetOpen && restoreAttachFocus) {
+            attachFocus.requestFocus()
+            restoreAttachFocus = false
+        }
+    }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val barShape = RoundedCornerShape(dimens.composerRadius)
 
-    Column(
+    BoxWithConstraints(
         modifier = modifier
+            .widthIn(max = 760.dp)
             .fillMaxWidth()
-            .padding(horizontal = dimens.padding, vertical = dimens.space2)
+            .padding(horizontal = dimens.screenPadding, vertical = dimens.densitySpace1)
             .testTag(ChatComposerTestTags.Composer),
-        verticalArrangement = Arrangement.spacedBy(dimens.space2),
     ) {
-        if (offline) {
-            Row(
+        val lineHeight = with(LocalDensity.current) { Typography.body.lineHeight.toDp() }
+        val inputPadding = dimens.densitySpace1.coerceAtMost(
+            ((maxHeight - lineHeight) / 2).coerceAtLeast(0.dp),
+        )
+        val inputMinHeight = maxOf(dimens.touchTargetMin, lineHeight + inputPadding * 2)
+        val rowPadding = dimens.space1.coerceAtMost(
+            ((maxHeight - inputMinHeight) / 2).coerceAtLeast(0.dp),
+        )
+        val inputMaxHeight = (maxHeight * 0.4f).coerceAtLeast(inputMinHeight)
+        val attachmentWidth = maxWidth.coerceAtMost(360.dp)
+        val hasAccessories = offline || attachments.isNotEmpty() || attachmentWarning != null ||
+            attachmentError != null || processingAttachments
+        val accessoryMinHeight = if (attachments.isNotEmpty() || attachmentWarning != null ||
+            attachmentError != null
+        ) dimens.touchTargetMin * 2 else dimens.touchTargetMin
+        val accessoryMaxHeight = (maxHeight * 0.3f).coerceAtLeast(accessoryMinHeight)
+        val collapsedAccessories = maxHeight <
+            inputMinHeight + rowPadding * 2 + dimens.space2 + accessoryMinHeight
+        val accessories: @Composable () -> Unit = {
+            ComposerAccessories(
+                attachments = attachments,
+                attachmentWarning = attachmentWarning,
+                attachmentError = attachmentError,
+                attachmentFile = attachmentFile,
+                onRemoveAttachment = onRemoveAttachment,
+                onChooseAgain = onDismissAttachmentError?.let { dismiss ->
+                    {
+                        dismiss()
+                        sheetOpen = true
+                    }
+                },
+                processing = processingAttachments,
+                offline = offline,
+                maxWidth = attachmentWidth,
+            )
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(dimens.space2),
+        ) {
+            if (hasAccessories && !collapsedAccessories) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .heightIn(max = accessoryMaxHeight)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    accessories()
+                }
+            }
+
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(dimens.radiusMd))
-                    .background(colors.warning.copy(alpha = 0.14f))
-                    .padding(horizontal = dimens.space3, vertical = dimens.space2)
-                    .testTag(ChatComposerTestTags.Offline),
-                verticalAlignment = Alignment.CenterVertically,
+                    .border(
+                        width = 1.dp,
+                        color = if (focused) colors.accent else colors.borderSubtle,
+                        shape = barShape,
+                    ),
+                shape = barShape,
+                color = colors.bgInput,
             ) {
-                Text(
-                    text = "You are offline. Sending is disabled.",
-                    style = Typography.footnote,
-                    color = colors.fgPrimary,
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = dimens.space2, vertical = rowPadding),
+                    horizontalArrangement = Arrangement.spacedBy(dimens.space1),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    IconButton(
+                        onClick = { sheetOpen = true },
+                        enabled = enabled || (collapsedAccessories && hasAccessories),
+                        modifier = Modifier
+                            .sizeIn(minWidth = dimens.touchTargetMin, minHeight = dimens.touchTargetMin)
+                            .focusRequester(attachFocus)
+                            .testTag(ChatComposerTestTags.Attach)
+                            .semantics {
+                                contentDescription = if (collapsedAccessories && hasAccessories) {
+                                    "Attachments"
+                                } else {
+                                    "Add attachment"
+                                }
+                                if (collapsedAccessories && hasAccessories && !sheetOpen) {
+                                    stateDescription = listOfNotNull(
+                                        attachments.takeIf { it.isNotEmpty() }?.let { "${it.size} attachments" },
+                                        "Adding attachments".takeIf { processingAttachments },
+                                        attachmentError,
+                                        attachmentWarning,
+                                        "Offline. Sending is disabled.".takeIf { offline },
+                                    ).joinToString(". ")
+                                    liveRegion = LiveRegionMode.Polite
+                                }
+                            },
+                    ) {
+                        if (collapsedAccessories && hasAccessories && !sheetOpen) {
+                            BadgedBox(
+                                badge = {
+                                    Badge(
+                                        containerColor = colors.bgSurfaceRaised,
+                                        contentColor = colors.fgPrimary,
+                                        modifier = if (processingAttachments) {
+                                            Modifier.testTag(ChatComposerTestTags.Processing)
+                                        } else {
+                                            Modifier
+                                        },
+                                    ) {
+                                        Text(
+                                            when {
+                                                attachmentError != null || attachmentWarning != null -> "!"
+                                                processingAttachments -> "\u2026"
+                                                attachments.isNotEmpty() -> attachments.size.toString()
+                                                else -> "!"
+                                            },
+                                        )
+                                    }
+                                },
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = null, tint = colors.fgSecondary)
+                            }
+                        } else {
+                            Icon(Icons.Rounded.Add, contentDescription = null, tint = colors.fgSecondary)
+                        }
+                    }
+
+                    BasicTextField(
+                        value = draft,
+                        onValueChange = onDraftChange,
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = inputMinHeight, max = inputMaxHeight)
+                            .onFocusChanged { focused = it.isFocused }
+                            .testTag(ChatComposerTestTags.Input)
+                            .onPreviewKeyEvent { event ->
+                                if (event.type != KeyEventType.KeyDown || event.key != Key.Enter ||
+                                    event.isShiftPressed
+                                ) {
+                                    return@onPreviewKeyEvent false
+                                }
+                                val shouldSend = sendKey == SendKey.ENTER ||
+                                    event.isCtrlPressed || event.isMetaPressed
+                                if (shouldSend && canSend) {
+                                    onSend()
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
+                        enabled = enabled,
+                        textStyle = Typography.body.copy(color = colors.fgPrimary),
+                        minLines = 1,
+                        maxLines = 8,
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = if (sendKey == SendKey.ENTER) ImeAction.Send else ImeAction.Default,
+                        ),
+                        keyboardActions = if (sendKey == SendKey.ENTER) {
+                            KeyboardActions(onSend = { if (canSend) onSend() })
+                        } else {
+                            KeyboardActions()
+                        },
+                        decorationBox = { innerTextField ->
+                            Box(Modifier.padding(vertical = inputPadding)) {
+                                if (draft.isEmpty()) {
+                                    Text("Message…", style = Typography.body, color = colors.fgMuted)
+                                }
+                                innerTextField()
+                            }
+                        },
+                    )
+
+                    IconButton(
+                        onClick = {
+                            if (canStop) {
+                                onStop()
+                            } else {
+                                haptics.confirm()
+                                onSend()
+                            }
+                        },
+                        enabled = canStop || canSend,
+                        modifier = Modifier
+                            .sizeIn(minWidth = dimens.touchTargetMin, minHeight = dimens.touchTargetMin)
+                            .testTag(if (canStop) ChatComposerTestTags.Stop else ChatComposerTestTags.Send)
+                            .semantics { contentDescription = if (canStop) "Stop response" else "Send message" },
+                    ) {
+                        if (canStop) {
+                            Icon(Icons.Rounded.Stop, contentDescription = null, tint = colors.fgPrimary)
+                        } else {
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowUpward,
+                                contentDescription = null,
+                                tint = if (canSend) colors.fgOnAccent else colors.fgMuted,
+                                modifier = Modifier.size(28.dp).clip(CircleShape)
+                                    .background(if (canSend) colors.accent else colors.bgSurfaceRaised)
+                                    .padding(5.dp),
+                            )
+                        }
+                    }
+                }
             }
         }
+        if (sheetOpen) {
+            ModalBottomSheet(onDismissRequest = closeSheet, sheetState = sheetState) {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = dimens.space5),
+                ) {
+                    if (collapsedAccessories && hasAccessories) {
+                        Column(
+                            modifier = Modifier.padding(dimens.screenPadding),
+                            verticalArrangement = Arrangement.spacedBy(dimens.space2),
+                        ) {
+                            Text("Attachments and status", style = Typography.title3)
+                            accessories()
+                        }
+                    }
+                    if (onAddPhoto != null) {
+                        SheetAction(Icons.Rounded.Image, "Photo", ChatComposerTestTags.AttachPhoto, enabled) {
+                            closeSheet()
+                            onAddPhoto()
+                        }
+                    }
+                    if (onAddFile != null) {
+                        SheetAction(Icons.Rounded.AttachFile, "File", ChatComposerTestTags.AttachFile, enabled) {
+                            closeSheet()
+                            onAddFile()
+                        }
+                    }
+                    if (onPasteImage != null) {
+                        SheetAction(Icons.Rounded.ContentPaste, "Paste", ChatComposerTestTags.Paste, enabled) {
+                            closeSheet()
+                            onPasteImage()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
+@Composable
+private fun ComposerAccessories(
+    attachments: List<Attachment>,
+    attachmentWarning: String?,
+    attachmentError: String?,
+    attachmentFile: (String) -> File?,
+    onRemoveAttachment: ((String) -> Unit)?,
+    onChooseAgain: (() -> Unit)?,
+    processing: Boolean,
+    offline: Boolean,
+    maxWidth: Dp,
+) {
+    val dimens = LocalDimens.current
+    val colors = LocalChatUiColors.current
+    val reducedMotion = LocalReducedMotion.current
+    Column(verticalArrangement = Arrangement.spacedBy(dimens.space2)) {
+        if (processing) {
+            Text(
+                text = "Adding attachments...",
+                style = Typography.footnote,
+                color = colors.fgSecondary,
+                modifier = Modifier.testTag(ChatComposerTestTags.Processing)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        attachmentError?.let { error ->
+            InlineBanner(
+                severity = BannerSeverity.Error,
+                title = "Attachment failed",
+                body = error,
+                modifier = Modifier.testTag(ChatComposerTestTags.AttachmentError),
+                action = onChooseAgain?.let { chooseAgain ->
+                    { TextButton(onClick = chooseAgain) { Text("Choose again") } }
+                },
+            )
+        }
+        if (offline) {
+            Text(
+                text = "You are offline. Sending is disabled.",
+                style = Typography.footnote,
+                color = colors.fgSecondary,
+                modifier = Modifier.testTag(ChatComposerTestTags.Offline),
+            )
+        }
         if (attachments.isNotEmpty()) {
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -199,15 +460,15 @@ fun ChatComposer(
                     AttachmentChip(
                         attachment = attachment,
                         file = attachmentFile(attachment.id),
-                        onRemove = onRemoveAttachment?.let { remove ->
-                            { remove(attachment.id) }
-                        },
-                        modifier = Modifier.animateItem(),
+                        onRemove = onRemoveAttachment?.let { remove -> { remove(attachment.id) } },
+                        maxWidth = maxWidth,
+                        modifier = if (reducedMotion) Modifier else Modifier.animateItem(
+                            placementSpec = tween(160),
+                        ),
                     )
                 }
             }
         }
-
         attachmentWarning?.let { warning ->
             InlineBanner(
                 severity = BannerSeverity.Warning,
@@ -215,239 +476,6 @@ fun ChatComposer(
                 body = warning,
                 modifier = Modifier.testTag(ChatComposerTestTags.AttachmentWarning),
             )
-        }
-
-        attachmentError?.let { error ->
-            InlineBanner(
-                severity = BannerSeverity.Error,
-                title = "Attachment failed",
-                body = error,
-                modifier = Modifier.testTag(ChatComposerTestTags.AttachmentError),
-                action = onDismissAttachmentError?.let { dismiss ->
-                    {
-                        TextButton(onClick = dismiss) {
-                            Text("Dismiss")
-                        }
-                    }
-                },
-            )
-        }
-
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .softShadow(dimens.elevation2, barShape)
-                .border(
-                    width = 1.dp,
-                    color = if (focused) colors.accent else colors.borderSubtle,
-                    shape = barShape,
-                ),
-            shape = barShape,
-            color = colors.bgInput,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = dimens.space2, vertical = dimens.space1),
-                horizontalArrangement = Arrangement.spacedBy(dimens.space1),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                IconButton(
-                    onClick = { sheetOpen = true },
-                    enabled = enabled,
-                    modifier = Modifier
-                        .heightIn(min = dimens.touchTargetMin)
-                        .testTag(ChatComposerTestTags.Attach)
-                        .semantics { contentDescription = "Add attachment" },
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Add,
-                        contentDescription = null,
-                        tint = colors.fgSecondary,
-                    )
-                }
-
-                BasicTextField(
-                    value = draft,
-                    onValueChange = onDraftChange,
-                    modifier = Modifier
-                        .weight(1f)
-                        .onFocusChanged { focused = it.isFocused }
-                        .testTag(ChatComposerTestTags.Input)
-                        .onPreviewKeyEvent { event ->
-                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                            if (event.key != Key.Enter) return@onPreviewKeyEvent false
-                            if (event.isShiftPressed) return@onPreviewKeyEvent false
-
-                            val modifierPressed = event.isCtrlPressed || event.isMetaPressed
-                            val shouldSend = sendKey == SendKey.ENTER || modifierPressed
-
-                            if (!shouldSend || !canSend) {
-                                false
-                            } else {
-                                onSend()
-                                true
-                            }
-                        },
-                    enabled = enabled,
-                    textStyle = Typography.body.copy(color = colors.fgPrimary),
-                    minLines = 1,
-                    maxLines = 8,
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = if (sendKey == SendKey.ENTER) {
-                            ImeAction.Send
-                        } else {
-                            ImeAction.Default
-                        },
-                    ),
-                    keyboardActions = if (sendKey == SendKey.ENTER) {
-                        KeyboardActions(
-                            onSend = {
-                                if (canSend) onSend()
-                            },
-                        )
-                    } else {
-                        KeyboardActions()
-                    },
-                    decorationBox = { innerTextField ->
-                        Box(
-                            modifier = Modifier.padding(vertical = dimens.space2),
-                        ) {
-                            if (draft.isEmpty()) {
-                                Text(
-                                    text = "Message…",
-                                    style = Typography.body,
-                                    color = colors.fgMuted,
-                                )
-                            }
-                            innerTextField()
-                        }
-                    },
-                )
-
-                Box(
-                    modifier = Modifier
-                        .animateContentSize(
-                            animationSpec = if (reducedMotion) {
-                                snap()
-                            } else {
-                                MotionSpecs.springGentleSize
-                            },
-                        )
-                        .graphicsLayer {
-                            scaleX = sendScale
-                            scaleY = sendScale
-                        },
-                ) {
-                    AnimatedContent(
-                        targetState = streaming || sending,
-                        transitionSpec = {
-                            if (reducedMotion) {
-                                EnterTransition.None togetherWith ExitTransition.None
-                            } else {
-                                (
-                                    fadeIn(tween(MotionSpecs.dialogMillis)) +
-                                        scaleIn(
-                                            initialScale = 0.8f,
-                                            animationSpec = MotionSpecs.springPress,
-                                        )
-                                    ) togetherWith (
-                                    fadeOut(tween(MotionSpecs.dialogMillis)) +
-                                        scaleOut(
-                                            targetScale = 0.8f,
-                                            animationSpec = MotionSpecs.springPress,
-                                        )
-                                    )
-                            }
-                        },
-                        label = "sendStopMorph",
-                    ) { isStreaming ->
-                        if (isStreaming) {
-                            IconButton(
-                                onClick = onStop,
-                                modifier = Modifier
-                                    .heightIn(min = dimens.touchTargetMin)
-                                    .testTag(ChatComposerTestTags.Stop)
-                                    .semantics { contentDescription = "Stop response" },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Stop,
-                                    contentDescription = null,
-                                    tint = colors.fgPrimary,
-                                )
-                            }
-                        } else {
-                            IconButton(
-                                onClick = {
-                                    haptics.confirm()
-                                    onSend()
-                                },
-                                enabled = canSend,
-                                interactionSource = sendInteraction,
-                                modifier = Modifier
-                                    .heightIn(min = dimens.touchTargetMin)
-                                    .testTag(ChatComposerTestTags.Send)
-                                    .semantics { contentDescription = "Send message" },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.ArrowUpward,
-                                    contentDescription = null,
-                                    tint = if (canSend) colors.fgOnAccent else colors.fgMuted,
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (canSend) colors.accent else colors.bgSurfaceRaised,
-                                        )
-                                        .padding(5.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (sheetOpen) {
-        ModalBottomSheet(
-            onDismissRequest = { sheetOpen = false },
-            sheetState = sheetState,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = dimens.space5),
-            ) {
-                if (onAddPhoto != null) {
-                    SheetAction(
-                        icon = Icons.Rounded.Image,
-                        label = "Photo",
-                        tag = ChatComposerTestTags.AttachPhoto,
-                    ) {
-                        sheetOpen = false
-                        onAddPhoto()
-                    }
-                }
-                if (onAddFile != null) {
-                    SheetAction(
-                        icon = Icons.Rounded.AttachFile,
-                        label = "File",
-                        tag = ChatComposerTestTags.AttachFile,
-                    ) {
-                        sheetOpen = false
-                        onAddFile()
-                    }
-                }
-                if (onPasteImage != null) {
-                    SheetAction(
-                        icon = Icons.Rounded.ContentPaste,
-                        label = "Paste",
-                        tag = ChatComposerTestTags.Paste,
-                    ) {
-                        sheetOpen = false
-                        onPasteImage()
-                    }
-                }
-            }
         }
     }
 }
@@ -457,28 +485,18 @@ private fun SheetAction(
     icon: ImageVector,
     label: String,
     tag: String,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
     TextButton(
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = dimens.touchTargetMin)
-            .testTag(tag),
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().heightIn(min = dimens.touchTargetMin).testTag(tag),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = colors.fgSecondary,
-            modifier = Modifier.size(20.dp),
-        )
-        Text(
-            text = label,
-            style = Typography.body,
-            modifier = Modifier.padding(start = dimens.space3),
-        )
+        Icon(icon, contentDescription = null, tint = colors.fgSecondary, modifier = Modifier.size(20.dp))
+        Text(label, style = Typography.body, modifier = Modifier.padding(start = dimens.space3))
     }
 }
 
@@ -487,82 +505,50 @@ private fun AttachmentChip(
     attachment: Attachment,
     file: File?,
     onRemove: (() -> Unit)?,
+    maxWidth: Dp,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
     val colors = LocalChatUiColors.current
     val shape = RoundedCornerShape(dimens.radiusMd)
-
-    Box(
+    Row(
         modifier = modifier
-            .size(72.dp)
+            .widthIn(min = maxWidth.coerceAtMost(240.dp), max = maxWidth)
             .clip(shape)
             .background(colors.bgSurfaceRaised)
+            .padding(dimens.space2)
             .testTag(ChatComposerTestTags.attachmentChip(attachment.id)),
+        horizontalArrangement = Arrangement.spacedBy(dimens.space2),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         if (attachment.kind == AttachmentKind.IMAGE && file != null) {
-            val request = rememberChatImageRequest(
-                file = file,
-                maxWidth = 72.dp,
-                maxHeight = 72.dp,
-            )
             AsyncImage(
-                model = request,
-                contentDescription = attachment.name,
+                model = rememberChatImageRequest(file, maxWidth = 48.dp, maxHeight = 48.dp),
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(72.dp),
+                modifier = Modifier.size(48.dp).clip(shape),
             )
         } else {
-            Column(
-                modifier = Modifier
-                    .size(72.dp)
-                    .padding(dimens.space2),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.InsertDriveFile,
-                    contentDescription = null,
-                    tint = colors.fgSecondary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Text(
-                    text = attachment.name,
-                    style = Typography.caption,
-                    color = colors.fgSecondary,
-                    maxLines = 1,
-                )
-                Text(
-                    text = formatAttachmentSize(attachment.size),
-                    style = Typography.caption,
-                    color = colors.fgMuted,
-                    maxLines = 1,
-                )
-            }
+            Icon(
+                Icons.Rounded.InsertDriveFile,
+                contentDescription = null,
+                tint = colors.fgSecondary,
+                modifier = Modifier.size(22.dp),
+            )
         }
-
+        Column(Modifier.weight(1f)) {
+            Text(attachment.name, style = Typography.caption, color = colors.fgSecondary)
+            Text(formatAttachmentSize(attachment.size), style = Typography.caption, color = colors.fgMuted)
+        }
         if (onRemove != null) {
             IconButton(
                 onClick = onRemove,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .sizeIn(
-                        minWidth = dimens.touchTargetMin,
-                        minHeight = dimens.touchTargetMin,
-                    )
+                    .sizeIn(minWidth = dimens.touchTargetMin, minHeight = dimens.touchTargetMin)
                     .testTag(ChatComposerTestTags.removeAttachment(attachment.id))
                     .semantics { contentDescription = "Remove ${attachment.name}" },
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Close,
-                    contentDescription = null,
-                    tint = colors.fgOnAccent,
-                    modifier = Modifier
-                        .size(16.dp)
-                        .clip(CircleShape)
-                        .background(colors.scrim)
-                        .padding(2.dp),
-                )
+                Icon(Icons.Rounded.Close, contentDescription = null, tint = colors.fgSecondary)
             }
         }
     }

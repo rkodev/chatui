@@ -28,7 +28,8 @@ use crate::conversations::history::{ConversationHistory, HistoryState, HistorySt
 use crate::conversations::search::{ConversationSearchService, ConversationSearchState};
 
 slint::slint! {
-    import { Button, LineEdit, Palette, ScrollView } from "std-widgets.slint";
+    import { AppButton as Button, AppText as Text, Design } from "../design.slint";
+    import { LineEdit, Palette, ScrollView } from "std-widgets.slint";
 
     export struct HistoryRow {
         id: string,
@@ -50,8 +51,8 @@ slint::slint! {
 
     export component HistoryWindow inherits Window {
         title: "ChatUI history";
-        width: 420px;
-        height: 760px;
+        preferred-width: 420px;
+        preferred-height: 760px;
 
         in property <[HistoryRow]> rows: [];
         in property <bool> archived: false;
@@ -70,7 +71,7 @@ slint::slint! {
         in property <bool> search-truncated: false;
         in property <bool> dark: false;
 
-        background: root.dark ? #0f1115 : #ffffff;
+        background: Design.colors(root.dark).canvas;
         init => {
             Palette.color-scheme = root.dark ? ColorScheme.dark : ColorScheme.light;
         }
@@ -87,6 +88,7 @@ slint::slint! {
         callback commit-rename();
         callback cancel-rename();
         callback toggle-archive(string);
+        callback toggle-pin(string);
         callback delete-conversation(string);
         callback undo-delete();
         callback search-query-changed(string);
@@ -94,21 +96,27 @@ slint::slint! {
         callback clear-search();
         callback open-search-result(string);
 
-        VerticalLayout {
-            padding: 12px;
-            spacing: 8px;
+        ScrollView {
+          content-width: self.width;
+          VerticalLayout {
+            padding: 16px;
+            spacing: 12px;
+            alignment: start;
 
             HorizontalLayout {
                 spacing: 8px;
 
                 Button {
                     text: "New chat";
+                    primary: true;
+                    icon-kind: 5;
                     enabled: !root.busy;
                     clicked => { root.new-chat(); }
                 }
 
                 Button {
                     text: root.archived ? "Show active" : "Show archived";
+                    enabled: !root.busy;
                     clicked => { root.toggle-archived(); }
                 }
             }
@@ -138,7 +146,7 @@ slint::slint! {
 
             if (!root.search-status.is-empty) : Text {
                 text: root.search-status;
-                color: root.dark ? #9ca3af : #5f6368;
+                color: Design.colors(root.dark).muted;
                 wrap: word-wrap;
                 accessible-live-region: polite;
             }
@@ -150,29 +158,40 @@ slint::slint! {
                     spacing: 4px;
 
                     for result in root.search-results : Rectangle {
-                        height: 52px;
-                        background: transparent;
-                        border-radius: 6px;
+                        height: 88px;
+                        background: Design.colors(root.dark).raised;
+                        border-radius: 10px;
+                        border-width: 1px;
+                        border-color: Design.colors(root.dark).border;
 
                         TouchArea {
+                            enabled: !root.busy;
                             clicked => { root.open-search-result(result.conversation-id); }
                         }
 
                         VerticalLayout {
-                            padding: 4px;
-                            spacing: 2px;
+                            padding: 8px;
+                            spacing: 4px;
 
-                            Text {
+                            Button {
                                 text: result.title;
-                                font-weight: 600;
-                                overflow: elide;
+                                align-left: true;
+                                quiet: true;
+                                min-width: 0px;
+                                min-height: 32px;
+                                preferred-height: 32px;
+                                horizontal-stretch: 1;
+                                enabled: !root.busy;
+                                clicked => { root.open-search-result(result.conversation-id); }
                             }
 
                             Text {
                                 text: result.snippet;
-                                color: root.dark ? #9ca3af : #5f6368;
+                                color: Design.colors(root.dark).muted;
                                 font-size: 12px;
                                 wrap: word-wrap;
+                                overflow: elide;
+                                height: 32px;
                             }
                         }
                     }
@@ -181,25 +200,25 @@ slint::slint! {
 
             if (!root.error.is-empty) : Text {
                 text: root.error;
-                color: root.dark ? #f87171 : #b91c1c;
+                color: Design.colors(root.dark).danger;
                 wrap: word-wrap;
                 accessible-live-region: assertive;
             }
 
             if (root.loading) : Text {
                 text: "Loading conversations...";
-                color: root.dark ? #9ca3af : #5f6368;
+                color: Design.colors(root.dark).muted;
                 accessible-live-region: polite;
             }
 
             if (root.empty && !root.loading) : Text {
                 text: root.archived ? "No archived conversations." : "No conversations yet. Start a new chat.";
-                color: root.dark ? #9ca3af : #5f6368;
+                color: Design.colors(root.dark).muted;
                 wrap: word-wrap;
             }
 
             if (!root.pending-delete-title.is-empty) : Rectangle {
-                background: root.dark ? #3a2d12 : #fef3c7;
+                background: Design.colors(root.dark).warning-soft;
                 border-radius: 6px;
 
                 HorizontalLayout {
@@ -250,73 +269,114 @@ slint::slint! {
                 }
             }
 
-            ScrollView {
-                VerticalLayout {
-                    spacing: 2px;
+            Rectangle {
+                height: history-rows.preferred-height;
+                history-rows := VerticalLayout {
+                    spacing: 8px;
 
                     for row in root.rows : Rectangle {
-                        height: row.is-header ? 24px : 44px;
-                        background: row.active ? (root.dark ? #1f232b : #f7f7f8) : transparent;
-                        border-radius: 6px;
+                        height: row.is-header ? 28px : 112px;
+                        background: row.is-header ? transparent : row.active ? Design.colors(root.dark).accent-soft : Design.colors(root.dark).raised;
+                        border-radius: 12px;
+                        border-width: row.is-header ? 0px : 1px;
+                        border-color: row.active ? Design.colors(root.dark).accent : Design.colors(root.dark).border;
 
                         if (row.is-header) : Text {
                             text: row.title;
-                            color: root.dark ? #9ca3af : #5f6368;
+                            color: Design.colors(root.dark).muted;
                             font-size: 12px;
+                            font-weight: 600;
                             vertical-alignment: center;
                             x: 8px;
                         }
 
                         if (!row.is-header) : TouchArea {
+                            enabled: !root.busy;
                             clicked => { root.select-conversation(row.id); }
                         }
 
-                        if (!row.is-header) : HorizontalLayout {
-                            padding-left: 8px;
-                            padding-right: 8px;
-                            spacing: 6px;
-
-                            Text {
+                        if (!row.is-header) : VerticalLayout {
+                            padding: 10px;
+                            spacing: 4px;
+                            Button {
                                 text: row.title;
-                                vertical-alignment: center;
+                                quiet: true;
+                                align-left: true;
+                                min-width: 0px;
+                                min-height: 32px;
+                                preferred-height: 32px;
                                 horizontal-stretch: 1;
-                                overflow: elide;
+                                enabled: !root.busy;
+                                clicked => { root.select-conversation(row.id); }
                             }
 
+                            HorizontalLayout {
+                              spacing: 8px;
                             if (row.draft) : Text {
                                 text: "Draft";
-                                color: root.dark ? #fbbf24 : #b45309;
+                                color: Design.colors(root.dark).warning;
                                 font-size: 11px;
                                 vertical-alignment: center;
                             }
 
                             if (row.pinned) : Text {
                                 text: "Pinned";
-                                color: root.dark ? #9ca3af : #5f6368;
+                                color: Design.colors(root.dark).muted;
                                 font-size: 11px;
                                 vertical-alignment: center;
                             }
 
                             Text {
                                 text: row.timestamp;
-                                color: root.dark ? #9ca3af : #5f6368;
+                                color: Design.colors(root.dark).muted;
                                 font-size: 11px;
                                 vertical-alignment: center;
                             }
+                            Rectangle { horizontal-stretch: 1; }
+                            }
 
+                            HorizontalLayout {
+                              spacing: 4px;
+                            Button {
+                                text: row.pinned ? "Unpin" : "Pin";
+                                quiet: true;
+                                min-width: 0px;
+                                min-height: 30px;
+                                preferred-height: 30px;
+                                enabled: !root.busy;
+                                clicked => { root.toggle-pin(row.id); }
+                            }
                             Button {
                                 text: "Rename";
+                                quiet: true;
+                                min-width: 0px;
+                                min-height: 30px;
+                                preferred-height: 30px;
+                                enabled: !root.busy;
                                 clicked => { root.begin-rename(row.id); }
                             }
 
                             Button {
                                 text: row.archived ? "Unarchive" : "Archive";
+                                quiet: true;
+                                min-width: 0px;
+                                min-height: 30px;
+                                preferred-height: 30px;
+                                enabled: !root.busy;
                                 clicked => { root.toggle-archive(row.id); }
                             }
 
                             Button {
                                 text: "Delete";
+                                quiet: true;
+                                danger: true;
+                                min-width: 0px;
+                                min-height: 30px;
+                                preferred-height: 30px;
+                                enabled: !root.busy;
                                 clicked => { root.delete-conversation(row.id); }
+                            }
+                            Rectangle { horizontal-stretch: 1; }
                             }
                         }
                     }
@@ -331,10 +391,11 @@ slint::slint! {
 
             if (!root.status.is-empty) : Text {
                 text: root.status;
-                color: root.dark ? #9ca3af : #5f6368;
+                color: Design.colors(root.dark).muted;
                 wrap: word-wrap;
                 accessible-live-region: polite;
             }
+          }
         }
     }
 }
@@ -667,6 +728,34 @@ fn spawn_archive(
             history.state().clone()
         };
 
+        let _ = sender.send(HistorySnapshot {
+            history: history_state,
+            search: None,
+            busy: false,
+            notice: None,
+            navigation: None,
+            clear_rename: false,
+        });
+    }));
+}
+
+fn spawn_pin(
+    history: Arc<tokio::sync::Mutex<ConversationHistory>>,
+    runtime: Arc<dyn HistoryRuntime>,
+    sender: Sender<HistorySnapshot>,
+    conversation_id: String,
+    pinned: bool,
+) {
+    runtime.spawn(Box::pin(async move {
+        let history_state = {
+            let mut history = history.lock().await;
+            let result = history.set_pinned(&conversation_id, pinned).await;
+            let mut state = history.state().clone();
+            if let Err(error) = result {
+                state.error = Some(error.to_string());
+            }
+            state
+        };
         let _ = sender.send(HistorySnapshot {
             history: history_state,
             search: None,
@@ -1066,6 +1155,34 @@ impl HistoryController {
                 id.to_string(),
                 archived,
             );
+        });
+
+        let weak = self.window.as_weak();
+        let state = Rc::clone(&self.state);
+        let history = Arc::clone(&self.history);
+        let runtime = Arc::clone(&self.runtime);
+        let sender = self.sender.clone();
+        self.window.on_toggle_pin(move |id| {
+            if state.borrow().busy {
+                return;
+            }
+            let pinned = state
+                .borrow()
+                .history
+                .conversations
+                .iter()
+                .find(|conversation| conversation.id == id.as_str())
+                .map(|conversation| !conversation.pinned);
+            if let Some(pinned) = pinned {
+                set_busy(&state, &weak, true);
+                spawn_pin(
+                    Arc::clone(&history),
+                    Arc::clone(&runtime),
+                    sender.clone(),
+                    id.to_string(),
+                    pinned,
+                );
+            }
         });
 
         let weak = self.window.as_weak();
@@ -1555,6 +1672,50 @@ mod tests {
             .expect("conversation");
         assert_eq!(stored.title, "New title");
         assert!(harness.controller.state().rename.is_none());
+    }
+
+    #[test]
+    fn pin_and_unpin_persist_and_regroup_the_history() {
+        let harness = harness();
+        wait_idle(&harness.controller);
+        harness
+            .runtime
+            .runtime
+            .block_on(harness.conversations.create(&conversation(
+                "c1",
+                "Chat",
+                false,
+                false,
+                Timestamp::now(),
+            )))
+            .expect("create conversation");
+        harness.controller.refresh();
+        wait_until(&harness.controller, |view| {
+            view.history.conversations.len() == 1 && !view.busy
+        });
+        for pinned in [true, false] {
+            harness.controller.window().invoke_toggle_pin("c1".into());
+            wait_until(&harness.controller, |view| {
+                !view.busy && view.history.conversations[0].pinned == pinned
+            });
+            let stored = harness
+                .runtime
+                .runtime
+                .block_on(harness.conversations.get("c1"))
+                .expect("get conversation")
+                .expect("conversation");
+            assert_eq!(stored.pinned, pinned);
+            assert_eq!(
+                harness
+                    .controller
+                    .window()
+                    .get_rows()
+                    .row_data(0)
+                    .expect("header")
+                    .title,
+                if pinned { "Pinned" } else { "Today" },
+            );
+        }
     }
 
     #[test]
